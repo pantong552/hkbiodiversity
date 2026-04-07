@@ -13,8 +13,8 @@ const workSans = Work_Sans({
 });
 
 export const metadata: Metadata = {
-  title: '地區生物圖鑑 | Regional Biodiversity Encyclopedia',
-  description: '涵蓋約一萬種物種的生物圖鑑平台',
+  title: 'Hong Kong Biodiversity Collective',
+  description: 'A comprehensive biodiversity encyclopedia of Hong Kong, covering approximately 10,000 species.',
 };
 
 export default function RootLayout({

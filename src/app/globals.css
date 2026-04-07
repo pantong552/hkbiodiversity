@@ -25,6 +25,8 @@
   --animate-filter-in: filter-in 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
   --animate-grid-fade: grid-fade 0.5s ease-out forwards;
   
+  --shadow-card: 0 12px 20px -3px rgba(0, 0, 0, 0.08); /* 強化基礎陰影 */
+  --shadow-card-hover: 0 40px 80px -15px rgba(4, 120, 87, 0.2); /* 讓滑過的層次更高 */
   --shadow-premium: 0 20px 25px -5px rgba(0, 0, 0, 10%), 0 8px 10px -6px rgba(0, 0, 0, 10%);
 }
 

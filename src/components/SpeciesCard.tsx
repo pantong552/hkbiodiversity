@@ -14,7 +14,7 @@ export default function SpeciesCard({ species }: { species: Species }) {
   const rarityClass = rarityColors[species.rarity] || 'bg-slate-500 text-white border-slate-600';
 
   return (
-    <div className="group relative bg-white/90 backdrop-blur-sm rounded-[2.5rem] border border-slate-100 overflow-hidden hover:shadow-premium hover:-translate-y-2 transition-all duration-500 flex flex-col">
+    <div className="group relative bg-white rounded-[2.5rem] border border-slate-200/50 overflow-hidden shadow-card hover:shadow-card-hover hover:-translate-y-2 transition-all duration-500 flex flex-col">
       {/* Image Container with Overlay */}
       <div className="relative h-72 overflow-hidden bg-slate-100">
         <Image
