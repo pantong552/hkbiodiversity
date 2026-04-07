@@ -259,10 +259,10 @@ export default function SidebarFilter({
                                 onClick={() => handleTaxonomyToggle(level, opt.name)}
                                 style={{ animationDelay: `${idx * 40}ms` }}
                                 className={`
-                                  px-3 py-1.5 rounded-xl text-xs font-bold transition-all duration-300 border shadow-sm flex items-center gap-1.5 animate-filter-in opacity-0
+                                  px-3 py-1.5 rounded-xl text-xs font-bold transition-all duration-300 border shadow-sm flex items-center gap-1.5 opacity-0 animate-filter-in
                                   ${isSelected
                                     ? 'bg-emerald-600 border-emerald-600 text-white ring-4 ring-slate-100'
-                                    : 'bg-white border-slate-100 text-emerald-700 hover:border-emerald-300 hover:bg-cyan-50'}
+                                    : 'bg-white border-slate-200 text-slate-700 hover:border-emerald-300 hover:bg-emerald-50'}
                                 `}
                               >
                                 {isSelected && <CheckCircle2 className="w-3 h-3" />}
