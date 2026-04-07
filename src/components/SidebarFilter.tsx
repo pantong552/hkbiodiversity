@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { ChevronDown, ChevronRight, Search, Filter, X, CheckCircle2 } from 'lucide-react';
 import { Species, TaxonomyLevel } from '../types/species';
 
@@ -114,6 +114,19 @@ export default function SidebarFilter({
     return options;
   }, [species, selected, searchQuery]);
 
+  // Lock body scroll when mobile sidebar is open
+  useEffect(() => {
+    const isMobile = window.innerWidth < 1024;
+    if (isOpen && isMobile) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+    return () => {
+      document.body.style.overflow = '';
+    };
+  }, [isOpen]);
+
   const toggleExpand = (key: string) => {
     setExpanded(prev => ({ ...prev, [key]: !prev[key] }));
   };
@@ -157,7 +170,7 @@ export default function SidebarFilter({
       {/* Mobile Backdrop */}
       {isOpen && (
         <div 
-          className="fixed inset-0 bg-cyan-900/30 backdrop-blur-md z-40 lg:hidden"
+          className="fixed inset-0 bg-emerald-900/30 backdrop-blur-md z-40 lg:hidden"
           onClick={onClose}
         />
       )}
@@ -165,22 +178,22 @@ export default function SidebarFilter({
       {/* Sidebar Container */}
       <aside className={`
         fixed lg:sticky top-0 lg:top-8 left-0 h-full lg:h-[calc(100vh-4rem)]
-        w-[320px] bg-white border-r border-cyan-100 lg:border lg:rounded-3xl
+        w-[320px] bg-white border-r border-slate-100 lg:border lg:rounded-3xl
         shadow-2xl lg:shadow-xl overflow-y-auto z-50 lg:z-0
         transition-all duration-500 cubic-bezier(0.4, 0, 0.2, 1)
         ${isOpen ? 'translate-x-0 opacity-100' : '-translate-x-full lg:translate-x-0'}
-        scrollbar-thin scrollbar-thumb-cyan-100 scrollbar-track-transparent
+        scrollbar-thin scrollbar-thumb-slate-100 scrollbar-track-transparent
       `}>
         <div className="p-8">
           <div className="flex items-center justify-between mb-8">
-            <h2 className="text-2xl font-black text-cyan-900 flex items-center gap-3">
-              <Filter className="w-6 h-6 text-cyan-500" />
+            <h2 className="text-2xl font-black text-emerald-900 flex items-center gap-3">
+              <Filter className="w-6 h-6 text-emerald-500" />
               進階篩選
             </h2>
             {activeCount > 0 && (
               <button 
                 onClick={clearFilters}
-                className="text-xs font-bold text-cyan-500 hover:text-cyan-700 bg-cyan-50 px-2 py-1 rounded-lg transition-colors"
+                className="text-xs font-bold text-emerald-500 hover:text-emerald-700 bg-cyan-50 px-2 py-1 rounded-lg transition-colors"
               >
                 重置
               </button>
@@ -194,13 +207,13 @@ export default function SidebarFilter({
           <div className="relative mb-10 group">
             <input 
               type="text" 
-              placeholder="快速檢檢檢..." 
+              placeholder="快速檢索..." 
               value={searchQuery}
               onChange={(e) => onSearchChange(e.target.value)}
               suppressHydrationWarning={true}
-              className="w-full pl-12 pr-4 py-4 bg-cyan-50/50 border-2 border-transparent rounded-2xl text-cyan-900 placeholder:text-cyan-400 focus:bg-white focus:border-cyan-200 focus:ring-4 focus:ring-cyan-50 transition-all outline-none"
+              className="w-full pl-12 pr-4 py-4 bg-cyan-50/50 border-2 border-transparent rounded-2xl text-emerald-900 placeholder:text-cyan-400 focus:bg-white focus:border-emerald-200 focus:ring-4 focus:ring-cyan-50 transition-all outline-none"
             />
-            <Search className="w-6 h-6 text-cyan-300 absolute left-4 top-4 group-focus-within:text-cyan-500 transition-colors" />
+            <Search className="w-6 h-6 text-emerald-300 absolute left-4 top-4 group-focus-within:text-emerald-500 transition-colors" />
           </div>
 
           <div className="space-y-8">
@@ -208,7 +221,7 @@ export default function SidebarFilter({
             <div className="space-y-4">
               <button 
                 onClick={() => toggleExpand('taxonomy')}
-                className="w-full flex items-center justify-between text-sm font-black uppercase tracking-widest text-cyan-400 hover:text-cyan-600 transition-colors"
+                className="w-full flex items-center justify-between text-sm font-black uppercase tracking-widest text-cyan-400 hover:text-emerald-600 transition-colors"
               >
                 物種分類層級
                 {expanded.taxonomy ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
@@ -220,13 +233,13 @@ export default function SidebarFilter({
                     <div key={level} className="space-y-3">
                       <button 
                         onClick={() => toggleExpand(level)}
-                        className="w-full flex items-center justify-between text-xs font-bold text-cyan-800 hover:text-cyan-500 transition-colors"
+                        className="w-full flex items-center justify-between text-xs font-bold text-cyan-800 hover:text-emerald-500 transition-colors"
                       >
                         <div className="flex items-center gap-2">
-                          <div className={`w-1.5 h-1.5 rounded-full ${selected.taxonomy[level].length > 0 ? 'bg-cyan-500' : 'bg-cyan-200'}`} />
+                          <div className={`w-1.5 h-1.5 rounded-full ${selected.taxonomy[level].length > 0 ? 'bg-emerald-500' : 'bg-emerald-200'}`} />
                           {TAXONOMY_LABELS[level]}
                           {selected.taxonomy[level].length > 0 && (
-                            <span className="ml-1 text-[10px] bg-cyan-100 text-cyan-600 px-1.5 py-0.5 rounded-md">
+                            <span className="ml-1 text-[10px] bg-slate-100 text-emerald-600 px-1.5 py-0.5 rounded-md">
                               {selected.taxonomy[level].length}
                             </span>
                           )}
@@ -248,13 +261,13 @@ export default function SidebarFilter({
                                 className={`
                                   px-3 py-1.5 rounded-xl text-xs font-bold transition-all duration-300 border shadow-sm flex items-center gap-1.5 animate-filter-in opacity-0
                                   ${isSelected
-                                    ? 'bg-cyan-600 border-cyan-600 text-white ring-4 ring-cyan-100'
-                                    : 'bg-white border-cyan-100 text-cyan-700 hover:border-cyan-300 hover:bg-cyan-50'}
+                                    ? 'bg-emerald-600 border-emerald-600 text-white ring-4 ring-slate-100'
+                                    : 'bg-white border-slate-100 text-emerald-700 hover:border-emerald-300 hover:bg-cyan-50'}
                                 `}
                               >
                                 {isSelected && <CheckCircle2 className="w-3 h-3" />}
                                 {opt.name}
-                                <span className={`transition-colors duration-300 opacity-60 font-medium ${isSelected ? 'text-cyan-100' : 'text-cyan-400'}`}>
+                                <span className={`transition-colors duration-300 opacity-60 font-medium ${isSelected ? 'text-slate-100' : 'text-cyan-400'}`}>
                                   ({opt.count})
                                 </span>
                               </button>
@@ -272,7 +285,7 @@ export default function SidebarFilter({
             <div className="space-y-4 pt-4 border-t border-cyan-50">
               <button 
                 onClick={() => toggleExpand('rarity')}
-                className="w-full flex items-center justify-between text-sm font-black uppercase tracking-widest text-cyan-400 hover:text-cyan-600 transition-colors"
+                className="w-full flex items-center justify-between text-sm font-black uppercase tracking-widest text-cyan-400 hover:text-emerald-600 transition-colors"
               >
                 稀有度與現狀
                 {expanded.rarity ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
@@ -287,8 +300,8 @@ export default function SidebarFilter({
                       className={`
                         px-4 py-3 rounded-2xl text-xs font-bold transition-all border text-center
                         ${selected.rarity.includes(rarity)
-                          ? 'bg-cyan-900 border-cyan-900 text-white shadow-lg'
-                          : 'bg-white border-cyan-100 text-cyan-700 hover:bg-cyan-50'}
+                          ? 'bg-emerald-900 border-emerald-900 text-white shadow-lg'
+                          : 'bg-white border-slate-100 text-emerald-700 hover:bg-cyan-50'}
                       `}
                     >
                       {rarity}
