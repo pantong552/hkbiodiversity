@@ -1,16 +1,32 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Leaf, Menu, X, User } from 'lucide-react';
+import { Leaf, Menu, X, User, LogOut } from 'lucide-react';
 import Link from 'next/link';
+import { createClient } from '@/utils/supabase/client';
+import LoginButton from './LoginButton';
+import { User as SupabaseUser } from '@supabase/supabase-js';
 
 export default function Header() {
   const [isScrolled, setIsScrolled] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isVisible, setIsVisible] = useState(true);
   const [lastScrollY, setLastScrollY] = useState(0);
+  const [user, setUser] = useState<SupabaseUser | null>(null);
+  const supabase = createClient();
 
   useEffect(() => {
+    const fetchUser = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      setUser(user);
+    };
+
+    fetchUser();
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(session?.user ?? null);
+    });
+
     const handleScroll = () => {
       const currentScrollY = window.scrollY;
       
@@ -28,8 +44,15 @@ export default function Header() {
     };
 
     window.addEventListener('scroll', handleScroll, { passive: true });
-    return () => window.removeEventListener('scroll', handleScroll);
-  }, [lastScrollY]);
+    return () => {
+      window.removeEventListener('scroll', handleScroll);
+      subscription.unsubscribe();
+    };
+  }, [lastScrollY, supabase.auth]);
+
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+  };
 
   const navLinks = [
     { name: 'Home', href: '/' },
@@ -70,10 +93,34 @@ export default function Header() {
               </Link>
             ))}
           </div>
-          <button className="flex items-center gap-2 px-6 py-3 bg-emerald-600 text-white rounded-2xl font-bold shadow-lg shadow-emerald-100 hover:bg-emerald-700 hover:-translate-y-0.5 transition-all">
-            <User className="w-4 h-4" />
-            Member Login
-          </button>
+          
+          {user ? (
+            <div className="flex items-center gap-4">
+              <div className="flex items-center gap-2 px-4 py-2 bg-slate-50 rounded-2xl border border-slate-100">
+                {user.user_metadata.avatar_url ? (
+                  <img 
+                    src={user.user_metadata.avatar_url} 
+                    alt="User Avatar" 
+                    className="w-6 h-6 rounded-full"
+                  />
+                ) : (
+                  <User className="w-4 h-4 text-slate-500" />
+                )}
+                <span className="text-sm font-bold text-slate-700">
+                  {user.user_metadata.full_name || user.email}
+                </span>
+              </div>
+              <button 
+                onClick={handleLogout}
+                className="p-3 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all"
+                title="Logout"
+              >
+                <LogOut className="w-5 h-5" />
+              </button>
+            </div>
+          ) : (
+            <LoginButton />
+          )}
         </div>
 
         {/* Mobile Menu Toggle */}
@@ -100,10 +147,38 @@ export default function Header() {
               </Link>
             ))}
             <hr className="border-slate-100 my-2" />
-            <button className="flex items-center justify-center gap-2 w-full py-4 bg-emerald-600 text-white rounded-2xl font-bold shadow-lg shadow-emerald-100">
-              <User className="w-5 h-5" />
-              Member Login
-            </button>
+            {user ? (
+              <div className="space-y-4">
+                <div className="flex items-center gap-3 px-4 py-3 bg-slate-50 rounded-2xl border border-slate-100">
+                  {user.user_metadata.avatar_url ? (
+                    <img 
+                      src={user.user_metadata.avatar_url} 
+                      alt="User Avatar" 
+                      className="w-10 h-10 rounded-full"
+                    />
+                  ) : (
+                    <div className="w-10 h-10 bg-slate-200 rounded-full flex items-center justify-center">
+                      <User className="w-6 h-6 text-slate-500" />
+                    </div>
+                  )}
+                  <div className="flex flex-col">
+                    <span className="font-bold text-slate-900">{user.user_metadata.full_name || 'Member'}</span>
+                    <span className="text-xs text-slate-500">{user.email}</span>
+                  </div>
+                </div>
+                <button 
+                  onClick={handleLogout}
+                  className="flex items-center justify-center gap-2 w-full py-4 text-red-600 font-bold border-2 border-red-100 rounded-2xl hover:bg-red-50"
+                >
+                  <LogOut className="w-5 h-5" />
+                  Logout
+                </button>
+              </div>
+            ) : (
+              <div className="flex justify-center">
+                <LoginButton />
+              </div>
+            )}
           </div>
         </div>
       )}
