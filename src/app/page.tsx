@@ -136,6 +136,7 @@ export default function Home() {
                           value={searchQuery}
                           onChange={(e) => setSearchQuery(e.target.value)}
                           placeholder="快速搜尋俗名、學名..." 
+                          suppressHydrationWarning={true}
                           className="bg-transparent pl-12 pr-6 py-3 w-[400px] outline-none text-slate-900 font-bold placeholder:text-slate-300"
                         />
                         <Search className="w-6 h-6 text-slate-400 absolute left-4 top-1/2 -translate-y-1/2 group-focus-within:text-cyan-500 transition-colors" />
@@ -157,6 +158,7 @@ export default function Home() {
                        <select 
                           value={sortBy}
                           onChange={(e) => setSortBy(e.target.value as any)}
+                          suppressHydrationWarning={true}
                           className="bg-slate-50 border-none rounded-xl px-4 py-2 text-sm font-bold text-slate-700 outline-none focus:ring-2 focus:ring-cyan-100 transition-all cursor-pointer"
                        >
                           <option value="common_name">俗名 (A-Z)</option>
@@ -227,7 +229,10 @@ export default function Home() {
               </div>
             ) : (
               /* Grid Layout */
-              <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-2 2xl:grid-cols-3 3xl:grid-cols-4 gap-x-8 gap-y-12 animate-in fade-in duration-700">
+              <div 
+                key={`${currentPage}-${sortBy}-${itemsPerPage}-${searchQuery}-${JSON.stringify(selectedFilters)}`}
+                className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-2 2xl:grid-cols-3 3xl:grid-cols-4 gap-x-8 gap-y-12 animate-grid-fade"
+              >
                 {paginatedSpecies.map((species) => (
                   <SpeciesCard key={species.id} species={species} />
                 ))}

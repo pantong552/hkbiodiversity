@@ -70,6 +70,7 @@ export default function SidebarFilter({
 
   // Calculate counts and hierarchy options from species list (Cross-filtering)
   const filterOptions = useMemo(() => {
+    // Fixed order for consistency between server and client
     const levels: TaxonomyLevel[] = ['kingdom', 'phylum', 'class', 'order', 'family', 'genus'];
     const options: Record<TaxonomyLevel, { name: string; count: number }[]> = {
       kingdom: [], phylum: [], class: [], order: [], family: [], genus: []
@@ -193,9 +194,10 @@ export default function SidebarFilter({
           <div className="relative mb-10 group">
             <input 
               type="text" 
-              placeholder="快速檢索..." 
+              placeholder="快速檢檢檢..." 
               value={searchQuery}
               onChange={(e) => onSearchChange(e.target.value)}
+              suppressHydrationWarning={true}
               className="w-full pl-12 pr-4 py-4 bg-cyan-50/50 border-2 border-transparent rounded-2xl text-cyan-900 placeholder:text-cyan-400 focus:bg-white focus:border-cyan-200 focus:ring-4 focus:ring-cyan-50 transition-all outline-none"
             />
             <Search className="w-6 h-6 text-cyan-300 absolute left-4 top-4 group-focus-within:text-cyan-500 transition-colors" />
@@ -233,18 +235,18 @@ export default function SidebarFilter({
                       </button>
 
                       {expanded[level] && (
-                        <div className="flex flex-wrap gap-2 pl-3 pb-2 animate-in fade-in slide-in-from-top-1 duration-200">
-                          {filterOptions[level].map((opt) => {
+                        <div className="flex flex-wrap gap-2 pl-3 pb-2 transition-all duration-300 ease-in-out">
+                          {filterOptions[level].map((opt, idx) => {
                             const isSelected = selected.taxonomy[level].includes(opt.name);
-                            // Only show options that have counts > 0 OR are already selected
                             if (opt.count === 0 && !isSelected) return null;
                             
                             return (
                               <button
                                 key={opt.name}
                                 onClick={() => handleTaxonomyToggle(level, opt.name)}
+                                style={{ animationDelay: `${idx * 40}ms` }}
                                 className={`
-                                  px-3 py-1.5 rounded-xl text-xs font-bold transition-all border shadow-sm flex items-center gap-1.5
+                                  px-3 py-1.5 rounded-xl text-xs font-bold transition-all duration-300 border shadow-sm flex items-center gap-1.5 animate-filter-in opacity-0
                                   ${isSelected
                                     ? 'bg-cyan-600 border-cyan-600 text-white ring-4 ring-cyan-100'
                                     : 'bg-white border-cyan-100 text-cyan-700 hover:border-cyan-300 hover:bg-cyan-50'}
@@ -252,7 +254,7 @@ export default function SidebarFilter({
                               >
                                 {isSelected && <CheckCircle2 className="w-3 h-3" />}
                                 {opt.name}
-                                <span className={`opacity-60 font-medium ${isSelected ? 'text-cyan-100' : 'text-cyan-400'}`}>
+                                <span className={`transition-colors duration-300 opacity-60 font-medium ${isSelected ? 'text-cyan-100' : 'text-cyan-400'}`}>
                                   ({opt.count})
                                 </span>
                               </button>
