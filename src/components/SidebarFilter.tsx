@@ -116,7 +116,7 @@ export default function SidebarFilter({
 
   // Lock body scroll when mobile sidebar is open
   useEffect(() => {
-    const isMobile = window.innerWidth < 1024;
+    const isMobile = window.innerWidth <= 1100;
     if (isOpen && isMobile) {
       document.body.style.overflow = 'hidden';
     } else {
@@ -177,11 +177,11 @@ export default function SidebarFilter({
 
       {/* Sidebar Container */}
       <aside className={`
-        fixed lg:sticky top-0 lg:top-8 left-0 h-full lg:h-[calc(100vh-4rem)]
-        w-[320px] bg-white border-r border-slate-100 lg:border lg:rounded-3xl
-        shadow-2xl lg:shadow-xl overflow-y-auto z-50 lg:z-0
+        fixed min-[1101px]:sticky top-0 min-[1101px]:top-8 left-0 h-full min-[1101px]:h-[calc(100vh-4rem)]
+        w-[320px] bg-white border-r border-slate-100 min-[1101px]:border min-[1101px]:rounded-3xl
+        shadow-2xl min-[1101px]:shadow-xl overflow-y-auto z-50 min-[1101px]:z-0
         transition-all duration-500 cubic-bezier(0.4, 0, 0.2, 1)
-        ${isOpen ? 'translate-x-0 opacity-100' : '-translate-x-full lg:translate-x-0'}
+        ${isOpen ? 'translate-x-0 opacity-100' : '-translate-x-full min-[1101px]:translate-x-0'}
         scrollbar-thin scrollbar-thumb-slate-100 scrollbar-track-transparent
       `}>
         <div className="p-8">
@@ -198,7 +198,7 @@ export default function SidebarFilter({
                 重置
               </button>
             )}
-            <button onClick={onClose} className="lg:hidden p-2 text-cyan-400 hover:bg-cyan-50 rounded-xl">
+            <button onClick={onClose} className="min-[1101px]:hidden p-2 text-cyan-400 hover:bg-cyan-50 rounded-xl">
               <X className="w-6 h-6" />
             </button>
           </div>

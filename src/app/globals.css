@@ -51,3 +51,31 @@ body {
   font-family: inherit;
   min-height: 100vh;
 }
+
+/* Custom Scrollbar Styles */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.02);
+}
+
+::-webkit-scrollbar-thumb {
+  background: #a7f3d0; /* emerald-200 */
+  border-radius: 4px;
+  transition: all 0.3s;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #10b981; /* emerald-500 */
+}
+
+/* FireFox Support */
+* {
+  scrollbar-width: auto;
+  scrollbar-color: #a7f3d0 transparent;
+}
+
+

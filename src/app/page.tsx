@@ -1,10 +1,11 @@
 'use client';
 
 import { useState, useMemo, useEffect } from 'react';
-import { Menu, Search, X, FilterX, LayoutGrid, List, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Menu, Search, X, FilterX, LayoutGrid, List, ChevronLeft, ChevronRight, Filter } from 'lucide-react';
 import SpeciesCard from '@/components/SpeciesCard';
 import SidebarFilter, { SelectedFilters } from '@/components/SidebarFilter';
 import Header from '@/components/Header';
+import CustomDropdown from '@/components/ui/CustomDropdown';
 import { MOCK_SPECIES } from '@/data/mockSpecies';
 import { Species } from '@/types/species';
 
@@ -80,11 +81,11 @@ export default function Home() {
     <div className="min-h-screen text-slate-900 font-sans selection:bg-emerald-100 selection:text-emerald-900">
       <Header />
 
-      <main className="max-w-[1920px] mx-auto px-6 sm:px-10 lg:px-16 py-10 lg:py-16">
+      <main className="max-w-[1920px] mx-auto px-6 sm:px-10 min-[1101px]:px-16 py-10">
         <div className="flex flex-col lg:flex-row gap-12 lg:gap-16">
           
-          {/* Sidebar Area */}
-          <div className="shrink-0 lg:w-[320px]">
+          {/* Sidebar Area - Collapses at 1100px */}
+          <div className="shrink-0 min-[1101px]:w-[320px]">
             <SidebarFilter 
               isOpen={isSidebarOpen} 
               onClose={() => setIsSidebarOpen(false)} 
@@ -97,8 +98,8 @@ export default function Home() {
 
           {/* Main Content Area */}
           <div className="flex-1 min-w-0">
-            {/* Desktop Hero & Tools */}
-            <div className="hidden lg:flex flex-col gap-10 mb-16 pb-12 border-b border-slate-100">
+            {/* Desktop Hero & Tools - Visible on Tablet and above */}
+            <div className="hidden md:flex flex-col gap-10 mb-8 pb-10 border-b border-slate-100">
               <div className="flex justify-between items-end">
                 <div className="max-w-2xl">
                   <div className="flex items-center gap-3 text-emerald-600 font-black text-xs uppercase tracking-[0.3em] mb-4">
@@ -140,16 +141,15 @@ export default function Home() {
                  <div className="flex items-center gap-8">
                     <div className="flex items-center gap-3">
                        <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">排序方式</span>
-                       <select 
+                       <CustomDropdown 
+                          options={[
+                            { value: 'common_name', label: '俗名 (A-Z)' },
+                            { value: 'scientific_name', label: '學名 (A-Z)' },
+                            { value: 'rarity', label: '稀有度 (高級優先)' }
+                          ]}
                           value={sortBy}
-                          onChange={(e) => setSortBy(e.target.value as any)}
-                          suppressHydrationWarning={true}
-                          className="bg-slate-50 border-none rounded-xl px-4 py-2 text-sm font-bold text-slate-700 outline-none focus:ring-2 focus:ring-emerald-100 transition-all cursor-pointer"
-                       >
-                          <option value="common_name">俗名 (A-Z)</option>
-                          <option value="scientific_name">學名 (A-Z)</option>
-                          <option value="rarity">稀有度 (高級優先)</option>
-                       </select>
+                          onChange={(val) => setSortBy(val)}
+                       />
                     </div>
                     <div className="h-6 w-px bg-slate-100" />
                     <div className="flex items-center gap-3">
@@ -269,14 +269,14 @@ export default function Home() {
         </div>
       </main>
 
-      {/* Floating Action Button for Mobile Filter */}
+      {/* Floating Action Button for Mobile Filter - Visible below 1100px */}
       {!isSidebarOpen && (
         <button
           onClick={() => setIsSidebarOpen(true)}
-          className="lg:hidden fixed bottom-8 right-8 w-16 h-16 bg-emerald-600 text-white rounded-full shadow-2xl shadow-emerald-200 flex items-center justify-center z-40 animate-in fade-in zoom-in duration-300 backdrop-blur-md border border-white/20 active:scale-95 transition-transform"
+          className="min-[1101px]:hidden fixed bottom-8 right-8 w-16 h-16 bg-emerald-600 text-white rounded-full shadow-2xl shadow-emerald-200 flex items-center justify-center z-40 animate-in fade-in zoom-in duration-300 backdrop-blur-md border border-white/20 active:scale-95 transition-transform"
         >
           <div className="relative">
-            <LayoutGrid className="w-8 h-8" />
+            <Filter className="w-8 h-8" />
             <div className="absolute -top-1 -right-1 w-3 h-3 bg-white rounded-full border-2 border-emerald-600" />
           </div>
         </button>
