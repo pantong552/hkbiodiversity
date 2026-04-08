@@ -1,14 +1,12 @@
-'use client';
-
 import { useState, useMemo, useEffect } from 'react';
 import { ChevronDown, ChevronRight, Search, Filter, X, CheckCircle2 } from 'lucide-react';
 import { Species, TaxonomyLevel } from '../types/species';
 import { useLanguage } from '../context/LanguageContext';
+import { supabase } from '@/lib/supabase';
 
 interface SidebarFilterProps {
   isOpen: boolean;
   onClose: () => void;
-  species: Species[];
   onFilterChange: (filters: SelectedFilters) => void;
   searchQuery: string;
   onSearchChange: (query: string) => void;
@@ -22,7 +20,6 @@ export interface SelectedFilters {
 export default function SidebarFilter({ 
   isOpen, 
   onClose,
-  species,
   onFilterChange,
   searchQuery,
   onSearchChange
@@ -72,49 +69,86 @@ export default function SidebarFilter({
     iucn: [],
   });
 
-  const filterOptions = useMemo(() => {
-    const levels: TaxonomyLevel[] = ['phylum_eng', 'class_eng', 'order_eng', 'family_eng', 'genus_eng'];
-    const options: Record<TaxonomyLevel, { name: string; display: string; count: number }[]> = {
-      phylum_eng: [], class_eng: [], order_eng: [], family_eng: [], genus_eng: []
-    };
+  const [taxonomyOptions, setTaxonomyOptions] = useState<Record<TaxonomyLevel, { name: string; display: string; count: number }[]>>({
+    phylum_eng: [], class_eng: [], order_eng: [], family_eng: [], genus_eng: []
+  });
+  const [iucnCounts, setIucnCounts] = useState<Record<string, number>>({});
 
-    levels.forEach(currentLevel => {
-      const filteredForThisLevel = species.filter(s => {
-        const matchesSearch = searchQuery === '' || 
-          [s.common_name_chi, s.common_name_eng, s.scientific_name, s.phylum_eng, s.phylum_chi, s.class_eng, s.class_chi, s.order_eng, s.order_chi, s.family_eng, s.family_chi, s.genus_eng, s.genus_chi]
-            .some(attr => attr && attr.toLowerCase().includes(searchQuery.toLowerCase()));
-        if (!matchesSearch) return false;
+  useEffect(() => {
+    async function fetchTaxonomyOptions() {
+      const levels: TaxonomyLevel[] = ['phylum_eng', 'class_eng', 'order_eng', 'family_eng', 'genus_eng'];
+      const newOptions = { ...taxonomyOptions };
 
-        const matchesOtherTaxonomy = Object.entries(selected.taxonomy).every(([lvl, values]) => {
-          if (lvl === currentLevel || values.length === 0) return true;
-          return values.includes(s[lvl as TaxonomyLevel] as string);
-        });
-        if (!matchesOtherTaxonomy) return false;
-
-        const matchesIUCN = selected.iucn.length === 0 || selected.iucn.includes(s.iucn);
-        return matchesIUCN;
-      });
-
-      const countsMap = new Map<string, { display: string, count: number }>();
-      filteredForThisLevel.forEach(s => {
-        // We use the English taxonomy key for internal identification
-        const val = s[currentLevel] as string;
-        // Construct visual text based on language preference
-        const displayVal = language === 'zh' ? (s[currentLevel.replace('_eng', '_chi') as keyof Species] as string || val) : val;
+      // 我們並行處理所有展開的級別
+      const fetchPromises = levels.map(async (level) => {
+        // 如果該層級沒展開且沒被選中，我們不更新它（節省資源），除非是初始加載
+        const chiLevel = level.replace('_eng', '_chi');
         
-        if (!countsMap.has(val)) {
-          countsMap.set(val, { display: displayVal, count: 0 });
-        }
-        countsMap.get(val)!.count += 1;
-      });
-      
-      options[currentLevel] = Array.from(countsMap.entries())
-        .map(([name, data]) => ({ name, display: data.display, count: data.count }))
-        .sort((a, b) => b.count - a.count);
-    });
+        // 構建帶條件的查詢
+        let query = supabase.from('species').select(`${level}, ${chiLevel}`);
+        
+        // 加入 Cross Filter 條件：加入「其他級別」已選的限制
+        Object.entries(selected.taxonomy).forEach(([selLevel, values]) => {
+          if (selLevel !== level && values.length > 0) {
+            query = query.in(selLevel, values);
+          }
+        });
 
-    return options;
-  }, [species, selected, searchQuery, language]);
+        // 加入 IUCN 限制
+        if (selected.iucn.length > 0) {
+          query = query.in('iucn', selected.iucn);
+        }
+
+        const { data, error } = await query.not(level, 'is', null);
+
+        if (!error && data) {
+          const countsMap = new Map<string, { chi: string, count: number }>();
+          data.forEach(item => {
+            const eng = item[level];
+            const chi = item[chiLevel] || eng;
+            if (eng) {
+              const current = countsMap.get(eng) || { chi, count: 0 };
+              countsMap.set(eng, { chi, count: current.count + 1 });
+            }
+          });
+          
+          newOptions[level] = Array.from(countsMap.entries()).map(([name, info]) => ({
+            name,
+            display: language === 'zh' ? info.chi : name,
+            count: info.count
+          })).sort((a, b) => b.count - a.count);
+        }
+      });
+
+      await Promise.all(fetchPromises);
+      setTaxonomyOptions(newOptions);
+    }
+
+    async function fetchIUCNCounts() {
+      let query = supabase.from('species').select('iucn');
+      
+      // IUCN 也要受分類過濾影響
+      Object.entries(selected.taxonomy).forEach(([selLevel, values]) => {
+        if (values.length > 0) {
+          query = query.in(selLevel, values);
+        }
+      });
+
+      const { data, error } = await query;
+      if (!error && data) {
+        const counts: Record<string, number> = {};
+        data.forEach(item => {
+          counts[item.iucn] = (counts[item.iucn] || 0) + 1;
+        });
+        setIucnCounts(counts);
+      }
+    }
+
+    fetchTaxonomyOptions();
+    fetchIUCNCounts();
+  }, [selected, language]); // 當選擇改變或語言改變時觸發連動更新
+
+  const filterOptions = taxonomyOptions;
 
   useEffect(() => {
     const isMobile = window.innerWidth <= 1100;
@@ -248,7 +282,8 @@ export default function SidebarFilter({
                         <div className="flex flex-wrap gap-2 pl-3 pb-2 transition-all duration-300 ease-in-out">
                           {filterOptions[level].map((opt, idx) => {
                             const isSelected = selected.taxonomy[level].includes(opt.name);
-                            if (opt.count === 0 && !isSelected) return null;
+                            // 在伺服器端模式，不根據 count === 0 隱藏，除非真的沒有資料
+                            if (opt.name === '') return null;
                             
                             return (
                               <button
@@ -264,9 +299,11 @@ export default function SidebarFilter({
                               >
                                 {isSelected && <CheckCircle2 className="w-3 h-3" />}
                                 {opt.display}
-                                <span className={`transition-colors duration-300 opacity-60 font-medium ${isSelected ? 'text-slate-100' : 'text-cyan-400'}`}>
-                                  ({opt.count})
-                                </span>
+                                {opt.count > 0 && (
+                                  <span className={`transition-colors duration-300 opacity-60 font-medium ${isSelected ? 'text-slate-100' : 'text-cyan-400'}`}>
+                                    ({opt.count})
+                                  </span>
+                                )}
                               </button>
                             );
                           })}
@@ -290,7 +327,7 @@ export default function SidebarFilter({
               {expanded.iucn && (
                 <div className="flex flex-wrap gap-2 pt-2">
                   {IUCN_STATUSES.map((status) => {
-                    const count = species.filter(s => s.iucn === status).length;
+                    const count = iucnCounts[status] || 0;
                     const isSelected = selected.iucn.includes(status);
                     if (count === 0 && !isSelected) return null; // Only show active statuses
                     

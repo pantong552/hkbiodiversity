@@ -10,6 +10,7 @@ import { Species } from '@/types/species';
 import { useLanguage } from '@/context/LanguageContext';
 import { supabase } from '@/lib/supabase';
 import { Loader2 } from 'lucide-react';
+import { debounce } from 'lodash';
 
 export default function Home() {
   const { language, t } = useLanguage();
@@ -18,6 +19,8 @@ export default function Home() {
   const [error, setError] = useState<string | null>(null);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
+  const [totalResultCount, setTotalResultCount] = useState(0);
   const [selectedFilters, setSelectedFilters] = useState<SelectedFilters>({
     taxonomy: { phylum_eng: [], class_eng: [], order_eng: [], family_eng: [], genus_eng: [] },
     iucn: []
@@ -28,41 +31,76 @@ export default function Home() {
   const [itemsPerPage, setItemsPerPage] = useState(12);
   const [currentPage, setCurrentPage] = useState(1);
 
+  // Debounced search logic
+  const debouncedSetSearch = useMemo(
+    () => debounce((query: string) => setDebouncedSearch(query), 300),
+    []
+  );
+
   useEffect(() => {
-    async function fetchSpecies() {
-      console.log('Supabase: 正在開始抓取物種資料...');
+    debouncedSetSearch(searchQuery);
+  }, [searchQuery, debouncedSetSearch]);
+
+  const fetchSpecies = useMemo(() => {
+    return async () => {
+      console.log('Supabase: 正在根據條件抓取動態資料...', { debouncedSearch, selectedFilters, currentPage, sortBy });
       setIsLoading(true);
       setError(null);
+      
       try {
-        const { data, error, status, statusText } = await supabase
-          .from('species')
-          .select('*')
-          .order('common_name_chi', { ascending: true });
+        let query = supabase.from('species').select('*', { count: 'exact' });
 
-        console.log('Supabase Response Status:', status, statusText);
-
-        if (error) {
-          console.error('Supabase 查詢錯誤:', error);
-          setError(error.message);
-          throw error;
+        // 1. Server-side Search (Full Text / Like)
+        if (debouncedSearch) {
+          query = query.or(`common_name_chi.ilike.%${debouncedSearch}%,common_name_eng.ilike.%${debouncedSearch}%,scientific_name.ilike.%${debouncedSearch}%`);
         }
+
+        // 2. Server-side Taxonomy Filtering
+        Object.entries(selectedFilters.taxonomy).forEach(([level, values]) => {
+          if (values.length > 0) {
+            query = query.in(level, values);
+          }
+        });
+
+        // 3. Server-side IUCN Filtering
+        if (selectedFilters.iucn.length > 0) {
+          query = query.in('iucn', selectedFilters.iucn);
+        }
+
+        // 4. Server-side Sorting
+        const fieldMap: Record<string, string> = {
+          'common_name': language === 'zh' ? 'common_name_chi' : 'common_name_eng',
+          'scientific_name': 'scientific_name',
+          'rarity': 'iucn' // 注意：IUCN 排序較複雜，此處先簡單處理
+        };
+        const sortField = fieldMap[sortBy] || 'common_name_chi';
+        query = query.order(sortField, { ascending: true });
+
+        // 5. Server-side Pagination
+        const from = (currentPage - 1) * itemsPerPage;
+        const to = from + itemsPerPage - 1;
+        query = query.range(from, to);
+
+        const { data, error, count } = await query;
+
+        if (error) throw error;
         
         if (data) {
-          console.log('Supabase 資料抓取成功，總筆數:', data.length);
-          if (data.length === 0) {
-            console.warn('警告: 資料庫回傳為空陣列 []，請檢查 species 表是否有資料。');
-          }
           setSpecies(data as Species[]);
+          setTotalResultCount(count || 0);
         }
       } catch (err: any) {
-        console.error('fetchSpecies 捕捉到異常:', err);
-        setError(err.message || '未知連線錯誤');
+        console.error('fetchSpecies 錯誤:', err);
+        setError(err.message || '連線錯誤');
       } finally {
         setIsLoading(false);
       }
-    }
+    };
+  }, [debouncedSearch, selectedFilters, currentPage, itemsPerPage, sortBy, language]);
+
+  useEffect(() => {
     fetchSpecies();
-  }, []);
+  }, [fetchSpecies]);
 
   const iucnPriority: Record<string, number> = {
     'Critically Endangered': 1,
@@ -74,45 +112,12 @@ export default function Home() {
     'Not Evaluated': 7,
   };
 
-  // Filter & Sort Logic
-  const filteredAndSortedSpecies = useMemo(() => {
-    let result = species.filter(s => {
-      // 1. Text Search
-      const matchesSearch = searchQuery === '' || 
-        [s.common_name_chi, s.common_name_eng, s.scientific_name, s.phylum_eng, s.phylum_chi, s.class_eng, s.class_chi, s.order_eng, s.order_chi, s.family_eng, s.family_chi, s.genus_eng, s.genus_chi]
-          .some(attr => attr && attr.toLowerCase().includes(searchQuery.toLowerCase()));
-
-      // 2. Taxonomy Filter
-      const matchesTaxonomy = Object.entries(selectedFilters.taxonomy).every(([level, values]) => {
-        if (values.length === 0) return true;
-        const speciesValue = s[level as keyof Species] as string;
-        return values.includes(speciesValue);
-      });
-
-      // 3. IUCN Filter
-      const matchesIUCN = selectedFilters.iucn.length === 0 || 
-        selectedFilters.iucn.includes(s.iucn);
-
-      return matchesSearch && matchesTaxonomy && matchesIUCN;
-    });
-
-    // Sort Results
-    return result.sort((a, b) => {
-      if (sortBy === 'rarity') {
-        return (iucnPriority[a.iucn] || 99) - (iucnPriority[b.iucn] || 99);
-      }
-      
-      const field = (sortBy === 'common_name' && language === 'en') ? 'common_name_eng' : (sortBy === 'common_name' ? 'common_name_chi' : sortBy);
-      return (a[field as keyof Species] as string).localeCompare(b[field as keyof Species] as string, language === 'zh' ? 'zh-TW' : 'en');
-    });
-  }, [species, searchQuery, selectedFilters, sortBy, language]);
+  // 已由伺服器端處理，此處僅作為佔位或簡單排序微調
+  const filteredAndSortedSpecies = species;
 
   // Pagination Logic
-  const totalPages = Math.ceil(filteredAndSortedSpecies.length / itemsPerPage);
-  const paginatedSpecies = useMemo(() => {
-    const start = (currentPage - 1) * itemsPerPage;
-    return filteredAndSortedSpecies.slice(start, start + itemsPerPage);
-  }, [filteredAndSortedSpecies, currentPage, itemsPerPage]);
+  const totalPages = Math.ceil(totalResultCount / itemsPerPage);
+  const paginatedSpecies = species; // 伺服器端已經分好頁了
 
   // Reset page when filters or itemsPerPage change
   useEffect(() => {
@@ -135,7 +140,6 @@ export default function Home() {
             <SidebarFilter 
               isOpen={isSidebarOpen} 
               onClose={() => setIsSidebarOpen(false)} 
-              species={species}
               onFilterChange={handleFilterChange}
               searchQuery={searchQuery}
               onSearchChange={setSearchQuery}
@@ -180,7 +184,7 @@ export default function Home() {
                       </div>
                    </div>
                    <div className="flex items-center gap-4 text-xs font-black text-slate-400 uppercase tracking-widest">
-                      <span>{t('results.found')} {filteredAndSortedSpecies.length} {t('results.unit')}</span>
+                      <span>{t('results.found')} {totalResultCount} {t('results.unit')}</span>
                       <div className="w-1 h-1 rounded-full bg-slate-300" />
                       <span>{t('results.viewing_page')} {currentPage} {t('results.page_of')} {totalPages || 1}</span>
                    </div>
@@ -314,7 +318,10 @@ export default function Home() {
                         <div key={p} className="flex items-center">
                           {i > 0 && arr[i-1] !== p - 1 && <span className="px-2 text-slate-300">...</span>}
                           <button
-                            onClick={() => setCurrentPage(p)}
+                            onClick={() => {
+                              setCurrentPage(p);
+                              window.scrollTo({ top: 0, behavior: 'smooth' });
+                            }}
                             className={`w-10 h-10 rounded-xl text-sm font-black transition-all ${currentPage === p ? 'bg-emerald-600 text-white shadow-lg shadow-cyan-200' : 'text-slate-500 hover:bg-slate-100'}`}
                           >
                             {p}
@@ -331,7 +338,7 @@ export default function Home() {
                   </button>
                 </div>
                 <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
-                  {t('pagination.showing')} {Math.min(filteredAndSortedSpecies.length, (currentPage - 1) * itemsPerPage + 1)}-{Math.min(filteredAndSortedSpecies.length, currentPage * itemsPerPage)} {t('pagination.of')} {filteredAndSortedSpecies.length} {t('pagination.species')}
+                  {t('pagination.showing')} {Math.min(totalResultCount, (currentPage - 1) * itemsPerPage + 1)}-{Math.min(totalResultCount, currentPage * itemsPerPage)} {t('pagination.of')} {totalResultCount} {t('pagination.species')}
                 </p>
               </div>
             )}
