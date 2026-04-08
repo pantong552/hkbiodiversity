@@ -1,36 +1,93 @@
 'use client';
 
-import { use, useMemo } from 'react';
+import { useState, useEffect, use } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
-import { ArrowLeft, Map, ExternalLink, Bookmark, Image as ImageIcon } from 'lucide-react';
-import { MOCK_SPECIES } from '../../../data/mockSpecies';
-import { useLanguage } from '../../../context/LanguageContext';
+import { supabase } from '@/lib/supabase';
+import { Species } from '@/types/species';
+import { ArrowLeft, Map, ExternalLink, Bookmark, Image as ImageIcon, Loader2 } from 'lucide-react';
+import { useLanguage } from '@/context/LanguageContext';
 
 export default function SpeciesDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { language } = useLanguage();
+  const [species, setSpecies] = useState<Species | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
   const unwrappedParams = use(params);
   
-  const species = useMemo(() => {
-    return MOCK_SPECIES.find(s => s.slug === unwrappedParams.id || s.id.toString() === unwrappedParams.id) || MOCK_SPECIES[0];
+  useEffect(() => {
+    async function fetchSpeciesDetail() {
+      if (!unwrappedParams.id) return;
+      
+      setIsLoading(true);
+      try {
+        console.log('正在根據 ID 抓取物種詳情:', unwrappedParams.id);
+        const { data, error } = await supabase
+          .from('species')
+          .select('*')
+          .eq('id', unwrappedParams.id)
+          .maybeSingle();
+
+        if (error) {
+          console.error('Supabase 詳情查詢失敗:', error);
+          throw error;
+        }
+        if (data) {
+          console.log('物種詳情載入成功:', data.common_name_chi);
+          setSpecies(data as Species);
+        } else {
+          console.warn('未找到與此 ID 匹配的物種');
+        }
+      } catch (err: any) {
+        console.error('fetchSpeciesDetail 發生錯誤:', err.message || err);
+      } finally {
+        setIsLoading(false);
+      }
+    }
+    fetchSpeciesDetail();
   }, [unwrappedParams.id]);
 
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center bg-slate-50">
+        <Loader2 className="w-12 h-12 text-emerald-500 animate-spin mb-4" />
+        <p className="text-slate-500 font-medium tracking-wide">
+          {language === 'zh' ? '正在載入物種詳細資料...' : 'Loading species details...'}
+        </p>
+      </div>
+    );
+  }
+
   if (!species) {
-    return <div className="p-20 text-center">Species not found</div>;
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center bg-slate-50 p-6 text-center">
+        <div className="w-20 h-20 bg-slate-100 rounded-full flex items-center justify-center mb-6 text-slate-300">
+          <ArrowLeft className="w-10 h-10" />
+        </div>
+        <h2 className="text-2xl font-black text-slate-800 mb-2">
+          {language === 'zh' ? '找不到該物種' : 'Species Not Found'}
+        </h2>
+        <p className="text-slate-500 mb-8 max-w-xs">
+          {language === 'zh' ? '抱歉，我們無法找到您要查看的生物資料。' : "Sorry, we couldn't find the species information you are looking for."}
+        </p>
+        <Link href="/" className="px-8 py-3 bg-emerald-600 text-white font-black rounded-2xl shadow-xl shadow-emerald-200 hover:-translate-y-1 transition-all">
+          {language === 'zh' ? '返回目錄' : 'Back to Directory'}
+        </Link>
+      </div>
+    );
   }
 
   // Formatting strings
-  const commonName = language === 'zh' ? species.common_name : species.common_name_en;
-  const phylum = language === 'zh' ? species.phylum_chi : species.phylum;
-  const classTax = language === 'zh' ? species.class_chi : species.class;
-  const order = language === 'zh' ? species.order_chi : species.order;
-  const family = language === 'zh' ? species.family_chi : species.family;
+  const commonName = language === 'zh' ? species.common_name_chi : species.common_name_eng;
+  const phylum = language === 'zh' ? species.phylum_chi : species.phylum_eng;
+  const classTax = language === 'zh' ? species.class_chi : species.class_eng;
+  const order = language === 'zh' ? species.order_chi : species.order_eng;
+  const family = language === 'zh' ? species.family_chi : species.family_eng;
   
-  const description = language === 'zh' ? species.description_chi : species.description_en;
-  const remarks = language === 'zh' ? species.remarks_chi : species.remarks_en;
-  const hkDist = language === 'zh' ? species.hk_distribution_chi : species.hk_distribution_en;
-  const globalDist = language === 'zh' ? species.global_distribution_chi : species.global_distribution_en;
-  const refs = language === 'zh' ? species.references_chi : species.references_en;
+  const description = language === 'zh' ? species.description_chi : species.description_eng;
+  const remarks = language === 'zh' ? species.remarks_chi : species.remarks_eng;
+  const hkDist = language === 'zh' ? species.hk_distribution_chi : species.hk_distribution_eng;
+  const globalDist = language === 'zh' ? species.global_distribution_chi : species.global_distribution_eng;
+  const refs = language === 'zh' ? species.references_chi : species.references_eng;
 
   return (
     <div className="min-h-screen bg-slate-50 pb-20">
@@ -56,7 +113,7 @@ export default function SpeciesDetailPage({ params }: { params: Promise<{ id: st
       {/* Hero Banner Placeholder for Cloudinary Image Gallery */}
       <div className="w-full h-[50vh] min-h-[400px] bg-slate-200 relative group overflow-hidden">
         <Image 
-          src={species.image_url} 
+          src={species.image_url || 'https://images.unsplash.com/photo-1549488344-1f9b8d2bd1f3?q=80&w=1080&auto=format&fit=crop'} 
           alt={commonName}
           fill
           className="object-cover transition-transform duration-1000 group-hover:scale-105"

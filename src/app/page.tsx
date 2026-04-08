@@ -6,16 +6,20 @@ import SpeciesCard from '@/components/SpeciesCard';
 import SidebarFilter, { SelectedFilters } from '@/components/SidebarFilter';
 import Header from '@/components/Header';
 import CustomDropdown from '@/components/ui/CustomDropdown';
-import { MOCK_SPECIES } from '@/data/mockSpecies';
 import { Species } from '@/types/species';
 import { useLanguage } from '@/context/LanguageContext';
+import { supabase } from '@/lib/supabase';
+import { Loader2 } from 'lucide-react';
 
 export default function Home() {
   const { language, t } = useLanguage();
+  const [species, setSpecies] = useState<Species[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedFilters, setSelectedFilters] = useState<SelectedFilters>({
-    taxonomy: { phylum: [], class: [], order: [], family: [], genus: [] },
+    taxonomy: { phylum_eng: [], class_eng: [], order_eng: [], family_eng: [], genus_eng: [] },
     iucn: []
   });
 
@@ -23,6 +27,42 @@ export default function Home() {
   const [sortBy, setSortBy] = useState<'common_name' | 'scientific_name' | 'rarity'>('common_name');
   const [itemsPerPage, setItemsPerPage] = useState(12);
   const [currentPage, setCurrentPage] = useState(1);
+
+  useEffect(() => {
+    async function fetchSpecies() {
+      console.log('Supabase: 正在開始抓取物種資料...');
+      setIsLoading(true);
+      setError(null);
+      try {
+        const { data, error, status, statusText } = await supabase
+          .from('species')
+          .select('*')
+          .order('common_name_chi', { ascending: true });
+
+        console.log('Supabase Response Status:', status, statusText);
+
+        if (error) {
+          console.error('Supabase 查詢錯誤:', error);
+          setError(error.message);
+          throw error;
+        }
+        
+        if (data) {
+          console.log('Supabase 資料抓取成功，總筆數:', data.length);
+          if (data.length === 0) {
+            console.warn('警告: 資料庫回傳為空陣列 []，請檢查 species 表是否有資料。');
+          }
+          setSpecies(data as Species[]);
+        }
+      } catch (err: any) {
+        console.error('fetchSpecies 捕捉到異常:', err);
+        setError(err.message || '未知連線錯誤');
+      } finally {
+        setIsLoading(false);
+      }
+    }
+    fetchSpecies();
+  }, []);
 
   const iucnPriority: Record<string, number> = {
     'Critically Endangered': 1,
@@ -36,10 +76,10 @@ export default function Home() {
 
   // Filter & Sort Logic
   const filteredAndSortedSpecies = useMemo(() => {
-    let result = MOCK_SPECIES.filter(s => {
+    let result = species.filter(s => {
       // 1. Text Search
       const matchesSearch = searchQuery === '' || 
-        [s.common_name, s.common_name_en, s.scientific_name, s.phylum, s.phylum_chi, s.class, s.class_chi, s.order, s.order_chi, s.family, s.family_chi, s.genus, s.genus_chi]
+        [s.common_name_chi, s.common_name_eng, s.scientific_name, s.phylum_eng, s.phylum_chi, s.class_eng, s.class_chi, s.order_eng, s.order_chi, s.family_eng, s.family_chi, s.genus_eng, s.genus_chi]
           .some(attr => attr && attr.toLowerCase().includes(searchQuery.toLowerCase()));
 
       // 2. Taxonomy Filter
@@ -62,10 +102,10 @@ export default function Home() {
         return (iucnPriority[a.iucn] || 99) - (iucnPriority[b.iucn] || 99);
       }
       
-      const field = (sortBy === 'common_name' && language === 'en') ? 'common_name_en' : sortBy;
+      const field = (sortBy === 'common_name' && language === 'en') ? 'common_name_eng' : (sortBy === 'common_name' ? 'common_name_chi' : sortBy);
       return (a[field as keyof Species] as string).localeCompare(b[field as keyof Species] as string, language === 'zh' ? 'zh-TW' : 'en');
     });
-  }, [searchQuery, selectedFilters, sortBy, language]);
+  }, [species, searchQuery, selectedFilters, sortBy, language]);
 
   // Pagination Logic
   const totalPages = Math.ceil(filteredAndSortedSpecies.length / itemsPerPage);
@@ -95,7 +135,7 @@ export default function Home() {
             <SidebarFilter 
               isOpen={isSidebarOpen} 
               onClose={() => setIsSidebarOpen(false)} 
-              species={MOCK_SPECIES}
+              species={species}
               onFilterChange={handleFilterChange}
               searchQuery={searchQuery}
               onSearchChange={setSearchQuery}
@@ -154,11 +194,11 @@ export default function Home() {
                        <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">{t('sort.label')}</span>
                        <CustomDropdown 
                           options={[
-                            { value: 'common_name', label: t('sort.common_name') },
+                            { value: 'common_name_chi', label: t('sort.common_name') },
                             { value: 'scientific_name', label: t('sort.scientific_name') },
                             { value: 'rarity', label: t('sort.rarity') }
                           ]}
-                          value={sortBy}
+                          value={sortBy === 'common_name' ? 'common_name_chi' : sortBy}
                           onChange={(val) => setSortBy(val)}
                        />
                     </div>
@@ -201,7 +241,28 @@ export default function Home() {
             </div>
 
             {/* Empty State */}
-            {filteredAndSortedSpecies.length === 0 ? (
+            {isLoading ? (
+              <div className="flex flex-col items-center justify-center py-40">
+                <Loader2 className="w-12 h-12 text-emerald-500 animate-spin mb-4" />
+                <p className="text-slate-400 font-medium">{t('loading.message') || '正在從雲端載入 5,800+ 筆資料...'}</p>
+              </div>
+            ) : error ? (
+              <div className="flex flex-col items-center justify-center py-40 text-center bg-red-50 rounded-[3rem] border border-red-100">
+                <div className="w-20 h-20 bg-red-100 rounded-full flex items-center justify-center mb-6 text-red-500">
+                  <X className="w-10 h-10" />
+                </div>
+                <h3 className="text-2xl font-black text-red-900 mb-2">資料載入失敗</h3>
+                <p className="text-red-600 font-medium mb-8 max-w-sm px-6">
+                  錯誤訊息: {error}
+                </p>
+                <button 
+                  onClick={() => window.location.reload()}
+                  className="px-8 py-4 bg-red-600 text-white font-black rounded-2xl shadow-xl shadow-red-200 hover:-translate-y-1 transition-all"
+                >
+                  重試連線
+                </button>
+              </div>
+            ) : filteredAndSortedSpecies.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-40 text-center bg-white rounded-[3rem] border border-dashed border-slate-200 shadow-sm">
                 <div className="w-24 h-24 bg-slate-50 rounded-full flex items-center justify-center mb-6">
                   <FilterX className="w-12 h-12 text-slate-300" />
@@ -214,7 +275,7 @@ export default function Home() {
                   onClick={() => {
                     setSearchQuery('');
                     setSelectedFilters({
-                      taxonomy: { phylum: [], class: [], order: [], family: [], genus: [] },
+                      taxonomy: { phylum_eng: [], class_eng: [], order_eng: [], family_eng: [], genus_eng: [] },
                       iucn: []
                     });
                   }}

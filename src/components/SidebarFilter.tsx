@@ -30,11 +30,11 @@ export default function SidebarFilter({
   const { language, t } = useLanguage();
 
   const TAXONOMY_LABELS: Record<TaxonomyLevel, string> = {
-    phylum: language === 'zh' ? '門 (Phylum)' : 'Phylum',
-    class: language === 'zh' ? '綱 (Class)' : 'Class',
-    order: language === 'zh' ? '目 (Order)' : 'Order',
-    family: language === 'zh' ? '科 (Family)' : 'Family',
-    genus: language === 'zh' ? '屬 (Genus)' : 'Genus',
+    phylum_eng: language === 'zh' ? '門 (Phylum)' : 'Phylum',
+    class_eng: language === 'zh' ? '綱 (Class)' : 'Class',
+    order_eng: language === 'zh' ? '目 (Order)' : 'Order',
+    family_eng: language === 'zh' ? '科 (Family)' : 'Family',
+    genus_eng: language === 'zh' ? '屬 (Genus)' : 'Genus',
   };
 
   const IUCN_STATUSES = [
@@ -54,34 +54,34 @@ export default function SidebarFilter({
   const [expanded, setExpanded] = useState<Record<string, boolean>>({
     taxonomy: true,
     iucn: true,
-    phylum: false,
-    class: false,
-    order: false,
-    family: false,
-    genus: false
+    phylum_eng: false,
+    class_eng: false,
+    order_eng: false,
+    family_eng: false,
+    genus_eng: false
   });
 
   const [selected, setSelected] = useState<SelectedFilters>({
     taxonomy: {
-      phylum: [],
-      class: [],
-      order: [],
-      family: [],
-      genus: [],
+      phylum_eng: [],
+      class_eng: [],
+      order_eng: [],
+      family_eng: [],
+      genus_eng: [],
     },
     iucn: [],
   });
 
   const filterOptions = useMemo(() => {
-    const levels: TaxonomyLevel[] = ['phylum', 'class', 'order', 'family', 'genus'];
+    const levels: TaxonomyLevel[] = ['phylum_eng', 'class_eng', 'order_eng', 'family_eng', 'genus_eng'];
     const options: Record<TaxonomyLevel, { name: string; display: string; count: number }[]> = {
-      phylum: [], class: [], order: [], family: [], genus: []
+      phylum_eng: [], class_eng: [], order_eng: [], family_eng: [], genus_eng: []
     };
 
     levels.forEach(currentLevel => {
       const filteredForThisLevel = species.filter(s => {
         const matchesSearch = searchQuery === '' || 
-          [s.common_name, s.common_name_en, s.scientific_name, s.phylum, s.phylum_chi, s.class, s.class_chi, s.order, s.order_chi, s.family, s.family_chi, s.genus, s.genus_chi]
+          [s.common_name_chi, s.common_name_eng, s.scientific_name, s.phylum_eng, s.phylum_chi, s.class_eng, s.class_chi, s.order_eng, s.order_chi, s.family_eng, s.family_chi, s.genus_eng, s.genus_chi]
             .some(attr => attr && attr.toLowerCase().includes(searchQuery.toLowerCase()));
         if (!matchesSearch) return false;
 
@@ -100,7 +100,7 @@ export default function SidebarFilter({
         // We use the English taxonomy key for internal identification
         const val = s[currentLevel] as string;
         // Construct visual text based on language preference
-        const displayVal = language === 'zh' ? (s[`${currentLevel}_chi` as keyof Species] as string || val) : val;
+        const displayVal = language === 'zh' ? (s[currentLevel.replace('_eng', '_chi') as keyof Species] as string || val) : val;
         
         if (!countsMap.has(val)) {
           countsMap.set(val, { display: displayVal, count: 0 });
@@ -157,7 +157,7 @@ export default function SidebarFilter({
 
   const clearFilters = () => {
     const reset = {
-      taxonomy: { phylum: [], class: [], order: [], family: [], genus: [] },
+      taxonomy: { phylum_eng: [], class_eng: [], order_eng: [], family_eng: [], genus_eng: [] },
       iucn: [],
     };
     setSelected(reset);

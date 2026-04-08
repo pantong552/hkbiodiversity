@@ -29,8 +29,8 @@ export default function SpeciesCard({ species }: { species: Species }) {
       {/* Image Container with Overlay */}
       <div className="relative h-60 overflow-hidden bg-slate-100">
         <Image
-          src={species.image_url}
-          alt={language === 'zh' ? species.common_name : species.common_name_en}
+          src={species.image_url || 'https://images.unsplash.com/photo-1549488344-1f9b8d2bd1f3?q=80&w=1080&auto=format&fit=crop'}
+          alt={language === 'zh' ? species.common_name_chi : species.common_name_eng}
           fill
           className="object-cover transition-transform duration-700 group-hover:scale-110"
         />
@@ -54,7 +54,7 @@ export default function SpeciesCard({ species }: { species: Species }) {
       <div className="p-6 flex-1 flex flex-col">
         <div className="mb-4">
           <h3 className="text-xl font-black text-slate-900 mb-0.5 group-hover:text-emerald-600 transition-colors leading-tight">
-            {language === 'zh' ? species.common_name : species.common_name_en}
+            {language === 'zh' ? species.common_name_chi : species.common_name_eng}
           </h3>
           <p className="text-xs text-slate-500 font-serif tracking-wide truncate">
             <span className="italic font-medium">{species.scientific_name}</span> {species.author}
@@ -64,8 +64,8 @@ export default function SpeciesCard({ species }: { species: Species }) {
         {/* Taxonomy Tags */}
         <div className="flex flex-wrap gap-1.5 mb-6">
           {[
-            language === 'zh' ? species.order_chi : species.order, 
-            language === 'zh' ? species.family_chi : species.family
+            language === 'zh' ? species.order_chi : species.order_eng, 
+            language === 'zh' ? species.family_chi : species.family_eng
           ].map((tax, i) => (
             <span key={i} className="px-2.5 py-1 bg-slate-50 text-[11px] font-bold text-slate-500 rounded-lg border border-slate-100 group-hover:border-emerald-100 group-hover:bg-emerald-50/50 transition-all">
               {tax}
@@ -78,10 +78,10 @@ export default function SpeciesCard({ species }: { species: Species }) {
           <div className="flex items-center gap-2">
             <div className="w-1.5 h-1.5 rounded-full bg-emerald-500/80" />
             <span className="text-[11px] font-bold text-slate-400 uppercase tracking-widest">
-              {language === 'zh' ? species.informal_group_chi : species.informal_group}
+              {language === 'zh' ? species.informal_group_chi : species.informal_group_eng}
             </span>
           </div>
-          <Link href={`/species/${species.slug || species.id}`} className="flex items-center text-emerald-600 font-black text-[11px] uppercase tracking-widest hover:translate-x-1 transition-transform cursor-pointer">
+          <Link href={`/species/${species.id}`} className="flex items-center text-emerald-600 font-black text-[11px] uppercase tracking-widest hover:translate-x-1 transition-transform cursor-pointer">
             Details →
           </Link>
         </div>
