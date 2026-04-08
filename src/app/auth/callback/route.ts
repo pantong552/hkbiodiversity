@@ -36,11 +36,15 @@ export async function GET(request: Request) {
     // 將 code 換成使用者的 session
     const { error } = await supabase.auth.exchangeCodeForSession(code)
     
+    // 確保重定向到正確的網域
+    const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || origin
+    
     if (!error) {
-      return NextResponse.redirect(`${origin}${next}`)
+      return NextResponse.redirect(`${siteUrl}${next}`)
     }
   }
 
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || origin
   // 驗證失敗時導向錯誤頁面或回首頁
-  return NextResponse.redirect(`${origin}/auth/auth-code-error`)
+  return NextResponse.redirect(`${siteUrl}/auth/auth-code-error`)
 }
