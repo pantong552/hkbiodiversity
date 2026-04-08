@@ -15,15 +15,8 @@ interface SidebarFilterProps {
 }
 
 export interface SelectedFilters {
-  taxonomy: {
-    kingdom: string[];
-    phylum: string[];
-    class: string[];
-    order: string[];
-    family: string[];
-    genus: string[];
-  };
-  rarity: string[];
+  taxonomy: Record<TaxonomyLevel, string[]>;
+  iucn: string[];
 }
 
 export default function SidebarFilter({ 
@@ -37,7 +30,6 @@ export default function SidebarFilter({
   const { language, t } = useLanguage();
 
   const TAXONOMY_LABELS: Record<TaxonomyLevel, string> = {
-    kingdom: language === 'zh' ? '界 (Kingdom)' : 'Kingdom',
     phylum: language === 'zh' ? '門 (Phylum)' : 'Phylum',
     class: language === 'zh' ? '綱 (Class)' : 'Class',
     order: language === 'zh' ? '目 (Order)' : 'Order',
@@ -45,20 +37,23 @@ export default function SidebarFilter({
     genus: language === 'zh' ? '屬 (Genus)' : 'Genus',
   };
 
-  const RARITIES = ['極危', '瀕危', '易危', '近危', '常見'];
-  const RARITY_MAP: Record<string, string> = {
-    '極危': 'Critically Endangered',
-    '瀕危': 'Endangered',
-    '易危': 'Vulnerable',
-    '近危': 'Near Threatened',
-    '常見': 'Common'
+  const IUCN_STATUSES = [
+    'Least Concern', 'Near Threatened', 'Vulnerable', 
+    'Endangered', 'Critically Endangered', 'Data Deficient', 'Not Evaluated'
+  ];
+  const IUCN_MAP: Record<string, string> = {
+    'Least Concern': '無危 (LC)',
+    'Near Threatened': '近危 (NT)',
+    'Vulnerable': '易危 (VU)',
+    'Endangered': '瀕危 (EN)',
+    'Critically Endangered': '極危 (CR)',
+    'Data Deficient': '數據缺乏 (DD)',
+    'Not Evaluated': '未評估 (NE)'
   };
 
   const [expanded, setExpanded] = useState<Record<string, boolean>>({
     taxonomy: true,
-    rarity: true,
-    // Individual level toggles, all false (collapsed) by default
-    kingdom: false,
+    iucn: true,
     phylum: false,
     class: false,
     order: false,
@@ -68,63 +63,59 @@ export default function SidebarFilter({
 
   const [selected, setSelected] = useState<SelectedFilters>({
     taxonomy: {
-      kingdom: [],
       phylum: [],
       class: [],
       order: [],
       family: [],
       genus: [],
     },
-    rarity: [],
+    iucn: [],
   });
 
-  // Calculate counts and hierarchy options from species list (Cross-filtering)
   const filterOptions = useMemo(() => {
-    // Fixed order for consistency between server and client
-    const levels: TaxonomyLevel[] = ['kingdom', 'phylum', 'class', 'order', 'family', 'genus'];
-    const options: Record<TaxonomyLevel, { name: string; count: number }[]> = {
-      kingdom: [], phylum: [], class: [], order: [], family: [], genus: []
+    const levels: TaxonomyLevel[] = ['phylum', 'class', 'order', 'family', 'genus'];
+    const options: Record<TaxonomyLevel, { name: string; display: string; count: number }[]> = {
+      phylum: [], class: [], order: [], family: [], genus: []
     };
 
     levels.forEach(currentLevel => {
-      // To implement correct cross-filtering:
-      // When calculating options for "Level A", we should apply filters from ALL OTHER levels + Search query
-      // but NOT the filters from "Level A" itself (otherwise you couldn't select multiple items in the same level).
-      
       const filteredForThisLevel = species.filter(s => {
-        // 1. Apply Search Query
         const matchesSearch = searchQuery === '' || 
-          [s.common_name, s.scientific_name, s.kingdom, s.phylum, s.class, s.order, s.family, s.genus]
-            .some(attr => attr.toLowerCase().includes(searchQuery.toLowerCase()));
+          [s.common_name, s.common_name_en, s.scientific_name, s.phylum, s.phylum_chi, s.class, s.class_chi, s.order, s.order_chi, s.family, s.family_chi, s.genus, s.genus_chi]
+            .some(attr => attr && attr.toLowerCase().includes(searchQuery.toLowerCase()));
         if (!matchesSearch) return false;
 
-        // 2. Apply ALL OTHER taxonomy filters except currentLevel
         const matchesOtherTaxonomy = Object.entries(selected.taxonomy).every(([lvl, values]) => {
           if (lvl === currentLevel || values.length === 0) return true;
-          return values.includes(s[lvl as keyof Species] as string);
+          return values.includes(s[lvl as TaxonomyLevel] as string);
         });
         if (!matchesOtherTaxonomy) return false;
 
-        // 3. Apply Rarity Filter
-        const matchesRarity = selected.rarity.length === 0 || selected.rarity.includes(s.rarity);
-        return matchesRarity;
+        const matchesIUCN = selected.iucn.length === 0 || selected.iucn.includes(s.iucn);
+        return matchesIUCN;
       });
 
-      const counts: Record<string, number> = {};
+      const countsMap = new Map<string, { display: string, count: number }>();
       filteredForThisLevel.forEach(s => {
-        const val = s[currentLevel];
-        counts[val] = (counts[val] || 0) + 1;
+        // We use the English taxonomy key for internal identification
+        const val = s[currentLevel] as string;
+        // Construct visual text based on language preference
+        const displayVal = language === 'zh' ? (s[`${currentLevel}_chi` as keyof Species] as string || val) : val;
+        
+        if (!countsMap.has(val)) {
+          countsMap.set(val, { display: displayVal, count: 0 });
+        }
+        countsMap.get(val)!.count += 1;
       });
       
-      options[currentLevel] = Object.entries(counts)
-        .map(([name, count]) => ({ name, count }))
+      options[currentLevel] = Array.from(countsMap.entries())
+        .map(([name, data]) => ({ name, display: data.display, count: data.count }))
         .sort((a, b) => b.count - a.count);
     });
 
     return options;
-  }, [species, selected, searchQuery]);
+  }, [species, selected, searchQuery, language]);
 
-  // Lock body scroll when mobile sidebar is open
   useEffect(() => {
     const isMobile = window.innerWidth <= 1100;
     if (isOpen && isMobile) {
@@ -153,12 +144,12 @@ export default function SidebarFilter({
     onFilterChange(newSelected);
   };
 
-  const handleRarityToggle = (value: string) => {
+  const handleIUCNToggle = (value: string) => {
     const newSelected = { ...selected };
-    if (newSelected.rarity.includes(value)) {
-      newSelected.rarity = newSelected.rarity.filter(v => v !== value);
+    if (newSelected.iucn.includes(value)) {
+      newSelected.iucn = newSelected.iucn.filter(v => v !== value);
     } else {
-      newSelected.rarity = [...newSelected.rarity, value];
+      newSelected.iucn = [...newSelected.iucn, value];
     }
     setSelected(newSelected);
     onFilterChange(newSelected);
@@ -166,18 +157,17 @@ export default function SidebarFilter({
 
   const clearFilters = () => {
     const reset = {
-      taxonomy: { kingdom: [], phylum: [], class: [], order: [], family: [], genus: [] },
-      rarity: [],
+      taxonomy: { phylum: [], class: [], order: [], family: [], genus: [] },
+      iucn: [],
     };
     setSelected(reset);
     onFilterChange(reset);
   };
 
-  const activeCount = Object.values(selected.taxonomy).flat().length + selected.rarity.length;
+  const activeCount = Object.values(selected.taxonomy).flat().length + selected.iucn.length;
 
   return (
     <>
-      {/* Mobile Backdrop */}
       {isOpen && (
         <div 
           className="fixed inset-0 bg-emerald-900/30 backdrop-blur-md z-40 lg:hidden"
@@ -185,7 +175,6 @@ export default function SidebarFilter({
         />
       )}
 
-      {/* Sidebar Container */}
       <aside className={`
         fixed min-[1101px]:sticky top-0 min-[1101px]:top-8 left-0 h-full min-[1101px]:h-[calc(100vh-4rem)]
         w-[320px] bg-white border-r border-slate-100 min-[1101px]:border min-[1101px]:rounded-3xl
@@ -213,7 +202,6 @@ export default function SidebarFilter({
             </button>
           </div>
 
-          {/* Search Box */}
           <div className="relative mb-10 group">
             <input 
               type="text" 
@@ -227,7 +215,6 @@ export default function SidebarFilter({
           </div>
 
           <div className="space-y-8">
-            {/* Taxonomy Section */}
             <div className="space-y-4">
               <button 
                 onClick={() => toggleExpand('taxonomy')}
@@ -276,7 +263,7 @@ export default function SidebarFilter({
                                 `}
                               >
                                 {isSelected && <CheckCircle2 className="w-3 h-3" />}
-                                {language === 'en' ? (opt.name.match(/\(([^)]+)\)/)?.[1] || opt.name) : opt.name}
+                                {opt.display}
                                 <span className={`transition-colors duration-300 opacity-60 font-medium ${isSelected ? 'text-slate-100' : 'text-cyan-400'}`}>
                                   ({opt.count})
                                 </span>
@@ -291,32 +278,38 @@ export default function SidebarFilter({
               )}
             </div>
 
-            {/* Rarity Section */}
             <div className="space-y-4 pt-4 border-t border-cyan-50">
               <button 
-                onClick={() => toggleExpand('rarity')}
+                onClick={() => toggleExpand('iucn')}
                 className="w-full flex items-center justify-between text-sm font-black uppercase tracking-widest text-cyan-400 hover:text-emerald-600 transition-colors"
               >
-                {language === 'zh' ? '稀有度與現狀' : 'Rarity & Status'}
-                {expanded.rarity ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+                {language === 'zh' ? 'IUCN 狀態' : 'IUCN Status'}
+                {expanded.iucn ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
               </button>
               
-              {expanded.rarity && (
-                <div className="grid grid-cols-2 gap-3 pt-2">
-                  {RARITIES.map((rarity) => (
-                    <button
-                      key={rarity}
-                      onClick={() => handleRarityToggle(rarity)}
-                      className={`
-                        px-4 py-3 rounded-2xl text-xs font-bold transition-all border text-center
-                        ${selected.rarity.includes(rarity)
-                          ? 'bg-emerald-900 border-emerald-900 text-white shadow-lg'
-                          : 'bg-white border-slate-100 text-emerald-700 hover:bg-cyan-50'}
-                      `}
-                    >
-                      {language === 'zh' ? rarity : RARITY_MAP[rarity]}
-                    </button>
-                  ))}
+              {expanded.iucn && (
+                <div className="flex flex-wrap gap-2 pt-2">
+                  {IUCN_STATUSES.map((status) => {
+                    const count = species.filter(s => s.iucn === status).length;
+                    const isSelected = selected.iucn.includes(status);
+                    if (count === 0 && !isSelected) return null; // Only show active statuses
+                    
+                    return (
+                      <button
+                        key={status}
+                        onClick={() => handleIUCNToggle(status)}
+                        className={`
+                          px-3 py-1.5 rounded-xl text-xs font-bold transition-all border shadow-sm flex items-center gap-1
+                          ${isSelected
+                            ? 'bg-amber-600 border-amber-600 text-white shadow-md'
+                            : 'bg-amber-50 border-amber-100 text-amber-900 hover:bg-amber-100'}
+                        `}
+                      >
+                        {isSelected && <CheckCircle2 className="w-3 h-3" />}
+                        {language === 'zh' ? IUCN_MAP[status] : status}
+                      </button>
+                    );
+                  })}
                 </div>
               )}
             </div>

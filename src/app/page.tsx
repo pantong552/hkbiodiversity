@@ -15,8 +15,8 @@ export default function Home() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedFilters, setSelectedFilters] = useState<SelectedFilters>({
-    taxonomy: { kingdom: [], phylum: [], class: [], order: [], family: [], genus: [] },
-    rarity: []
+    taxonomy: { phylum: [], class: [], order: [], family: [], genus: [] },
+    iucn: []
   });
 
   // Sorting and Pagination State
@@ -24,12 +24,14 @@ export default function Home() {
   const [itemsPerPage, setItemsPerPage] = useState(12);
   const [currentPage, setCurrentPage] = useState(1);
 
-  const rarityPriority: Record<string, number> = {
-    '極危': 1,
-    '瀕危': 2,
-    '易危': 3,
-    '近危': 4,
-    '常見': 5,
+  const iucnPriority: Record<string, number> = {
+    'Critically Endangered': 1,
+    'Endangered': 2,
+    'Vulnerable': 3,
+    'Near Threatened': 4,
+    'Least Concern': 5,
+    'Data Deficient': 6,
+    'Not Evaluated': 7,
   };
 
   // Filter & Sort Logic
@@ -37,8 +39,8 @@ export default function Home() {
     let result = MOCK_SPECIES.filter(s => {
       // 1. Text Search
       const matchesSearch = searchQuery === '' || 
-        [s.common_name, s.common_name_en, s.scientific_name, s.kingdom, s.phylum, s.class, s.order, s.family, s.genus]
-          .some(attr => attr.toLowerCase().includes(searchQuery.toLowerCase()));
+        [s.common_name, s.common_name_en, s.scientific_name, s.phylum, s.phylum_chi, s.class, s.class_chi, s.order, s.order_chi, s.family, s.family_chi, s.genus, s.genus_chi]
+          .some(attr => attr && attr.toLowerCase().includes(searchQuery.toLowerCase()));
 
       // 2. Taxonomy Filter
       const matchesTaxonomy = Object.entries(selectedFilters.taxonomy).every(([level, values]) => {
@@ -47,23 +49,23 @@ export default function Home() {
         return values.includes(speciesValue);
       });
 
-      // 3. Rarity Filter
-      const matchesRarity = selectedFilters.rarity.length === 0 || 
-        selectedFilters.rarity.includes(s.rarity);
+      // 3. IUCN Filter
+      const matchesIUCN = selectedFilters.iucn.length === 0 || 
+        selectedFilters.iucn.includes(s.iucn);
 
-      return matchesSearch && matchesTaxonomy && matchesRarity;
+      return matchesSearch && matchesTaxonomy && matchesIUCN;
     });
 
     // Sort Results
     return result.sort((a, b) => {
       if (sortBy === 'rarity') {
-        return (rarityPriority[a.rarity] || 99) - (rarityPriority[b.rarity] || 99);
+        return (iucnPriority[a.iucn] || 99) - (iucnPriority[b.iucn] || 99);
       }
       
       const field = (sortBy === 'common_name' && language === 'en') ? 'common_name_en' : sortBy;
       return (a[field as keyof Species] as string).localeCompare(b[field as keyof Species] as string, language === 'zh' ? 'zh-TW' : 'en');
     });
-  }, [searchQuery, selectedFilters, sortBy]);
+  }, [searchQuery, selectedFilters, sortBy, language]);
 
   // Pagination Logic
   const totalPages = Math.ceil(filteredAndSortedSpecies.length / itemsPerPage);
@@ -212,8 +214,8 @@ export default function Home() {
                   onClick={() => {
                     setSearchQuery('');
                     setSelectedFilters({
-                      taxonomy: { kingdom: [], phylum: [], class: [], order: [], family: [], genus: [] },
-                      rarity: []
+                      taxonomy: { phylum: [], class: [], order: [], family: [], genus: [] },
+                      iucn: []
                     });
                   }}
                   className="px-8 py-4 bg-slate-900 text-white font-black rounded-2xl shadow-xl shadow-slate-200 hover:-translate-y-1 transition-all"
