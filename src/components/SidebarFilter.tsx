@@ -103,9 +103,9 @@ export default function SidebarFilter({
 
         if (!error && data) {
           const countsMap = new Map<string, { chi: string, count: number }>();
-          data.forEach(item => {
-            const eng = item[level];
-            const chi = item[chiLevel] || eng;
+          (data as any[]).forEach((item: Record<string, any>) => {
+            const eng = item[level] as string;
+            const chi = (item[chiLevel] as string) || eng;
             if (eng) {
               const current = countsMap.get(eng) || { chi, count: 0 };
               countsMap.set(eng, { chi, count: current.count + 1 });
