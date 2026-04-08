@@ -3,6 +3,7 @@
 import { useState, useMemo, useEffect } from 'react';
 import { ChevronDown, ChevronRight, Search, Filter, X, CheckCircle2 } from 'lucide-react';
 import { Species, TaxonomyLevel } from '../types/species';
+import { useLanguage } from '../context/LanguageContext';
 
 interface SidebarFilterProps {
   isOpen: boolean;
@@ -25,17 +26,6 @@ export interface SelectedFilters {
   rarity: string[];
 }
 
-const TAXONOMY_LABELS: Record<TaxonomyLevel, string> = {
-  kingdom: '界 (Kingdom)',
-  phylum: '門 (Phylum)',
-  class: '綱 (Class)',
-  order: '目 (Order)',
-  family: '科 (Family)',
-  genus: '屬 (Genus)',
-};
-
-const RARITIES = ['極危', '瀕危', '易危', '近危', '常見'];
-
 export default function SidebarFilter({ 
   isOpen, 
   onClose,
@@ -44,6 +34,26 @@ export default function SidebarFilter({
   searchQuery,
   onSearchChange
 }: SidebarFilterProps) {
+  const { language, t } = useLanguage();
+
+  const TAXONOMY_LABELS: Record<TaxonomyLevel, string> = {
+    kingdom: language === 'zh' ? '界 (Kingdom)' : 'Kingdom',
+    phylum: language === 'zh' ? '門 (Phylum)' : 'Phylum',
+    class: language === 'zh' ? '綱 (Class)' : 'Class',
+    order: language === 'zh' ? '目 (Order)' : 'Order',
+    family: language === 'zh' ? '科 (Family)' : 'Family',
+    genus: language === 'zh' ? '屬 (Genus)' : 'Genus',
+  };
+
+  const RARITIES = ['極危', '瀕危', '易危', '近危', '常見'];
+  const RARITY_MAP: Record<string, string> = {
+    '極危': 'Critically Endangered',
+    '瀕危': 'Endangered',
+    '易危': 'Vulnerable',
+    '近危': 'Near Threatened',
+    '常見': 'Common'
+  };
+
   const [expanded, setExpanded] = useState<Record<string, boolean>>({
     taxonomy: true,
     rarity: true,
@@ -188,14 +198,14 @@ export default function SidebarFilter({
           <div className="flex items-center justify-between mb-8">
             <h2 className="text-2xl font-black text-emerald-900 flex items-center gap-3">
               <Filter className="w-6 h-6 text-emerald-500" />
-              進階篩選
+              {t('filter.title')}
             </h2>
             {activeCount > 0 && (
               <button 
                 onClick={clearFilters}
                 className="text-xs font-bold text-emerald-500 hover:text-emerald-700 bg-cyan-50 px-2 py-1 rounded-lg transition-colors"
               >
-                重置
+                {t('filter.reset')}
               </button>
             )}
             <button onClick={onClose} className="min-[1101px]:hidden p-2 text-cyan-400 hover:bg-cyan-50 rounded-xl">
@@ -207,7 +217,7 @@ export default function SidebarFilter({
           <div className="relative mb-10 group">
             <input 
               type="text" 
-              placeholder="快速檢索..." 
+              placeholder={t('search.sidebar_placeholder')} 
               value={searchQuery}
               onChange={(e) => onSearchChange(e.target.value)}
               suppressHydrationWarning={true}
@@ -223,7 +233,7 @@ export default function SidebarFilter({
                 onClick={() => toggleExpand('taxonomy')}
                 className="w-full flex items-center justify-between text-sm font-black uppercase tracking-widest text-cyan-400 hover:text-emerald-600 transition-colors"
               >
-                物種分類層級
+                {t('filter.taxonomy')}
                 {expanded.taxonomy ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
               </button>
               
@@ -266,7 +276,7 @@ export default function SidebarFilter({
                                 `}
                               >
                                 {isSelected && <CheckCircle2 className="w-3 h-3" />}
-                                {opt.name}
+                                {language === 'en' ? (opt.name.match(/\(([^)]+)\)/)?.[1] || opt.name) : opt.name}
                                 <span className={`transition-colors duration-300 opacity-60 font-medium ${isSelected ? 'text-slate-100' : 'text-cyan-400'}`}>
                                   ({opt.count})
                                 </span>
@@ -287,7 +297,7 @@ export default function SidebarFilter({
                 onClick={() => toggleExpand('rarity')}
                 className="w-full flex items-center justify-between text-sm font-black uppercase tracking-widest text-cyan-400 hover:text-emerald-600 transition-colors"
               >
-                稀有度與現狀
+                {language === 'zh' ? '稀有度與現狀' : 'Rarity & Status'}
                 {expanded.rarity ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
               </button>
               
@@ -304,7 +314,7 @@ export default function SidebarFilter({
                           : 'bg-white border-slate-100 text-emerald-700 hover:bg-cyan-50'}
                       `}
                     >
-                      {rarity}
+                      {language === 'zh' ? rarity : RARITY_MAP[rarity]}
                     </button>
                   ))}
                 </div>

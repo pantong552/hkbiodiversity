@@ -8,8 +8,10 @@ import Header from '@/components/Header';
 import CustomDropdown from '@/components/ui/CustomDropdown';
 import { MOCK_SPECIES } from '@/data/mockSpecies';
 import { Species } from '@/types/species';
+import { useLanguage } from '@/context/LanguageContext';
 
 export default function Home() {
+  const { language, t } = useLanguage();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedFilters, setSelectedFilters] = useState<SelectedFilters>({
@@ -35,7 +37,7 @@ export default function Home() {
     let result = MOCK_SPECIES.filter(s => {
       // 1. Text Search
       const matchesSearch = searchQuery === '' || 
-        [s.common_name, s.scientific_name, s.kingdom, s.phylum, s.class, s.order, s.family, s.genus]
+        [s.common_name, s.common_name_en, s.scientific_name, s.kingdom, s.phylum, s.class, s.order, s.family, s.genus]
           .some(attr => attr.toLowerCase().includes(searchQuery.toLowerCase()));
 
       // 2. Taxonomy Filter
@@ -57,7 +59,9 @@ export default function Home() {
       if (sortBy === 'rarity') {
         return (rarityPriority[a.rarity] || 99) - (rarityPriority[b.rarity] || 99);
       }
-      return a[sortBy].localeCompare(b[sortBy], 'zh-TW');
+      
+      const field = (sortBy === 'common_name' && language === 'en') ? 'common_name_en' : sortBy;
+      return (a[field as keyof Species] as string).localeCompare(b[field as keyof Species] as string, language === 'zh' ? 'zh-TW' : 'en');
     });
   }, [searchQuery, selectedFilters, sortBy]);
 
@@ -104,14 +108,19 @@ export default function Home() {
                 <div className="max-w-2xl">
                   <div className="flex items-center gap-3 text-emerald-600 font-black text-xs uppercase tracking-[0.3em] mb-4">
                     <div className="h-[2px] w-8 bg-emerald-600" />
-                    Nature Collective
+                    {t('hero.badge')}
                   </div>
                   <h1 className="text-7xl font-black text-slate-900 tracking-tight leading-[0.9] mb-6">
-                    Hong Kong <span className="text-emerald-600">Biodiversity</span>
+                    {language === 'zh' ? (
+                      <>香港 <span className="text-emerald-600">生物多樣性</span></>
+                    ) : (
+                      <>Hong Kong <span className="text-emerald-600">Biodiversity</span></>
+                    )}
                   </h1>
                   <p className="text-xl text-slate-500 font-medium leading-relaxed">
-                    Explore our comprehensive database of over <span className="text-slate-900 font-bold">10,000</span> species, 
-                    showcasing the incredible richness of Hong Kong's local ecosystems.
+                    {t('hero.subtitle_part1')}
+                    <span className="text-slate-900 font-bold">{t('hero.subtitle_part2')}</span>
+                    {t('hero.subtitle_part3')}
                   </p>
                 </div>
                 <div className="flex flex-col items-end gap-4">
@@ -121,7 +130,7 @@ export default function Home() {
                           type="text" 
                           value={searchQuery}
                           onChange={(e) => setSearchQuery(e.target.value)}
-                          placeholder="快速搜尋俗名、學名..." 
+                          placeholder={t('search.placeholder')} 
                           suppressHydrationWarning={true}
                           className="bg-transparent pl-12 pr-6 py-3 w-[400px] outline-none text-slate-900 font-bold placeholder:text-slate-300"
                         />
@@ -129,9 +138,9 @@ export default function Home() {
                       </div>
                    </div>
                    <div className="flex items-center gap-4 text-xs font-black text-slate-400 uppercase tracking-widest">
-                      <span>Found {filteredAndSortedSpecies.length} Results</span>
+                      <span>{t('results.found')} {filteredAndSortedSpecies.length} {t('results.unit')}</span>
                       <div className="w-1 h-1 rounded-full bg-slate-300" />
-                      <span>Viewing Page {currentPage} of {totalPages || 1}</span>
+                      <span>{t('results.viewing_page')} {currentPage} {t('results.page_of')} {totalPages || 1}</span>
                    </div>
                 </div>
               </div>
@@ -140,12 +149,12 @@ export default function Home() {
               <div className="flex items-center justify-between bg-white px-8 py-5 rounded-[2rem] shadow-sm border border-slate-100 ring-1 ring-slate-50">
                  <div className="flex items-center gap-8">
                     <div className="flex items-center gap-3">
-                       <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">排序方式</span>
+                       <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">{t('sort.label')}</span>
                        <CustomDropdown 
                           options={[
-                            { value: 'common_name', label: '俗名 (A-Z)' },
-                            { value: 'scientific_name', label: '學名 (A-Z)' },
-                            { value: 'rarity', label: '稀有度 (高級優先)' }
+                            { value: 'common_name', label: t('sort.common_name') },
+                            { value: 'scientific_name', label: t('sort.scientific_name') },
+                            { value: 'rarity', label: t('sort.rarity') }
                           ]}
                           value={sortBy}
                           onChange={(val) => setSortBy(val)}
@@ -153,7 +162,7 @@ export default function Home() {
                     </div>
                     <div className="h-6 w-px bg-slate-100" />
                     <div className="flex items-center gap-3">
-                       <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">每頁顯示</span>
+                       <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">{t('view.per_page')}</span>
                        <div className="flex bg-slate-50 rounded-xl p-1">
                           {[9, 12, 15, 18, 21].map((size) => (
                              <button
@@ -195,9 +204,9 @@ export default function Home() {
                 <div className="w-24 h-24 bg-slate-50 rounded-full flex items-center justify-center mb-6">
                   <FilterX className="w-12 h-12 text-slate-300" />
                 </div>
-                <h3 className="text-2xl font-black text-slate-900 mb-2">找不到匹配的物種</h3>
+                <h3 className="text-2xl font-black text-slate-900 mb-2">{t('empty.title')}</h3>
                 <p className="text-slate-400 font-medium mb-8 max-w-sm px-6">
-                  請嘗試放寬篩選條件，或使用不同的搜尋字串進行檢索。
+                  {t('empty.subtitle')}
                 </p>
                 <button 
                   onClick={() => {
@@ -209,7 +218,7 @@ export default function Home() {
                   }}
                   className="px-8 py-4 bg-slate-900 text-white font-black rounded-2xl shadow-xl shadow-slate-200 hover:-translate-y-1 transition-all"
                 >
-                  清除所有篩選
+                  {t('filter.clear_all')}
                 </button>
               </div>
             ) : (
@@ -259,7 +268,7 @@ export default function Home() {
                   </button>
                 </div>
                 <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
-                  Showing {Math.min(filteredAndSortedSpecies.length, (currentPage - 1) * itemsPerPage + 1)}-{Math.min(filteredAndSortedSpecies.length, currentPage * itemsPerPage)} of {filteredAndSortedSpecies.length} Species
+                  {t('pagination.showing')} {Math.min(filteredAndSortedSpecies.length, (currentPage - 1) * itemsPerPage + 1)}-{Math.min(filteredAndSortedSpecies.length, currentPage * itemsPerPage)} {t('pagination.of')} {filteredAndSortedSpecies.length} {t('pagination.species')}
                 </p>
               </div>
             )}
