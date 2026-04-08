@@ -17,8 +17,13 @@ export default function Header() {
 
   useEffect(() => {
     const fetchUser = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      setUser(user);
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        setUser(user);
+      } catch (error) {
+        // Handle lock stealing errors gracefully - onAuthStateChange will handle updates
+        console.debug('Error fetching user:', error);
+      }
     };
 
     fetchUser();
