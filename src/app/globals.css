@@ -54,28 +54,39 @@ body {
 
 /* Custom Scrollbar Styles */
 ::-webkit-scrollbar {
-  width: 10px;
-  height: 10px;
+  width: 12px;
+  height: 12px;
+}
+
+::-webkit-scrollbar-button:single-button {
+  display: none;
+  height: 0;
+  width: 0;
 }
 
 ::-webkit-scrollbar-track {
-  background: rgba(0, 0, 0, 0.02);
+  background: rgba(0, 0, 0, 0.03);
+  border-radius: 6px;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #a7f3d0; /* emerald-200 */
-  border-radius: 4px;
+  background: #064e3b; /* emerald-900 */
+  border-radius: 6px;
+  border: 3px solid transparent;
+  background-clip: content-box;
   transition: all 0.3s;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #10b981; /* emerald-500 */
+  background: #065f46; /* emerald-800 */
 }
 
 /* FireFox Support */
 * {
   scrollbar-width: auto;
-  scrollbar-color: #a7f3d0 transparent;
+  scrollbar-color: #064e3b transparent;
 }
+
+
 
 

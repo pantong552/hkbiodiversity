@@ -6,8 +6,11 @@ import Link from 'next/link';
 import { createClient } from '@/utils/supabase/client';
 import LoginButton from './LoginButton';
 import { User as SupabaseUser } from '@supabase/supabase-js';
+import { useLanguage } from '@/context/LanguageContext';
+import { Globe } from 'lucide-react';
 
 export default function Header() {
+  const { language, setLanguage, t } = useLanguage();
   const [isScrolled, setIsScrolled] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isVisible, setIsVisible] = useState(true);
@@ -60,10 +63,10 @@ export default function Header() {
   };
 
   const navLinks = [
-    { name: 'Home', href: '/' },
-    { name: 'About', href: '/about' },
-    { name: 'Blog', href: '/blog' },
-    { name: 'Contact', href: '/contact' },
+    { name: t('nav.home'), href: '/' },
+    { name: t('nav.about'), href: '/about' },
+    { name: t('nav.blog'), href: '/blog' },
+    { name: t('nav.contact'), href: '/contact' },
   ];
 
   return (
@@ -81,7 +84,7 @@ export default function Header() {
             <Leaf className="w-6 h-6 text-white" />
           </div>
           <span className="text-lg font-black tracking-tight text-slate-900">
-            Hong Kong <span className="text-emerald-600">Biodiversity</span> Collective
+            HK <span className="text-emerald-600">Biodiversity</span> Collective
           </span>
         </Link>
 
@@ -97,6 +100,22 @@ export default function Header() {
                 {link.name}
               </Link>
             ))}
+          </div>
+
+          {/* Language Switcher - Desktop */}
+          <div className="flex items-center p-1 bg-slate-100/50 rounded-full border border-slate-200/50 backdrop-blur-sm">
+            <button
+              onClick={() => setLanguage('zh')}
+              className={`px-3 py-1 text-[10px] font-black rounded-full transition-all ${language === 'zh' ? 'bg-white text-emerald-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
+            >
+              繁中
+            </button>
+            <button
+              onClick={() => setLanguage('en')}
+              className={`px-3 py-1 text-[10px] font-black rounded-full transition-all ${language === 'en' ? 'bg-white text-emerald-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
+            >
+              EN
+            </button>
           </div>
           
           {user ? (
@@ -140,53 +159,78 @@ export default function Header() {
       {/* Mobile Menu */}
       {isMobileMenuOpen && (
         <div className="lg:hidden absolute top-full left-0 right-0 mt-4 mx-4 p-6 bg-white rounded-3xl shadow-2xl border border-slate-100 animate-in fade-in slide-in-from-top-4 duration-300">
-          <div className="flex flex-col gap-4">
-            {navLinks.map((link) => (
-              <Link 
-                key={link.name} 
-                href={link.href}
-                onClick={() => setIsMobileMenuOpen(false)}
-                className="text-lg font-bold text-slate-700 hover:text-emerald-600 px-4 py-2 rounded-xl hover:bg-emerald-50 transition-all"
-              >
-                {link.name}
-              </Link>
-            ))}
-            <hr className="border-slate-100 my-2" />
-            {user ? (
-              <div className="space-y-4">
-                <div className="flex items-center gap-3 px-4 py-3 bg-slate-50 rounded-2xl border border-slate-100">
-                  {user.user_metadata.avatar_url ? (
-                    <img 
-                      src={user.user_metadata.avatar_url} 
-                      alt="User Avatar" 
-                      className="w-10 h-10 rounded-full"
-                    />
-                  ) : (
-                    <div className="w-10 h-10 bg-slate-200 rounded-full flex items-center justify-center">
-                      <User className="w-6 h-6 text-slate-500" />
-                    </div>
-                  )}
-                  <div className="flex flex-col">
-                    <span className="font-bold text-slate-900">{user.user_metadata.full_name || 'Member'}</span>
-                    <span className="text-xs text-slate-500">{user.email}</span>
-                  </div>
-                </div>
-                <button 
-                  onClick={handleLogout}
-                  className="flex items-center justify-center gap-2 w-full py-4 text-red-600 font-bold border-2 border-red-100 rounded-2xl hover:bg-red-50"
+          <div className="flex flex-col gap-6">
+            {/* Language Selection - Mobile */}
+            <div className="flex items-center justify-between px-2">
+              <div className="flex items-center gap-2 text-slate-400">
+                <Globe className="w-4 h-4" />
+                <span className="text-xs font-bold uppercase tracking-wider">Language</span>
+              </div>
+              <div className="flex p-1 bg-slate-50 rounded-xl border border-slate-100">
+                <button
+                  onClick={() => setLanguage('zh')}
+                  className={`px-4 py-1.5 text-xs font-black rounded-lg transition-all ${language === 'zh' ? 'bg-white text-emerald-600 shadow-sm ring-1 ring-slate-100' : 'text-slate-400'}`}
                 >
-                  <LogOut className="w-5 h-5" />
-                  Logout
+                  繁中
+                </button>
+                <button
+                  onClick={() => setLanguage('en')}
+                  className={`px-4 py-1.5 text-xs font-black rounded-lg transition-all ${language === 'en' ? 'bg-white text-emerald-600 shadow-sm ring-1 ring-slate-100' : 'text-slate-400'}`}
+                >
+                  EN
                 </button>
               </div>
-            ) : (
-              <div className="flex justify-center">
-                <LoginButton />
-              </div>
-            )}
+            </div>
+
+            <div className="flex flex-col gap-2">
+              {navLinks.map((link) => (
+                <Link 
+                  key={link.name} 
+                  href={link.href}
+                  onClick={() => setIsMobileMenuOpen(false)}
+                  className="text-lg font-bold text-slate-700 hover:text-emerald-600 px-4 py-2 rounded-xl hover:bg-emerald-50 transition-all"
+                >
+                  {link.name}
+                </Link>
+              ))}
+              <hr className="border-slate-100 my-2" />
+              {user ? (
+                <div className="space-y-4">
+                  <div className="flex items-center gap-3 px-4 py-3 bg-slate-50 rounded-2xl border border-slate-100">
+                    {user.user_metadata.avatar_url ? (
+                      <img 
+                        src={user.user_metadata.avatar_url} 
+                        alt="User Avatar" 
+                        className="w-10 h-10 rounded-full"
+                      />
+                    ) : (
+                      <div className="w-10 h-10 bg-slate-200 rounded-full flex items-center justify-center">
+                        <User className="w-6 h-6 text-slate-500" />
+                      </div>
+                    )}
+                    <div className="flex flex-col">
+                      <span className="font-bold text-slate-900">{user.user_metadata.full_name || 'Member'}</span>
+                      <span className="text-xs text-slate-500">{user.email}</span>
+                    </div>
+                  </div>
+                  <button 
+                    onClick={handleLogout}
+                    className="flex items-center justify-center gap-2 w-full py-4 text-red-600 font-bold border-2 border-red-100 rounded-2xl hover:bg-red-50"
+                  >
+                    <LogOut className="w-5 h-5" />
+                    Logout
+                  </button>
+                </div>
+              ) : (
+                <div className="flex justify-center">
+                  <LoginButton />
+                </div>
+              )}
+            </div>
           </div>
         </div>
       )}
     </nav>
   );
 }
+

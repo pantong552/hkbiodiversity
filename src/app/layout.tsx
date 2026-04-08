@@ -17,6 +17,8 @@ export const metadata: Metadata = {
   description: 'A comprehensive biodiversity encyclopedia of Hong Kong, covering approximately 10,000 species.',
 };
 
+import { LanguageProvider } from '@/context/LanguageContext';
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -25,8 +27,11 @@ export default function RootLayout({
   return (
     <html lang="zh-TW">
       <body className={`${workSans.variable} ${outfit.variable} font-sans antialiased text-cyan-900`}>
-        {children}
+        <LanguageProvider>
+          {children}
+        </LanguageProvider>
       </body>
     </html>
   );
 }
+
