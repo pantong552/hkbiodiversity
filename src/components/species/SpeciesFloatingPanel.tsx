@@ -23,7 +23,7 @@ export default function SpeciesFloatingPanel() {
   const [speciesData, setSpeciesData] = useState<Record<number, Species>>({});
   const [isLoading, setIsLoading] = useState<Record<number, boolean>>({});
 
-  // Fetch data for new IDs
+  // 1. Fetch data for new IDs
   useEffect(() => {
     openSpeciesIds.forEach(async (id) => {
       if (!speciesData[id] && !isLoading[id]) {
@@ -45,7 +45,25 @@ export default function SpeciesFloatingPanel() {
         }
       }
     });
-  }, [openSpeciesIds, speciesData, isLoading]);
+  }, [openSpeciesIds, speciesData, isLoading, supabase]);
+
+  // 2. Prevent Background Scroll & Double Scrollbar
+  useEffect(() => {
+    if (isExpanded && activeSpeciesId) {
+      // 獲取捲動軸寬度，防止 body 鎖定時頁面抖動
+      const scrollBarWidth = window.innerWidth - document.documentElement.clientWidth;
+      document.body.style.overflow = 'hidden';
+      document.body.style.paddingRight = `${scrollBarWidth}px`;
+    } else {
+      document.body.style.overflow = '';
+      document.body.style.paddingRight = '';
+    }
+
+    return () => {
+      document.body.style.overflow = '';
+      document.body.style.paddingRight = '';
+    };
+  }, [isExpanded, activeSpeciesId]);
 
   if (openSpeciesIds.length === 0) return null;
 
