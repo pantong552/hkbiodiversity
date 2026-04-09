@@ -210,7 +210,7 @@ export default function Home() {
                     <div className="flex items-center gap-3">
                        <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">{t('view.per_page')}</span>
                        <div className="flex bg-slate-50 rounded-xl p-1">
-                          {[9, 12, 15, 18, 21].map((size) => (
+                          {[8, 12, 16, 20, 24].map((size) => (
                              <button
                                 key={size}
                                 onClick={() => setItemsPerPage(size)}
@@ -292,7 +292,7 @@ export default function Home() {
               /* Grid Layout */
               <div 
                 key={`${currentPage}-${sortBy}-${itemsPerPage}-${searchQuery}-${JSON.stringify(selectedFilters)}`}
-                className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-2 2xl:grid-cols-3 3xl:grid-cols-4 gap-x-8 gap-y-12 animate-grid-fade"
+                className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 min-[1101px]:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-x-8 gap-y-12 animate-grid-fade"
               >
                 {paginatedSpecies.map((species) => (
                   <SpeciesCard key={species.id} species={species} />
