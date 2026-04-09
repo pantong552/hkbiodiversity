@@ -1,15 +1,16 @@
 'use client';
 
 import Image from 'next/image';
-import Link from 'next/link';
-import { Heart } from 'lucide-react';
+import { Heart, ArrowRight } from 'lucide-react';
 import { Species } from '../types/species';
 import { useLanguage } from '../context/LanguageContext';
+import { useSpeciesPanel } from '../context/SpeciesPanelContext';
 import { getIUCNConfig } from '../constants/statusStyles';
 
 
 export default function SpeciesCard({ species }: { species: Species }) {
   const { language } = useLanguage();
+  const { addSpecies } = useSpeciesPanel();
   
   const config = getIUCNConfig(species.iucn);
   const badgeClass = config.styles;
@@ -17,12 +18,15 @@ export default function SpeciesCard({ species }: { species: Species }) {
 
 
   return (
-    <div className="group relative bg-white rounded-[2.5rem] border border-slate-200/50 overflow-hidden shadow-card hover:shadow-card-hover hover:-translate-y-2 transition-all duration-500 flex flex-col">
+    <div 
+      onClick={() => addSpecies(species.id)}
+      className="group relative bg-white rounded-[2.5rem] border border-slate-200/50 overflow-hidden shadow-card hover:shadow-card-hover hover:-translate-y-2 transition-all duration-500 flex flex-col cursor-pointer"
+    >
       {/* Image Container with Overlay */}
       <div className="relative h-60 overflow-hidden bg-slate-100">
         <Image
           src={species.image_url || 'https://images.unsplash.com/photo-1549488344-1f9b8d2bd1f3?q=80&w=1080&auto=format&fit=crop'}
-          alt={language === 'zh' ? species.common_name_chi : species.common_name_eng}
+          alt={(language === 'zh' ? species.common_name_chi : species.common_name_eng) || species.scientific_name || 'Species Image'}
           fill
           className="object-cover transition-transform duration-700 group-hover:scale-110"
         />
@@ -36,7 +40,10 @@ export default function SpeciesCard({ species }: { species: Species }) {
           `}>
             {badgeText}
           </span>
-          <button className="w-8 h-8 md:w-10 md:h-10 bg-white/90 backdrop-blur-md rounded-full shadow-lg border border-white/50 flex items-center justify-center text-slate-400 hover:text-rose-500 hover:bg-white transition-all cursor-pointer">
+          <button 
+            onClick={(e) => { e.stopPropagation(); /* 收藏邏輯預留 */ }}
+            className="w-8 h-8 md:w-10 md:h-10 bg-white/90 backdrop-blur-md rounded-full shadow-lg border border-white/50 flex items-center justify-center text-slate-400 hover:text-rose-500 hover:bg-white transition-all cursor-pointer"
+          >
             <Heart className="w-4 h-4 md:w-5 h-5" />
           </button>
         </div>
@@ -49,7 +56,7 @@ export default function SpeciesCard({ species }: { species: Species }) {
             {language === 'zh' ? species.common_name_chi : species.common_name_eng}
           </h3>
           <p className="text-xs text-slate-500 font-serif tracking-wide truncate">
-            <span className="italic font-medium">{species.scientific_name}</span> {species.author}
+            <span className="italic font-medium">{species.scientific_name}</span>
           </p>
         </div>
 
@@ -73,9 +80,9 @@ export default function SpeciesCard({ species }: { species: Species }) {
               {language === 'zh' ? species.informal_group_chi : species.informal_group_eng}
             </span>
           </div>
-          <Link href={`/species/${species.id}`} className="flex items-center text-emerald-600 font-black text-[11px] uppercase tracking-widest hover:translate-x-1 transition-transform cursor-pointer">
-            Details →
-          </Link>
+          <div className="flex items-center gap-1 text-emerald-600 font-black text-[11px] uppercase tracking-widest hover:translate-x-1 transition-transform">
+            Details <ArrowRight className="w-3.5 h-3.5" />
+          </div>
         </div>
       </div>
     </div>

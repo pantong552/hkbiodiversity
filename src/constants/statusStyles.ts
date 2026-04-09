@@ -13,39 +13,39 @@ export interface IUCNStatusConfig {
 
 export const IUCN_CONFIG: Record<string, IUCNStatusConfig> = {
   'Extinct': {
-    label: { zh: '絕滅 (EX)', en: 'Extinct' },
+    label: { zh: '絕滅 (EX)', en: 'EX' },
     styles: 'bg-black border-slate-800 text-white',
   },
   'Extinct in the Wild': {
-    label: { zh: '野外絕滅 (EW)', en: 'Extinct in the Wild' },
+    label: { zh: '野外絕滅 (EW)', en: 'EW' },
     styles: 'bg-slate-900 border-slate-700 text-white',
   },
   'Critically Endangered': {
-    label: { zh: '極危 (CR)', en: 'Critically Endangered' },
+    label: { zh: '極危 (CR)', en: 'CR' },
     styles: 'bg-red-600 border-red-700 text-white',
   },
   'Endangered': {
-    label: { zh: '瀕危 (EN)', en: 'Endangered' },
+    label: { zh: '瀕危 (EN)', en: 'EN' },
     styles: 'bg-rose-500 border-rose-600 text-white',
   },
   'Vulnerable': {
-    label: { zh: '易危 (VU)', en: 'Vulnerable' },
+    label: { zh: '易危 (VU)', en: 'VU' },
     styles: 'bg-orange-500 border-orange-600 text-white',
   },
   'Near Threatened': {
-    label: { zh: '近危 (NT)', en: 'Near Threatened' },
+    label: { zh: '近危 (NT)', en: 'NT' },
     styles: 'bg-amber-400 border-amber-500 text-amber-950',
   },
   'Least Concern': {
-    label: { zh: '無危 (LC)', en: 'Least Concern' },
+    label: { zh: '無危 (LC)', en: 'LC' },
     styles: 'bg-emerald-500 border-emerald-600 text-white',
   },
   'Data Deficient': {
-    label: { zh: '數據缺乏 (DD)', en: 'Data Deficient' },
+    label: { zh: '數據缺乏 (DD)', en: 'DD' },
     styles: 'bg-slate-400 border-slate-500 text-white',
   },
   'Not Evaluated': {
-    label: { zh: '未評估 (NE)', en: 'Not Evaluated' },
+    label: { zh: '未評估 (NE)', en: 'NE' },
     styles: 'bg-slate-300 border-slate-400 text-slate-700',
   },
 };

@@ -18,6 +18,8 @@ export const metadata: Metadata = {
 };
 
 import { LanguageProvider } from '@/context/LanguageContext';
+import { SpeciesPanelProvider } from '@/context/SpeciesPanelContext';
+import SpeciesFloatingPanel from '@/components/species/SpeciesFloatingPanel';
 
 export default function RootLayout({
   children,
@@ -28,7 +30,10 @@ export default function RootLayout({
     <html lang="zh-TW">
       <body className={`${workSans.variable} ${outfit.variable} font-sans antialiased text-cyan-900`}>
         <LanguageProvider>
-          {children}
+          <SpeciesPanelProvider>
+            {children}
+            <SpeciesFloatingPanel />
+          </SpeciesPanelProvider>
         </LanguageProvider>
       </body>
     </html>
