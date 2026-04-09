@@ -5,24 +5,16 @@ import Link from 'next/link';
 import { Heart } from 'lucide-react';
 import { Species } from '../types/species';
 import { useLanguage } from '../context/LanguageContext';
+import { getIUCNConfig } from '../constants/statusStyles';
+
 
 export default function SpeciesCard({ species }: { species: Species }) {
   const { language } = useLanguage();
   
-  // Standard IUCN Categories and corresponding styles
-  const iucnStyles: Record<string, { color: string, zh: string }> = {
-    'Least Concern': { color: 'bg-emerald-500 border-emerald-600', zh: '無危' },
-    'Near Threatened': { color: 'bg-amber-400 border-amber-500 text-amber-950', zh: '近危' },
-    'Vulnerable': { color: 'bg-orange-500 border-orange-600', zh: '易危' },
-    'Endangered': { color: 'bg-rose-500 border-rose-600', zh: '瀕危' },
-    'Critically Endangered': { color: 'bg-red-600 border-red-700', zh: '極危' },
-    'Data Deficient': { color: 'bg-slate-400 border-slate-500', zh: '數據缺乏' },
-    'Not Evaluated': { color: 'bg-slate-300 border-slate-400 text-slate-700', zh: '未評估' },
-  };
+  const config = getIUCNConfig(species.iucn);
+  const badgeClass = config.styles;
+  const badgeText = language === 'zh' ? config.label.zh : config.label.en;
 
-  const statusObj = iucnStyles[species.iucn] || { color: 'bg-slate-500 border-slate-600', zh: species.iucn };
-  const badgeClass = statusObj.color.includes('text-') ? statusObj.color : `${statusObj.color} text-white`;
-  const badgeText = language === 'zh' ? statusObj.zh : species.iucn;
 
   return (
     <div className="group relative bg-white rounded-[2.5rem] border border-slate-200/50 overflow-hidden shadow-card hover:shadow-card-hover hover:-translate-y-2 transition-all duration-500 flex flex-col">

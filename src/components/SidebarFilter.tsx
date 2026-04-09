@@ -3,6 +3,8 @@ import { ChevronDown, ChevronRight, Search, Filter, X, CheckCircle2 } from 'luci
 import { Species, TaxonomyLevel } from '../types/species';
 import { useLanguage } from '../context/LanguageContext';
 import { supabase } from '@/lib/supabase';
+import { getIUCNConfig, IUCN_CONFIG } from '../constants/statusStyles';
+
 
 interface SidebarFilterProps {
   isOpen: boolean;
@@ -34,19 +36,8 @@ export default function SidebarFilter({
     genus_eng: language === 'zh' ? '屬 (Genus)' : 'Genus',
   };
 
-  const IUCN_STATUSES = [
-    'Least Concern', 'Near Threatened', 'Vulnerable', 
-    'Endangered', 'Critically Endangered', 'Data Deficient', 'Not Evaluated'
-  ];
-  const IUCN_MAP: Record<string, string> = {
-    'Least Concern': '無危 (LC)',
-    'Near Threatened': '近危 (NT)',
-    'Vulnerable': '易危 (VU)',
-    'Endangered': '瀕危 (EN)',
-    'Critically Endangered': '極危 (CR)',
-    'Data Deficient': '數據缺乏 (DD)',
-    'Not Evaluated': '未評估 (NE)'
-  };
+  const IUCN_STATUSES = Object.keys(IUCN_CONFIG);
+
 
   const [expanded, setExpanded] = useState<Record<string, boolean>>({
     taxonomy: true,
@@ -75,78 +66,45 @@ export default function SidebarFilter({
   const [iucnCounts, setIucnCounts] = useState<Record<string, number>>({});
 
   useEffect(() => {
-    async function fetchTaxonomyOptions() {
-      const levels: TaxonomyLevel[] = ['phylum_eng', 'class_eng', 'order_eng', 'family_eng', 'genus_eng'];
-      const newOptions = { ...taxonomyOptions };
+    async function fetchStats() {
+      // 準備 RPC 參數，將目前的過濾狀態傳給資料庫
+      const rpcParams = {
+        p_phylum_eng: selected.taxonomy.phylum_eng,
+        p_class_eng: selected.taxonomy.class_eng,
+        p_order_eng: selected.taxonomy.order_eng,
+        p_family_eng: selected.taxonomy.family_eng,
+        p_genus_eng: selected.taxonomy.genus_eng,
+        p_iucn: selected.iucn,
+        p_search: searchQuery
+      };
 
-      // 我們並行處理所有展開的級別
-      const fetchPromises = levels.map(async (level) => {
-        // 如果該層級沒展開且沒被選中，我們不更新它（節省資源），除非是初始加載
-        const chiLevel = level.replace('_eng', '_chi');
-        
-        // 構建帶條件的查詢
-        let query = supabase.from('species').select(`${level}, ${chiLevel}`);
-        
-        // 加入 Cross Filter 條件：加入「其他級別」已選的限制
-        Object.entries(selected.taxonomy).forEach(([selLevel, values]) => {
-          if (selLevel !== level && values.length > 0) {
-            query = query.in(selLevel, values);
-          }
-        });
+      const { data, error } = await supabase.rpc('get_species_stats', rpcParams);
 
-        // 加入 IUCN 限制
-        if (selected.iucn.length > 0) {
-          query = query.in('iucn', selected.iucn);
-        }
-
-        const { data, error } = await query.not(level, 'is', null);
-
-        if (!error && data) {
-          const countsMap = new Map<string, { chi: string, count: number }>();
-          (data as any[]).forEach((item: Record<string, any>) => {
-            const eng = item[level] as string;
-            const chi = (item[chiLevel] as string) || eng;
-            if (eng) {
-              const current = countsMap.get(eng) || { chi, count: 0 };
-              countsMap.set(eng, { chi, count: current.count + 1 });
-            }
-          });
-          
-          newOptions[level] = Array.from(countsMap.entries()).map(([name, info]) => ({
-            name,
-            display: language === 'zh' ? info.chi : name,
-            count: info.count
-          })).sort((a, b) => b.count - a.count);
-        }
-      });
-
-      await Promise.all(fetchPromises);
-      setTaxonomyOptions(newOptions);
-    }
-
-    async function fetchIUCNCounts() {
-      let query = supabase.from('species').select('iucn');
-      
-      // IUCN 也要受分類過濾影響
-      Object.entries(selected.taxonomy).forEach(([selLevel, values]) => {
-        if (values.length > 0) {
-          query = query.in(selLevel, values);
-        }
-      });
-
-      const { data, error } = await query;
       if (!error && data) {
-        const counts: Record<string, number> = {};
-        data.forEach(item => {
-          counts[item.iucn] = (counts[item.iucn] || 0) + 1;
+        // 更新分類選項
+        const levels: TaxonomyLevel[] = ['phylum_eng', 'class_eng', 'order_eng', 'family_eng', 'genus_eng'];
+        const newOptions = { ...taxonomyOptions };
+
+        levels.forEach(level => {
+          const rawData = data[level] || [];
+          newOptions[level] = rawData.map((item: any) => ({
+            name: item.name,
+            display: language === 'zh' ? item.chi : item.name,
+            count: parseInt(item.count)
+          })).sort((a: any, b: any) => b.count - a.count);
         });
-        setIucnCounts(counts);
+
+        setTaxonomyOptions(newOptions);
+        
+        // 更新 IUCN 計數
+        setIucnCounts(data.iucn || {});
+      } else if (error) {
+        console.error('RPC Error fetching species stats:', error);
       }
     }
 
-    fetchTaxonomyOptions();
-    fetchIUCNCounts();
-  }, [selected, language]); // 當選擇改變或語言改變時觸發連動更新
+    fetchStats();
+  }, [selected, language, searchQuery]); // 當選擇改變、語言改變或搜尋文字改變時觸發連動更新
 
   const filterOptions = taxonomyOptions;
 
@@ -329,21 +287,30 @@ export default function SidebarFilter({
                   {IUCN_STATUSES.map((status) => {
                     const count = iucnCounts[status] || 0;
                     const isSelected = selected.iucn.includes(status);
-                    if (count === 0 && !isSelected) return null; // Only show active statuses
+                    const config = getIUCNConfig(status);
+                    const label = language === 'zh' ? config.label.zh : config.label.en;
                     
+                    // Always show for complete filter list, but dim if count is 0 and not selected
+                    const isEmpty = count === 0 && !isSelected;
+
                     return (
                       <button
                         key={status}
                         onClick={() => handleIUCNToggle(status)}
                         className={`
-                          px-3 py-1.5 rounded-xl text-xs font-bold transition-all border shadow-sm flex items-center gap-1
+                          px-3 py-1.5 rounded-xl text-[11px] font-black transition-all border shadow-sm flex items-center gap-1.5 uppercase tracking-wider
                           ${isSelected
-                            ? 'bg-amber-600 border-amber-600 text-white shadow-md'
-                            : 'bg-amber-50 border-amber-100 text-amber-900 hover:bg-amber-100'}
+                            ? `${config.styles} shadow-md scale-105 ring-2 ring-emerald-500/20`
+                            : isEmpty 
+                              ? 'bg-slate-50 border-slate-100 text-slate-300 opacity-50 grayscale hover:grayscale-0 hover:opacity-100'
+                              : 'bg-white border-slate-200 text-slate-600 hover:border-emerald-200 hover:bg-slate-50'}
                         `}
                       >
                         {isSelected && <CheckCircle2 className="w-3 h-3" />}
-                        {language === 'zh' ? IUCN_MAP[status] : status}
+                        {label}
+                        <span className={`text-[10px] font-bold ${isSelected ? 'text-white/70' : 'text-slate-400'}`}>
+                          ({count})
+                        </span>
                       </button>
                     );
                   })}

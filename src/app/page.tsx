@@ -10,7 +10,7 @@ import { Species } from '@/types/species';
 import { useLanguage } from '@/context/LanguageContext';
 import { supabase } from '@/lib/supabase';
 import { Loader2 } from 'lucide-react';
-import { debounce } from 'lodash';
+import debounce from 'lodash/debounce';
 
 export default function Home() {
   const { language, t } = useLanguage();
