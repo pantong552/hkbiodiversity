@@ -5,8 +5,9 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { supabase } from '@/lib/supabase';
 import { Species } from '@/types/species';
-import { ArrowLeft, Map, ExternalLink, Bookmark, Image as ImageIcon, Loader2 } from 'lucide-react';
+import { ArrowLeft, Loader2 } from 'lucide-react';
 import { useLanguage } from '@/context/LanguageContext';
+import SpeciesContent from '@/components/species/SpeciesContent';
 
 export default function SpeciesDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { language } = useLanguage();
@@ -102,22 +103,6 @@ export default function SpeciesDetailPage({ params }: { params: Promise<{ id: st
       </div>
 
       <SpeciesContent species={species} showBreadcrumb={true} />
-    </div>
-  );
-}
-
-function StatusRow({ label, value, isPrimary = false }: { label: string, value?: string, isPrimary?: boolean }) {
-  if (!value) return null;
-  
-  return (
-    <div className="flex flex-col">
-      <span className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5">{label}</span>
-      <span className={`
-        text-sm font-semibold
-        ${isPrimary ? 'px-3 py-1.5 bg-emerald-50 text-emerald-700 rounded-lg border border-emerald-100 inline-block w-fit' : 'text-slate-700'}
-      `}>
-        {value}
-      </span>
     </div>
   );
 }
