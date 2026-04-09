@@ -7,6 +7,7 @@ import { useLanguage } from '@/context/LanguageContext';
 import { Bookmark, Map, ExternalLink, Image as ImageIcon } from 'lucide-react';
 import TaxonomyDisplay from './TaxonomyDisplay';
 import ConservationStatus from './ConservationStatus';
+import CommentSection from '../comments/CommentSection';
 
 interface SpeciesContentProps {
   species: Species;
@@ -149,6 +150,9 @@ export default function SpeciesContent({ species, showBreadcrumb = true }: Speci
                 </ul>
               </section>
             )}
+
+            {/* 社群討論系統 */}
+            <CommentSection speciesId={species.id} />
           </div>
 
           {/* Right Column - Conservation Status (Sticky) */}
