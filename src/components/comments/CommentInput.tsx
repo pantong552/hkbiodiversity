@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { Send, Loader2, X } from 'lucide-react';
 import Image from 'next/image';
+import { useLanguage } from '@/context/LanguageContext';
 
 interface CommentInputProps {
   onSubmit: (content: string) => Promise<void>;
@@ -18,14 +19,18 @@ interface CommentInputProps {
 
 export default function CommentInput({
   onSubmit,
-  placeholder = '留下您的評論...',
+  placeholder,
   initialContent = '',
   onCancel,
   isLoading = false,
   userProfile
 }: CommentInputProps) {
+  const { language } = useLanguage();
   const [content, setContent] = useState(initialContent);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  const defaultPlaceholder = language === 'zh' ? '留下您的評論...' : 'Write a comment...';
+  const displayPlaceholder = placeholder || defaultPlaceholder;
 
   // Auto-resize textarea
   useEffect(() => {
@@ -68,7 +73,7 @@ export default function CommentInput({
             ref={textareaRef}
             value={content}
             onChange={(e) => setContent(e.target.value)}
-            placeholder={placeholder}
+            placeholder={displayPlaceholder}
             rows={1}
             maxLength={1000}
             className="w-full bg-transparent border-none outline-none resize-none py-2 text-slate-700 placeholder:text-slate-400 font-medium"
@@ -92,7 +97,7 @@ export default function CommentInput({
                   onClick={onCancel}
                   className="px-4 py-2 text-xs font-bold text-slate-500 uppercase tracking-widest hover:bg-slate-50 rounded-xl transition-colors"
                 >
-                  取消
+                  {language === 'zh' ? '取消' : 'Cancel'}
                 </button>
               )}
               <button
@@ -110,7 +115,7 @@ export default function CommentInput({
                 ) : (
                   <>
                     <Send className="h-3 w-3" />
-                    發布
+                    {language === 'zh' ? '發布' : 'Post'}
                   </>
                 )}
               </button>

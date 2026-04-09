@@ -154,8 +154,12 @@ export default function CommentItem({
           {!isEditing && (
             <div className="flex items-center gap-6">
               <button 
-                onClick={() => onLike(comment.id)}
-                className={`flex items-center gap-1.5 text-xs font-bold tracking-tight transition-all active:scale-90 ${comment.user_has_liked ? 'text-rose-500' : 'text-slate-400 hover:text-rose-400'}`}
+                onClick={() => currentUserId && onLike(comment.id)}
+                disabled={!currentUserId}
+                title={!currentUserId ? (language === 'zh' ? '請先登入以按讚' : 'Please log in to like') : ''}
+                className={`flex items-center gap-1.5 text-xs font-bold tracking-tight transition-all active:scale-90 
+                  ${!currentUserId ? 'opacity-30 cursor-not-allowed' : ''}
+                  ${comment.user_has_liked ? 'text-rose-500' : 'text-slate-400 hover:text-rose-400'}`}
               >
                 <Heart className={`w-3.5 h-3.5 ${comment.user_has_liked ? 'fill-current' : ''}`} />
                 <span>{comment.likes_count || 0}</span>
@@ -163,8 +167,12 @@ export default function CommentItem({
               
               {!isReply && (
                 <button 
-                  onClick={() => setIsReplying(!isReplying)}
-                  className={`flex items-center gap-1.5 text-xs font-bold tracking-tight transition-all ${isReplying ? 'text-emerald-600' : 'text-slate-400 hover:text-emerald-500'}`}
+                  onClick={() => currentUserId && setIsReplying(!isReplying)}
+                  disabled={!currentUserId}
+                  title={!currentUserId ? (language === 'zh' ? '請先登入以回覆' : 'Please log in to reply') : ''}
+                  className={`flex items-center gap-1.5 text-xs font-bold tracking-tight transition-all 
+                    ${!currentUserId ? 'opacity-30 cursor-not-allowed' : ''}
+                    ${isReplying ? 'text-emerald-600' : 'text-slate-400 hover:text-emerald-500'}`}
                 >
                   <Reply className="w-3.5 h-3.5" />
                   <span>{language === 'zh' ? '回覆' : 'Reply'}</span>
