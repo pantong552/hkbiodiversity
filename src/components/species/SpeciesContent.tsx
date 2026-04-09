@@ -55,9 +55,16 @@ export default function SpeciesContent({ species, showBreadcrumb = true }: Speci
             <span className="inline-block px-3 py-1 bg-emerald-500/20 text-emerald-300 border border-emerald-400/30 rounded-full text-[10px] font-bold tracking-widest uppercase mb-4">
               {species.taxa_group} • ID: {species.species_id}
             </span>
-            <h1 className="text-4xl md:text-5xl font-black text-white mb-2 leading-tight">
-              {commonName}
-            </h1>
+            <div className="flex flex-col mb-2">
+              <h1 className="text-4xl md:text-5xl font-black text-white leading-tight">
+                {commonName}
+              </h1>
+              {language === 'zh' && species.common_name_eng && (
+                <p className="text-xl text-emerald-200/60 font-medium tracking-wide">
+                  {species.common_name_eng}
+                </p>
+              )}
+            </div>
             <p className="text-lg md:text-xl text-emerald-50 font-serif tracking-wide italic">
               {species.scientific_name} <span className="text-emerald-200/60 not-italic text-sm ml-2">{species.author}</span>
             </p>
@@ -107,6 +114,15 @@ export default function SpeciesContent({ species, showBreadcrumb = true }: Speci
                 {language === 'zh' ? '地理分佈' : 'Distribution'}
               </h2>
               
+              {/* MapBox Banner Placeholder */}
+              <div className="w-full h-[300px] bg-slate-200 rounded-[2.5rem] border-2 border-dashed border-slate-300 flex flex-col items-center justify-center text-slate-500 relative overflow-hidden group">
+                {/* Simulated map background grid */}
+                <div className="absolute inset-0 opacity-20" style={{ backgroundImage: 'radial-gradient(circle at 2px 2px, slate-400 1px, transparent 0)', backgroundSize: '24px 24px' }}></div>
+                <Map className="w-12 h-12 mb-3 text-slate-400 group-hover:scale-110 transition-transform" />
+                <p className="font-bold text-lg">{language === 'zh' ? 'MapBox 地圖整合即將推出' : 'MapBox Integration Coming Soon'}</p>
+                <p className="text-sm mt-1">{language === 'zh' ? '預留全站滿版展示佈局' : 'Reserved for full-width geographic display'}</p>
+              </div>
+
               <div className="grid md:grid-cols-2 gap-6">
                 <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-100">
                   <h3 className="font-black text-slate-800 mb-2">{language === 'zh' ? '香港分佈' : 'HK Distribution'}</h3>
