@@ -18,6 +18,14 @@ const nextConfig: NextConfig = {
       {
         protocol: 'https',
         hostname: 'lh3.googleusercontent.com',
+      },
+      {
+        protocol: 'https',
+        hostname: 'inaturalist-open-data.s3.amazonaws.com',
+      },
+      {
+        protocol: 'https',
+        hostname: '*.inaturalist.org',
       }
     ],
   },

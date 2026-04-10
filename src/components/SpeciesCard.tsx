@@ -5,12 +5,20 @@ import { Heart, ArrowRight } from 'lucide-react';
 import { Species } from '../types/species';
 import { useLanguage } from '../context/LanguageContext';
 import { useSpeciesPanel } from '../context/SpeciesPanelContext';
+import { useInaturalistPhoto } from '../hooks/useInaturalistPhoto';
 import { getIUCNConfig } from '../constants/statusStyles';
 
 
 export default function SpeciesCard({ species, mode = 'detail' }: { species: Species, mode?: 'detail' | 'photo' }) {
   const { language } = useLanguage();
   const { addSpecies } = useSpeciesPanel();
+  
+  // Fetch iNaturalist photo if local image_url is missing
+  const { imageUrl: inatPhoto, isLoading: isInatLoading } = useInaturalistPhoto(
+    !species.image_url ? species.species_id : undefined
+  );
+
+  const displayImage = species.image_url || inatPhoto || 'https://images.unsplash.com/photo-1549488344-1f9b8d2bd1f3?q=80&w=1080&auto=format&fit=crop';
   
   const config = getIUCNConfig(species.iucn);
   const badgeClass = config.styles;
@@ -30,10 +38,10 @@ export default function SpeciesCard({ species, mode = 'detail' }: { species: Spe
       {/* Image Container with Overlay */}
       <div className={`relative overflow-hidden bg-slate-100 ${isPhoto ? 'h-52' : 'h-60'}`}>
         <Image
-          src={species.image_url || 'https://images.unsplash.com/photo-1549488344-1f9b8d2bd1f3?q=80&w=1080&auto=format&fit=crop'}
+          src={displayImage}
           alt={(language === 'zh' ? species.common_name_chi : species.common_name_eng) || species.scientific_name || 'Species Image'}
           fill
-          className="object-cover transition-transform duration-700 group-hover:scale-110"
+          className={`object-cover transition-all duration-700 group-hover:scale-110 ${isInatLoading ? 'blur-sm grayscale' : 'blur-0 grayscale-0'}`}
         />
         <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
         
