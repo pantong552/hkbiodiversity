@@ -39,3 +39,9 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Dataset
+species_rows.csv
+species_rows_updated.csv
+hkbws_species_partial.csv
+hkbws_species.csv
