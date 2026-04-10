@@ -47,7 +47,15 @@ const translations: Record<Language, Record<string, string>> = {
     'auth.logout': '登出',
     'view.display_mode': '顯示模式',
     'view.mode_detail': '詳情模式',
-    'view.mode_photo': '照片模式'
+    'view.mode_photo': '照片模式',
+    'view.mode_table': '表格模式',
+    'table.order': '目',
+    'table.family': '科',
+    'table.genus': '屬',
+    'table.scientific_name': '科學名',
+    'table.common_name': '俗名',
+    'table.native_status': '原生狀態',
+    'table.iucn_status': 'IUCN 狀態'
   },
   en: {
     'nav.home': 'Home',
@@ -85,7 +93,15 @@ const translations: Record<Language, Record<string, string>> = {
     'auth.logout': 'Logout',
     'view.display_mode': 'Display Mode',
     'view.mode_detail': 'Detail Mode',
-    'view.mode_photo': 'Photo Mode'
+    'view.mode_photo': 'Photo Mode',
+    'view.mode_table': 'Table Mode',
+    'table.order': 'Order',
+    'table.family': 'Family',
+    'table.genus': 'Genus',
+    'table.scientific_name': 'Scientific Name',
+    'table.common_name': 'Common Name',
+    'table.native_status': 'Native Status',
+    'table.iucn_status': 'IUCN Status'
   }
 };
 

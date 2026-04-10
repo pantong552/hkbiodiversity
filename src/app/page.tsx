@@ -1,8 +1,9 @@
 'use client';
 
 import { useState, useMemo, useEffect } from 'react';
-import { Menu, Search, X, FilterX, LayoutGrid, List, ChevronLeft, ChevronRight, Filter } from 'lucide-react';
+import { Menu, Search, X, FilterX, LayoutGrid, List, ChevronLeft, ChevronRight, Filter, Table as TableIcon } from 'lucide-react';
 import SpeciesCard from '@/components/SpeciesCard';
+import SpeciesTable from '@/components/species/SpeciesTable';
 import SidebarFilter, { SelectedFilters } from '@/components/SidebarFilter';
 import Header from '@/components/Header';
 import CustomDropdown from '@/components/ui/CustomDropdown';
@@ -27,9 +28,10 @@ export default function Home() {
   });
 
   // Sorting and Pagination State
-  const [sortBy, setSortBy] = useState<'common_name' | 'scientific_name' | 'rarity'>('common_name');
-  const [itemsPerPage, setItemsPerPage] = useState(12);
-  const [displayMode, setDisplayMode] = useState<'detail' | 'photo'>('detail');
+  const [sortBy, setSortBy] = useState<string>('common_name');
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
+  const [itemsPerPage, setItemsPerPage] = useState(50);
+  const [displayMode, setDisplayMode] = useState<'detail' | 'photo' | 'table'>('detail');
   const [currentPage, setCurrentPage] = useState(1);
 
   // Debounced search logic
@@ -72,10 +74,14 @@ export default function Home() {
         const fieldMap: Record<string, string> = {
           'common_name': language === 'zh' ? 'common_name_chi' : 'common_name_eng',
           'scientific_name': 'scientific_name',
-          'rarity': 'iucn' // 注意：IUCN 排序較複雜，此處先簡單處理
+          'rarity': 'iucn',
+          'order': language === 'zh' ? 'order_chi' : 'order_eng',
+          'family': language === 'zh' ? 'family_chi' : 'family_eng',
+          'genus': language === 'zh' ? 'genus_chi' : 'genus_eng',
+          'native_status': 'native_status'
         };
-        const sortField = fieldMap[sortBy] || 'common_name_chi';
-        query = query.order(sortField, { ascending: true });
+        const sortField = fieldMap[sortBy] || sortBy;
+        query = query.order(sortField, { ascending: sortOrder === 'asc' });
 
         // 5. Server-side Pagination
         const from = (currentPage - 1) * itemsPerPage;
@@ -97,7 +103,7 @@ export default function Home() {
         setIsLoading(false);
       }
     };
-  }, [debouncedSearch, selectedFilters, currentPage, itemsPerPage, sortBy, language]);
+  }, [debouncedSearch, selectedFilters, currentPage, itemsPerPage, sortBy, sortOrder, language]);
 
   useEffect(() => {
     fetchSpecies();
@@ -195,33 +201,37 @@ export default function Home() {
               {/* Advanced Toolbar: Sort & Paging */}
               <div className="flex items-center justify-between bg-white px-8 py-5 rounded-[2rem] shadow-sm border border-slate-100 ring-1 ring-slate-50">
                 <div className="flex items-center gap-8">
-                  <div className="flex items-center gap-3">
-                    <span className="text-[12px] font-black uppercase tracking-widest text-slate-400">{t('sort.label')}</span>
-                    <CustomDropdown
-                      options={[
-                        { value: 'common_name_chi', label: t('sort.common_name') },
-                        { value: 'scientific_name', label: t('sort.scientific_name') },
-                        { value: 'rarity', label: t('sort.rarity') }
-                      ]}
-                      value={sortBy === 'common_name' ? 'common_name_chi' : sortBy}
-                      onChange={(val) => setSortBy(val)}
-                    />
-                  </div>
-                  <div className="h-6 w-px bg-slate-100" />
-                  <div className="flex items-center gap-3">
-                    <span className="text-[12px] font-black uppercase tracking-widest text-slate-400">{t('view.per_page')}</span>
-                    <div className="flex bg-slate-50 rounded-xl p-1">
-                      {[12, 24, 36, 48, 60].map((size) => (
-                        <button
-                          key={size}
-                          onClick={() => setItemsPerPage(size)}
-                          className={`px-3 py-1.5 rounded-lg text-xs font-black transition-all ${itemsPerPage === size ? 'bg-white text-emerald-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
-                        >
-                          {size}
-                        </button>
-                      ))}
+                  {displayMode !== 'table' && (
+                    <>
+                      <div className="flex items-center gap-3">
+                        <span className="text-[12px] font-black uppercase tracking-widest text-slate-400">{t('sort.label')}</span>
+                        <CustomDropdown
+                          options={[
+                            { value: 'common_name', label: t('sort.common_name') },
+                            { value: 'scientific_name', label: t('sort.scientific_name') },
+                            { value: 'rarity', label: t('sort.rarity') }
+                          ]}
+                          value={sortBy}
+                          onChange={(val) => setSortBy(val)}
+                        />
+                      </div>
+                      <div className="h-6 w-px bg-slate-100" />
+                    </>
+                  )}
+                    <div className="flex items-center gap-3">
+                      <span className="text-[12px] font-black uppercase tracking-widest text-slate-400">{t('view.per_page')}</span>
+                      <div className="flex bg-slate-50 rounded-xl p-1">
+                        {[50, 75, 100, 150, 200, 300].map((size) => (
+                          <button
+                            key={size}
+                            onClick={() => setItemsPerPage(size)}
+                            className={`px-3 py-1.5 rounded-lg text-xs font-black transition-all ${itemsPerPage === size ? 'bg-white text-emerald-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
+                          >
+                            {size}
+                          </button>
+                        ))}
+                      </div>
                     </div>
-                  </div>
                   <div className="h-6 w-px bg-slate-100" />
                   <div className="flex items-center gap-3">
                     <span className="text-[12px] font-black uppercase tracking-widest text-slate-400">{t('view.display_mode')}</span>
@@ -239,6 +249,13 @@ export default function Home() {
                         className={`p-1.5 rounded-lg transition-all ${displayMode === 'photo' ? 'bg-white text-emerald-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
                       >
                         <LayoutGrid className="w-4 h-4" />
+                      </button>
+                      <button
+                        onClick={() => setDisplayMode('table')}
+                        title={t('view.mode_table')}
+                        className={`p-1.5 rounded-lg transition-all ${displayMode === 'table' ? 'bg-white text-emerald-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
+                      >
+                        <TableIcon className="w-4 h-4" />
                       </button>
                     </div>
                   </div>
@@ -309,22 +326,36 @@ export default function Home() {
                   {t('filter.clear_all')}
                 </button>
               </div>
-            ) : (
-              /* Grid Layout */
-              <div
-                key={`${currentPage}-${sortBy}-${itemsPerPage}-${searchQuery}-${JSON.stringify(selectedFilters)}-${displayMode}`}
-                className={`
-                  grid gap-x-8 gap-y-12 animate-grid-fade
-                  ${displayMode === 'photo'
-                    ? 'grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 min-[1101px]:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5'
-                    : 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 min-[1101px]:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4'}
-                `}
-              >
-                {paginatedSpecies.map((species) => (
-                  <SpeciesCard key={species.id} species={species} mode={displayMode} />
-                ))}
-              </div>
-            )}
+            ) : displayMode === 'table' ? (
+                <SpeciesTable 
+                  species={paginatedSpecies} 
+                  sortBy={sortBy}
+                  sortOrder={sortOrder}
+                  onSort={(field) => {
+                    if (sortBy === field) {
+                      setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
+                    } else {
+                      setSortBy(field);
+                      setSortOrder('asc');
+                    }
+                  }}
+                />
+              ) : (
+                /* Grid Layout */
+                <div
+                  key={`${currentPage}-${sortBy}-${itemsPerPage}-${searchQuery}-${JSON.stringify(selectedFilters)}-${displayMode}`}
+                  className={`
+                    grid gap-x-8 gap-y-12 animate-grid-fade
+                    ${displayMode === 'photo'
+                      ? 'grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 min-[1101px]:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5'
+                      : 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 min-[1101px]:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4'}
+                  `}
+                >
+                  {paginatedSpecies.map((species) => (
+                    <SpeciesCard key={species.id} species={species} mode={displayMode} />
+                  ))}
+                </div>
+              )}
 
             {/* Full Pagination Navigation */}
             {totalPages > 1 && (
