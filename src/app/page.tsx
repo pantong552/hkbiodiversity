@@ -13,6 +13,12 @@ import { supabase } from '@/lib/supabase';
 import { Loader2 } from 'lucide-react';
 import debounce from 'lodash/debounce';
 
+const PAGE_SIZE_OPTIONS = {
+  detail: [12, 24, 36, 48, 60],
+  photo: [20, 40, 60, 80, 100],
+  table: [50, 75, 100, 150, 200, 300]
+};
+
 export default function Home() {
   const { language, t } = useLanguage();
   const [species, setSpecies] = useState<Species[]>([]);
@@ -31,7 +37,7 @@ export default function Home() {
   // Sorting and Pagination State
   const [sortBy, setSortBy] = useState<string>('common_name');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
-  const [itemsPerPage, setItemsPerPage] = useState(50);
+  const [itemsPerPage, setItemsPerPage] = useState(12);
   const [displayMode, setDisplayMode] = useState<'detail' | 'photo' | 'table'>('detail');
   const [currentPage, setCurrentPage] = useState(1);
 
@@ -131,6 +137,14 @@ export default function Home() {
     'Data Deficient': 6,
     'Not Evaluated': 7,
   };
+
+  // Sync page size when display mode changes
+  useEffect(() => {
+    const currentOptions = PAGE_SIZE_OPTIONS[displayMode];
+    if (!currentOptions.includes(itemsPerPage)) {
+      setItemsPerPage(currentOptions[0]);
+    }
+  }, [displayMode, itemsPerPage]);
 
   // 已由伺服器端處理，此處僅作為佔位或簡單排序微調
   const filteredAndSortedSpecies = species;
@@ -242,7 +256,7 @@ export default function Home() {
                     <div className="flex items-center gap-3">
                       <span className="text-[12px] font-black uppercase tracking-widest text-slate-400">{t('view.per_page')}</span>
                       <div className="flex bg-slate-50 rounded-xl p-1">
-                        {[50, 75, 100, 150, 200, 300].map((size) => (
+                        {PAGE_SIZE_OPTIONS[displayMode].map((size) => (
                           <button
                             key={size}
                             onClick={() => setItemsPerPage(size)}
