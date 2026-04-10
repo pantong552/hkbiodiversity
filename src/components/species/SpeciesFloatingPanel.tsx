@@ -102,8 +102,10 @@ export default function SpeciesFloatingPanel() {
                 {loading ? (
                   <Loader2 className="w-3.5 h-3.5 animate-spin" />
                 ) : (
-                  <span className="text-xs font-black">
-                    {species ? (language === 'zh' ? species.common_name_chi : species.common_name_eng) : `ID: ${id}`}
+                  <span className={`text-xs font-black ${species && !(language === 'zh' ? species.common_name_chi : species.common_name_eng) ? 'italic' : ''}`}>
+                    {species ? (
+                      (language === 'zh' ? species.common_name_chi : species.common_name_eng) || species.scientific_name
+                    ) : `ID: ${id}`}
                   </span>
                 )}
                 <button 

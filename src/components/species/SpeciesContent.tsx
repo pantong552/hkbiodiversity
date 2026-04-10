@@ -45,7 +45,7 @@ export default function SpeciesContent({ species, showBreadcrumb = true }: Speci
       <div className="w-full h-[40vh] min-h-[300px] bg-slate-900 relative overflow-hidden">
         <Image 
           src={species.image_url || 'https://images.unsplash.com/photo-1549488344-1f9b8d2bd1f3?q=80&w=1080&auto=format&fit=crop'} 
-          alt={commonName}
+          alt={commonName || species.scientific_name}
           fill
           className="object-cover opacity-80"
         />
