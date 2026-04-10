@@ -47,6 +47,7 @@ export default function SpeciesContent({ species, showBreadcrumb = true }: Speci
           src={species.image_url || 'https://images.unsplash.com/photo-1549488344-1f9b8d2bd1f3?q=80&w=1080&auto=format&fit=crop'} 
           alt={commonName || species.scientific_name}
           fill
+          sizes="100vw"
           className="object-cover opacity-80"
         />
         <div className="absolute inset-0 bg-gradient-to-t from-slate-900 via-slate-900/20 to-transparent" />

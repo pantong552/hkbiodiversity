@@ -138,13 +138,11 @@ export default function Home() {
     'Not Evaluated': 7,
   };
 
-  // Sync page size when display mode changes
+  // Sync page size when display mode changes to apply default value immediately
   useEffect(() => {
-    const currentOptions = PAGE_SIZE_OPTIONS[displayMode];
-    if (!currentOptions.includes(itemsPerPage)) {
-      setItemsPerPage(currentOptions[0]);
-    }
-  }, [displayMode, itemsPerPage]);
+    const defaultPageSize = PAGE_SIZE_OPTIONS[displayMode][0];
+    setItemsPerPage(defaultPageSize);
+  }, [displayMode]);
 
   // 已由伺服器端處理，此處僅作為佔位或簡單排序微調
   const filteredAndSortedSpecies = species;

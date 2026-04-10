@@ -41,13 +41,14 @@ export default function SpeciesCard({ species, mode = 'detail' }: { species: Spe
           src={displayImage}
           alt={(language === 'zh' ? species.common_name_chi : species.common_name_eng) || species.scientific_name || 'Species Image'}
           fill
+          sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, (max-width: 1280px) 33vw, 25vw"
           className={`object-cover transition-all duration-700 group-hover:scale-110 ${isInatLoading ? 'blur-sm grayscale' : 'blur-0 grayscale-0'}`}
         />
         <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
         
         {/* Overlays */}
         <div className={`absolute left-4 right-4 flex justify-between items-start z-10 ${isPhoto ? 'top-3' : 'top-4'}`}>
-          {!isPhoto && (
+          {!isPhoto && species.iucn && (
             <span className={`
               px-3 py-1 rounded-2xl text-[11px] font-black uppercase tracking-widest backdrop-blur-md shadow-lg border
               ${badgeClass}
@@ -55,23 +56,12 @@ export default function SpeciesCard({ species, mode = 'detail' }: { species: Spe
               {badgeText}
             </span>
           )}
-          {isPhoto && <div />} {/* Spacer if no badge */}
-          
-          <button 
-            onClick={(e) => { e.stopPropagation(); /* 收藏邏輯預留 */ }}
-            className={`
-              bg-white/90 backdrop-blur-md rounded-full shadow-lg border border-white/50 flex items-center justify-center text-slate-400 hover:text-rose-500 hover:bg-white transition-all cursor-pointer
-              ${isPhoto ? 'w-7 h-7' : 'w-8 h-8 md:w-10 md:h-10'}
-            `}
-          >
-            <Heart className={isPhoto ? 'w-3.5 h-3.5' : 'w-4 h-4 md:w-5 h-5'} />
-          </button>
         </div>
       </div>
 
       {/* Content Area */}
-      <div className={`${isPhoto ? 'p-4' : 'p-6'} flex-1 flex flex-col`}>
-        <div className={isPhoto ? 'mb-0' : 'mb-4'}>
+      <div className={`${isPhoto ? 'p-4' : 'p-6'} flex-1 flex flex-col relative`}>
+        <div className={isPhoto ? 'mb-0' : 'mb-4 pr-8'}>
           <h3 className={`font-black text-slate-900 mb-0.5 group-hover:text-emerald-600 transition-colors leading-tight ${isPhoto ? 'text-base line-clamp-1' : 'text-xl'}`}>
             {language === 'zh' ? species.common_name_chi : species.common_name_eng}
           </h3>
@@ -80,7 +70,7 @@ export default function SpeciesCard({ species, mode = 'detail' }: { species: Spe
           </p>
         </div>
 
-        {!isPhoto && (
+        {!isPhoto ? (
           <>
             {/* Taxonomy Tags */}
             <div className="flex flex-wrap gap-1.5 mb-6">
@@ -102,12 +92,15 @@ export default function SpeciesCard({ species, mode = 'detail' }: { species: Spe
                   {language === 'zh' ? species.informal_group_chi : species.informal_group_eng}
                 </span>
               </div>
-              <div className="flex items-center gap-1 text-emerald-600 font-black text-[11px] uppercase tracking-widest hover:translate-x-1 transition-transform">
-                Details <ArrowRight className="w-3.5 h-3.5" />
-              </div>
+              <button 
+                onClick={(e) => { e.stopPropagation(); /* 收藏邏輯預留 */ }}
+                className="w-8 h-8 rounded-full border border-slate-100 flex items-center justify-center text-slate-300 hover:text-rose-500 hover:bg-rose-50 hover:border-rose-100 transition-all cursor-pointer bg-white"
+              >
+                <Heart className="w-4 h-4" />
+              </button>
             </div>
           </>
-        )}
+        ) : null}
       </div>
     </div>
   );

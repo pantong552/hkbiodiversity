@@ -125,25 +125,22 @@ export default function SpeciesTable({
                         options={col.key === 'iucn' ? iucnOptions : nativeOptions}
                         value={filters[col.key] || ''}
                         onChange={(val) => handleSelectChange(col.key, val)}
-                        placeholder={t('filter.reset')}
+                        placeholder=""
                       />
                     ) : (
                       <div className="relative flex items-center">
-                        <Search className="absolute left-3 w-3.5 h-3.5 text-slate-300 group-focus-within:text-emerald-500 transition-colors pointer-events-none" />
+                        <Search 
+                          className="absolute left-3 w-3.5 h-3.5 text-slate-300 group-focus-within:text-emerald-500 transition-colors cursor-pointer hover:scale-110 active:scale-95" 
+                          onClick={() => applyFilter(col.key)}
+                        />
                         <input 
                           type="text"
-                          placeholder={`${t('filter.reset')}...`}
+                          placeholder=""
                           value={localSearchValues[col.key] || ''}
                           onChange={(e) => handleInputChange(col.key, e.target.value)}
                           onKeyDown={(e) => handleKeyDown(e, col.key)}
-                          className="w-full bg-slate-50/50 border border-transparent focus:border-emerald-100 focus:bg-white rounded-xl pl-9 pr-12 py-2 text-xs font-medium outline-none transition-all placeholder:text-slate-300"
+                          className="w-full bg-slate-50/50 border border-transparent focus:border-emerald-100 focus:bg-white rounded-xl pl-9 pr-4 py-2 text-xs font-medium outline-none transition-all placeholder:text-slate-300"
                         />
-                        <button
-                          onClick={() => applyFilter(col.key)}
-                          className="absolute right-1 text-[10px] font-black bg-emerald-500 text-white px-2 py-1 rounded-lg hover:bg-emerald-600 transition-all opacity-0 group-focus-within:opacity-100 hover:scale-105 active:scale-95"
-                        >
-                          ENTER
-                        </button>
                       </div>
                     )}
                   </div>
