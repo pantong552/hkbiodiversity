@@ -20,12 +20,13 @@ export default function Home() {
   const [error, setError] = useState<string | null>(null);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-  const [debouncedSearch, setDebouncedSearch] = useState('');
+  const [localSearch, setLocalSearch] = useState('');
   const [totalResultCount, setTotalResultCount] = useState(0);
   const [selectedFilters, setSelectedFilters] = useState<SelectedFilters>({
     taxonomy: { phylum_eng: [], class_eng: [], order_eng: [], family_eng: [], genus_eng: [] },
     iucn: []
   });
+  const [tableFilters, setTableFilters] = useState<Record<string, string>>({});
 
   // Sorting and Pagination State
   const [sortBy, setSortBy] = useState<string>('common_name');
@@ -34,28 +35,23 @@ export default function Home() {
   const [displayMode, setDisplayMode] = useState<'detail' | 'photo' | 'table'>('detail');
   const [currentPage, setCurrentPage] = useState(1);
 
-  // Debounced search logic
-  const debouncedSetSearch = useMemo(
-    () => debounce((query: string) => setDebouncedSearch(query), 300),
-    []
-  );
-
-  useEffect(() => {
-    debouncedSetSearch(searchQuery);
-  }, [searchQuery, debouncedSetSearch]);
+  // Explicit search trigger
+  const handleSearchTrigger = (value: string) => {
+    setSearchQuery(value);
+  };
 
   const fetchSpecies = useMemo(() => {
     return async () => {
-      console.log('Supabase: 正在根據條件抓取動態資料...', { debouncedSearch, selectedFilters, currentPage, sortBy });
+      console.log('Supabase: 正在根據條件抓取動態資料...', { searchQuery, selectedFilters, currentPage, sortBy });
       setIsLoading(true);
       setError(null);
 
       try {
         let query = supabase.from('species').select('*', { count: 'exact' });
-
-        // 1. Server-side Search (Full Text / Like)
-        if (debouncedSearch) {
-          query = query.or(`common_name_chi.ilike.%${debouncedSearch}%,common_name_eng.ilike.%${debouncedSearch}%,scientific_name.ilike.%${debouncedSearch}%`);
+  
+        // 1. Server-side Search
+        if (searchQuery) {
+          query = query.or(`common_name_chi.ilike.%${searchQuery}%,common_name_eng.ilike.%${searchQuery}%,scientific_name.ilike.%${searchQuery}%`);
         }
 
         // 2. Server-side Taxonomy Filtering
@@ -68,6 +64,23 @@ export default function Home() {
         // 3. Server-side IUCN Filtering
         if (selectedFilters.iucn.length > 0) {
           query = query.in('iucn', selectedFilters.iucn);
+        }
+
+        // 3.5 Table Mode Specific Header Filters
+        if (displayMode === 'table') {
+          Object.entries(tableFilters).forEach(([key, value]) => {
+            if (value) {
+              if (key === 'common_name') {
+                query = query.or(`common_name_chi.ilike.%${value}%,common_name_eng.ilike.%${value}%`);
+              } else if (key === 'scientific_name') {
+                query = query.ilike('scientific_name', `%${value}%`);
+              } else if (key === 'order' || key === 'family') {
+                query = query.or(`${key}_chi.ilike.%${value}%,${key}_eng.ilike.%${value}%`);
+              } else {
+                query = query.ilike(key, `%${value}%`);
+              }
+            }
+          });
         }
 
         // 4. Server-side Sorting
@@ -103,7 +116,7 @@ export default function Home() {
         setIsLoading(false);
       }
     };
-  }, [debouncedSearch, selectedFilters, currentPage, itemsPerPage, sortBy, sortOrder, language]);
+  }, [searchQuery, selectedFilters, tableFilters, currentPage, itemsPerPage, sortBy, sortOrder, displayMode, language]);
 
   useEffect(() => {
     fetchSpecies();
@@ -129,7 +142,7 @@ export default function Home() {
   // Reset page when filters or itemsPerPage change
   useEffect(() => {
     setCurrentPage(1);
-  }, [selectedFilters, searchQuery, itemsPerPage]);
+  }, [selectedFilters, searchQuery, itemsPerPage, tableFilters]);
 
   const handleFilterChange = (filters: SelectedFilters) => {
     setSelectedFilters(filters);
@@ -148,8 +161,9 @@ export default function Home() {
               isOpen={isSidebarOpen}
               onClose={() => setIsSidebarOpen(false)}
               onFilterChange={handleFilterChange}
-              searchQuery={searchQuery}
-              onSearchChange={setSearchQuery}
+              searchValue={localSearch}
+              onSearchChange={setLocalSearch}
+              onSearchSubmit={() => handleSearchTrigger(localSearch)}
             />
           </div>
 
@@ -177,17 +191,24 @@ export default function Home() {
                   </p>
                 </div>
                 <div className="flex flex-col items-end gap-4">
-                  <div className="bg-white shadow-xl shadow-slate-200/50 rounded-[2rem] p-2 flex items-center ring-1 ring-slate-100">
-                    <div className="relative group">
+                  <div className="bg-white shadow-xl shadow-slate-200/50 rounded-[2rem] p-2 flex items-center ring-1 ring-slate-100 group">
+                    <div className="relative flex items-center">
+                      <Search className="w-6 h-6 text-slate-400 absolute left-4 pointer-events-none group-focus-within:text-emerald-500 transition-colors" />
                       <input
                         type="text"
-                        value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
+                        value={localSearch}
+                        onChange={(e) => setLocalSearch(e.target.value)}
+                        onKeyDown={(e) => e.key === 'Enter' && handleSearchTrigger(localSearch)}
                         placeholder={t('search.placeholder')}
                         suppressHydrationWarning={true}
-                        className="bg-transparent pl-12 pr-6 py-3 w-[400px] outline-none text-slate-900 font-bold placeholder:text-slate-300"
+                        className="bg-transparent pl-14 pr-24 py-3 w-[450px] outline-none text-slate-900 font-bold placeholder:text-slate-300"
                       />
-                      <Search className="w-6 h-6 text-slate-400 absolute left-4 top-1/2 -translate-y-1/2 group-focus-within:text-emerald-500 transition-colors" />
+                      <button
+                        onClick={() => handleSearchTrigger(localSearch)}
+                        className="absolute right-2 px-4 py-2 bg-emerald-600 text-white text-xs font-black rounded-xl shadow-lg shadow-emerald-100 opacity-0 group-focus-within:opacity-100 hover:scale-105 active:scale-95 transition-all"
+                      >
+                        ENTER
+                      </button>
                     </div>
                   </div>
                   <div className="flex items-center gap-4 text-xs font-black text-slate-400 uppercase tracking-widest">
@@ -315,7 +336,9 @@ export default function Home() {
                 </p>
                 <button
                   onClick={() => {
+                    setLocalSearch('');
                     setSearchQuery('');
+                    setTableFilters({});
                     setSelectedFilters({
                       taxonomy: { phylum_eng: [], class_eng: [], order_eng: [], family_eng: [], genus_eng: [] },
                       iucn: []
@@ -331,6 +354,8 @@ export default function Home() {
                   species={paginatedSpecies} 
                   sortBy={sortBy}
                   sortOrder={sortOrder}
+                  filters={tableFilters}
+                  onFilterChange={setTableFilters}
                   onSort={(field) => {
                     if (sortBy === field) {
                       setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');

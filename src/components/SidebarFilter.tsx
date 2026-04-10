@@ -10,8 +10,9 @@ interface SidebarFilterProps {
   isOpen: boolean;
   onClose: () => void;
   onFilterChange: (filters: SelectedFilters) => void;
-  searchQuery: string;
-  onSearchChange: (query: string) => void;
+  searchValue: string;
+  onSearchChange: (value: string) => void;
+  onSearchSubmit: () => void;
 }
 
 export interface SelectedFilters {
@@ -23,8 +24,9 @@ export default function SidebarFilter({
   isOpen, 
   onClose,
   onFilterChange,
-  searchQuery,
-  onSearchChange
+  searchValue,
+  onSearchChange,
+  onSearchSubmit
 }: SidebarFilterProps) {
   const { language, t } = useLanguage();
 
@@ -67,7 +69,6 @@ export default function SidebarFilter({
 
   useEffect(() => {
     async function fetchStats() {
-      // 準備 RPC 參數，將目前的過濾狀態傳給資料庫
       const rpcParams = {
         p_phylum_eng: selected.taxonomy.phylum_eng,
         p_class_eng: selected.taxonomy.class_eng,
@@ -75,7 +76,7 @@ export default function SidebarFilter({
         p_family_eng: selected.taxonomy.family_eng,
         p_genus_eng: selected.taxonomy.genus_eng,
         p_iucn: selected.iucn,
-        p_search: searchQuery
+        p_search: searchValue
       };
 
       const { data, error } = await supabase.rpc('get_species_stats', rpcParams);
@@ -130,7 +131,7 @@ export default function SidebarFilter({
     }
 
     fetchStats();
-  }, [selected, language, searchQuery]); // 當選擇改變、語言改變或搜尋文字改變時觸發連動更新
+  }, [selected, language]); // 移除 searchValue，使列表統計不會在輸入時即時更新
 
   const filterOptions = taxonomyOptions;
 
@@ -220,16 +221,23 @@ export default function SidebarFilter({
             </button>
           </div>
 
-          <div className="relative mb-10 group">
+          <div className="relative mb-10 group flex items-center">
+            <Search className="w-6 h-6 text-emerald-300 absolute left-4 pointer-events-none group-focus-within:text-emerald-500 transition-colors" />
             <input 
               type="text" 
               placeholder={t('search.sidebar_placeholder')} 
-              value={searchQuery}
+              value={searchValue}
               onChange={(e) => onSearchChange(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && onSearchSubmit()}
               suppressHydrationWarning={true}
-              className="w-full pl-12 pr-4 py-4 bg-cyan-50/50 border-2 border-transparent rounded-2xl text-emerald-900 placeholder:text-cyan-400 focus:bg-white focus:border-emerald-200 focus:ring-4 focus:ring-cyan-50 transition-all outline-none"
+              className="w-full pl-12 pr-12 py-4 bg-cyan-50/50 border-2 border-transparent rounded-2xl text-emerald-900 placeholder:text-cyan-400 focus:bg-white focus:border-emerald-200 focus:ring-4 focus:ring-cyan-50 transition-all outline-none"
             />
-            <Search className="w-6 h-6 text-emerald-300 absolute left-4 top-4 group-focus-within:text-emerald-500 transition-colors" />
+            <button
+              onClick={onSearchSubmit}
+              className="absolute right-2 p-2 bg-emerald-600 text-white rounded-xl shadow-lg shadow-emerald-100 opacity-0 group-focus-within:opacity-100 hover:scale-105 active:scale-95 transition-all text-[10px] font-black"
+            >
+              GO
+            </button>
           </div>
 
           <div className="space-y-8">
