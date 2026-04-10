@@ -87,11 +87,37 @@ export default function SidebarFilter({
 
         levels.forEach(level => {
           const rawData = data[level] || [];
-          newOptions[level] = rawData.map((item: any) => ({
-            name: item.name,
-            display: language === 'zh' ? item.chi : item.name,
-            count: parseInt(item.count)
-          })).sort((a: any, b: any) => b.count - a.count);
+          const uniqueItems = new Map<string, { name: string; display: string; count: number }>();
+          
+          rawData.forEach((item: any) => {
+            const name = item.name || 'Unknown';
+            const existing = uniqueItems.get(name);
+            const count = parseInt(item.count) || 0;
+            const chiName = item.chi || name;
+            
+            if (existing) {
+              existing.count += count;
+              // 策略：如果現有的顯示名稱含有亂碼（\ufffd），則用新的名稱取代
+              // 或者如果新項目的 count 遠大於原本的（代表更有代表性），也進行取代
+              const isCurrentGlitchy = existing.display.includes('\ufffd');
+              const isNewGlitchy = chiName.includes('\ufffd');
+              
+              if ((isCurrentGlitchy && !isNewGlitchy) || (count > (existing.count - count) && !isNewGlitchy)) {
+                existing.display = language === 'zh' ? chiName : name;
+              }
+            } else {
+              uniqueItems.set(name, {
+                name: name,
+                display: language === 'zh' ? chiName : name,
+                count: count
+              });
+            }
+          });
+
+          // 過濾掉無意義的 Unknown 或空值
+          newOptions[level] = Array.from(uniqueItems.values())
+            .filter(opt => opt.name !== 'Unknown' && opt.display.trim() !== '')
+            .sort((a, b) => b.count - a.count);
         });
 
         setTaxonomyOptions(newOptions);
