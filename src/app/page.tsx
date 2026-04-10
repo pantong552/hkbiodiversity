@@ -29,6 +29,7 @@ export default function Home() {
   // Sorting and Pagination State
   const [sortBy, setSortBy] = useState<'common_name' | 'scientific_name' | 'rarity'>('common_name');
   const [itemsPerPage, setItemsPerPage] = useState(12);
+  const [displayMode, setDisplayMode] = useState<'detail' | 'photo'>('detail');
   const [currentPage, setCurrentPage] = useState(1);
 
   // Debounced search logic
@@ -46,7 +47,7 @@ export default function Home() {
       console.log('Supabase: 正在根據條件抓取動態資料...', { debouncedSearch, selectedFilters, currentPage, sortBy });
       setIsLoading(true);
       setError(null);
-      
+
       try {
         let query = supabase.from('species').select('*', { count: 'exact' });
 
@@ -84,7 +85,7 @@ export default function Home() {
         const { data, error, count } = await query;
 
         if (error) throw error;
-        
+
         if (data) {
           setSpecies(data as Species[]);
           setTotalResultCount(count || 0);
@@ -134,12 +135,12 @@ export default function Home() {
 
       <main className="max-w-[1920px] mx-auto px-6 sm:px-10 min-[1101px]:px-16 py-10">
         <div className="flex flex-col lg:flex-row gap-12 lg:gap-16">
-          
+
           {/* Sidebar Area - Collapses at 1100px */}
           <div className="shrink-0 min-[1101px]:w-[320px]">
-            <SidebarFilter 
-              isOpen={isSidebarOpen} 
-              onClose={() => setIsSidebarOpen(false)} 
+            <SidebarFilter
+              isOpen={isSidebarOpen}
+              onClose={() => setIsSidebarOpen(false)}
               onFilterChange={handleFilterChange}
               searchQuery={searchQuery}
               onSearchChange={setSearchQuery}
@@ -170,77 +171,97 @@ export default function Home() {
                   </p>
                 </div>
                 <div className="flex flex-col items-end gap-4">
-                   <div className="bg-white shadow-xl shadow-slate-200/50 rounded-[2rem] p-2 flex items-center ring-1 ring-slate-100">
-                      <div className="relative group">
-                        <input 
-                          type="text" 
-                          value={searchQuery}
-                          onChange={(e) => setSearchQuery(e.target.value)}
-                          placeholder={t('search.placeholder')} 
-                          suppressHydrationWarning={true}
-                          className="bg-transparent pl-12 pr-6 py-3 w-[400px] outline-none text-slate-900 font-bold placeholder:text-slate-300"
-                        />
-                        <Search className="w-6 h-6 text-slate-400 absolute left-4 top-1/2 -translate-y-1/2 group-focus-within:text-emerald-500 transition-colors" />
-                      </div>
-                   </div>
-                   <div className="flex items-center gap-4 text-xs font-black text-slate-400 uppercase tracking-widest">
-                      <span>{t('results.found')} {totalResultCount} {t('results.unit')}</span>
-                      <div className="w-1 h-1 rounded-full bg-slate-300" />
-                      <span>{t('results.viewing_page')} {currentPage} {t('results.page_of')} {totalPages || 1}</span>
-                   </div>
+                  <div className="bg-white shadow-xl shadow-slate-200/50 rounded-[2rem] p-2 flex items-center ring-1 ring-slate-100">
+                    <div className="relative group">
+                      <input
+                        type="text"
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        placeholder={t('search.placeholder')}
+                        suppressHydrationWarning={true}
+                        className="bg-transparent pl-12 pr-6 py-3 w-[400px] outline-none text-slate-900 font-bold placeholder:text-slate-300"
+                      />
+                      <Search className="w-6 h-6 text-slate-400 absolute left-4 top-1/2 -translate-y-1/2 group-focus-within:text-emerald-500 transition-colors" />
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-4 text-xs font-black text-slate-400 uppercase tracking-widest">
+                    <span>{t('results.found')} {totalResultCount} {t('results.unit')}</span>
+                    <div className="w-1 h-1 rounded-full bg-slate-300" />
+                    <span>{t('results.viewing_page')} {currentPage} {t('results.page_of')} {totalPages || 1}</span>
+                  </div>
                 </div>
               </div>
 
               {/* Advanced Toolbar: Sort & Paging */}
               <div className="flex items-center justify-between bg-white px-8 py-5 rounded-[2rem] shadow-sm border border-slate-100 ring-1 ring-slate-50">
-                 <div className="flex items-center gap-8">
-                    <div className="flex items-center gap-3">
-                       <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">{t('sort.label')}</span>
-                       <CustomDropdown 
-                          options={[
-                            { value: 'common_name_chi', label: t('sort.common_name') },
-                            { value: 'scientific_name', label: t('sort.scientific_name') },
-                            { value: 'rarity', label: t('sort.rarity') }
-                          ]}
-                          value={sortBy === 'common_name' ? 'common_name_chi' : sortBy}
-                          onChange={(val) => setSortBy(val)}
-                       />
+                <div className="flex items-center gap-8">
+                  <div className="flex items-center gap-3">
+                    <span className="text-[12px] font-black uppercase tracking-widest text-slate-400">{t('sort.label')}</span>
+                    <CustomDropdown
+                      options={[
+                        { value: 'common_name_chi', label: t('sort.common_name') },
+                        { value: 'scientific_name', label: t('sort.scientific_name') },
+                        { value: 'rarity', label: t('sort.rarity') }
+                      ]}
+                      value={sortBy === 'common_name' ? 'common_name_chi' : sortBy}
+                      onChange={(val) => setSortBy(val)}
+                    />
+                  </div>
+                  <div className="h-6 w-px bg-slate-100" />
+                  <div className="flex items-center gap-3">
+                    <span className="text-[12px] font-black uppercase tracking-widest text-slate-400">{t('view.per_page')}</span>
+                    <div className="flex bg-slate-50 rounded-xl p-1">
+                      {[12, 24, 36, 48, 60].map((size) => (
+                        <button
+                          key={size}
+                          onClick={() => setItemsPerPage(size)}
+                          className={`px-3 py-1.5 rounded-lg text-xs font-black transition-all ${itemsPerPage === size ? 'bg-white text-emerald-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
+                        >
+                          {size}
+                        </button>
+                      ))}
                     </div>
-                    <div className="h-6 w-px bg-slate-100" />
-                    <div className="flex items-center gap-3">
-                       <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">{t('view.per_page')}</span>
-                       <div className="flex bg-slate-50 rounded-xl p-1">
-                          {[8, 12, 16, 20, 24].map((size) => (
-                             <button
-                                key={size}
-                                onClick={() => setItemsPerPage(size)}
-                                className={`px-3 py-1.5 rounded-lg text-xs font-black transition-all ${itemsPerPage === size ? 'bg-white text-emerald-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
-                             >
-                                {size}
-                             </button>
-                          ))}
-                       </div>
+                  </div>
+                  <div className="h-6 w-px bg-slate-100" />
+                  <div className="flex items-center gap-3">
+                    <span className="text-[12px] font-black uppercase tracking-widest text-slate-400">{t('view.display_mode')}</span>
+                    <div className="flex bg-slate-50 rounded-xl p-1">
+                      <button
+                        onClick={() => setDisplayMode('detail')}
+                        title={t('view.mode_detail')}
+                        className={`p-1.5 rounded-lg transition-all ${displayMode === 'detail' ? 'bg-white text-emerald-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
+                      >
+                        <List className="w-4 h-4" />
+                      </button>
+                      <button
+                        onClick={() => setDisplayMode('photo')}
+                        title={t('view.mode_photo')}
+                        className={`p-1.5 rounded-lg transition-all ${displayMode === 'photo' ? 'bg-white text-emerald-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
+                      >
+                        <LayoutGrid className="w-4 h-4" />
+                      </button>
                     </div>
-                 </div>
-                 
-                 {/* Mini pagination for top toolbar */}
-                 <div className="flex items-center gap-2">
-                    <button 
-                      disabled={currentPage === 1}
-                      onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-                      className="p-2 rounded-xl border border-slate-100 text-slate-400 hover:bg-slate-50 disabled:opacity-30 disabled:hover:bg-transparent transition-all"
-                    >
-                       <ChevronLeft className="w-4 h-4" />
-                    </button>
-                    <span className="text-xs font-black text-slate-700 px-2">{currentPage} / {totalPages || 1}</span>
-                    <button 
-                      disabled={currentPage === totalPages || totalPages === 0}
-                      onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
-                      className="p-2 rounded-xl border border-slate-100 text-slate-400 hover:bg-slate-50 disabled:opacity-30 disabled:hover:bg-transparent transition-all"
-                    >
-                       <ChevronRight className="w-4 h-4" />
-                    </button>
-                 </div>
+                  </div>
+                </div>
+
+                {/* Mini pagination for top toolbar */}
+                <div className="flex items-center gap-2">
+                  <button
+                    disabled={currentPage === 1}
+                    onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                    className="p-2 rounded-xl border border-slate-100 text-slate-400 hover:bg-slate-50 disabled:opacity-30 disabled:hover:bg-transparent transition-all"
+                  >
+                    <ChevronLeft className="w-4 h-4" />
+                  </button>
+                  <span className="text-xs font-black text-slate-700 px-2">{currentPage} / {totalPages || 1}</span>
+                  <button
+                    disabled={currentPage === totalPages || totalPages === 0}
+                    onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                    className="p-2 rounded-xl border border-slate-100 text-slate-400 hover:bg-slate-50 disabled:opacity-30 disabled:hover:bg-transparent transition-all"
+                  >
+                    <ChevronRight className="w-4 h-4" />
+                  </button>
+                </div>
               </div>
             </div>
 
@@ -259,7 +280,7 @@ export default function Home() {
                 <p className="text-red-600 font-medium mb-8 max-w-sm px-6">
                   錯誤訊息: {error}
                 </p>
-                <button 
+                <button
                   onClick={() => window.location.reload()}
                   className="px-8 py-4 bg-red-600 text-white font-black rounded-2xl shadow-xl shadow-red-200 hover:-translate-y-1 transition-all"
                 >
@@ -275,7 +296,7 @@ export default function Home() {
                 <p className="text-slate-400 font-medium mb-8 max-w-sm px-6">
                   {t('empty.subtitle')}
                 </p>
-                <button 
+                <button
                   onClick={() => {
                     setSearchQuery('');
                     setSelectedFilters({
@@ -290,12 +311,17 @@ export default function Home() {
               </div>
             ) : (
               /* Grid Layout */
-              <div 
-                key={`${currentPage}-${sortBy}-${itemsPerPage}-${searchQuery}-${JSON.stringify(selectedFilters)}`}
-                className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 min-[1101px]:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-x-8 gap-y-12 animate-grid-fade"
+              <div
+                key={`${currentPage}-${sortBy}-${itemsPerPage}-${searchQuery}-${JSON.stringify(selectedFilters)}-${displayMode}`}
+                className={`
+                  grid gap-x-8 gap-y-12 animate-grid-fade
+                  ${displayMode === 'photo'
+                    ? 'grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 min-[1101px]:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5'
+                    : 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 min-[1101px]:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4'}
+                `}
               >
                 {paginatedSpecies.map((species) => (
-                  <SpeciesCard key={species.id} species={species} />
+                  <SpeciesCard key={species.id} species={species} mode={displayMode} />
                 ))}
               </div>
             )}
@@ -304,7 +330,7 @@ export default function Home() {
             {totalPages > 1 && (
               <div className="mt-20 pt-10 border-t border-slate-200/60 flex flex-col items-center gap-6">
                 <div className="flex items-center gap-2">
-                  <button 
+                  <button
                     disabled={currentPage === 1}
                     onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
                     className="p-2 rounded-xl border border-slate-200 text-slate-500 hover:bg-slate-50 disabled:opacity-30 transition-all"
@@ -316,7 +342,7 @@ export default function Home() {
                       .filter(p => p === 1 || p === totalPages || (p >= currentPage - 2 && p <= currentPage + 2))
                       .map((p, i, arr) => (
                         <div key={p} className="flex items-center">
-                          {i > 0 && arr[i-1] !== p - 1 && <span className="px-2 text-slate-300">...</span>}
+                          {i > 0 && arr[i - 1] !== p - 1 && <span className="px-2 text-slate-300">...</span>}
                           <button
                             onClick={() => {
                               setCurrentPage(p);
@@ -329,7 +355,7 @@ export default function Home() {
                         </div>
                       ))}
                   </div>
-                  <button 
+                  <button
                     disabled={currentPage === totalPages}
                     onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
                     className="p-2 rounded-xl border border-slate-200 text-slate-500 hover:bg-slate-50 disabled:opacity-30 transition-all"
@@ -342,7 +368,7 @@ export default function Home() {
                 </p>
               </div>
             )}
-            
+
             <div className="h-20" />
           </div>
         </div>

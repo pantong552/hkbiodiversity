@@ -44,7 +44,10 @@ const translations: Record<Language, Record<string, string>> = {
     'empty.subtitle': '請嘗試放寬篩選條件，或使用不同的搜尋字串進行檢索。',
     'view.per_page': '每頁顯示',
     'auth.login': '登入',
-    'auth.logout': '登出'
+    'auth.logout': '登出',
+    'view.display_mode': '顯示模式',
+    'view.mode_detail': '詳情模式',
+    'view.mode_photo': '照片模式'
   },
   en: {
     'nav.home': 'Home',
@@ -79,7 +82,10 @@ const translations: Record<Language, Record<string, string>> = {
     'empty.subtitle': 'Try relaxing your filters or using different search terms.',
     'view.per_page': 'Per Page',
     'auth.login': 'Login',
-    'auth.logout': 'Logout'
+    'auth.logout': 'Logout',
+    'view.display_mode': 'Display Mode',
+    'view.mode_detail': 'Detail Mode',
+    'view.mode_photo': 'Photo Mode'
   }
 };
 
