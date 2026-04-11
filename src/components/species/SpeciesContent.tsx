@@ -8,6 +8,8 @@ import { Bookmark, Map, ExternalLink, Image as ImageIcon } from 'lucide-react';
 import TaxonomyDisplay from './TaxonomyDisplay';
 import ConservationStatus from './ConservationStatus';
 import CommentSection from '../comments/CommentSection';
+import SpeciesPhotoGallery from './SpeciesPhotoGallery';
+
 
 interface SpeciesContentProps {
   species: Species;
@@ -83,6 +85,17 @@ export default function SpeciesContent({ species, showBreadcrumb = true }: Speci
             
             {/* Taxonomy Section - New Design */}
             <TaxonomyDisplay species={species} />
+
+            {/* iNaturalist Photo Gallery */}
+            {species.species_id && (
+              <section className="bg-white p-8 rounded-[2.5rem] shadow-sm border border-slate-100">
+                <SpeciesPhotoGallery 
+                  taxonId={species.species_id} 
+                  commonName={commonName || species.scientific_name} 
+                />
+              </section>
+            )}
+
 
             {/* Description */}
             {description && (
