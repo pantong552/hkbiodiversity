@@ -36,6 +36,17 @@ export interface InatPhoto {
   nativePageUrl: string | null;
 }
 
+const convertInatUrl = (url: string, size: 'square' | 'small' | 'medium' | 'large' | 'original') => {
+  if (!url) return '';
+  return url
+    .replace('/square.', `/${size}.`)
+    .replace('/medium.', `/${size}.`)
+    .replace('/large.', `/${size}.`)
+    .replace('/small.', `/${size}.`)
+    .replace('size=square', `size=${size}`)
+    .replace('size=medium', `size=${size}`);
+};
+
 /**
  * Helper to fetch with retry, exponential backoff, AND concurrency control
  */
@@ -121,7 +132,17 @@ export function useInaturalistPhoto(taxonId: number | string | undefined) {
           ...(result.taxon_photos || []).map((tp: any) => tp.photo)
         ].filter(p => p !== undefined && p !== null);
 
-        const validPhoto = allPhotos.find(p => p.license_code !== null);
+        let validPhoto = allPhotos.find((p: any) => p.license_code !== null);
+
+        // --- FALLBACK: Try Observations API if no valid taxon photo found ---
+        // This solves issues like ID 708162 where taxon has only RR photos but observations have CC photos
+        if (!validPhoto) {
+          const obsData = await fetchWithRetry(`https://api.inaturalist.org/v1/observations?taxon_id=${tId}&quality_grade=research&per_page=1&order_by=votes`);
+          const firstObs = obsData.results?.[0];
+          if (firstObs && firstObs.photos?.length > 0) {
+            validPhoto = firstObs.photos.find((p: any) => p.license_code !== null);
+          }
+        }
 
         if (validPhoto) {
           let author = 'Unknown';
@@ -144,7 +165,8 @@ export function useInaturalistPhoto(taxonId: number | string | undefined) {
           const nativeUrl = validPhoto.native_page_url || `https://www.inaturalist.org/photos/${validPhoto.id}`;
 
           const finalData: InatPhoto = {
-            url: validPhoto.medium_url || validPhoto.url,
+            // Use medium resolution for cards to balance quality and mobile loading speed
+            url: convertInatUrl(validPhoto.medium_url || validPhoto.url, 'medium'),
             attribution: simplifiedAttribution,
             licenseCode: validPhoto.license_code,
             nativePageUrl: nativeUrl
