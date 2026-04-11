@@ -21,15 +21,19 @@ interface SpeciesPhotoGalleryProps {
   commonName?: string;
   initialPhotos?: InatGalleryPhoto[];
   isInitialLoading?: boolean;
+  dataScope?: 'hongkong' | 'global';
 }
 
 export default function SpeciesPhotoGallery({ 
   taxonId, 
   commonName, 
   initialPhotos = [], 
-  isInitialLoading = false 
+  isInitialLoading = false,
+  dataScope: externalDataScope
 }: SpeciesPhotoGalleryProps) {
-  const { photos: fetchedPhotos, isLoading, hasMore, loadMore } = useInaturalistSpeciesPhotos(taxonId);
+  const { photos: fetchedPhotos, isLoading, hasMore, loadMore, dataScope: internalDataScope } = useInaturalistSpeciesPhotos(taxonId);
+  
+  const dataScope = externalDataScope || internalDataScope;
   
   // Combine internal state with external photos for immediate rendering
   const [photos, setPhotos] = useState<InatGalleryPhoto[]>(initialPhotos);
@@ -188,7 +192,9 @@ export default function SpeciesPhotoGallery({
           </div>
           <div className="flex flex-col items-start pr-1">
             <span className="text-[10px] font-black text-slate-700 tracking-wider leading-none">iNaturalist</span>
-            <span className="text-[8px] font-bold text-emerald-600 tracking-tight leading-none mt-1 uppercase">Hong Kong • Research Grade</span>
+            <span className={`text-[8px] font-bold tracking-tight leading-none mt-1 uppercase transition-colors duration-500 ${dataScope === 'global' ? 'text-blue-600' : 'text-emerald-600'}`}>
+              {dataScope === 'global' ? 'Global • Research Grade' : 'Hong Kong • Research Grade'}
+            </span>
           </div>
         </div>
       </div>

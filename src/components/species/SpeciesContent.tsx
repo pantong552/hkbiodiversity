@@ -11,6 +11,7 @@ import CommentSection from '../comments/CommentSection';
 import SpeciesPhotoGallery from './SpeciesPhotoGallery';
 import { useInaturalistSpeciesPhotos, InatGalleryPhoto } from '@/hooks/useInaturalistSpeciesPhotos';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useRef } from 'react';
 
 
 interface SpeciesContentProps {
@@ -20,7 +21,16 @@ interface SpeciesContentProps {
 
 const SpeciesHeroBackground = ({ photos, defaultImage }: { photos: InatGalleryPhoto[], defaultImage: string }) => {
   const [index, setIndex] = React.useState(0);
-  const displayPhotos = photos.length > 0 ? photos : [];
+  
+  // Use a ref to keep track of the last valid photos to prevent flickering during scope fallback
+  const lastValidPhotosRef = useRef<InatGalleryPhoto[]>([]);
+  
+  if (photos.length > 0) {
+    lastValidPhotosRef.current = photos;
+  }
+
+  const displayPhotos = photos.length > 0 ? photos : lastValidPhotosRef.current;
+  const hasPhotos = displayPhotos.length > 0;
 
   React.useEffect(() => {
     if (displayPhotos.length <= 1) return;
@@ -33,34 +43,34 @@ const SpeciesHeroBackground = ({ photos, defaultImage }: { photos: InatGalleryPh
   }, [displayPhotos.length]);
 
   return (
-    <div className="absolute inset-0 z-0">
+    <div className="absolute inset-0 z-0 bg-slate-950">
       <AnimatePresence mode="wait">
         <motion.div
-          key={displayPhotos.length > 0 ? displayPhotos[index].id : 'default'}
+          key={hasPhotos ? `hero-${displayPhotos[index].id}` : 'default-bg'}
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          transition={{ duration: 1.5 }}
+          transition={{ duration: 1.2, ease: "easeInOut" }}
           className="absolute inset-0"
         >
           {/* Background Image */}
           <Image 
-            src={displayPhotos.length > 0 ? (displayPhotos[index].large_url || displayPhotos[index].url) : defaultImage} 
+            src={hasPhotos ? (displayPhotos[index].large_url || displayPhotos[index].url) : defaultImage} 
             alt="Species background"
             fill
             sizes="100vw"
-            className="object-cover opacity-80"
-            priority
+            className="object-cover opacity-70"
+            priority={index === 0}
           />
           
-          {/* Individual Gradient Overlay - Prevents blocking clicks when nested */}
-          <div className="absolute inset-0 bg-gradient-to-t from-slate-900 via-slate-900/10 to-transparent z-10" />
+          {/* Individual Gradient Overlay */}
+          <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-900/20 to-transparent z-10" />
 
-          {/* Dynamic Photo Credit - Nested inside motion.div for animation sync */}
-          {displayPhotos.length > 0 && (
+          {/* Dynamic Photo Credit */}
+          {hasPhotos && (
             <div 
-              className="absolute bottom-6 right-8 z-30 flex items-center gap-2 px-3 py-1.5 bg-black/40 backdrop-blur-md rounded-full border border-white/10 hover:bg-black/60 transition-colors group cursor-default"
-              onClick={(e) => e.stopPropagation()} // Prevent any parent clicks
+              className="absolute bottom-6 right-8 z-30 flex items-center gap-2 px-3 py-1.5 bg-black/40 backdrop-blur-md rounded-full border border-white/10 hover:bg-black/60 transition-colors group cursor-default pointer-events-auto"
+              onClick={(e) => e.stopPropagation()}
             >
               <span className="text-[10px] font-medium text-white/90 tracking-wide drop-shadow-sm select-none">
                 {displayPhotos[index].attribution}
@@ -86,7 +96,7 @@ const SpeciesHeroBackground = ({ photos, defaultImage }: { photos: InatGalleryPh
 
 export default function SpeciesContent({ species, showBreadcrumb = true }: SpeciesContentProps) {
   const { language } = useLanguage();
-  const { photos, isLoading: isPhotosLoading } = useInaturalistSpeciesPhotos(species.species_id);
+  const { photos, isLoading: isPhotosLoading, dataScope } = useInaturalistSpeciesPhotos(species.species_id);
 
   const commonName = language === 'zh' ? species.common_name_chi : species.common_name_eng;
   const description = language === 'zh' ? species.description_chi : species.description_eng;
@@ -159,6 +169,7 @@ export default function SpeciesContent({ species, showBreadcrumb = true }: Speci
                   commonName={commonName || species.scientific_name} 
                   initialPhotos={photos}
                   isInitialLoading={isPhotosLoading}
+                  dataScope={dataScope}
                 />
               </section>
             )}
