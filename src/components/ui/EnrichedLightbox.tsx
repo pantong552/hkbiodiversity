@@ -243,48 +243,59 @@ export default function EnrichedLightbox({
           className="absolute top-0 left-0 right-0 z-[120] p-4 md:p-6 flex items-center justify-between"
         >
           <div className="flex items-center gap-3">
-             <div className="px-4 py-2 bg-white/10 backdrop-blur-md border border-white/10 rounded-2xl flex items-center gap-3">
-                <span className="text-white/40 text-xs font-black tracking-tighter w-8">
-                  {(currentIndex + 1).toString().padStart(2, '0')}
-                </span>
-                <div className="w-px h-3 bg-white/10" />
-                <span className="text-white/40 text-xs font-black tracking-tighter w-8 text-right">
-                  {photos.length.toString().padStart(2, '0')}
-                </span>
+             <div className="px-3 py-1.5 bg-black/20 backdrop-blur-xl border border-white/10 rounded-full flex items-center gap-2.5 shadow-2xl">
+                <div className="flex items-center gap-1.5 font-mono">
+                  <span className="text-emerald-400 text-xs font-black tracking-tight">
+                    {(currentIndex + 1).toString().padStart(2, '0')}
+                  </span>
+                  <span className="text-white/20 text-[10px] font-light">/</span>
+                  <span className="text-white/40 text-[10px] font-bold">
+                    {photos.length.toString().padStart(2, '0')}
+                  </span>
+                </div>
              </div>
              {scale > 1 && (
                <motion.div 
                  initial={{ scale: 0.8, opacity: 0 }}
                  animate={{ scale: 1, opacity: 1 }}
-                 className="px-3 py-2 bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 rounded-xl text-[10px] font-black tracking-widest uppercase"
+                 className="px-3 py-1.5 bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 rounded-full text-[9px] font-black tracking-widest uppercase backdrop-blur-md"
                >
                  Zoom {Math.round(scale * 100)}%
                </motion.div>
              )}
           </div>
 
-          <div className="flex items-center gap-2 md:gap-3 bg-black/20 backdrop-blur-xl p-1.5 rounded-[1.5rem] border border-white/5 shadow-2xl">
+          <div className="flex items-center gap-2 md:gap-3 bg-black/20 backdrop-blur-xl p-1.5 rounded-full border border-white/5 shadow-2xl">
             <button 
               onClick={() => setIsAutoplay(!isAutoplay)}
-              className={`p-2.5 rounded-xl transition-all relative overflow-hidden ${isAutoplay ? 'bg-emerald-500 text-white shadow-[0_0_20px_rgba(16,185,129,0.4)]' : 'text-white/70 hover:bg-white/10 hover:text-white'}`}
+              className={`p-2.5 rounded-full transition-all relative overflow-hidden ${isAutoplay ? 'bg-emerald-500 text-white shadow-[0_0_20px_rgba(16,185,129,0.4)]' : 'text-white/70 hover:bg-white/10 hover:text-white'}`}
               title="Autoplay"
             >
               {isAutoplay ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4 ml-0.5" />}
               {isAutoplay && (
-                <div className="absolute bottom-0 left-0 h-0.5 bg-white/40 transition-none" style={{ width: `${autoplayProgress}%` }} />
+                <div className="absolute bottom-0 left-0 h-1 bg-white/40 transition-none" style={{ width: `${autoplayProgress}%` }} />
               )}
             </button>
+            
+            <div className="hidden md:flex items-center gap-2 border-l border-white/5 pl-2">
+              <button onClick={handleZoomOut} className="p-2.5 text-white/70 hover:bg-white/10 hover:text-white rounded-full transition-all"><ZoomOut className="w-4 h-4" /></button>
+              <button onClick={handleZoomIn} className="p-2.5 text-white/70 hover:bg-white/10 hover:text-white rounded-full transition-all"><ZoomIn className="w-4 h-4" /></button>
+              <button onClick={resetZoom} className="p-2.5 text-white/70 hover:bg-white/10 hover:text-white rounded-full transition-all" title="Reset"><RotateCcw className="w-4 h-4" /></button>
+            </div>
+
             <div className="w-px h-4 bg-white/5" />
-            <button onClick={handleZoomOut} className="p-2.5 text-white/70 hover:bg-white/10 hover:text-white rounded-xl transition-all"><ZoomOut className="w-4 h-4" /></button>
-            <button onClick={handleZoomIn} className="p-2.5 text-white/70 hover:bg-white/10 hover:text-white rounded-xl transition-all"><ZoomIn className="w-4 h-4" /></button>
-            <button onClick={resetZoom} className="p-2.5 text-white/70 hover:bg-white/10 hover:text-white rounded-xl transition-all" title="Reset"><RotateCcw className="w-4 h-4" /></button>
+            
+            <button onClick={handleDownload} className="p-2.5 text-white/70 hover:bg-white/10 hover:text-white rounded-full transition-all" title="Download Original"><Download className="w-4 h-4" /></button>
+            
+            <div className="hidden md:block">
+              <button onClick={toggleFullscreen} className="p-2.5 text-white/70 hover:bg-white/10 hover:text-white rounded-full transition-all" title="Toggle Fullscreen">{isFullscreen ? <Minimize className="w-4 h-4" /> : <Maximize className="w-4 h-4" />}</button>
+            </div>
+
             <div className="w-px h-4 bg-white/5" />
-            <button onClick={handleDownload} className="p-2.5 text-white/70 hover:bg-white/10 hover:text-white rounded-xl transition-all" title="Download Original"><Download className="w-4 h-4" /></button>
-            <button onClick={toggleFullscreen} className="p-2.5 text-white/70 hover:bg-white/10 hover:text-white rounded-xl transition-all" title="Toggle Fullscreen">{isFullscreen ? <Minimize className="w-4 h-4" /> : <Maximize className="w-4 h-4" />}</button>
-            <div className="w-px h-4 bg-white/5" />
+            
             <button 
               onClick={onClose}
-              className="p-2.5 text-white/70 hover:bg-red-500 hover:text-white rounded-xl transition-all"
+              className="p-2.5 text-white/70 hover:bg-red-500 hover:text-white rounded-full transition-all"
             >
               <X className="w-4 h-4" />
             </button>
@@ -369,7 +380,6 @@ export default function EnrichedLightbox({
                 </h3>
                 <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-2 text-white/50 text-xs font-medium">
                   <span className="flex items-center gap-2">
-                    <Info className="w-3.5 h-3.5" />
                     {currentPhoto?.attribution}
                   </span>
                   {currentPhoto?.observedOn && (
