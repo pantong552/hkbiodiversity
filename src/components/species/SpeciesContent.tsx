@@ -9,6 +9,8 @@ import TaxonomyDisplay from './TaxonomyDisplay';
 import ConservationStatus from './ConservationStatus';
 import CommentSection from '../comments/CommentSection';
 import SpeciesPhotoGallery from './SpeciesPhotoGallery';
+import { useInaturalistSpeciesPhotos, InatGalleryPhoto } from '@/hooks/useInaturalistSpeciesPhotos';
+import { motion, AnimatePresence } from 'framer-motion';
 
 
 interface SpeciesContentProps {
@@ -16,8 +18,75 @@ interface SpeciesContentProps {
   showBreadcrumb?: boolean;
 }
 
+const SpeciesHeroBackground = ({ photos, defaultImage }: { photos: InatGalleryPhoto[], defaultImage: string }) => {
+  const [index, setIndex] = React.useState(0);
+  const displayPhotos = photos.length > 0 ? photos : [];
+
+  React.useEffect(() => {
+    if (displayPhotos.length <= 1) return;
+    
+    const timer = setInterval(() => {
+      setIndex((prev) => (prev + 1) % displayPhotos.length);
+    }, 10000);
+    
+    return () => clearInterval(timer);
+  }, [displayPhotos.length]);
+
+  return (
+    <div className="absolute inset-0 z-0">
+      <AnimatePresence mode="wait">
+        <motion.div
+          key={displayPhotos.length > 0 ? displayPhotos[index].id : 'default'}
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 1.5 }}
+          className="absolute inset-0"
+        >
+          {/* Background Image */}
+          <Image 
+            src={displayPhotos.length > 0 ? (displayPhotos[index].large_url || displayPhotos[index].url) : defaultImage} 
+            alt="Species background"
+            fill
+            sizes="100vw"
+            className="object-cover opacity-80"
+            priority
+          />
+          
+          {/* Individual Gradient Overlay - Prevents blocking clicks when nested */}
+          <div className="absolute inset-0 bg-gradient-to-t from-slate-900 via-slate-900/10 to-transparent z-10" />
+
+          {/* Dynamic Photo Credit - Nested inside motion.div for animation sync */}
+          {displayPhotos.length > 0 && (
+            <div 
+              className="absolute bottom-6 right-8 z-30 flex items-center gap-2 px-3 py-1.5 bg-black/40 backdrop-blur-md rounded-full border border-white/10 hover:bg-black/60 transition-colors group cursor-default"
+              onClick={(e) => e.stopPropagation()} // Prevent any parent clicks
+            >
+              <span className="text-[10px] font-medium text-white/90 tracking-wide drop-shadow-sm select-none">
+                {displayPhotos[index].attribution}
+              </span>
+              {displayPhotos[index].observationUrl && (
+                <a 
+                  href={displayPhotos[index].observationUrl} 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  className="text-white/60 hover:text-emerald-400 p-0.5 rounded transition-colors"
+                  title="View on iNaturalist"
+                >
+                  <ExternalLink className="w-3 h-3" />
+                </a>
+              )}
+            </div>
+          )}
+        </motion.div>
+      </AnimatePresence>
+    </div>
+  );
+};
+
 export default function SpeciesContent({ species, showBreadcrumb = true }: SpeciesContentProps) {
   const { language } = useLanguage();
+  const { photos, isLoading: isPhotosLoading } = useInaturalistSpeciesPhotos(species.species_id);
 
   const commonName = language === 'zh' ? species.common_name_chi : species.common_name_eng;
   const description = language === 'zh' ? species.description_chi : species.description_eng;
@@ -44,18 +113,14 @@ export default function SpeciesContent({ species, showBreadcrumb = true }: Speci
       )}
 
       {/* Hero Header */}
-      <div className="w-full h-[40vh] min-h-[300px] bg-slate-900 relative overflow-hidden">
-        <Image 
-          src={species.image_url || 'https://images.unsplash.com/photo-1549488344-1f9b8d2bd1f3?q=80&w=1080&auto=format&fit=crop'} 
-          alt={commonName || species.scientific_name}
-          fill
-          sizes="100vw"
-          className="object-cover opacity-80"
+      <div className="w-full h-[40vh] min-h-[400px] bg-slate-950 relative overflow-hidden">
+        <SpeciesHeroBackground 
+          photos={photos} 
+          defaultImage={species.image_url || 'https://images.unsplash.com/photo-1549488344-1f9b8d2bd1f3?q=80&w=1080&auto=format&fit=crop'} 
         />
-        <div className="absolute inset-0 bg-gradient-to-t from-slate-900 via-slate-900/20 to-transparent" />
         
-        <div className="absolute bottom-0 left-0 w-full p-8 md:p-12">
-          <div className="max-w-7xl mx-auto">
+        <div className="absolute bottom-0 left-0 w-full p-8 md:p-12 z-20 pointer-events-none">
+          <div className="max-w-7xl mx-auto pointer-events-auto">
             <span className="inline-block px-3 py-1 bg-emerald-500/20 text-emerald-300 border border-emerald-400/30 rounded-full text-[10px] font-bold tracking-widest uppercase mb-4">
               {species.taxa_group} • ID: {species.species_id}
             </span>
@@ -92,6 +157,8 @@ export default function SpeciesContent({ species, showBreadcrumb = true }: Speci
                 <SpeciesPhotoGallery 
                   taxonId={species.species_id} 
                   commonName={commonName || species.scientific_name} 
+                  initialPhotos={photos}
+                  isInitialLoading={isPhotosLoading}
                 />
               </section>
             )}

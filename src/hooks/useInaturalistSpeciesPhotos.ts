@@ -97,15 +97,18 @@ export function useInaturalistSpeciesPhotos(taxonId: number | string | undefined
 
     try {
       // Using API v2 Observations endpoint to get more photos
-      // Fields selection for performance, including all resolutions
-      const fields = '(photos:(id:!t,url:!t,small_url:!t,medium_url:!t,large_url:!t,original_url:!t,attribution:!t,license_code:!t))';
-      const url = `https://api.inaturalist.org/v2/observations?taxon_id=${taxonId}&per_page=12&page=${pageNum}&order=desc&order_by=votes&fields=${fields}`;
+      // Fields selection for performance, including all resolutions and outer id
+      // Filtered by: quality_grade=research, place_id=7613 (Hong Kong)
+      const fields = '(id:!t,photos:(id:!t,url:!t,small_url:!t,medium_url:!t,large_url:!t,original_url:!t,attribution:!t,license_code:!t))';
+      const url = `https://api.inaturalist.org/v2/observations?taxon_id=${taxonId}&quality_grade=research&place_id=7613&per_page=12&page=${pageNum}&order=desc&order_by=votes&fields=${fields}`;
       
       const data = await fetchWithRetry(url);
       
       const newPhotos: InatGalleryPhoto[] = (data.results || []).flatMap((obs: any) => 
-        (obs.photos || []).map((p: any) => {
-          let author = 'Unknown';
+        (obs.photos || [])
+          .filter((p: any) => p.license_code !== null) // 僅保留有開放授權的照片 (All Rights Reserved 的為 null)
+          .map((p: any) => {
+            let author = 'Unknown';
           if (p.attribution) {
             author = p.attribution
               .replace(/\(c\)/gi, '')
@@ -118,7 +121,7 @@ export function useInaturalistSpeciesPhotos(taxonId: number | string | undefined
           }
 
           return {
-            id: p.id,
+            id: p.id || `photo-${Math.random()}`,
             url: p.url,
             small_url: p.small_url || convertInatUrl(p.url, 'small'),
             medium_url: p.medium_url || convertInatUrl(p.url, 'medium'),
@@ -127,7 +130,7 @@ export function useInaturalistSpeciesPhotos(taxonId: number | string | undefined
             attribution: `© ${author} (${p.license_code?.toUpperCase() || 'CC0'})`,
             licenseCode: p.license_code,
             nativePageUrl: `https://www.inaturalist.org/photos/${p.id}`,
-            observationUrl: `https://www.inaturalist.org/observations/${obs.id}`
+            observationUrl: obs.id ? `https://www.inaturalist.org/observations/${obs.id}` : null
           };
         })
       );

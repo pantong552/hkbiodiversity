@@ -19,13 +19,32 @@ import { useInaturalistSpeciesPhotos, InatGalleryPhoto } from '@/hooks/useInatur
 interface SpeciesPhotoGalleryProps {
   taxonId: number | string;
   commonName?: string;
+  initialPhotos?: InatGalleryPhoto[];
+  isInitialLoading?: boolean;
 }
 
-export default function SpeciesPhotoGallery({ taxonId, commonName }: SpeciesPhotoGalleryProps) {
-  const { photos, isLoading, hasMore, loadMore } = useInaturalistSpeciesPhotos(taxonId);
+export default function SpeciesPhotoGallery({ 
+  taxonId, 
+  commonName, 
+  initialPhotos = [], 
+  isInitialLoading = false 
+}: SpeciesPhotoGalleryProps) {
+  const { photos: fetchedPhotos, isLoading, hasMore, loadMore } = useInaturalistSpeciesPhotos(taxonId);
+  
+  // Combine internal state with external photos for immediate rendering
+  const [photos, setPhotos] = useState<InatGalleryPhoto[]>(initialPhotos);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isLightboxOpen, setIsLightboxOpen] = useState(false);
   const thumbRef = useRef<HTMLDivElement>(null);
+
+  // Sync internal photos with fetched photos from hook
+  useEffect(() => {
+    if (fetchedPhotos.length > 0) {
+      setPhotos(fetchedPhotos);
+    } else if (initialPhotos.length > 0) {
+      setPhotos(initialPhotos);
+    }
+  }, [fetchedPhotos, initialPhotos]);
 
   // 捲動控制與狀態
   const [isDragging, setIsDragging] = useState(false);
@@ -49,14 +68,28 @@ export default function SpeciesPhotoGallery({ taxonId, commonName }: SpeciesPhot
     const currentThumbRef = thumbRef.current;
     if (currentThumbRef) {
       currentThumbRef.addEventListener('scroll', checkArrows);
+
+      // 實作嚴格捲動阻斷 (Scroll Lock)
+      // 非 passive 事件監聽器才能使用 preventDefault()
+      const handleWheelScroll = (e: WheelEvent) => {
+        if (e.deltaY !== 0) {
+          e.preventDefault();
+          currentThumbRef.scrollLeft += e.deltaY;
+        }
+      };
+
+      currentThumbRef.addEventListener('wheel', handleWheelScroll, { passive: false });
+      
+      window.addEventListener('resize', checkArrows);
+      
+      return () => {
+        if (currentThumbRef) {
+          currentThumbRef.removeEventListener('scroll', checkArrows);
+          currentThumbRef.removeEventListener('wheel', handleWheelScroll);
+        }
+        window.removeEventListener('resize', checkArrows);
+      };
     }
-    window.addEventListener('resize', checkArrows);
-    return () => {
-      if (currentThumbRef) {
-        currentThumbRef.removeEventListener('scroll', checkArrows);
-      }
-      window.removeEventListener('resize', checkArrows);
-    };
   }, [photos]);
 
   const handleMouseDown = (e: React.MouseEvent) => {
@@ -79,10 +112,8 @@ export default function SpeciesPhotoGallery({ taxonId, commonName }: SpeciesPhot
   };
 
   const handleWheel = (e: React.WheelEvent) => {
-    if (thumbRef.current) {
-      // 垂直捲動轉水平
-      thumbRef.current.scrollLeft += e.deltaY;
-    }
+    // 這裡維持空實作，真正的邏輯在 useEffect 的 addEventListener 中處理
+    // 以確保可以使用 preventDefault()
   };
 
   const scrollByAmount = (amount: number) => {
@@ -155,7 +186,10 @@ export default function SpeciesPhotoGallery({ taxonId, commonName }: SpeciesPhot
               className="object-contain p-1"
             />
           </div>
-          <span className="text-xs font-black text-slate-700 tracking-wider">iNaturalist</span>
+          <div className="flex flex-col items-start pr-1">
+            <span className="text-[10px] font-black text-slate-700 tracking-wider leading-none">iNaturalist</span>
+            <span className="text-[8px] font-bold text-emerald-600 tracking-tight leading-none mt-1 uppercase">Hong Kong • Research Grade</span>
+          </div>
         </div>
       </div>
 
@@ -241,6 +275,7 @@ export default function SpeciesPhotoGallery({ taxonId, commonName }: SpeciesPhot
           <AnimatePresence>
             {showLeftArrow && (
               <motion.button
+                key="left-arrow-btn"
                 initial={{ opacity: 0, x: -10 }}
                 animate={{ opacity: 1, x: 0 }}
                 exit={{ opacity: 0, x: -10 }}
@@ -252,6 +287,7 @@ export default function SpeciesPhotoGallery({ taxonId, commonName }: SpeciesPhot
             )}
             {showRightArrow && (
               <motion.button
+                key="right-arrow-btn"
                 initial={{ opacity: 0, x: 10 }}
                 animate={{ opacity: 1, x: 0 }}
                 exit={{ opacity: 0, x: 10 }}
@@ -274,11 +310,11 @@ export default function SpeciesPhotoGallery({ taxonId, commonName }: SpeciesPhot
             onMouseUp={handleMouseUp}
             onMouseLeave={handleMouseUp}
             onWheel={handleWheel}
-            className={`flex gap-4 overflow-x-auto pb-4 pt-2 no-scrollbar scroll-smooth px-2 items-center cursor-grab active:cursor-grabbing ${isDragging ? 'select-none' : ''}`}
+            className={`flex gap-4 overflow-x-auto pb-4 pt-4 no-scrollbar scroll-smooth px-2 items-center cursor-grab active:cursor-grabbing ${isDragging ? 'select-none' : ''}`}
           >
             {photos.map((photo, index) => (
               <button
-                key={photo.id}
+                key={photo.id || `photo-idx-${index}`}
                 onClick={() => !isDragging && setCurrentIndex(index)}
                 className={`relative flex-shrink-0 w-24 aspect-square rounded-2xl overflow-hidden transition-all duration-300 ${index === currentIndex ? 'ring-4 ring-emerald-500 ring-offset-4 ring-offset-slate-50 scale-105 shadow-xl' : 'opacity-60 hover:opacity-100'}`}
               >
