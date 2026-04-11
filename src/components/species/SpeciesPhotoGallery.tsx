@@ -11,44 +11,53 @@ import {
   ImageIcon, 
   Loader2,
   Plus,
-  ExternalLink
+  ExternalLink,
+  Calendar
 } from 'lucide-react';
 import { useInaturalistSpeciesPhotos, InatGalleryPhoto } from '@/hooks/useInaturalistSpeciesPhotos';
-
 
 interface SpeciesPhotoGalleryProps {
   taxonId: number | string;
   commonName?: string;
-  initialPhotos?: InatGalleryPhoto[];
-  isInitialLoading?: boolean;
   dataScope?: 'hongkong' | 'global';
+  onScopeChange?: (scope: 'hongkong' | 'global') => void;
 }
 
 export default function SpeciesPhotoGallery({ 
   taxonId, 
   commonName, 
-  initialPhotos = [], 
-  isInitialLoading = false,
-  dataScope: externalDataScope
+  dataScope: externalDataScope,
+  onScopeChange
 }: SpeciesPhotoGalleryProps) {
-  const { photos: fetchedPhotos, isLoading, hasMore, loadMore, dataScope: internalDataScope } = useInaturalistSpeciesPhotos(taxonId);
+  const { photos: fetchedPhotos, isLoading, hasMore, loadMore, dataScope: internalDataScope, setScope: internalSetScope, hasHkPhotos } = useInaturalistSpeciesPhotos(taxonId);
   
   const dataScope = externalDataScope || internalDataScope;
+  const setScope = onScopeChange || internalSetScope;
+
+  const handleScopeToggle = () => {
+    if (!hasHkPhotos && dataScope === 'global') return;
+    setScope(dataScope === 'hongkong' ? 'global' : 'hongkong');
+  };
   
-  // Combine internal state with external photos for immediate rendering
-  const [photos, setPhotos] = useState<InatGalleryPhoto[]>(initialPhotos);
+  // Internal state for managing the currently displayed list and index
+  const [photos, setPhotos] = useState<InatGalleryPhoto[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isLightboxOpen, setIsLightboxOpen] = useState(false);
+  const [showTooltip, setShowTooltip] = useState(false);
   const thumbRef = useRef<HTMLDivElement>(null);
 
   // Sync internal photos with fetched photos from hook
   useEffect(() => {
+    if (isLoading && fetchedPhotos.length === 0) {
+      setPhotos([]);
+      setCurrentIndex(0);
+      return;
+    }
+
     if (fetchedPhotos.length > 0) {
       setPhotos(fetchedPhotos);
-    } else if (initialPhotos.length > 0) {
-      setPhotos(initialPhotos);
     }
-  }, [fetchedPhotos, initialPhotos]);
+  }, [fetchedPhotos, isLoading]);
 
   // 捲動控制與狀態
   const [isDragging, setIsDragging] = useState(false);
@@ -181,21 +190,53 @@ export default function SpeciesPhotoGallery({
           <ImageIcon className="w-6 h-6 text-emerald-500" />
           野外觀察相片
         </h2>
-        <div className="flex items-center gap-2 bg-white/50 backdrop-blur-sm border border-slate-200 pl-2 pr-3 py-1.5 rounded-2xl shadow-sm hover:shadow-md transition-all group">
-          <div className="w-8 h-8 rounded-xl bg-white flex items-center justify-center shadow-sm overflow-hidden relative">
-            <Image 
-              src="/INaturalist_logo.svg" 
-              alt="iNaturalist" 
-              fill 
-              className="object-contain p-1"
-            />
-          </div>
-          <div className="flex flex-col items-start pr-1">
-            <span className="text-[10px] font-black text-slate-700 tracking-wider leading-none">iNaturalist</span>
-            <span className={`text-[8px] font-bold tracking-tight leading-none mt-1 uppercase transition-colors duration-500 ${dataScope === 'global' ? 'text-blue-600' : 'text-emerald-600'}`}>
-              {dataScope === 'global' ? 'Global • Research Grade' : 'Hong Kong • Research Grade'}
-            </span>
-          </div>
+        <div className="relative">
+          <button 
+            onClick={handleScopeToggle}
+            onMouseEnter={() => setShowTooltip(true)}
+            onMouseLeave={() => setShowTooltip(false)}
+            disabled={isLoading || (!hasHkPhotos && dataScope === 'global')}
+            className={`flex items-center gap-2 bg-white/50 backdrop-blur-sm border ${dataScope === 'global' ? (hasHkPhotos ? 'border-blue-200 hover:border-blue-300' : 'border-slate-200 opacity-70') : 'border-emerald-200 hover:border-emerald-300'} pl-2 pr-3 py-1.5 rounded-2xl shadow-sm hover:shadow-md transition-all group cursor-pointer disabled:cursor-not-allowed`}
+          >
+            <div className="w-8 h-8 rounded-xl bg-white flex items-center justify-center shadow-sm overflow-hidden relative group-hover:scale-105 transition-transform">
+              <Image 
+                src="/INaturalist_logo.svg" 
+                alt="iNaturalist" 
+                fill 
+                className="object-contain p-1"
+              />
+            </div>
+            <div className="flex flex-col items-start pr-1">
+              <span className="text-[10px] font-black text-slate-700 tracking-wider leading-none">iNaturalist</span>
+              <span className={`text-[8px] font-bold tracking-tight leading-none mt-1 uppercase transition-colors duration-500 flex items-center gap-1 ${dataScope === 'global' ? 'text-blue-600' : 'text-emerald-600'}`}>
+                {dataScope === 'global' ? 'Global • Research Grade' : 'Hong Kong • Research Grade'}
+                <span className={`inline-block w-1 h-1 rounded-full ${dataScope === 'global' ? 'bg-blue-600/50' : 'bg-emerald-600/50'} animate-pulse`}></span>
+              </span>
+            </div>
+          </button>
+
+          {/* Tooltip */}
+          <AnimatePresence>
+            {showTooltip && (
+              <motion.div
+                initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: 10, scale: 0.95 }}
+                className="absolute right-0 top-full mt-2 w-48 p-3 bg-slate-900 text-white rounded-xl shadow-xl z-50 pointer-events-none"
+              >
+                <div className="text-[11px] leading-relaxed font-medium">
+                  {!hasHkPhotos && dataScope === 'global' ? (
+                    <span className="text-amber-400 flex items-center gap-1.5">
+                      此物種目前在香港暫無紀錄，已自動切換至全球模式。
+                    </span>
+                  ) : (
+                    <span>點擊以切換 {dataScope === 'hongkong' ? '全球探索' : '香港本土'} 模式</span>
+                  )}
+                </div>
+                <div className="absolute -top-1 right-6 w-2 h-2 bg-slate-900 rotate-45" />
+              </motion.div>
+            )}
+          </AnimatePresence>
         </div>
       </div>
 
@@ -225,23 +266,34 @@ export default function SpeciesPhotoGallery({
           {/* Overlays */}
           <div className="absolute inset-x-0 bottom-0 p-6 bg-gradient-to-t from-black/80 via-black/20 to-transparent">
             <div className="flex items-end justify-between">
-              <div>
-              <div className="flex items-center gap-3">
-                <p className="text-white font-medium text-sm drop-shadow-md">
-                  {currentPhoto?.attribution}
-                </p>
-                {currentPhoto?.observationUrl && (
-                  <a 
-                    href={currentPhoto.observationUrl} 
-                    target="_blank" 
-                    rel="noopener noreferrer"
-                    className="p-1.5 bg-white/10 hover:bg-emerald-500 rounded-lg text-white transition-all backdrop-blur-md border border-white/20 active:scale-95"
-                    title="View on iNaturalist"
-                  >
-                    <ExternalLink className="w-3.5 h-3.5" />
-                  </a>
+              <div className="flex flex-col items-start gap-1">
+                <div className="flex items-center gap-3">
+                  <p className="text-white font-medium text-sm drop-shadow-md">
+                    {currentPhoto?.attribution}
+                  </p>
+                  {currentPhoto?.observationUrl && (
+                    <a 
+                      href={currentPhoto.observationUrl} 
+                      target="_blank" 
+                      rel="noopener noreferrer"
+                      className="p-1.5 bg-white/10 hover:bg-emerald-500 rounded-lg text-white transition-all backdrop-blur-md border border-white/20 active:scale-95"
+                      title="View on iNaturalist"
+                    >
+                      <ExternalLink className="w-3.5 h-3.5" />
+                    </a>
+                  )}
+                </div>
+                {/* Observation Date */}
+                {currentPhoto?.observedOn && (
+                  <p className="text-white/70 text-[10px] drop-shadow-md flex items-center gap-1.5 tracking-wider uppercase font-medium">
+                    <Calendar className="w-3 h-3" />
+                    {new Date(currentPhoto.observedOn).toLocaleDateString('en-GB', {
+                      day: 'numeric',
+                      month: 'short',
+                      year: 'numeric'
+                    })}
+                  </p>
                 )}
-              </div>
               </div>
               <button 
                 onClick={() => setIsLightboxOpen(true)}

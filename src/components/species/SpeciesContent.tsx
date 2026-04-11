@@ -96,7 +96,7 @@ const SpeciesHeroBackground = ({ photos, defaultImage }: { photos: InatGalleryPh
 
 export default function SpeciesContent({ species, showBreadcrumb = true }: SpeciesContentProps) {
   const { language } = useLanguage();
-  const { photos, isLoading: isPhotosLoading, dataScope } = useInaturalistSpeciesPhotos(species.species_id);
+  const { photos } = useInaturalistSpeciesPhotos(species.species_id);
 
   const commonName = language === 'zh' ? species.common_name_chi : species.common_name_eng;
   const description = language === 'zh' ? species.description_chi : species.description_eng;
@@ -167,9 +167,6 @@ export default function SpeciesContent({ species, showBreadcrumb = true }: Speci
                 <SpeciesPhotoGallery 
                   taxonId={species.species_id} 
                   commonName={commonName || species.scientific_name} 
-                  initialPhotos={photos}
-                  isInitialLoading={isPhotosLoading}
-                  dataScope={dataScope}
                 />
               </section>
             )}

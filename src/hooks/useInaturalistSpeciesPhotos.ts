@@ -13,6 +13,7 @@ export interface InatGalleryPhoto {
   licenseCode: string | null;
   nativePageUrl: string | null;
   observationUrl: string | null;
+  observedOn: string | null;
 }
 
 const convertInatUrl = (url: string, size: 'square' | 'small' | 'medium' | 'large' | 'original') => {
@@ -50,6 +51,7 @@ export function useInaturalistSpeciesPhotos(taxonId: number | string | undefined
     hasMore: true,
     totalCount: 0,
     dataScope: 'hongkong' as 'hongkong' | 'global',
+    hasHkPhotos: true, // Assume true until proven otherwise
     page: 1
   });
 
@@ -60,11 +62,8 @@ export function useInaturalistSpeciesPhotos(taxonId: number | string | undefined
   const fetchInternal = useCallback(async (pageNum: number, scope: 'hongkong' | 'global', isInitial: boolean) => {
     if (!taxonId) return;
     
-    // Safety check: if taxonId changed since last render, we might be in an old closure
-    // But useCallback with [taxonId] handles this.
-
     const placeParam = scope === 'hongkong' ? '&place_id=7613' : '';
-    const fields = '(id:!t,photos:(id:!t,url:!t,small_url:!t,medium_url:!t,large_url:!t,original_url:!t,attribution:!t,license_code:!t))';
+    const fields = '(id:!t,observed_on:!t,photos:(id:!t,url:!t,small_url:!t,medium_url:!t,large_url:!t,original_url:!t,attribution:!t,license_code:!t))';
     const url = `https://api.inaturalist.org/v2/observations?taxon_id=${taxonId}&quality_grade=research${placeParam}&per_page=12&page=${pageNum}&order=desc&order_by=votes&fields=${fields}`;
 
     const data = await fetchWithRetry(url);
@@ -93,7 +92,8 @@ export function useInaturalistSpeciesPhotos(taxonId: number | string | undefined
             attribution: `© ${author} (${p.license_code?.toUpperCase() || 'CC0'})`,
             licenseCode: p.license_code,
             nativePageUrl: `https://www.inaturalist.org/photos/${p.id}`,
-            observationUrl: obs.id ? `https://www.inaturalist.org/observations/${obs.id}` : null
+            observationUrl: obs.id ? `https://www.inaturalist.org/observations/${obs.id}` : null,
+            observedOn: obs.observed_on || null
           };
         })
     );
@@ -108,8 +108,15 @@ export function useInaturalistSpeciesPhotos(taxonId: number | string | undefined
     if (!taxonId || isFetchingRef.current) return;
     
     isFetchingRef.current = true;
+    
+    // When switching scopes or loading a new taxon, clear everything first to avoid UI lag
     if (isInitial) {
-      setState(prev => ({ ...prev, isLoading: true, photos: isInitial ? [] : prev.photos }));
+      setState(prev => ({ 
+        ...prev, 
+        isLoading: true, 
+        photos: [], 
+        dataScope: targetScope 
+      }));
     } else {
       setState(prev => ({ ...prev, isLoading: true }));
     }
@@ -117,17 +124,17 @@ export function useInaturalistSpeciesPhotos(taxonId: number | string | undefined
     try {
       let result = await fetchInternal(targetPage, targetScope, isInitial);
       
-      // FALLBACK LOGIC
+      // FALLBACK LOGIC: If HK requested but empty
       if (isInitial && targetScope === 'hongkong' && (!result || result.photos.length === 0)) {
-        // Automatically try global if Hong Kong is empty on first load
         const globalResult = await fetchInternal(1, 'global', true);
         if (globalResult) {
           setState({
             photos: globalResult.photos,
             isLoading: false,
-            hasMore: globalResult.photos.length === 12,
+            hasMore: globalResult.photos.length > 0 && globalResult.photos.length < globalResult.totalResults,
             totalCount: globalResult.totalResults,
             dataScope: 'global',
+            hasHkPhotos: false,
             page: 1
           });
           return;
@@ -138,15 +145,15 @@ export function useInaturalistSpeciesPhotos(taxonId: number | string | undefined
       if (result) {
         setState(prev => {
           const newPhotos = isInitial ? result.photos : [...prev.photos, ...result.photos];
-          // Simple ID deduplication
           const uniquePhotos = Array.from(new Map(newPhotos.map(p => [p.id, p])).values());
           
           return {
             photos: uniquePhotos,
             isLoading: false,
-            hasMore: result.photos.length === 12,
+            hasMore: uniquePhotos.length < result.totalResults,
             totalCount: result.totalResults,
             dataScope: targetScope,
+            hasHkPhotos: targetScope === 'hongkong' ? (uniquePhotos.length > 0) : prev.hasHkPhotos,
             page: targetPage
           };
         });
@@ -173,8 +180,13 @@ export function useInaturalistSpeciesPhotos(taxonId: number | string | undefined
     }
   }, [state, loadData]);
 
+  const setScope = useCallback((newScope: 'hongkong' | 'global') => {
+    loadData(1, newScope, true);
+  }, [loadData]);
+
   return {
     ...state,
-    loadMore
+    loadMore,
+    setScope
   };
 }
