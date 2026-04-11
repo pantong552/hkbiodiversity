@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import { useInaturalistSpeciesPhotos, InatGalleryPhoto } from '@/hooks/useInaturalistSpeciesPhotos';
 import { useLanguage } from '@/context/LanguageContext';
+import EnrichedLightbox from '../ui/EnrichedLightbox';
 
 
 interface SpeciesPhotoGalleryProps {
@@ -389,69 +390,15 @@ export default function SpeciesPhotoGallery({
         </div>
       </div>
 
-      <AnimatePresence>
-        {isLightboxOpen && (
-          <motion.div 
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/95 backdrop-blur-xl p-4 md:p-12"
-          >
-            <motion.button 
-              initial={{ scale: 0 }}
-              animate={{ scale: 1 }}
-              onClick={() => setIsLightboxOpen(false)}
-              className="absolute top-8 right-8 p-4 bg-white/10 hover:bg-red-500/20 hover:text-red-400 rounded-full text-white transition-all z-[110] border border-white/10"
-            >
-              <X className="w-6 h-6" />
-            </motion.button>
-
-            <motion.div 
-              initial={{ scale: 0.9, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.9, opacity: 0 }}
-              className="relative w-full h-full max-w-7xl flex items-center justify-center"
-            >
-              <Image
-                src={currentPhoto?.original_url}
-                alt="Full observation"
-                className="object-contain w-full h-full"
-                width={1920}
-                height={1080}
-                priority
-              />
-              
-              <button 
-                onClick={handlePrev}
-                disabled={currentIndex === 0}
-                className="absolute left-0 p-6 bg-white/5 hover:bg-white/10 rounded-full text-white/50 hover:text-white transition-all border border-white/10 disabled:opacity-0"
-              >
-                <ChevronLeft className="w-10 h-10" />
-              </button>
-              <button 
-                onClick={handleNext}
-                disabled={currentIndex === photos.length - 1}
-                className="absolute right-0 p-6 bg-white/5 hover:bg-white/10 rounded-full text-white/50 hover:text-white transition-all border border-white/10 disabled:opacity-0"
-              >
-                <ChevronRight className="w-10 h-10" />
-              </button>
-            </motion.div>
-
-            <motion.div 
-              initial={{ y: 50, opacity: 0 }}
-              animate={{ y: 0, opacity: 1 }}
-              className="absolute bottom-8 left-1/2 -translate-x-1/2 w-fit px-8 py-4 bg-white/10 backdrop-blur-md rounded-3xl border border-white/20 text-center"
-            >
-              <p className="text-white text-lg font-bold">
-                {commonName}
-              </p>
-              <p className="text-white/60 text-sm">
-                {currentPhoto?.attribution}
-              </p>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+      <EnrichedLightbox 
+        isOpen={isLightboxOpen}
+        onClose={() => setIsLightboxOpen(false)}
+        photos={photos}
+        currentIndex={currentIndex}
+        onNavigate={(index) => setCurrentIndex(index)}
+        commonName={commonName}
+        language={language}
+      />
 
       <style jsx global>{`
         .no-scrollbar::-webkit-scrollbar {
