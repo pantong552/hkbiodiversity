@@ -1,7 +1,7 @@
 'use client';
 
 import Image from 'next/image';
-import { Heart, ArrowRight } from 'lucide-react';
+import { Heart, Info, ExternalLink, Leaf } from 'lucide-react';
 import { Species } from '../types/species';
 import { useLanguage } from '../context/LanguageContext';
 import { useSpeciesPanel } from '../context/SpeciesPanelContext';
@@ -14,7 +14,7 @@ export default function SpeciesCard({ species, mode = 'detail' }: { species: Spe
   const { addSpecies } = useSpeciesPanel();
   
   // Fetch iNaturalist photo if local image_url is missing
-  const { imageUrl: inatPhoto, isLoading: isInatLoading } = useInaturalistPhoto(
+  const { imageUrl: inatPhoto, isLoading: isInatLoading, attribution, nativePageUrl } = useInaturalistPhoto(
     !species.image_url ? species.species_id : undefined
   );
 
@@ -55,6 +55,49 @@ export default function SpeciesCard({ species, mode = 'detail' }: { species: Spe
             `}>
               {badgeText}
             </span>
+          )}
+
+          {/* iNaturalist Attribution (i) Button */}
+          {attribution && (
+            <div className="absolute top-0 right-0 z-20 group/info">
+              <div className="p-1.5 bg-black/30 hover:bg-black/50 backdrop-blur-md border border-white/10 rounded-full text-white/80 hover:text-white transition-all duration-300 cursor-help">
+                <Info className="w-3.5 h-3.5" />
+              </div>
+              
+              {/* Tooltip Content */}
+              <div className="absolute top-full right-0 mt-2 w-max min-w-[140px] max-w-[200px] bg-slate-900/95 backdrop-blur-xl p-3 rounded-xl shadow-2xl border border-white/10 opacity-0 invisible group-hover/info:opacity-100 group-hover/info:visible transition-all duration-300 -translate-y-2 group-hover/info:translate-y-0 z-30">
+                <div className="flex items-center gap-2 mb-2 pb-2 border-b border-white/5">
+                  <div className="relative w-4 h-4">
+                    <Image 
+                      src="/INaturalist_logo.svg" 
+                      alt="iNaturalist" 
+                      fill
+                      className="object-contain"
+                    />
+                  </div>
+                  <span className="text-[10px] text-white/50 uppercase font-black tracking-widest">iNaturalist</span>
+                </div>
+
+                <div className="space-y-2.5">
+                  <p className="text-[11px] text-white font-bold leading-snug">
+                    © {attribution}
+                  </p>
+                  
+                  {nativePageUrl && (
+                    <a 
+                      href={nativePageUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      onClick={(e) => e.stopPropagation()}
+                      className="flex items-center gap-1.5 text-[10px] text-emerald-400 hover:text-emerald-300 transition-colors font-black uppercase tracking-wider group/link"
+                    >
+                      View Source
+                      <ExternalLink className="w-2.5 h-2.5 transition-transform group-hover/link:translate-x-0.5 group-hover/link:-translate-y-0.5" />
+                    </a>
+                  )}
+                </div>
+              </div>
+            </div>
           )}
         </div>
       </div>
