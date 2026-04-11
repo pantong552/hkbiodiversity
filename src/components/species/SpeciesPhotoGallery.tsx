@@ -170,68 +170,70 @@ export default function SpeciesPhotoGallery({
 
   return (
     <section className="space-y-6">
-      <div className="flex items-center justify-between mb-4">
-        <h2 className="text-2xl font-black text-slate-800 flex items-center gap-3">
-          <ImageIcon className="w-6 h-6 text-emerald-500" />
-          {language === 'zh' ? '野外觀察相片' : 'Field Observations'}
-        </h2>
-        <div className="relative">
-          <button 
-            onClick={handleScopeToggle}
-            onMouseEnter={() => setShowTooltip(true)}
-            onMouseLeave={() => setShowTooltip(false)}
-            disabled={isLoading || (!hasHkPhotos && dataScope === 'global')}
-            className={`flex items-center gap-2 bg-white/50 backdrop-blur-sm border ${dataScope === 'global' ? (hasHkPhotos ? 'border-blue-200 hover:border-blue-300' : 'border-slate-200 opacity-70') : 'border-emerald-200 hover:border-emerald-300'} pl-2 pr-3 py-1.5 rounded-2xl shadow-sm hover:shadow-md transition-all group cursor-pointer disabled:cursor-not-allowed`}
-          >
-            <div className="w-8 h-8 rounded-xl bg-white flex items-center justify-center shadow-sm overflow-hidden relative group-hover:scale-105 transition-transform">
-              <Image 
-                src="/INaturalist_logo.svg" 
-                alt="iNaturalist" 
-                fill 
-                className="object-contain p-1"
-              />
-            </div>
-            <div className="flex flex-col items-start pr-1">
-              <span className="text-[10px] font-black text-slate-700 tracking-wider leading-none">iNaturalist</span>
-              <span className={`text-[8px] font-bold tracking-tight leading-none mt-1 uppercase transition-colors duration-500 flex items-center gap-1 ${dataScope === 'global' ? 'text-blue-600' : 'text-emerald-600'}`}>
-                {dataScope === 'global' ? 'Global • Research Grade' : 'Hong Kong • Research Grade'}
-                <span className={`inline-block w-1 h-1 rounded-full ${dataScope === 'global' ? 'bg-blue-600/50' : 'bg-emerald-600/50'} animate-pulse`}></span>
-              </span>
-            </div>
-          </button>
-
-          <AnimatePresence>
-            {showTooltip && (
-              <motion.div
-                initial={{ opacity: 0, y: 10, scale: 0.95 }}
-                animate={{ opacity: 1, y: 0, scale: 1 }}
-                exit={{ opacity: 0, y: 10, scale: 0.95 }}
-                className="absolute right-0 top-full mt-2 w-48 p-3 bg-slate-900 text-white rounded-xl shadow-xl z-50 pointer-events-none"
-              >
-                <div className="text-[11px] leading-relaxed font-medium">
-                  {!hasHkPhotos && dataScope === 'global' ? (
-                    <span className="text-amber-400 flex items-center gap-1.5">
-                      {language === 'zh' 
-                        ? '此物種目前在香港暫無紀錄，已自動切換至全球模式。' 
-                        : 'No records in HK yet. Auto-switched to Global mode.'}
-                    </span>
-                  ) : (
-                    <span>
-                      {language === 'zh' 
-                        ? `點擊以切換 ${dataScope === 'hongkong' ? '全球探索' : '香港本土'} 模式`
-                        : `Click to switch to ${dataScope === 'hongkong' ? 'Global' : 'Local HK'} mode`}
-                    </span>
-                  )}
-                </div>
-                <div className="absolute -top-1 right-6 w-2 h-2 bg-slate-900 rotate-45" />
-              </motion.div>
-            )}
-          </AnimatePresence>
+      <div className="flex items-center justify-between gap-2 mb-6">
+        <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+          <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl sm:rounded-2xl bg-emerald-50 flex items-center justify-center shrink-0">
+            <ImageIcon className="w-4 h-4 sm:w-5 h-5 text-emerald-500" />
+          </div>
+          <h2 className="text-xl sm:text-2xl font-black text-slate-800 truncate">
+            {language === 'zh' ? '圖庫' : 'Gallery'}
+          </h2>
+        </div>
+        
+        <div className="flex items-center shrink-0">
+          <div className="relative">
+            <button 
+              onClick={handleScopeToggle}
+              onMouseEnter={() => setShowTooltip(true)}
+              onMouseLeave={() => setShowTooltip(false)}
+              disabled={isLoading || (!hasHkPhotos && dataScope === 'global')}
+              className={`flex items-center gap-1.5 sm:gap-2 bg-white/80 backdrop-blur-md border ${dataScope === 'global' ? (hasHkPhotos ? 'border-blue-100 hover:border-blue-200' : 'border-slate-200 opacity-70') : 'border-emerald-100 hover:border-emerald-200'} pl-1 sm:pl-1.5 pr-2 sm:pr-3 py-1 sm:py-1.5 rounded-xl sm:rounded-2xl shadow-sm transition-all group active:scale-95 disabled:cursor-not-allowed`}
+            >
+              <div className="w-6 h-6 sm:w-7 h-7 rounded-lg bg-white flex items-center justify-center shadow-sm overflow-hidden relative shrink-0">
+                <Image 
+                  src="/INaturalist_logo.svg" 
+                  alt="iNaturalist" 
+                  fill 
+                  className="object-contain p-1"
+                />
+              </div>
+              <div className="flex flex-col items-start leading-none gap-0.5">
+                <span className="text-[8px] sm:text-[9px] font-black text-slate-700 tracking-tight uppercase">iNaturalist</span>
+                <span className={`text-[7px] sm:text-[8px] font-bold uppercase transition-colors duration-500 flex items-center gap-1 whitespace-nowrap ${dataScope === 'global' ? 'text-blue-600' : 'text-emerald-600'}`}>
+                  {dataScope === 'global' ? (language === 'zh' ? '全球' : 'Global') : (language === 'zh' ? '香港' : 'HK')}
+                  <span className="opacity-50 ml-0.5 font-black">• Research Grade</span>
+                </span>
+              </div>
+            </button>
+            
+            <AnimatePresence>
+              {showTooltip && (
+                <motion.div
+                  initial={{ opacity: 0, y: 5 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: 5 }}
+                  className="absolute right-0 top-full mt-2 w-44 p-2.5 bg-slate-900/95 backdrop-blur-md text-white rounded-xl shadow-xl z-50 pointer-events-none"
+                >
+                  <div className="text-[10px] leading-snug font-medium">
+                    {!hasHkPhotos && dataScope === 'global' ? (
+                      <span className="text-amber-300">
+                        {language === 'zh' ? '目前僅提供全球模式紀錄' : 'Global mode enabled by default'}
+                      </span>
+                    ) : (
+                      <span>
+                        {language === 'zh' ? `切換至 ${dataScope === 'hongkong' ? '全球' : '本土'} 觀察` : `Switch to ${dataScope === 'hongkong' ? 'Global' : 'Local'} observations`}
+                      </span>
+                    )}
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
         </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-1 gap-6">
-        <div className="relative aspect-[16/10] bg-slate-900 rounded-[2.5rem] overflow-hidden group shadow-2xl">
+        <div className="relative aspect-[4/3] sm:aspect-[16/10] bg-slate-900 rounded-[2rem] sm:rounded-[2.5rem] overflow-hidden group shadow-2xl">
           <AnimatePresence mode="wait">
             <motion.div
               key={currentPhoto?.id}
@@ -239,24 +241,31 @@ export default function SpeciesPhotoGallery({
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.95 }}
               transition={{ duration: 0.4 }}
-              className="absolute inset-0"
+              drag="x"
+              dragConstraints={{ left: 0, right: 0 }}
+              dragElastic={0.2}
+              onDragEnd={(_, info) => {
+                if (info.offset.x < -50) handleNext();
+                if (info.offset.x > 50) handlePrev();
+              }}
+              className="absolute inset-0 cursor-grab active:cursor-grabbing"
             >
               <Image
                 src={currentPhoto?.large_url}
                 alt={commonName || 'Species observation'}
                 fill
-                className="object-cover"
-                sizes="(max-w-1280px) 100vw, 1280px"
+                className="object-contain sm:object-cover"
+                sizes="(max-width: 640px) 100vw, (max-width: 1024px) 80vw, 1200px"
               />
             </motion.div>
           </AnimatePresence>
 
-          <div className="absolute inset-x-0 bottom-0 p-6 bg-gradient-to-t from-black/80 via-black/20 to-transparent">
-            <div className="flex items-end justify-between">
-              <div className="flex flex-col items-start gap-1">
-                {/* (2) Observation Date Above Credit */}
+          {/* 移動端底部簡化資訊層 */}
+          <div className="absolute inset-x-0 bottom-0 p-4 sm:p-6 bg-gradient-to-t from-black/80 via-black/30 to-transparent">
+            <div className="flex items-end justify-between gap-4">
+              <div className="flex flex-col items-start min-w-0">
                 {currentPhoto?.observedOn && (
-                  <p className="text-white/70 text-[10px] drop-shadow-md flex items-center gap-1.5 tracking-wider uppercase font-medium">
+                  <p className="text-white/70 text-[9px] sm:text-[10px] drop-shadow-md flex items-center gap-1.5 mb-1 tracking-wider uppercase font-medium">
                     <Calendar className="w-3 h-3" />
                     {new Date(currentPhoto.observedOn).toLocaleDateString(language === 'zh' ? 'zh-HK' : 'en-GB', {
                       day: 'numeric',
@@ -265,8 +274,8 @@ export default function SpeciesPhotoGallery({
                     })}
                   </p>
                 )}
-                <div className="flex items-center gap-3">
-                  <p className="text-white font-medium text-sm drop-shadow-md">
+                <div className="flex items-center gap-2 max-w-full">
+                  <p className="text-white font-bold text-xs sm:text-sm drop-shadow-md truncate">
                     {currentPhoto?.attribution}
                   </p>
                   {currentPhoto?.observationUrl && (
@@ -275,39 +284,40 @@ export default function SpeciesPhotoGallery({
                       target="_blank" 
                       rel="noopener noreferrer"
                       className="p-1.5 bg-white/10 hover:bg-emerald-500 rounded-lg text-white transition-all backdrop-blur-md border border-white/20 active:scale-95"
-                      title="View on iNaturalist"
                     >
-                      <ExternalLink className="w-3.5 h-3.5" />
+                      <ExternalLink className="w-3 h-3" />
                     </a>
                   )}
                 </div>
               </div>
               <button 
                 onClick={() => setIsLightboxOpen(true)}
-                className="p-3 bg-white/10 backdrop-blur-md border border-white/20 rounded-2xl text-white hover:bg-emerald-500 transition-all group-hover:scale-110 active:scale-95 shadow-lg"
+                className="p-3 sm:p-4 bg-white/10 backdrop-blur-md border border-white/20 rounded-2xl text-white hover:bg-emerald-500 transition-all shadow-lg shrink-0"
               >
-                <Maximize2 className="w-5 h-5" />
+                <Maximize2 className="w-4 h-4 sm:w-5 h-5" />
               </button>
             </div>
           </div>
 
+          {/* 電腦版箭頭 - 行動端隱藏或縮小 */}
           <button 
             onClick={handlePrev}
             disabled={currentIndex === 0}
-            className={`absolute left-4 top-1/2 -translate-y-1/2 p-4 rounded-full backdrop-blur-md border border-white/20 text-white transition-all shadow-xl ${currentIndex === 0 ? 'opacity-0 scale-50 pointer-events-none' : 'opacity-80 hover:opacity-100 hover:bg-white/20 active:scale-90'}`}
+            className={`hidden sm:flex absolute left-4 top-1/2 -translate-y-1/2 p-4 rounded-full backdrop-blur-md border border-white/20 text-white transition-all shadow-xl ${currentIndex === 0 ? 'opacity-0 scale-50 pointer-events-none' : 'opacity-80 hover:opacity-100 hover:bg-white/20 active:scale-90'}`}
           >
             <ChevronLeft className="w-6 h-6" />
           </button>
           <button 
             onClick={handleNext}
             disabled={currentIndex === photos.length - 1}
-            className={`absolute right-4 top-1/2 -translate-y-1/2 p-4 rounded-full backdrop-blur-md border border-white/20 text-white transition-all shadow-xl ${currentIndex === photos.length - 1 ? 'opacity-0 scale-50 pointer-events-none' : 'opacity-80 hover:opacity-100 hover:bg-white/20 active:scale-90'}`}
+            className={`hidden sm:flex absolute right-4 top-1/2 -translate-y-1/2 p-4 rounded-full backdrop-blur-md border border-white/20 text-white transition-all shadow-xl ${currentIndex === photos.length - 1 ? 'opacity-0 scale-50 pointer-events-none' : 'opacity-80 hover:opacity-100 hover:bg-white/20 active:scale-90'}`}
           >
             <ChevronRight className="w-6 h-6" />
           </button>
 
-          <div className="absolute top-6 right-6">
-            <span className="px-4 py-2 bg-black/40 backdrop-blur-md border border-white/20 rounded-full text-white text-[10px] font-black tracking-widest">
+          {/* 張數指示器 - 調整至行動端邊角 */}
+          <div className="absolute top-4 right-4 sm:top-6 sm:right-6">
+            <span className="px-3 py-1.5 bg-black/40 backdrop-blur-md border border-white/10 rounded-xl text-white text-[9px] sm:text-[10px] font-black tracking-widest">
               {currentIndex + 1} / {photos.length}
             </span>
           </div>
@@ -350,7 +360,7 @@ export default function SpeciesPhotoGallery({
             onMouseMove={handleMouseMove}
             onMouseUp={handleMouseUp}
             onMouseLeave={handleMouseUp}
-            className={`flex gap-4 overflow-x-auto pb-4 pt-4 no-scrollbar scroll-smooth px-2 items-center cursor-grab active:cursor-grabbing ${isDragging ? 'select-none' : ''}`}
+            className={`flex gap-4 overflow-x-auto pb-4 pt-4 no-scrollbar scroll-smooth px-6 items-center cursor-grab active:cursor-grabbing ${isDragging ? 'select-none' : ''}`}
           >
             {photos.map((photo, index) => (
               <button
@@ -363,6 +373,7 @@ export default function SpeciesPhotoGallery({
                   alt="Thumb"
                   fill
                   className="object-cover pointer-events-none"
+                  sizes="96px"
                 />
               </button>
             ))}

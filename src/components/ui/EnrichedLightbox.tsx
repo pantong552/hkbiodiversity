@@ -233,6 +233,7 @@ export default function EnrichedLightbox({
             alt="" 
             fill 
             className="object-cover" 
+            sizes="100vw"
           />
         </div>
 
