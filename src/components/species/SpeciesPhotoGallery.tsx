@@ -15,38 +15,32 @@ import {
   Calendar
 } from 'lucide-react';
 import { useInaturalistSpeciesPhotos, InatGalleryPhoto } from '@/hooks/useInaturalistSpeciesPhotos';
+import { useLanguage } from '@/context/LanguageContext';
+
 
 interface SpeciesPhotoGalleryProps {
   taxonId: number | string;
   commonName?: string;
-  dataScope?: 'hongkong' | 'global';
-  onScopeChange?: (scope: 'hongkong' | 'global') => void;
 }
 
 export default function SpeciesPhotoGallery({ 
   taxonId, 
-  commonName, 
-  dataScope: externalDataScope,
-  onScopeChange
+  commonName
 }: SpeciesPhotoGalleryProps) {
-  const { photos: fetchedPhotos, isLoading, hasMore, loadMore, dataScope: internalDataScope, setScope: internalSetScope, hasHkPhotos } = useInaturalistSpeciesPhotos(taxonId);
+  const { language } = useLanguage();
+  const { photos: fetchedPhotos, isLoading, hasMore, loadMore, dataScope, setScope, hasHkPhotos } = useInaturalistSpeciesPhotos(taxonId);
   
-  const dataScope = externalDataScope || internalDataScope;
-  const setScope = onScopeChange || internalSetScope;
-
   const handleScopeToggle = () => {
     if (!hasHkPhotos && dataScope === 'global') return;
     setScope(dataScope === 'hongkong' ? 'global' : 'hongkong');
   };
   
-  // Internal state for managing the currently displayed list and index
   const [photos, setPhotos] = useState<InatGalleryPhoto[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isLightboxOpen, setIsLightboxOpen] = useState(false);
   const [showTooltip, setShowTooltip] = useState(false);
   const thumbRef = useRef<HTMLDivElement>(null);
 
-  // Sync internal photos with fetched photos from hook
   useEffect(() => {
     if (isLoading && fetchedPhotos.length === 0) {
       setPhotos([]);
@@ -59,14 +53,12 @@ export default function SpeciesPhotoGallery({
     }
   }, [fetchedPhotos, isLoading]);
 
-  // 捲動控制與狀態
   const [isDragging, setIsDragging] = useState(false);
   const [startX, setStartX] = useState(0);
   const [scrollLeft, setScrollLeft] = useState(0);
   const [showLeftArrow, setShowLeftArrow] = useState(false);
   const [showRightArrow, setShowRightArrow] = useState(false);
 
-  // 檢查是否需要顯示箭頭
   const checkArrows = () => {
     if (thumbRef.current) {
       const { scrollLeft, scrollWidth, clientWidth } = thumbRef.current;
@@ -77,13 +69,10 @@ export default function SpeciesPhotoGallery({
 
   useEffect(() => {
     checkArrows();
-    // 監聽容器捲動
     const currentThumbRef = thumbRef.current;
     if (currentThumbRef) {
       currentThumbRef.addEventListener('scroll', checkArrows);
 
-      // 實作嚴格捲動阻斷 (Scroll Lock)
-      // 非 passive 事件監聽器才能使用 preventDefault()
       const handleWheelScroll = (e: WheelEvent) => {
         if (e.deltaY !== 0) {
           e.preventDefault();
@@ -92,7 +81,6 @@ export default function SpeciesPhotoGallery({
       };
 
       currentThumbRef.addEventListener('wheel', handleWheelScroll, { passive: false });
-      
       window.addEventListener('resize', checkArrows);
       
       return () => {
@@ -116,17 +104,12 @@ export default function SpeciesPhotoGallery({
     if (!isDragging || !thumbRef.current) return;
     e.preventDefault();
     const x = e.pageX - thumbRef.current.offsetLeft;
-    const walk = (x - startX) * 1.5; // 捲動速度
+    const walk = (x - startX) * 1.5;
     thumbRef.current.scrollLeft = scrollLeft - walk;
   };
 
   const handleMouseUp = () => {
     setIsDragging(false);
-  };
-
-  const handleWheel = (e: React.WheelEvent) => {
-    // 這裡維持空實作，真正的邏輯在 useEffect 的 addEventListener 中處理
-    // 以確保可以使用 preventDefault()
   };
 
   const scrollByAmount = (amount: number) => {
@@ -149,7 +132,6 @@ export default function SpeciesPhotoGallery({
     }
   };
 
-  // Auto-scroll thumbnail into view
   useEffect(() => {
     if (thumbRef.current && !isDragging) {
       const activeThumb = thumbRef.current.children[currentIndex] as HTMLElement;
@@ -178,7 +160,9 @@ export default function SpeciesPhotoGallery({
     return (
       <div className="w-full p-12 flex flex-col items-center justify-center bg-slate-50 rounded-[2.5rem] border-2 border-dashed border-slate-200 text-slate-400">
         <ImageIcon className="w-12 h-12 mb-4 opacity-20" />
-        <p className="font-medium">暫無野外觀察照片</p>
+        <p className="font-medium">
+          {language === 'zh' ? '暫無野外觀察照片' : 'No field observations found'}
+        </p>
       </div>
     );
   }
@@ -188,7 +172,7 @@ export default function SpeciesPhotoGallery({
       <div className="flex items-center justify-between mb-4">
         <h2 className="text-2xl font-black text-slate-800 flex items-center gap-3">
           <ImageIcon className="w-6 h-6 text-emerald-500" />
-          野外觀察相片
+          {language === 'zh' ? '野外觀察相片' : 'Field Observations'}
         </h2>
         <div className="relative">
           <button 
@@ -215,7 +199,6 @@ export default function SpeciesPhotoGallery({
             </div>
           </button>
 
-          {/* Tooltip */}
           <AnimatePresence>
             {showTooltip && (
               <motion.div
@@ -227,10 +210,16 @@ export default function SpeciesPhotoGallery({
                 <div className="text-[11px] leading-relaxed font-medium">
                   {!hasHkPhotos && dataScope === 'global' ? (
                     <span className="text-amber-400 flex items-center gap-1.5">
-                      此物種目前在香港暫無紀錄，已自動切換至全球模式。
+                      {language === 'zh' 
+                        ? '此物種目前在香港暫無紀錄，已自動切換至全球模式。' 
+                        : 'No records in HK yet. Auto-switched to Global mode.'}
                     </span>
                   ) : (
-                    <span>點擊以切換 {dataScope === 'hongkong' ? '全球探索' : '香港本土'} 模式</span>
+                    <span>
+                      {language === 'zh' 
+                        ? `點擊以切換 ${dataScope === 'hongkong' ? '全球探索' : '香港本土'} 模式`
+                        : `Click to switch to ${dataScope === 'hongkong' ? 'Global' : 'Local HK'} mode`}
+                    </span>
                   )}
                 </div>
                 <div className="absolute -top-1 right-6 w-2 h-2 bg-slate-900 rotate-45" />
@@ -240,9 +229,7 @@ export default function SpeciesPhotoGallery({
         </div>
       </div>
 
-      {/* Main Container */}
       <div className="grid grid-cols-1 lg:grid-cols-1 gap-6">
-        {/* Main Viewer */}
         <div className="relative aspect-[16/10] bg-slate-900 rounded-[2.5rem] overflow-hidden group shadow-2xl">
           <AnimatePresence mode="wait">
             <motion.div
@@ -263,10 +250,20 @@ export default function SpeciesPhotoGallery({
             </motion.div>
           </AnimatePresence>
 
-          {/* Overlays */}
           <div className="absolute inset-x-0 bottom-0 p-6 bg-gradient-to-t from-black/80 via-black/20 to-transparent">
             <div className="flex items-end justify-between">
               <div className="flex flex-col items-start gap-1">
+                {/* (2) Observation Date Above Credit */}
+                {currentPhoto?.observedOn && (
+                  <p className="text-white/70 text-[10px] drop-shadow-md flex items-center gap-1.5 tracking-wider uppercase font-medium">
+                    <Calendar className="w-3 h-3" />
+                    {new Date(currentPhoto.observedOn).toLocaleDateString(language === 'zh' ? 'zh-HK' : 'en-GB', {
+                      day: 'numeric',
+                      month: 'short',
+                      year: 'numeric'
+                    })}
+                  </p>
+                )}
                 <div className="flex items-center gap-3">
                   <p className="text-white font-medium text-sm drop-shadow-md">
                     {currentPhoto?.attribution}
@@ -283,17 +280,6 @@ export default function SpeciesPhotoGallery({
                     </a>
                   )}
                 </div>
-                {/* Observation Date */}
-                {currentPhoto?.observedOn && (
-                  <p className="text-white/70 text-[10px] drop-shadow-md flex items-center gap-1.5 tracking-wider uppercase font-medium">
-                    <Calendar className="w-3 h-3" />
-                    {new Date(currentPhoto.observedOn).toLocaleDateString('en-GB', {
-                      day: 'numeric',
-                      month: 'short',
-                      year: 'numeric'
-                    })}
-                  </p>
-                )}
               </div>
               <button 
                 onClick={() => setIsLightboxOpen(true)}
@@ -304,7 +290,6 @@ export default function SpeciesPhotoGallery({
             </div>
           </div>
 
-          {/* Navigation Arrows */}
           <button 
             onClick={handlePrev}
             disabled={currentIndex === 0}
@@ -320,7 +305,6 @@ export default function SpeciesPhotoGallery({
             <ChevronRight className="w-6 h-6" />
           </button>
 
-          {/* Counter Tag */}
           <div className="absolute top-6 right-6">
             <span className="px-4 py-2 bg-black/40 backdrop-blur-md border border-white/20 rounded-full text-white text-[10px] font-black tracking-widest">
               {currentIndex + 1} / {photos.length}
@@ -329,7 +313,6 @@ export default function SpeciesPhotoGallery({
         </div>
 
         <div className="relative group/thumbs">
-          {/* Scroll Arrows */}
           <AnimatePresence>
             {showLeftArrow && (
               <motion.button
@@ -357,7 +340,6 @@ export default function SpeciesPhotoGallery({
             )}
           </AnimatePresence>
 
-          {/* Gradient Masks */}
           <div className={`absolute inset-y-0 left-0 w-12 bg-gradient-to-r from-slate-50 to-transparent z-[1] pointer-events-none transition-opacity duration-300 ${showLeftArrow ? 'opacity-100' : 'opacity-0'}`} />
           <div className={`absolute inset-y-0 right-0 w-12 bg-gradient-to-l from-slate-50 to-transparent z-[1] pointer-events-none transition-opacity duration-300 ${showRightArrow ? 'opacity-100' : 'opacity-0'}`} />
 
@@ -367,7 +349,6 @@ export default function SpeciesPhotoGallery({
             onMouseMove={handleMouseMove}
             onMouseUp={handleMouseUp}
             onMouseLeave={handleMouseUp}
-            onWheel={handleWheel}
             className={`flex gap-4 overflow-x-auto pb-4 pt-4 no-scrollbar scroll-smooth px-2 items-center cursor-grab active:cursor-grabbing ${isDragging ? 'select-none' : ''}`}
           >
             {photos.map((photo, index) => (
@@ -385,7 +366,6 @@ export default function SpeciesPhotoGallery({
               </button>
             ))}
 
-            {/* Load More Button */}
             {hasMore && (
               <button
                 onClick={loadMore}
@@ -397,7 +377,10 @@ export default function SpeciesPhotoGallery({
                 ) : (
                   <>
                     <Plus className="w-6 h-6 group-hover:scale-110 transition-transform" />
-                    <span className="text-[10px] font-bold uppercase tracking-tight">More</span>
+                    {/* (1) + 更多 Text */}
+                    <span className="text-[10px] font-bold uppercase tracking-tight">
+                      {language === 'zh' ? '更多' : 'More'}
+                    </span>
                   </>
                 )}
               </button>
@@ -406,7 +389,6 @@ export default function SpeciesPhotoGallery({
         </div>
       </div>
 
-      {/* Modern Lightbox Overlay */}
       <AnimatePresence>
         {isLightboxOpen && (
           <motion.div 
@@ -439,7 +421,6 @@ export default function SpeciesPhotoGallery({
                 priority
               />
               
-              {/* Lightbox Nav */}
               <button 
                 onClick={handlePrev}
                 disabled={currentIndex === 0}
@@ -456,7 +437,6 @@ export default function SpeciesPhotoGallery({
               </button>
             </motion.div>
 
-            {/* Lightbox Info Bar */}
             <motion.div 
               initial={{ y: 50, opacity: 0 }}
               animate={{ y: 0, opacity: 1 }}
