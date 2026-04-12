@@ -41,6 +41,17 @@ export default function Home() {
   const [displayMode, setDisplayMode] = useState<'detail' | 'photo' | 'table'>('detail');
   const [currentPage, setCurrentPage] = useState(1);
 
+  // Fallback：如果 OAuth code 意外落到根頁面（Supabase Dashboard redirect 設定問題），
+  // 自動重導到 /auth/callback 進行 code exchange
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const code = params.get('code');
+    if (code) {
+      // 保留完整的 query string 並轉送到 callback handler
+      window.location.href = `/auth/callback?${params.toString()}`;
+    }
+  }, []);
+
   // Explicit search trigger
   const handleSearchTrigger = (value: string) => {
     setSearchQuery(value);
