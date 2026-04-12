@@ -47,9 +47,10 @@ export default function Header() {
 
   const navLinks = [
     { name: t('nav.home'), href: '/' },
-    { name: t('nav.about'), href: '/about' },
-    { name: t('nav.blog'), href: '/blog' },
-    { name: t('nav.contact'), href: '/contact' },
+    // 以下頁面尚未建立，暫時停用以避免 404 prefetch 錯誤
+    { name: t('nav.about'), href: '#', disabled: true },
+    { name: t('nav.blog'), href: '#', disabled: true },
+    { name: t('nav.contact'), href: '#', disabled: true },
   ];
 
   return (
@@ -75,13 +76,23 @@ export default function Header() {
         <div className="hidden lg:flex items-center gap-10">
           <div className="flex items-center gap-8">
             {navLinks.map((link) => (
-              <Link 
-                key={link.name} 
-                href={link.href}
-                className="text-sm font-bold text-slate-500 hover:text-emerald-600 transition-colors"
-              >
-                {link.name}
-              </Link>
+              link.disabled ? (
+                <span 
+                  key={link.name}
+                  className="text-sm font-bold text-slate-300 cursor-not-allowed"
+                  title="Coming Soon"
+                >
+                  {link.name}
+                </span>
+              ) : (
+                <Link 
+                  key={link.name} 
+                  href={link.href}
+                  className="text-sm font-bold text-slate-500 hover:text-emerald-600 transition-colors"
+                >
+                  {link.name}
+                </Link>
+              )
             ))}
           </div>
 
@@ -167,14 +178,23 @@ export default function Header() {
 
             <div className="flex flex-col gap-2">
               {navLinks.map((link) => (
-                <Link 
-                  key={link.name} 
-                  href={link.href}
-                  onClick={() => setIsMobileMenuOpen(false)}
-                  className="text-lg font-bold text-slate-700 hover:text-emerald-600 px-4 py-2 rounded-xl hover:bg-emerald-50 transition-all"
-                >
-                  {link.name}
-                </Link>
+                link.disabled ? (
+                  <span 
+                    key={link.name}
+                    className="text-lg font-bold text-slate-300 px-4 py-2 rounded-xl cursor-not-allowed"
+                  >
+                    {link.name} <span className="text-xs text-slate-300 ml-1">(Coming Soon)</span>
+                  </span>
+                ) : (
+                  <Link 
+                    key={link.name} 
+                    href={link.href}
+                    onClick={() => setIsMobileMenuOpen(false)}
+                    className="text-lg font-bold text-slate-700 hover:text-emerald-600 px-4 py-2 rounded-xl hover:bg-emerald-50 transition-all"
+                  >
+                    {link.name}
+                  </Link>
+                )
               ))}
               <hr className="border-slate-100 my-2" />
               {user ? (

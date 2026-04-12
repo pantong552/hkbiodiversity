@@ -1,10 +1,6 @@
-import { createClient } from '@supabase/supabase-js';
+import { createClient } from '@/utils/supabase/client';
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
+// 重新匯出 Singleton 實例，維持向後相容
+// 所有 import { supabase } from '@/lib/supabase' 的地方都能繼續運作
+export const supabase = createClient();
 
-if (!supabaseUrl || !supabaseAnonKey) {
-  console.warn('Supabase URL or Anon Key is missing. Please check your .env.local file.');
-}
-
-export const supabase = createClient(supabaseUrl, supabaseAnonKey);

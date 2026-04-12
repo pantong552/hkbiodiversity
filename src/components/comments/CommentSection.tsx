@@ -54,12 +54,12 @@ export default function CommentSection({ speciesId }: CommentSectionProps) {
           user_has_liked: c.comment_likes?.some((l: any) => l.user_id === userId)
         }));
 
-        const mainComments = formatted.filter(c => !c.parent_id);
-        const replies = formatted.filter(c => c.parent_id);
+        const mainComments = formatted.filter((c: any) => !c.parent_id);
+        const replies = formatted.filter((c: any) => c.parent_id);
 
-        const structured = mainComments.map(main => ({
+        const structured = mainComments.map((main: any) => ({
           ...main,
-          replies: replies.filter(r => r.parent_id === main.id).reverse()
+          replies: replies.filter((r: any) => r.parent_id === main.id).reverse()
         }));
 
         setComments(structured);
