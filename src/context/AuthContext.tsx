@@ -20,7 +20,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [isLoading, setIsLoading] = useState(true);
   const supabase = createClient();
 
-  const fetchProfile = async (userId: string) => {
+  const fetchProfile = async (userId: string, currentUser?: User | null) => {
     try {
       const { data, error } = await supabase
         .from('profiles')
@@ -30,23 +30,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       if (error) throw error;
 
-      if (!data) {
-        // 如果沒有 Profile，嘗試建立一個 (對應原先 CommentSection 的 upsert 邏輯)
-        const { data: { user: currentUser } } = await supabase.auth.getUser();
-        if (currentUser) {
-          const { data: newProfile, error: upsertError } = await supabase
-            .from('profiles')
-            .upsert({
-              id: currentUser.id,
-              username: currentUser.user_metadata?.full_name || currentUser.email?.split('@')[0],
-              avatar_url: currentUser.user_metadata?.avatar_url || null,
-              updated_at: new Date().toISOString()
-            })
-            .select()
-            .single();
-          
-          if (!upsertError) return newProfile;
-        }
+      if (!data && currentUser) {
+        // 如果沒有 Profile，嘗試建立一個
+        const { data: newProfile, error: upsertError } = await supabase
+          .from('profiles')
+          .upsert({
+            id: currentUser.id,
+            username: currentUser.user_metadata?.full_name || currentUser.email?.split('@')[0],
+            avatar_url: currentUser.user_metadata?.avatar_url || null,
+            updated_at: new Date().toISOString()
+          })
+          .select()
+          .single();
+        
+        if (!upsertError) return newProfile;
       }
       return data;
     } catch (err) {
@@ -56,36 +53,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   useEffect(() => {
-    const initializeAuth = async () => {
-      setIsLoading(true);
-      try {
-        const { data: { session } } = await supabase.auth.getSession();
-        const currentUser = session?.user ?? null;
-        setUser(currentUser);
-
-        if (currentUser) {
-          const profileData = await fetchProfile(currentUser.id);
-          setProfile(profileData);
-        }
-      } catch (error) {
-        console.error('Error initializing auth:', error);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    initializeAuth();
-
+    // Supabase v2 的 onAuthStateChange 會在訂閱時立即觸發一次 INITIAL_SESSION 事件
+    // 這樣就不需要額外呼叫 getSession()，從而減少 Auth Lock 競爭
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event: string, session: any) => {
       const currentUser = session?.user ?? null;
       setUser(currentUser);
 
       if (currentUser) {
-        const profileData = await fetchProfile(currentUser.id);
+        const profileData = await fetchProfile(currentUser.id, currentUser);
         setProfile(profileData);
       } else {
         setProfile(null);
       }
+      
       setIsLoading(false);
     });
 

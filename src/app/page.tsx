@@ -12,6 +12,7 @@ import { useLanguage } from '@/context/LanguageContext';
 import { supabase } from '@/lib/supabase';
 import { Loader2 } from 'lucide-react';
 import debounce from 'lodash/debounce';
+import { useAuth } from '@/context/AuthContext';
 
 const PAGE_SIZE_OPTIONS = {
   detail: [12, 24, 36, 48, 60],
@@ -21,6 +22,7 @@ const PAGE_SIZE_OPTIONS = {
 
 export default function Home() {
   const { language, t } = useLanguage();
+  const { isLoading: isAuthLoading } = useAuth();
   const [species, setSpecies] = useState<Species[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -135,8 +137,10 @@ export default function Home() {
   }, [searchQuery, selectedFilters, tableFilters, currentPage, itemsPerPage, sortBy, sortOrder, displayMode, language]);
 
   useEffect(() => {
-    fetchSpecies();
-  }, [fetchSpecies]);
+    if (!isAuthLoading) {
+      fetchSpecies();
+    }
+  }, [fetchSpecies, isAuthLoading]);
 
   const iucnPriority: Record<string, number> = {
     'Critically Endangered': 1,
