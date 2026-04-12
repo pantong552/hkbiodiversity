@@ -53,23 +53,78 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   useEffect(() => {
-    // Supabase v2 的 onAuthStateChange 會在訂閱時立即觸發一次 INITIAL_SESSION 事件
-    // 這樣就不需要額外呼叫 getSession()，從而減少 Auth Lock 競爭
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event: string, session: any) => {
+    let mounted = true;
+    let authEventTriggered = false;
+
+    // 安全超時：如果在 3.5 秒內沒有收到任何 Auth 事件，強制取消 Loading 狀態
+    // 解決某些行動裝置瀏覽器不觸發 initial event 的問題
+    const safetyTimeout = setTimeout(() => {
+      if (mounted && !authEventTriggered) {
+        console.warn('Auth initialization timed out, forcing loading to false (Safety Fallback)');
+        setIsLoading(false);
+      }
+    }, 3500);
+
+    // 處理 Session 恢復
+    const handleSession = async (session: any) => {
+      if (!mounted) return;
+      authEventTriggered = true;
+      clearTimeout(safetyTimeout);
+
       const currentUser = session?.user ?? null;
       setUser(currentUser);
 
       if (currentUser) {
         const profileData = await fetchProfile(currentUser.id, currentUser);
-        setProfile(profileData);
+        if (mounted) setProfile(profileData);
       } else {
-        setProfile(null);
+        if (mounted) setProfile(null);
       }
       
-      setIsLoading(false);
+      if (mounted) setIsLoading(false);
+    };
+
+    // 1. 主要偵測：onAuthStateChange (Supabase v2 應立即觸發 INITIAL_SESSION)
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event: string, session: any) => {
+      console.log('Auth Event:', event);
+      handleSession(session);
     });
 
+    // 2. 次要偵測 (行動裝置補丁)：有些瀏覽器在跳轉後不會觸發初始事件
+    // 我們在 500ms 後主動檢查一次
+    const secondaryCheck = setTimeout(async () => {
+      if (mounted && !authEventTriggered) {
+        try {
+          const { data: { session } } = await supabase.auth.getSession();
+          if (session) {
+            console.log('Handled session via secondary check');
+            handleSession(session);
+          }
+        } catch (e) {
+          console.error('Secondary check failed:', e);
+        }
+      }
+    }, 500);
+
+    // 3. 頁面恢復偵測：當使用者從 OAuth 視窗跳回原 Tab 時刷新
+    const handleFocus = async () => {
+      if (mounted && !user) {
+        // 如果還沒登入，嘗試刷新一下 session
+        try {
+          const { data: sessionData } = await supabase.auth.getSession();
+          if (sessionData?.session) handleSession(sessionData.session);
+        } catch (e) {
+          console.error('Focus session check failed:', e);
+        }
+      }
+    };
+    window.addEventListener('focus', handleFocus);
+
     return () => {
+      mounted = false;
+      clearTimeout(safetyTimeout);
+      clearTimeout(secondaryCheck);
+      window.removeEventListener('focus', handleFocus);
       subscription.unsubscribe();
     };
   }, []);
