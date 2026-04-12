@@ -1,65 +1,48 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Leaf, Menu, X, User, LogOut } from 'lucide-react';
 import Link from 'next/link';
-import { createClient } from '@/utils/supabase/client';
 import LoginButton from './LoginButton';
-import { User as SupabaseUser } from '@supabase/supabase-js';
 import { useLanguage } from '@/context/LanguageContext';
+import { useAuth } from '@/context/AuthContext';
 import { Globe } from 'lucide-react';
 
 export default function Header() {
   const { language, setLanguage, t } = useLanguage();
+  const { user, signOut } = useAuth();
   const [isScrolled, setIsScrolled] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isVisible, setIsVisible] = useState(true);
-  const [lastScrollY, setLastScrollY] = useState(0);
-  const [user, setUser] = useState<SupabaseUser | null>(null);
-  const supabase = createClient();
+  
+  // 使用 ref 來儲存滾動位置，避免 useEffect 頻繁重新觸發
+  const lastScrollYRef = useRef(0);
 
   useEffect(() => {
-    const fetchUser = async () => {
-      try {
-        const { data: { user } } = await supabase.auth.getUser();
-        setUser(user);
-      } catch (error) {
-        // Handle lock stealing errors gracefully - onAuthStateChange will handle updates
-        console.debug('Error fetching user:', error);
-      }
-    };
-
-    fetchUser();
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUser(session?.user ?? null);
-    });
-
     const handleScroll = () => {
       const currentScrollY = window.scrollY;
       
-      // Toggle transparency/height
+      // 切換透明度/高度
       setIsScrolled(currentScrollY > 20);
 
-      // Smart Hide/Show logic
-      if (currentScrollY > lastScrollY && currentScrollY > 100) {
+      // 智慧顯示/隱藏邏輯
+      if (currentScrollY > lastScrollYRef.current && currentScrollY > 100) {
         setIsVisible(false);
       } else {
         setIsVisible(true);
       }
       
-      setLastScrollY(currentScrollY);
+      lastScrollYRef.current = currentScrollY;
     };
 
     window.addEventListener('scroll', handleScroll, { passive: true });
     return () => {
       window.removeEventListener('scroll', handleScroll);
-      subscription.unsubscribe();
     };
-  }, [lastScrollY, supabase.auth]);
+  }, []);
 
   const handleLogout = async () => {
-    await supabase.auth.signOut();
+    await signOut();
   };
 
   const navLinks = [

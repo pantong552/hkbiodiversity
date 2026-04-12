@@ -2,8 +2,9 @@
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { createClient } from '@/utils/supabase/client';
-import { Comment, Profile } from '@/types/comments';
+import { Comment } from '@/types/comments';
 import { useLanguage } from '@/context/LanguageContext';
+import { useAuth } from '@/context/AuthContext';
 import { MessageSquare, LogIn, Loader2, AlertCircle } from 'lucide-react';
 import CommentInput from './CommentInput';
 import CommentItem from './CommentItem';
@@ -14,70 +15,14 @@ interface CommentSectionProps {
 
 export default function CommentSection({ speciesId }: CommentSectionProps) {
   const { language, t } = useLanguage();
+  const { user, profile: userProfile } = useAuth();
   const supabase = useMemo(() => createClient(), []);
   
   const [comments, setComments] = useState<Comment[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [user, setUser] = useState<any>(null);
-  const [userProfile, setUserProfile] = useState<Profile | null>(null);
 
-  // 1. Fetch Auth State & Profile
-  useEffect(() => {
-    const getAuth = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      const currentUser = session?.user ?? null;
-      setUser(currentUser);
-
-      if (currentUser) {
-        // 先嘗試獲取 Profile
-        let { data: profile } = await supabase
-          .from('profiles')
-          .select('*')
-          .eq('id', currentUser.id)
-          .maybeSingle();
-
-        // 如果找不到 Profile (可能是 Trigger 建立前的舊用戶)，則主動同步一次
-        if (!profile) {
-          const { data: newProfile, error: upsertError } = await supabase
-            .from('profiles')
-            .upsert({
-              id: currentUser.id,
-              username: currentUser.user_metadata?.full_name || currentUser.email?.split('@')[0],
-              avatar_url: currentUser.user_metadata?.avatar_url || null,
-              updated_at: new Date().toISOString()
-            })
-            .select()
-            .single();
-          
-          if (!upsertError) profile = newProfile;
-        }
-        
-        setUserProfile(profile);
-      }
-    };
-    getAuth();
-
-    const { data: authListener } = supabase.auth.onAuthStateChange(async (_event, session) => {
-      const currentUser = session?.user ?? null;
-      setUser(currentUser);
-      
-      if (currentUser) {
-        const { data } = await supabase
-          .from('profiles')
-          .select('*')
-          .eq('id', currentUser.id)
-          .maybeSingle();
-        setUserProfile(data);
-      } else {
-        setUserProfile(null);
-      }
-    });
-
-    return () => authListener.subscription.unsubscribe();
-  }, [supabase]);
-
-  // 2. Fetch Comments
+  // 1. Fetch Comments
   const fetchComments = useCallback(async () => {
     setIsLoading(true);
     try {
