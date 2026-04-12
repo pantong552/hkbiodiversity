@@ -1,12 +1,15 @@
 'use client';
 
+import { useState, useEffect, useCallback } from 'react';
 import Image from 'next/image';
-import { Heart, Info, ExternalLink, Leaf } from 'lucide-react';
+import { Heart, Info, ExternalLink, Leaf, Loader2 } from 'lucide-react';
 import { Species } from '../types/species';
 import { useLanguage } from '../context/LanguageContext';
 import { useSpeciesPanel } from '../context/SpeciesPanelContext';
+import { useAuth } from '../context/AuthContext';
 import { useInaturalistPhoto } from '../hooks/useInaturalistPhoto';
 import { getIUCNConfig } from '../constants/statusStyles';
+import { createClient } from '@/utils/supabase/client';
 
 
 export default function SpeciesCard({ 
@@ -20,7 +23,80 @@ export default function SpeciesCard({
 }) {
   const { language } = useLanguage();
   const { addSpecies } = useSpeciesPanel();
+  const { user } = useAuth();
+  const supabase = createClient();
   
+  const [isBookmarked, setIsBookmarked] = useState(false);
+  const [isUpdating, setIsUpdating] = useState(false);
+
+  // 檢查是否已收藏
+  useEffect(() => {
+    const checkBookmark = async () => {
+      if (!user) {
+        setIsBookmarked(false);
+        return;
+      }
+
+      try {
+        const { data, error } = await supabase
+          .from('user_favorites')
+          .select('id')
+          .eq('user_id', user.id)
+          .eq('species_id', species.id)
+          .maybeSingle();
+        
+        if (error) throw error;
+        setIsBookmarked(!!data);
+      } catch (err) {
+        console.error('Error checking bookmark:', err);
+      }
+    };
+
+    checkBookmark();
+  }, [user, species.id, supabase]);
+
+  const toggleFavorite = useCallback(async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    
+    if (!user) {
+      // 如果未登入，可以選擇顯示提示或不執行
+      alert(language === 'zh' ? '請先登入以使用收藏功能' : 'Please log in to use bookmarks');
+      return;
+    }
+
+    if (isUpdating) return;
+    setIsUpdating(true);
+
+    try {
+      if (isBookmarked) {
+        // 移除收藏
+        const { error } = await supabase
+          .from('user_favorites')
+          .delete()
+          .eq('user_id', user.id)
+          .eq('species_id', species.id);
+        
+        if (error) throw error;
+        setIsBookmarked(false);
+      } else {
+        // 新增收藏
+        const { error } = await supabase
+          .from('user_favorites')
+          .insert({
+            user_id: user.id,
+            species_id: species.id
+          });
+        
+        if (error) throw error;
+        setIsBookmarked(true);
+      }
+    } catch (err) {
+      console.error('Error toggling favorite:', err);
+    } finally {
+      setIsUpdating(false);
+    }
+  }, [user, species.id, isBookmarked, isUpdating, supabase, language]);
+
   // Fetch iNaturalist photo if local image_url is missing
   const { imageUrl: inatPhoto, isLoading: isInatLoading, attribution, nativePageUrl } = useInaturalistPhoto(
     !species.image_url ? species.species_id : undefined
@@ -145,10 +221,22 @@ export default function SpeciesCard({
                 </span>
               </div>
               <button 
-                onClick={(e) => { e.stopPropagation(); /* 收藏邏輯預留 */ }}
-                className="w-8 h-8 rounded-full border border-slate-100 flex items-center justify-center text-slate-300 hover:text-rose-500 hover:bg-rose-50 hover:border-rose-100 transition-all cursor-pointer bg-white"
+                onClick={toggleFavorite}
+                disabled={isUpdating}
+                className={`
+                  w-8 h-8 rounded-full border flex items-center justify-center transition-all cursor-pointer bg-white
+                  ${isUpdating ? 'opacity-50 cursor-not-allowed' : ''}
+                  ${isBookmarked 
+                    ? 'text-rose-500 border-rose-200 bg-rose-50 shadow-sm' 
+                    : 'text-slate-300 border-slate-100 hover:text-rose-500 hover:bg-rose-50 hover:border-rose-100'
+                  }
+                `}
               >
-                <Heart className="w-4 h-4" />
+                {isUpdating ? (
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                ) : (
+                  <Heart className={`w-4 h-4 ${isBookmarked ? 'fill-current' : ''}`} />
+                )}
               </button>
             </div>
           </>

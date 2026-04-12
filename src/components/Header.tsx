@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { Leaf, Menu, X, User, LogOut } from 'lucide-react';
+import { Leaf, Menu, X, User, LogOut, Settings } from 'lucide-react';
 import Link from 'next/link';
 import LoginButton from './LoginButton';
 import { useLanguage } from '@/context/LanguageContext';
@@ -113,8 +113,8 @@ export default function Header() {
           </div>
           
           {user ? (
-            <div className="flex items-center gap-4">
-              <div className="flex items-center gap-2 px-4 py-2 bg-slate-50 rounded-2xl border border-slate-100">
+            <div className="flex items-center gap-3">
+              <Link href="/account" className="flex items-center gap-2 px-4 py-2 bg-slate-50 rounded-2xl border border-slate-100 hover:border-emerald-200 hover:bg-emerald-50/50 transition-all duration-300 cursor-pointer group">
                 {user.user_metadata.avatar_url ? (
                   <img 
                     src={user.user_metadata.avatar_url} 
@@ -124,13 +124,20 @@ export default function Header() {
                 ) : (
                   <User className="w-4 h-4 text-slate-500" />
                 )}
-                <span className="text-sm font-bold text-slate-700">
+                <span className="text-sm font-bold text-slate-700 group-hover:text-emerald-700 transition-colors">
                   {user.user_metadata.full_name || user.email}
                 </span>
-              </div>
+              </Link>
+              <Link
+                href="/account"
+                className="p-3 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-xl transition-all duration-300 cursor-pointer"
+                title={t('account.header_link')}
+              >
+                <Settings className="w-5 h-5" />
+              </Link>
               <button 
                 onClick={handleLogout}
-                className="p-3 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all"
+                className="p-3 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all cursor-pointer"
                 title="Logout"
               >
                 <LogOut className="w-5 h-5" />
@@ -198,8 +205,12 @@ export default function Header() {
               ))}
               <hr className="border-slate-100 my-2" />
               {user ? (
-                <div className="space-y-4">
-                  <div className="flex items-center gap-3 px-4 py-3 bg-slate-50 rounded-2xl border border-slate-100">
+                <div className="space-y-3">
+                  <Link 
+                    href="/account" 
+                    onClick={() => setIsMobileMenuOpen(false)}
+                    className="flex items-center gap-3 px-4 py-3 bg-slate-50 rounded-2xl border border-slate-100 hover:border-emerald-200 hover:bg-emerald-50/50 transition-all duration-300 cursor-pointer"
+                  >
                     {user.user_metadata.avatar_url ? (
                       <img 
                         src={user.user_metadata.avatar_url} 
@@ -211,17 +222,26 @@ export default function Header() {
                         <User className="w-6 h-6 text-slate-500" />
                       </div>
                     )}
-                    <div className="flex flex-col">
+                    <div className="flex flex-col flex-1">
                       <span className="font-bold text-slate-900">{user.user_metadata.full_name || 'Member'}</span>
                       <span className="text-xs text-slate-500">{user.email}</span>
                     </div>
-                  </div>
+                    <Settings className="w-5 h-5 text-slate-300" />
+                  </Link>
+                  <Link
+                    href="/account"
+                    onClick={() => setIsMobileMenuOpen(false)}
+                    className="flex items-center justify-center gap-2 w-full py-3 text-emerald-700 font-bold border-2 border-emerald-100 rounded-2xl hover:bg-emerald-50 transition-all cursor-pointer"
+                  >
+                    <Settings className="w-4 h-4" />
+                    {t('account.header_link')}
+                  </Link>
                   <button 
                     onClick={handleLogout}
-                    className="flex items-center justify-center gap-2 w-full py-4 text-red-600 font-bold border-2 border-red-100 rounded-2xl hover:bg-red-50"
+                    className="flex items-center justify-center gap-2 w-full py-3 text-red-600 font-bold border-2 border-red-100 rounded-2xl hover:bg-red-50 transition-all cursor-pointer"
                   >
                     <LogOut className="w-5 h-5" />
-                    Logout
+                    {t('auth.logout')}
                   </button>
                 </div>
               ) : (
