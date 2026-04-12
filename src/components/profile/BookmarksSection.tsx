@@ -7,6 +7,7 @@ import { createClient } from '@/utils/supabase/client';
 import { useAuth } from '@/context/AuthContext';
 import { useLanguage } from '@/context/LanguageContext';
 import { useSpeciesPanel } from '@/context/SpeciesPanelContext';
+import { useInaturalistPhoto } from '@/hooks/useInaturalistPhoto';
 
 interface BookmarkedSpecies {
   id: number;
@@ -18,15 +19,100 @@ interface BookmarkedSpecies {
   iucn: string;
   informal_group_eng: string;
   informal_group_chi: string;
-  // 收藏記錄的 ID
   favorite_id: string;
   bookmarked_at: string;
+}
+
+/**
+ * 獨立的子元件，用來動態讀取 iNaturalist 圖片
+ */
+function BookmarkItem({ 
+  species, 
+  onRemove, 
+  isRemoving, 
+  idx 
+}: { 
+  species: BookmarkedSpecies, 
+  onRemove: (id: string) => void,
+  isRemoving: boolean,
+  idx: number
+}) {
+  const { language } = useLanguage();
+  const { addSpecies } = useSpeciesPanel();
+  
+  // 獲取與 SpeciesCard 同款的動態圖片
+  const { imageUrl: inatPhoto, isLoading: isInatLoading } = useInaturalistPhoto(species.species_id);
+
+  // 將圖片解析度調整為最細 (square) 以節省列表載入資源
+  const getSmallPhoto = (url: string | null) => {
+    if (!url) return null;
+    return url.replace('/medium.', '/square.').replace('/large.', '/square.').replace('size=medium', 'size=square');
+  };
+
+  const displayImage = getSmallPhoto(species.image_url || inatPhoto);
+
+  return (
+    <div
+      className="group flex items-center gap-4 p-3 bg-white hover:bg-emerald-50/50 border border-slate-100 hover:border-emerald-200 rounded-2xl transition-all duration-300 cursor-pointer animate-in fade-in slide-in-from-left-4 duration-500"
+      style={{ animationDelay: `${idx * 50}ms` }}
+      onClick={() => addSpecies(species.id)}
+    >
+      {/* 物種縮圖 */}
+      <div className="relative w-14 h-14 rounded-xl overflow-hidden flex-shrink-0 bg-slate-100 border border-slate-100">
+        {isInatLoading ? (
+          <div className="w-full h-full flex items-center justify-center bg-slate-50">
+            <Loader2 className="w-4 h-4 text-emerald-300 animate-spin" />
+          </div>
+        ) : displayImage ? (
+          <Image
+            src={displayImage}
+            alt={language === 'zh' ? species.common_name_chi : species.common_name_eng}
+            fill
+            sizes="56px"
+            className="object-cover group-hover:scale-110 transition-transform duration-500"
+          />
+        ) : (
+          <div className="w-full h-full flex items-center justify-center bg-emerald-50">
+            <Heart className="w-5 h-5 text-emerald-300" />
+          </div>
+        )}
+      </div>
+
+      {/* 物種資訊 */}
+      <div className="flex-1 min-w-0">
+        <h4 className="text-sm font-bold text-slate-800 truncate group-hover:text-emerald-700 transition-colors">
+          {language === 'zh' ? species.common_name_chi : species.common_name_eng}
+        </h4>
+        <p className="text-xs text-slate-400 italic font-serif tracking-wide truncate">{species.scientific_name}</p>
+      </div>
+
+      {/* 物種分類小標 */}
+      <span className="hidden sm:inline-flex px-2.5 py-1 bg-slate-50 text-[10px] font-bold text-slate-400 rounded-lg border border-slate-100 flex-shrink-0 group-hover:bg-emerald-100 group-hover:text-emerald-700 transition-colors">
+        {language === 'zh' ? species.informal_group_chi : species.informal_group_eng}
+      </span>
+
+      {/* 移除按鈕 */}
+      <button
+        onClick={(e) => {
+          e.stopPropagation();
+          onRemove(species.favorite_id);
+        }}
+        disabled={isRemoving}
+        className="p-2.5 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all duration-300 opacity-0 group-hover:opacity-100 flex-shrink-0 cursor-pointer border border-transparent hover:border-red-100"
+      >
+        {isRemoving ? (
+          <Loader2 className="w-4 h-4 animate-spin" />
+        ) : (
+          <Trash2 className="w-4 h-4" />
+        )}
+      </button>
+    </div>
+  );
 }
 
 export default function BookmarksSection() {
   const { user } = useAuth();
   const { language, t } = useLanguage();
-  const { addSpecies } = useSpeciesPanel();
   const supabase = createClient();
 
   const [bookmarks, setBookmarks] = useState<BookmarkedSpecies[]>([]);
@@ -91,7 +177,6 @@ export default function BookmarksSection() {
 
       if (error) throw error;
 
-      // 樂觀移除
       setBookmarks((prev) => prev.filter((b) => b.favorite_id !== favoriteId));
     } catch (err) {
       console.error('Error removing bookmark:', err);
@@ -133,59 +218,13 @@ export default function BookmarksSection() {
 
       <div className="grid gap-3">
         {bookmarks.map((species, idx) => (
-          <div
+          <BookmarkItem 
             key={species.favorite_id}
-            className="group flex items-center gap-4 p-3 bg-white hover:bg-emerald-50/50 border border-slate-100 hover:border-emerald-200 rounded-2xl transition-all duration-300 cursor-pointer"
-            style={{ animationDelay: `${idx * 50}ms` }}
-            onClick={() => addSpecies(species.id)}
-          >
-            {/* 物種縮圖 */}
-            <div className="relative w-14 h-14 rounded-xl overflow-hidden flex-shrink-0 bg-slate-100">
-              {species.image_url ? (
-                <Image
-                  src={species.image_url}
-                  alt={language === 'zh' ? species.common_name_chi : species.common_name_eng}
-                  fill
-                  sizes="56px"
-                  className="object-cover group-hover:scale-110 transition-transform duration-500"
-                />
-              ) : (
-                <div className="w-full h-full flex items-center justify-center bg-emerald-50">
-                  <Heart className="w-5 h-5 text-emerald-300" />
-                </div>
-              )}
-            </div>
-
-            {/* 物種資訊 */}
-            <div className="flex-1 min-w-0">
-              <h4 className="text-sm font-bold text-slate-800 truncate group-hover:text-emerald-700 transition-colors">
-                {language === 'zh' ? species.common_name_chi : species.common_name_eng}
-              </h4>
-              <p className="text-xs text-slate-400 italic truncate">{species.scientific_name}</p>
-            </div>
-
-            {/* 物種分類小標 */}
-            <span className="hidden sm:inline-flex px-2.5 py-1 bg-slate-50 text-[10px] font-bold text-slate-400 rounded-lg border border-slate-100 flex-shrink-0">
-              {language === 'zh' ? species.informal_group_chi : species.informal_group_eng}
-            </span>
-
-            {/* 移除按鈕 */}
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                removeBookmark(species.favorite_id);
-              }}
-              disabled={removingId === species.favorite_id}
-              className="p-2.5 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all duration-300 opacity-0 group-hover:opacity-100 flex-shrink-0 cursor-pointer border border-transparent hover:border-red-100"
-              title={t('account.remove_bookmark')}
-            >
-              {removingId === species.favorite_id ? (
-                <Loader2 className="w-4 h-4 animate-spin" />
-              ) : (
-                <Trash2 className="w-4 h-4" />
-              )}
-            </button>
-          </div>
+            species={species}
+            onRemove={removeBookmark}
+            isRemoving={removingId === species.favorite_id}
+            idx={idx}
+          />
         ))}
       </div>
     </div>

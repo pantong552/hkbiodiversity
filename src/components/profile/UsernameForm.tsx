@@ -6,8 +6,8 @@ import { createClient } from '@/utils/supabase/client';
 import { useAuth } from '@/context/AuthContext';
 import { useLanguage } from '@/context/LanguageContext';
 
-// 只允許英文字母與數字
-const USERNAME_REGEX = /^[a-zA-Z0-9]+$/;
+// 允許英文字母、數字、空格、底線與連字號
+const USERNAME_REGEX = /^[a-zA-Z0-9 _-]+$/;
 const MIN_LENGTH = 3;
 
 export default function UsernameForm() {
@@ -79,11 +79,12 @@ export default function UsernameForm() {
   }, [username, isEditing, checkAvailability]);
 
   const handleSave = async () => {
-    if (validationState !== 'available' && username !== profile?.username) return;
-    if (!USERNAME_REGEX.test(username) || username.length < MIN_LENGTH) return;
+    const trimmedName = username.trim();
+    if (validationState !== 'available' && trimmedName !== profile?.username) return;
+    if (!USERNAME_REGEX.test(trimmedName) || trimmedName.length < MIN_LENGTH) return;
 
-    // 如果沒有變更
-    if (username === profile?.username) {
+    // 如果沒有變更 (trim 後)
+    if (trimmedName === profile?.username) {
       setIsEditing(false);
       return;
     }
@@ -94,7 +95,7 @@ export default function UsernameForm() {
     try {
       const { error } = await supabase
         .from('profiles')
-        .update({ username, updated_at: new Date().toISOString() })
+        .update({ username: trimmedName, updated_at: new Date().toISOString() })
         .eq('id', profile?.id);
 
       if (error) throw error;
