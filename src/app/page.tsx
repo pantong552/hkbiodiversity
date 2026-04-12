@@ -48,7 +48,6 @@ export default function Home() {
 
   const fetchSpecies = useMemo(() => {
     return async () => {
-      console.log('Supabase: 正在根據條件抓取動態資料...', { searchQuery, selectedFilters, currentPage, sortBy });
       setIsLoading(true);
       setError(null);
 
@@ -388,8 +387,13 @@ export default function Home() {
                       : 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 min-[1101px]:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4'}
                   `}
                 >
-                  {paginatedSpecies.map((species) => (
-                    <SpeciesCard key={species.id} species={species} mode={displayMode} />
+                  {paginatedSpecies.map((species, index) => (
+                    <SpeciesCard 
+                      key={species.id} 
+                      species={species} 
+                      mode={displayMode} 
+                      priority={index < 4}
+                    />
                   ))}
                 </div>
               )}
