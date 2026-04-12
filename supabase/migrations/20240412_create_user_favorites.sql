@@ -1,3 +1,6 @@
+-- 擴充 profiles 資料表以支援最後上線時間
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS last_online_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now());
+
 -- 建立使用者收藏資料表 (User Favorites)
 CREATE TABLE IF NOT EXISTS public.user_favorites (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -12,6 +15,12 @@ CREATE TABLE IF NOT EXISTS public.user_favorites (
 -- 啟用 Row Level Security (RLS)
 ALTER TABLE public.user_favorites ENABLE ROW LEVEL SECURITY;
 
+-- 先刪除可能存在的舊政策以避免重複執行錯誤
+DROP POLICY IF EXISTS "Users can view their own favorites" ON public.user_favorites;
+DROP POLICY IF EXISTS "Users can insert their own favorites" ON public.user_favorites;
+DROP POLICY IF EXISTS "Users can delete their own favorites" ON public.user_favorites;
+
+-- 重新建立政策
 -- 政策：使用者可以查看自己的收藏
 CREATE POLICY "Users can view their own favorites" 
 ON public.user_favorites 

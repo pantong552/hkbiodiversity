@@ -39,7 +39,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             id: currentUser.id,
             username: currentUser.user_metadata?.full_name || currentUser.email?.split('@')[0],
             avatar_url: currentUser.user_metadata?.avatar_url || null,
-            updated_at: new Date().toISOString()
+            updated_at: new Date().toISOString(),
+            last_online_at: new Date().toISOString()
           })
           .select()
           .single();
@@ -50,6 +51,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     } catch (err) {
       console.error('Error fetching profile:', err);
       return null;
+    }
+  };
+
+  const updateLastOnline = async (userId: string) => {
+    try {
+      await supabase
+        .from('profiles')
+        .update({ last_online_at: new Date().toISOString() })
+        .eq('id', userId);
+    } catch (err) {
+      console.error('Error updating last online:', err);
     }
   };
 
@@ -78,6 +90,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (currentUser) {
         const profileData = await fetchProfile(currentUser.id, currentUser);
         if (mounted) setProfile(profileData);
+        
+        // 自動更新最後上線時間 (心跳)
+        updateLastOnline(currentUser.id);
       } else {
         if (mounted) setProfile(null);
       }

@@ -3,6 +3,7 @@ export interface Profile {
   username: string | null;
   avatar_url: string | null;
   updated_at: string;
+  last_online_at?: string | null;
 }
 
 export interface Comment {

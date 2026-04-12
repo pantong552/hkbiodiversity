@@ -75,7 +75,7 @@ export default function AccountPanel() {
   ];
 
   return (
-    <div className="min-h-screen pt-28 pb-16 px-4 sm:px-6">
+    <div className="min-h-screen pt-20 pb-16 px-4 sm:px-6">
       <div className="max-w-2xl mx-auto space-y-8">
         
         {/* 頁面標題區 */}
@@ -190,10 +190,10 @@ export default function AccountPanel() {
                     </div>
                     <div>
                       <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">
-                        {t('account.last_login')}
+                        {t('account.last_online')}
                       </p>
                       <p className="text-sm font-bold text-slate-700 mt-0.5">
-                        {formatDateTime(user.last_sign_in_at)}
+                        {formatDateTime(profile?.last_online_at || user.last_sign_in_at)}
                       </p>
                     </div>
                   </div>
