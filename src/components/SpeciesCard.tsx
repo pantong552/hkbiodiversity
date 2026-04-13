@@ -27,6 +27,7 @@ export default function SpeciesCard({
   
   const [isBookmarked, setIsBookmarked] = useState(false);
   const [isUpdating, setIsUpdating] = useState(false);
+  const [showTooltip, setShowTooltip] = useState(false);
 
   // 檢查是否已收藏
   useEffect(() => {
@@ -109,6 +110,11 @@ export default function SpeciesCard({
 
   const isPhoto = mode === 'photo';
 
+  const toggleTooltip = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setShowTooltip(!showTooltip);
+  };
+
   return (
     <div 
       onClick={() => addSpecies(species.id)}
@@ -143,8 +149,8 @@ export default function SpeciesCard({
         
         {/* Top Overlay Controls */}
         <div className="absolute top-3 left-3 right-3 flex justify-between items-start z-20 pointer-events-none">
-          {/* IUCN Badge - left side */}
-          {species.iucn && (
+          {/* IUCN Badge - left side (Hidden in photo mode) */}
+          {!isPhoto && species.iucn && (
             <span className={`
               px-2 py-0.5 rounded-lg text-[9px] font-black uppercase tracking-wider backdrop-blur-md shadow-lg border pointer-events-auto
               ${badgeClass}
@@ -154,34 +160,43 @@ export default function SpeciesCard({
           )}
 
           {/* Action Buttons - right side */}
-          <div className="flex flex-col gap-2 items-end pointer-events-auto">
-            <button 
-              onClick={toggleFavorite}
-              disabled={isUpdating}
-              className={`
-                w-7 h-7 rounded-full backdrop-blur-md border flex items-center justify-center transition-all cursor-pointer
-                ${isUpdating ? 'opacity-50 cursor-not-allowed' : ''}
-                ${isBookmarked 
-                  ? 'text-rose-500 border-rose-200 bg-rose-50/90 shadow-sm' 
-                  : 'text-white/90 border-white/20 bg-black/20 hover:bg-rose-50 hover:text-rose-500 hover:border-rose-100 shadow-sm'
-                }
-              `}
-            >
-              {isUpdating ? (
-                <Loader2 className="w-3 h-3 animate-spin" />
-              ) : (
-                <Heart className={`w-3.5 h-3.5 ${isBookmarked ? 'fill-current' : ''}`} />
-              )}
-            </button>
+          <div className="flex flex-col gap-2 items-end pointer-events-auto ml-auto">
+            {/* Heart Button - Hidden in photo mode */}
+            {!isPhoto && (
+              <button 
+                onClick={toggleFavorite}
+                disabled={isUpdating}
+                className={`
+                  w-7 h-7 rounded-full backdrop-blur-md border flex items-center justify-center transition-all cursor-pointer
+                  ${isUpdating ? 'opacity-50 cursor-not-allowed' : ''}
+                  ${isBookmarked 
+                    ? 'text-rose-500 border-rose-200 bg-rose-50/90 shadow-sm' 
+                    : 'text-white/90 border-white/20 bg-black/20 hover:bg-rose-50 hover:text-rose-500 hover:border-rose-100 shadow-sm'
+                  }
+                `}
+              >
+                {isUpdating ? (
+                  <Loader2 className="w-3 h-3 animate-spin" />
+                ) : (
+                  <Heart className={`w-3.5 h-3.5 ${isBookmarked ? 'fill-current' : ''}`} />
+                )}
+              </button>
+            )}
             
             {attribution && (
               <div className="group/info relative">
-                <div className="p-1 w-7 h-7 bg-black/20 hover:bg-black/40 backdrop-blur-md border border-white/10 rounded-full text-white/80 hover:text-white transition-all duration-300 cursor-help flex items-center justify-center">
+                {/* Desktop Version: © with hover, Mobile Version: © with click */}
+                <button 
+                  onClick={toggleTooltip}
+                  className="w-7 h-7 bg-black/20 hover:bg-black/40 backdrop-blur-md border border-white/10 rounded-full text-white/80 hover:text-white transition-all duration-300 cursor-help flex items-center justify-center"
+                >
                   <Info className="w-3.5 h-3.5" />
-                </div>
+                </button>
                 
-                {/* Tooltip Content */}
-                <div className="absolute top-0 right-full mr-3 w-max min-w-[140px] max-w-[200px] bg-slate-900/95 backdrop-blur-xl p-3 rounded-xl shadow-2xl border border-white/10 opacity-0 invisible group-hover/info:opacity-100 group-hover/info:visible transition-all duration-300 translate-x-2 group-hover/info:translate-x-0 z-30">
+                {/* Desktop Tooltip (Original Style) */}
+                <div className={`
+                  hidden md:block absolute top-0 right-full mr-3 w-max min-w-[140px] max-w-[200px] bg-slate-900/95 backdrop-blur-xl p-3 rounded-xl shadow-2xl border border-white/10 opacity-0 invisible group-hover/info:opacity-100 group-hover/info:visible transition-all duration-300 translate-x-2 group-hover/info:translate-x-0 z-30
+                `}>
                   <div className="flex items-center gap-2 mb-2 pb-2 border-b border-white/5">
                     <div className="relative w-4 h-4">
                       <Image 
@@ -209,6 +224,40 @@ export default function SpeciesCard({
                       >
                         View Source
                         <ExternalLink className="w-2.5 h-2.5 transition-transform group-hover/link:translate-x-0.5 group-hover/link:-translate-y-0.5" />
+                      </a>
+                    )}
+                  </div>
+                </div>
+
+                {/* Mobile Tooltip (Minimal Style with Click Toggle) */}
+                <div className={`
+                  md:hidden absolute top-0 right-full mr-2 w-max max-w-[85vw] bg-slate-900/95 backdrop-blur-xl p-2.5 rounded-xl shadow-2xl border border-white/10 z-30 transition-all duration-300
+                  ${showTooltip ? 'opacity-100 visible translate-x-0' : 'opacity-0 invisible translate-x-2'}
+                `}>
+                  <div className="flex items-center justify-between gap-4">
+                    <div className="flex items-center gap-2 overflow-hidden shrink min-w-0">
+                      <div className="relative w-4 h-4 shrink-0">
+                        <Image 
+                          src="/INaturalist_logo.svg" 
+                          alt="iNaturalist" 
+                          fill
+                          className="object-contain"
+                        />
+                      </div>
+                      <span className="text-[10px] text-white font-bold leading-none whitespace-normal break-words">
+                        {attribution}
+                      </span>
+                    </div>
+
+                    {nativePageUrl && (
+                      <a 
+                        href={nativePageUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        onClick={(e) => e.stopPropagation()}
+                        className="p-1 bg-white/10 hover:bg-white/20 rounded-md text-emerald-400 transition-colors shrink-0"
+                      >
+                        <ExternalLink className="w-3 h-3" />
                       </a>
                     )}
                   </div>
