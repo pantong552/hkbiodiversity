@@ -129,6 +129,18 @@ export default function SpeciesCard({
           className={`object-cover transition-all duration-700 group-hover:scale-110 ${isInatLoading ? 'blur-sm grayscale' : 'blur-0 grayscale-0'}`}
         />
         
+        {/* Bottom Title Overlay for Detail Mode */}
+        {!isPhoto && (
+          <div className="absolute inset-x-0 bottom-0 p-4 pt-12 bg-gradient-to-t from-black/80 via-black/40 to-transparent z-10">
+            <h3 className="text-white text-lg font-black tracking-tight leading-tight drop-shadow-md">
+              {language === 'zh' ? species.common_name_chi : species.common_name_eng}
+            </h3>
+            <p className="text-white/80 text-[10px] italic drop-shadow-sm font-serif">
+              {species.scientific_name}
+            </p>
+          </div>
+        )}
+        
         {/* Top Overlay Controls */}
         <div className="absolute top-3 left-3 right-3 flex justify-between items-start z-20 pointer-events-none">
           {/* IUCN Badge - left side */}
@@ -210,50 +222,34 @@ export default function SpeciesCard({
         {isPhoto && <div className="absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-t from-black/60 to-transparent pointer-events-none" />}
       </div>
 
-      {/* Content Area */}
-      <div className={`${isPhoto ? 'absolute bottom-0 inset-x-0 p-3 pt-6 pointer-events-none' : 'p-4'} flex-1 flex flex-col`}>
-        <div className={`${isPhoto ? 'mb-0' : 'mb-3'}`}>
-          <h3 className={`font-black tracking-tight leading-tight group-hover:text-emerald-500 transition-colors ${
-            isPhoto ? 'text-white text-sm line-clamp-1 drop-shadow-md' : 'text-slate-900 text-lg'
-          }`}>
-            {language === 'zh' ? species.common_name_chi : species.common_name_eng}
-          </h3>
-          <p className={`text-[10px] tracking-wide truncate ${
-            isPhoto ? 'text-white/80 italic drop-shadow-sm' : 'text-slate-500 font-serif italic'
-          }`}>
-            {species.scientific_name}
-          </p>
+      {/* Content Area - Minimized for Detail Mode */}
+      {!isPhoto ? (
+        <div className="p-3 bg-white flex flex-col gap-2">
+          {/* Taxonomy Tags - Ultra Compact */}
+          <div className="flex flex-wrap gap-1.5">
+            {[
+              language === 'zh' ? species.order_chi : species.order_eng, 
+              language === 'zh' ? species.family_chi : species.family_eng,
+              language === 'zh' ? species.informal_group_chi : species.informal_group_eng
+            ].map((tax, i) => (
+              <span key={i} className="px-2 py-0.5 bg-slate-50 text-[9px] font-black text-slate-400 rounded-md border border-slate-100 group-hover:border-emerald-100 group-hover:bg-emerald-50/50 transition-all uppercase tracking-tighter">
+                {tax}
+              </span>
+            ))}
+          </div>
         </div>
-
-        {!isPhoto ? (
-          <>
-            {/* Taxonomy Tags - Compact */}
-            <div className="flex flex-wrap gap-1 mb-4">
-              {[
-                language === 'zh' ? species.order_chi : species.order_eng, 
-                language === 'zh' ? species.family_chi : species.family_eng
-              ].map((tax, i) => (
-                <span key={i} className="px-2 py-0.5 bg-slate-50/50 text-[10px] font-bold text-slate-400 rounded-md border border-slate-100 group-hover:border-emerald-100 group-hover:bg-emerald-50/50 transition-all">
-                  {tax}
-                </span>
-              ))}
-            </div>
-
-            {/* Action Footer - Tight */}
-            <div className="mt-auto flex items-center justify-between pt-3 border-t border-slate-50">
-              <div className="flex items-center gap-2">
-                <div className="w-1.5 h-1.5 rounded-full bg-emerald-500/80 shadow-[0_0_8px_rgba(16,185,129,0.4)]" />
-                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest truncate max-w-[120px]">
-                  {language === 'zh' ? species.informal_group_chi : species.informal_group_eng}
-                </span>
-              </div>
-              <div className="flex items-center text-emerald-500 opacity-0 group-hover:opacity-100 transition-opacity">
-                <Info className="w-3.5 h-3.5" />
-              </div>
-            </div>
-          </>
-        ) : null}
-      </div>
+      ) : (
+        <div className="absolute bottom-0 inset-x-0 p-3 pt-6 pointer-events-none">
+          <div className="mb-0">
+            <h3 className="font-black tracking-tight leading-tight group-hover:text-emerald-500 transition-colors text-white text-sm line-clamp-1 drop-shadow-md">
+              {language === 'zh' ? species.common_name_chi : species.common_name_eng}
+            </h3>
+            <p className="text-[10px] tracking-wide truncate text-white/80 italic drop-shadow-sm">
+              {species.scientific_name}
+            </p>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
