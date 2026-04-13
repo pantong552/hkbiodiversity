@@ -9,10 +9,11 @@ import Header from '@/components/Header';
 import CustomDropdown from '@/components/ui/CustomDropdown';
 import { Species } from '@/types/species';
 import { useLanguage } from '@/context/LanguageContext';
-import { supabase } from '@/lib/supabase';
+import { supabase as supabaseSingleton } from '@/lib/supabase';
 import { Loader2 } from 'lucide-react';
 import debounce from 'lodash/debounce';
 import { useAuth } from '@/context/AuthContext';
+import MobileToolbar from '@/components/search/MobileToolbar';
 
 const PAGE_SIZE_OPTIONS = {
   detail: [12, 24, 36, 48, 60],
@@ -61,30 +62,33 @@ export default function Home() {
 
   const fetchSpecies = useMemo(() => {
     return async () => {
+      // 防止在認證尚未初始化時發送請求
+      if (isAuthLoading) return;
+      
       setIsLoading(true);
       setError(null);
 
       try {
-        let query = supabase.from('species').select('*', { count: 'exact' });
+        let query = supabaseSingleton.from('species').select('*', { count: 'exact' });
   
-        // 1. Server-side Search
-        if (searchQuery) {
+        // 1. 搜尋邏輯
+        if (searchQuery.trim()) {
           query = query.or(`common_name_chi.ilike.%${searchQuery}%,common_name_eng.ilike.%${searchQuery}%,scientific_name.ilike.%${searchQuery}%`);
         }
 
-        // 2. Server-side Taxonomy Filtering
+        // 2. 分類過濾
         Object.entries(selectedFilters.taxonomy).forEach(([level, values]) => {
-          if (values.length > 0) {
+          if (values && values.length > 0) {
             query = query.in(level, values);
           }
         });
 
-        // 3. Server-side IUCN Filtering
-        if (selectedFilters.iucn.length > 0) {
+        // 3. IUCN 過濾
+        if (selectedFilters.iucn && selectedFilters.iucn.length > 0) {
           query = query.in('iucn', selectedFilters.iucn);
         }
 
-        // 3.5 Table Mode Specific Header Filters
+        // 4. 表格模式過濾
         if (displayMode === 'table') {
           Object.entries(tableFilters).forEach(([key, value]) => {
             if (value) {
@@ -101,7 +105,7 @@ export default function Home() {
           });
         }
 
-        // 4. Server-side Sorting
+        // 5. 排序邏輯
         const fieldMap: Record<string, string> = {
           'common_name': language === 'zh' ? 'common_name_chi' : 'common_name_eng',
           'scientific_name': 'scientific_name',
@@ -112,21 +116,22 @@ export default function Home() {
           'native_status': 'native_status'
         };
         const sortField = fieldMap[sortBy] || sortBy;
-        query = query.order(sortField, { ascending: sortOrder === 'asc' });
+        if (sortField) {
+          query = query.order(sortField, { ascending: sortOrder === 'asc' });
+        }
 
-        // 5. Server-side Pagination
-        const from = (currentPage - 1) * itemsPerPage;
-        const to = from + itemsPerPage - 1;
+        // 6. 分頁設定
+        const safeItemsPerPage = itemsPerPage || 12;
+        const from = (currentPage - 1) * safeItemsPerPage;
+        const to = from + safeItemsPerPage - 1;
         query = query.range(from, to);
 
-        const { data, error, count } = await query;
+        const { data, error: fetchError, count } = await query;
 
-        if (error) throw error;
+        if (fetchError) throw fetchError;
 
-        if (data) {
-          setSpecies(data as Species[]);
-          setTotalResultCount(count || 0);
-        }
+        setSpecies(data || []);
+        setTotalResultCount(count || 0);
       } catch (err: any) {
         console.error('fetchSpecies 錯誤:', err);
         setError(err.message || '連線錯誤');
@@ -134,7 +139,7 @@ export default function Home() {
         setIsLoading(false);
       }
     };
-  }, [searchQuery, selectedFilters, tableFilters, currentPage, itemsPerPage, sortBy, sortOrder, displayMode, language]);
+  }, [searchQuery, selectedFilters, tableFilters, currentPage, itemsPerPage, sortBy, sortOrder, displayMode, language, isAuthLoading]);
 
   useEffect(() => {
     if (!isAuthLoading) {
@@ -329,6 +334,18 @@ export default function Home() {
               </div>
             </div>
 
+            {/* Mobile Specialized Toolbar */}
+            <MobileToolbar 
+              sortBy={sortBy}
+              onSortChange={setSortBy}
+              itemsPerPage={itemsPerPage}
+              onItemsPerPageChange={setItemsPerPage}
+              displayMode={displayMode}
+              onDisplayModeChange={setDisplayMode}
+              pageSizeOptions={PAGE_SIZE_OPTIONS[displayMode]}
+              totalCount={totalResultCount}
+            />
+
             {/* Empty State */}
             {isLoading ? (
               <div className="flex flex-col items-center justify-center py-40">
@@ -396,7 +413,7 @@ export default function Home() {
                 <div
                   key={`${currentPage}-${sortBy}-${itemsPerPage}-${searchQuery}-${JSON.stringify(selectedFilters)}-${displayMode}`}
                   className={`
-                    grid gap-x-8 gap-y-12 animate-grid-fade
+                    grid gap-4 sm:gap-8 animate-grid-fade
                     ${displayMode === 'photo'
                       ? 'grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 min-[1101px]:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5'
                       : 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 min-[1101px]:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4'}
