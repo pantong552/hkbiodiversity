@@ -90,9 +90,9 @@ export default function MobileToolbar({
           {/* View Mode Toggle - Right Aligned */}
           <div className="flex items-center bg-slate-100/80 rounded-2xl p-1 shrink-0 min-w-[110px] justify-between">
             {[
-              { id: 'detail', icon: List },
+              { id: 'detail', icon: TableIcon },
               { id: 'photo', icon: LayoutGrid },
-              { id: 'table', icon: TableIcon }
+              { id: 'table', icon: List }
             ].map((mode) => (
               <button
                 key={mode.id}

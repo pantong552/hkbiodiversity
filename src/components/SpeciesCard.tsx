@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import Image from 'next/image';
-import { Heart, Info, ExternalLink, Leaf, Loader2 } from 'lucide-react';
+import { Heart, Info, ExternalLink, Leaf, Loader2, X } from 'lucide-react';
 import { Species } from '../types/species';
 import { useLanguage } from '../context/LanguageContext';
 import { useSpeciesPanel } from '../context/SpeciesPanelContext';
@@ -10,6 +10,7 @@ import { useAuth } from '../context/AuthContext';
 import { useInaturalistPhoto } from '../hooks/useInaturalistPhoto';
 import { getIUCNConfig } from '../constants/statusStyles';
 import { supabase as supabaseSingleton } from '@/lib/supabase';
+import { createPortal } from 'react-dom';
 
 
 export default function SpeciesCard({ 
@@ -28,6 +29,12 @@ export default function SpeciesCard({
   const [isBookmarked, setIsBookmarked] = useState(false);
   const [isUpdating, setIsUpdating] = useState(false);
   const [showTooltip, setShowTooltip] = useState(false);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+    return () => setMounted(false);
+  }, []);
 
   // 檢查是否已收藏
   useEffect(() => {
@@ -185,7 +192,7 @@ export default function SpeciesCard({
             
             {attribution && (
               <div className="group/info relative">
-                {/* Desktop Version: © with hover, Mobile Version: © with click */}
+                {/* Info Button Trigger */}
                 <button 
                   onClick={toggleTooltip}
                   className="w-7 h-7 bg-black/20 hover:bg-black/40 backdrop-blur-md border border-white/10 rounded-full text-white/80 hover:text-white transition-all duration-300 cursor-help flex items-center justify-center"
@@ -193,9 +200,9 @@ export default function SpeciesCard({
                   <Info className="w-3.5 h-3.5" />
                 </button>
                 
-                {/* Desktop Tooltip (Original Style) */}
+                {/* Desktop Tooltip (Stay Local) */}
                 <div className={`
-                  hidden md:block absolute top-0 right-full mr-3 w-max min-w-[140px] max-w-[200px] bg-slate-900/95 backdrop-blur-xl p-3 rounded-xl shadow-2xl border border-white/10 opacity-0 invisible group-hover/info:opacity-100 group-hover/info:visible transition-all duration-300 translate-x-2 group-hover/info:translate-x-0 z-30
+                  hidden md:block absolute top-0 right-full mr-3 w-max min-w-[140px] max-w-[calc(180px)] bg-slate-900/95 backdrop-blur-xl p-3 rounded-xl shadow-2xl border border-white/10 opacity-0 invisible group-hover/info:opacity-100 group-hover/info:visible transition-all duration-300 translate-x-2 group-hover/info:translate-x-0 z-30
                 `}>
                   <div className="flex items-center gap-2 mb-2 pb-2 border-b border-white/5">
                     <div className="relative w-4 h-4">
@@ -210,7 +217,7 @@ export default function SpeciesCard({
                   </div>
 
                   <div className="space-y-2.5">
-                    <p className="text-[11px] text-white font-bold leading-snug">
+                    <p className="text-[11px] text-white font-bold leading-snug break-words">
                       © {attribution}
                     </p>
                     
@@ -229,39 +236,58 @@ export default function SpeciesCard({
                   </div>
                 </div>
 
-                {/* Mobile Tooltip (Minimal Style with Click Toggle) */}
-                <div className={`
-                  md:hidden absolute top-0 right-full mr-2 w-max max-w-[85vw] bg-slate-900/95 backdrop-blur-xl p-2.5 rounded-xl shadow-2xl border border-white/10 z-30 transition-all duration-300
-                  ${showTooltip ? 'opacity-100 visible translate-x-0' : 'opacity-0 invisible translate-x-2'}
-                `}>
-                  <div className="flex items-center justify-between gap-4">
-                    <div className="flex items-center gap-2 overflow-hidden shrink min-w-0">
-                      <div className="relative w-4 h-4 shrink-0">
-                        <Image 
-                          src="/INaturalist_logo.svg" 
-                          alt="iNaturalist" 
-                          fill
-                          className="object-contain"
-                        />
+                {/* Mobile Portal (Ignore bounds, centered overlay) */}
+                {mounted && showTooltip && createPortal(
+                  <div 
+                    className="md:hidden fixed inset-0 z-[9999] flex items-center justify-center p-6 bg-black/40 backdrop-blur-sm transition-all duration-300"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setShowTooltip(false);
+                    }}
+                  >
+                    <div 
+                      className="w-full max-w-sm bg-slate-900/95 border border-white/10 rounded-3xl shadow-2xl p-5 overflow-hidden animate-in fade-in zoom-in duration-200"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <div className="flex items-center justify-between mb-4 pb-3 border-b border-white/10">
+                        <div className="flex items-center gap-2.5">
+                          <div className="relative w-5 h-5">
+                            <Image src="/INaturalist_logo.svg" alt="iNaturalist" fill className="object-contain" />
+                          </div>
+                          <span className="text-xs text-white/60 font-black uppercase tracking-widest">iNaturalist Photo</span>
+                        </div>
+                        <button 
+                          onClick={() => setShowTooltip(false)}
+                          className="p-1.5 hover:bg-white/10 rounded-full text-white/40 transition-colors"
+                        >
+                          <X className="w-5 h-5" />
+                        </button>
                       </div>
-                      <span className="text-[10px] text-white font-bold leading-none whitespace-normal break-words">
-                        {attribution}
-                      </span>
-                    </div>
 
-                    {nativePageUrl && (
-                      <a 
-                        href={nativePageUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        onClick={(e) => e.stopPropagation()}
-                        className="p-1 bg-white/10 hover:bg-white/20 rounded-md text-emerald-400 transition-colors shrink-0"
-                      >
-                        <ExternalLink className="w-3 h-3" />
-                      </a>
-                    )}
-                  </div>
-                </div>
+                      <div className="space-y-5">
+                        <div className="space-y-1.5">
+                          <span className="text-[10px] text-white/30 font-black uppercase tracking-tighter">Photo Credit</span>
+                          <p className="text-sm text-white font-bold leading-relaxed">
+                            {attribution}
+                          </p>
+                        </div>
+
+                        {nativePageUrl && (
+                          <a 
+                            href={nativePageUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="flex items-center justify-center gap-2 w-full py-3 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl text-emerald-400 font-black text-xs uppercase tracking-widest transition-all"
+                          >
+                            Visit iNaturalist Source
+                            <ExternalLink className="w-4 h-4" />
+                          </a>
+                        )}
+                      </div>
+                    </div>
+                  </div>,
+                  document.body
+                )}
               </div>
             )}
           </div>
