@@ -6,6 +6,7 @@ import { useSpeciesPanel } from '@/context/SpeciesPanelContext';
 import { getIUCNConfig } from '@/constants/statusStyles';
 import CustomDropdown from '@/components/ui/CustomDropdown';
 import debounce from 'lodash/debounce';
+import { formatScientificName } from '@/utils/formatters';
 
 interface SpeciesTableProps {
   species: Species[];
@@ -174,8 +175,8 @@ export default function SpeciesTable({
 
                   {/* Scientific Name */}
                   <td className="px-6 py-4">
-                    <span className="text-[14px] italic font-bold text-slate-900 group-hover:text-emerald-700 transition-colors whitespace-nowrap">
-                      {item.scientific_name}
+                    <span className="text-[14px] font-bold text-slate-900 group-hover:text-emerald-700 transition-colors whitespace-nowrap">
+                      {formatScientificName(item.scientific_name)}
                     </span>
                   </td>
 

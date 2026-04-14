@@ -12,6 +12,7 @@ import SpeciesPhotoGallery from './SpeciesPhotoGallery';
 import { useInaturalistSpeciesPhotos, InatGalleryPhoto } from '@/hooks/useInaturalistSpeciesPhotos';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useRef } from 'react';
+import { formatScientificName } from '@/utils/formatters';
 
 
 interface SpeciesContentProps {
@@ -144,8 +145,8 @@ export default function SpeciesContent({ species, showBreadcrumb = true }: Speci
                 </p>
               )}
             </div>
-            <p className="text-lg md:text-xl text-emerald-50 font-serif tracking-wide italic">
-              {species.scientific_name} <span className="text-emerald-200/60 not-italic text-sm ml-2">{species.author}</span>
+            <p className="text-lg md:text-xl text-emerald-50 font-serif tracking-wide">
+              {formatScientificName(species.scientific_name)} <span className="text-emerald-200/60 text-sm ml-2">{species.author}</span>
             </p>
           </div>
         </div>

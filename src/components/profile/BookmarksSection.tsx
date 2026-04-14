@@ -8,6 +8,7 @@ import { useAuth } from '@/context/AuthContext';
 import { useLanguage } from '@/context/LanguageContext';
 import { useSpeciesPanel } from '@/context/SpeciesPanelContext';
 import { useInaturalistPhoto } from '@/hooks/useInaturalistPhoto';
+import { formatScientificName } from '@/utils/formatters';
 
 interface BookmarkedSpecies {
   id: number;
@@ -83,7 +84,9 @@ function BookmarkItem({
         <h4 className="text-sm font-bold text-slate-800 truncate group-hover:text-emerald-700 transition-colors">
           {language === 'zh' ? species.common_name_chi : species.common_name_eng}
         </h4>
-        <p className="text-xs text-slate-400 italic font-serif tracking-wide truncate">{species.scientific_name}</p>
+        <div className="text-xs text-slate-400 font-serif tracking-wide truncate">
+          {formatScientificName(species.scientific_name)}
+        </div>
       </div>
 
       {/* 物種分類小標 */}

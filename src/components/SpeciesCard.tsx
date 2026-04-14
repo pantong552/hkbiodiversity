@@ -11,6 +11,7 @@ import { useInaturalistPhoto } from '../hooks/useInaturalistPhoto';
 import { getIUCNConfig } from '../constants/statusStyles';
 import { supabase as supabaseSingleton } from '@/lib/supabase';
 import { createPortal } from 'react-dom';
+import { formatScientificName } from '../utils/formatters';
 
 
 export default function SpeciesCard({ 
@@ -148,8 +149,8 @@ export default function SpeciesCard({
             <h3 className="text-white text-xl font-black tracking-tight leading-tight drop-shadow-md">
               {language === 'zh' ? species.common_name_chi : species.common_name_eng}
             </h3>
-            <p className="text-white/80 text-xs italic drop-shadow-sm font-serif mt-1">
-              {species.scientific_name}
+            <p className="text-white/80 text-xs drop-shadow-sm font-serif mt-1">
+              {formatScientificName(species.scientific_name)}
             </p>
           </div>
         )}
@@ -319,9 +320,9 @@ export default function SpeciesCard({
             <h3 className="font-black tracking-tight leading-tight group-hover:text-emerald-500 transition-colors text-white text-sm line-clamp-1 drop-shadow-md">
               {language === 'zh' ? species.common_name_chi : species.common_name_eng}
             </h3>
-            <p className="text-[10px] tracking-wide truncate text-white/80 italic drop-shadow-sm">
-              {species.scientific_name}
-            </p>
+            <div className="text-[10px] tracking-wide truncate text-white/80 drop-shadow-sm">
+              {formatScientificName(species.scientific_name)}
+            </div>
           </div>
         </div>
       )}
