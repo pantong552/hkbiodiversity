@@ -105,7 +105,7 @@ export default function Header() {
               <div className="hidden md:flex items-center gap-1.5 opacity-80 group-hover:opacity-100 transition-opacity duration-700">
                 <div className="w-1 h-1 bg-emerald-500 rounded-full" />
                 <span className="text-[12px] font-medium tracking-widest text-slate-400 whitespace-nowrap">
-                  香港生物多樣性匯誌
+                  香港自然生態匯誌
                 </span>
               </div>
             </div>
@@ -243,28 +243,52 @@ export default function Header() {
                   </Link>
                 )
               ))}
-              <div className="mt-4 px-4 py-6 bg-slate-50 rounded-2xl border border-slate-100">
-                <div className="flex flex-wrap gap-4 mb-4">
+              <hr className="border-slate-100 my-2" />
+              {user ? (
+                <div className="space-y-3">
                   <Link
-                    href="/privacy"
+                    href="/account"
                     onClick={() => setIsMobileMenuOpen(false)}
-                    className="text-xs font-bold text-slate-500 hover:text-emerald-600 transition-colors"
+                    className="flex items-center gap-3 px-4 py-3 bg-slate-50 rounded-2xl border border-slate-100 hover:border-emerald-200 hover:bg-emerald-50/50 transition-all duration-300 cursor-pointer"
                   >
-                    {t('nav.privacy')}
+                    {user.user_metadata.avatar_url ? (
+                      <img
+                        src={user.user_metadata.avatar_url}
+                        alt="User Avatar"
+                        className="w-10 h-10 rounded-full"
+                      />
+                    ) : (
+                      <div className="w-10 h-10 bg-slate-200 rounded-full flex items-center justify-center">
+                        <User className="w-6 h-6 text-slate-500" />
+                      </div>
+                    )}
+                    <div className="flex flex-col flex-1">
+                      <span className="font-bold text-slate-900">{user.user_metadata.full_name || 'Member'}</span>
+                      <span className="text-xs text-slate-500">{user.email}</span>
+                    </div>
+                    <Settings className="w-5 h-5 text-slate-300" />
                   </Link>
                   <Link
-                    href="/terms"
+                    href="/account"
                     onClick={() => setIsMobileMenuOpen(false)}
-                    className="text-xs font-bold text-slate-500 hover:text-emerald-600 transition-colors"
+                    className="flex items-center justify-center gap-2 w-full py-3 text-emerald-700 font-bold border-2 border-emerald-100 rounded-2xl hover:bg-emerald-50 transition-all cursor-pointer"
                   >
-                    {t('nav.terms')}
+                    <Settings className="w-4 h-4" />
+                    {t('account.header_link')}
                   </Link>
+                  <button
+                    onClick={handleLogout}
+                    className="flex items-center justify-center gap-2 w-full py-3 text-red-600 font-bold border-2 border-red-100 rounded-2xl hover:bg-red-50 transition-all cursor-pointer"
+                  >
+                    <LogOut className="w-5 h-5" />
+                    {t('auth.logout')}
+                  </button>
                 </div>
-                <p className="text-[10px] font-medium text-slate-400 leading-relaxed uppercase tracking-widest">
-                  © 2026 Hong Kong Biodiversity Collective<br />
-                  All Rights Reserved.
-                </p>
-              </div>
+              ) : (
+                <div className="flex justify-center">
+                  <LoginButton />
+                </div>
+              )}
             </div>
           </div>
         </div>
