@@ -83,7 +83,9 @@ const translations: Record<Language, Record<string, string>> = {
     'account.header_link': '帳號設定',
     'account.profile_info': '帳號資訊',
     'nav.privacy': '隱私權政策',
-    'nav.terms': '服務條款'
+    'nav.terms': '服務條款',
+    'loading.message': '正在從雲端載入物種資料...',
+    'loading.searching': '正在檢索自然數據庫，請稍候...'
   },
   en: {
     'nav.home': 'Home',
@@ -157,7 +159,9 @@ const translations: Record<Language, Record<string, string>> = {
     'account.header_link': 'Account',
     'account.profile_info': 'Account Info',
     'nav.privacy': 'Privacy Policy',
-    'nav.terms': 'Terms of Service'
+    'nav.terms': 'Terms of Service',
+    'loading.message': 'Loading species from the database...',
+    'loading.searching': 'Exploring natural databases, please wait...'
   }
 };
 

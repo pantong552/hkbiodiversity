@@ -390,7 +390,9 @@ function HomeContent() {
             {isLoading ? (
               <div className="flex flex-col items-center justify-center py-40">
                 <Loader2 className="w-12 h-12 text-emerald-500 animate-spin mb-4" />
-                <p className="text-slate-400 font-medium">{t('loading.message') || '正在從雲端載入 5,800+ 筆資料...'}</p>
+                <p className="text-slate-400 font-medium">
+                  {searchQuery ? t('loading.searching') : t('loading.message')}
+                </p>
               </div>
             ) : error ? (
               <div className="flex flex-col items-center justify-center py-40 text-center bg-red-50 rounded-[3rem] border border-red-100">
