@@ -4,7 +4,7 @@ import React from 'react';
 import Image from 'next/image';
 import { Species } from '@/types/species';
 import { useLanguage } from '@/context/LanguageContext';
-import { Bookmark, Map, ExternalLink, Image as ImageIcon } from 'lucide-react';
+import { Bookmark, Map, ExternalLink, Shield, Image as ImageIcon } from 'lucide-react';
 import TaxonomyDisplay from './TaxonomyDisplay';
 import ConservationStatus from './ConservationStatus';
 import CommentSection from '../comments/CommentSection';
@@ -158,10 +158,12 @@ export default function SpeciesContent({ species, showBreadcrumb = true }: Speci
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-12">
           
           {/* Left Column */}
-          <div className="lg:col-span-8 space-y-12">
+          <div className="lg:col-span-9 space-y-12">
             
-            {/* Taxonomy Section - New Design */}
-            <TaxonomyDisplay species={species} />
+            {/* Taxonomy Section - Mobile Only (At the very top) */}
+            <div className="lg:hidden">
+              <TaxonomyDisplay species={species} />
+            </div>
 
             {/* iNaturalist Photo Gallery */}
             {species.species_id && (
@@ -226,6 +228,9 @@ export default function SpeciesContent({ species, showBreadcrumb = true }: Speci
               </div>
             </section>
 
+            {/* Conservation Status - Moved here */}
+            <ConservationStatus species={species} />
+
             {/* References */}
             {refs && (
               <section className="bg-slate-900 text-slate-300 p-8 rounded-[2.5rem]">
@@ -245,10 +250,10 @@ export default function SpeciesContent({ species, showBreadcrumb = true }: Speci
             <CommentSection speciesId={species.id} />
           </div>
 
-          {/* Right Column - Conservation Status (Sticky) */}
-          <div className="lg:col-span-4">
+          {/* Right Column - Taxonomy Display (Sticky) */}
+          <div className="lg:col-span-3 hidden lg:block">
             <div className="sticky top-8">
-              <ConservationStatus species={species} />
+              <TaxonomyDisplay species={species} />
             </div>
           </div>
 
