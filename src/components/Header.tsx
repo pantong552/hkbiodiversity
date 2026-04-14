@@ -101,8 +101,8 @@ export default function Header() {
               <span className="text-[12px] font-bold uppercase tracking-[0.25em] text-slate-500">
                 Collective
               </span>
-              {/* Chinese Title Integration */}
-              <div className="flex items-center gap-1.5 opacity-80 group-hover:opacity-100 transition-opacity duration-700">
+              {/* Chinese Title Integration - Hidden on Mobile */}
+              <div className="hidden md:flex items-center gap-1.5 opacity-80 group-hover:opacity-100 transition-opacity duration-700">
                 <div className="w-1 h-1 bg-emerald-500 rounded-full" />
                 <span className="text-[12px] font-medium tracking-widest text-slate-400 whitespace-nowrap">
                   香港生物多樣性匯誌

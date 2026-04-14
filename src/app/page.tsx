@@ -14,6 +14,7 @@ import { Loader2 } from 'lucide-react';
 import debounce from 'lodash/debounce';
 import { useAuth } from '@/context/AuthContext';
 import MobileToolbar from '@/components/search/MobileToolbar';
+import { useSpeciesPanel } from '@/context/SpeciesPanelContext';
 
 const PAGE_SIZE_OPTIONS = {
   detail: [12, 24, 36, 48, 60],
@@ -64,13 +65,13 @@ export default function Home() {
     return async () => {
       // 防止在認證尚未初始化時發送請求
       if (isAuthLoading) return;
-      
+
       setIsLoading(true);
       setError(null);
 
       try {
         let query = supabaseSingleton.from('species').select('*', { count: 'exact' });
-  
+
         // 1. 搜尋邏輯
         if (searchQuery.trim()) {
           query = query.or(`common_name_chi.ilike.%${searchQuery}%,common_name_eng.ilike.%${searchQuery}%,scientific_name.ilike.%${searchQuery}%`);
@@ -183,7 +184,7 @@ export default function Home() {
     <div className="min-h-screen text-slate-900 font-sans selection:bg-emerald-100 selection:text-emerald-900">
       <Header />
 
-      <main className="max-w-[1920px] mx-auto px-6 sm:px-10 min-[1101px]:px-16 py-10">
+      <main className="max-w-[1920px] mx-auto px-6 sm:px-10 min-[1101px]:px-16 md:pt-10 pb-10">
         <div className="flex flex-col lg:flex-row gap-12 lg:gap-16">
 
           {/* Sidebar Area - Collapses at 1100px */}
@@ -270,20 +271,20 @@ export default function Home() {
                       <div className="h-6 w-px bg-slate-100" />
                     </>
                   )}
-                    <div className="flex items-center gap-3">
-                      <span className="text-[12px] font-black uppercase tracking-widest text-slate-400">{t('view.per_page')}</span>
-                      <div className="flex bg-slate-50 rounded-xl p-1">
-                        {PAGE_SIZE_OPTIONS[displayMode].map((size) => (
-                          <button
-                            key={size}
-                            onClick={() => setItemsPerPage(size)}
-                            className={`px-3 py-1.5 rounded-lg text-xs font-black transition-all ${itemsPerPage === size ? 'bg-white text-emerald-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
-                          >
-                            {size}
-                          </button>
-                        ))}
-                      </div>
+                  <div className="flex items-center gap-3">
+                    <span className="text-[12px] font-black uppercase tracking-widest text-slate-400">{t('view.per_page')}</span>
+                    <div className="flex bg-slate-50 rounded-xl p-1">
+                      {PAGE_SIZE_OPTIONS[displayMode].map((size) => (
+                        <button
+                          key={size}
+                          onClick={() => setItemsPerPage(size)}
+                          className={`px-3 py-1.5 rounded-lg text-xs font-black transition-all ${itemsPerPage === size ? 'bg-white text-emerald-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
+                        >
+                          {size}
+                        </button>
+                      ))}
                     </div>
+                  </div>
                   <div className="h-6 w-px bg-slate-100" />
                   <div className="flex items-center gap-3">
                     <span className="text-[12px] font-black uppercase tracking-widest text-slate-400">{t('view.display_mode')}</span>
@@ -335,7 +336,7 @@ export default function Home() {
             </div>
 
             {/* Mobile Specialized Toolbar */}
-            <MobileToolbar 
+            <MobileToolbar
               sortBy={sortBy}
               onSortChange={setSortBy}
               itemsPerPage={itemsPerPage}
@@ -393,42 +394,42 @@ export default function Home() {
                 </button>
               </div>
             ) : displayMode === 'table' ? (
-                <SpeciesTable 
-                  species={paginatedSpecies} 
-                  sortBy={sortBy}
-                  sortOrder={sortOrder}
-                  filters={tableFilters}
-                  onFilterChange={setTableFilters}
-                  onSort={(field) => {
-                    if (sortBy === field) {
-                      setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
-                    } else {
-                      setSortBy(field);
-                      setSortOrder('asc');
-                    }
-                  }}
-                />
-              ) : (
-                /* Grid Layout */
-                <div
-                  key={`${currentPage}-${sortBy}-${itemsPerPage}-${searchQuery}-${JSON.stringify(selectedFilters)}-${displayMode}`}
-                  className={`
+              <SpeciesTable
+                species={paginatedSpecies}
+                sortBy={sortBy}
+                sortOrder={sortOrder}
+                filters={tableFilters}
+                onFilterChange={setTableFilters}
+                onSort={(field) => {
+                  if (sortBy === field) {
+                    setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
+                  } else {
+                    setSortBy(field);
+                    setSortOrder('asc');
+                  }
+                }}
+              />
+            ) : (
+              /* Grid Layout */
+              <div
+                key={`${currentPage}-${sortBy}-${itemsPerPage}-${searchQuery}-${JSON.stringify(selectedFilters)}-${displayMode}`}
+                className={`
                     grid gap-4 sm:gap-8 animate-grid-fade
                     ${displayMode === 'photo'
-                      ? 'grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 min-[1101px]:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5'
-                      : 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 min-[1101px]:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4'}
+                    ? 'grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 min-[1101px]:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5'
+                    : 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 min-[1101px]:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4'}
                   `}
-                >
-                  {paginatedSpecies.map((species, index) => (
-                    <SpeciesCard 
-                      key={species.id} 
-                      species={species} 
-                      mode={displayMode} 
-                      priority={index < 4}
-                    />
-                  ))}
-                </div>
-              )}
+              >
+                {paginatedSpecies.map((species, index) => (
+                  <SpeciesCard
+                    key={species.id}
+                    species={species}
+                    mode={displayMode}
+                    priority={index < 4}
+                  />
+                ))}
+              </div>
+            )}
 
             {/* Full Pagination Navigation */}
             {totalPages > 1 && (
@@ -482,7 +483,13 @@ export default function Home() {
       {!isSidebarOpen && (
         <button
           onClick={() => setIsSidebarOpen(true)}
-          className="min-[1101px]:hidden fixed bottom-8 right-8 w-16 h-16 bg-emerald-600 text-white rounded-full shadow-2xl shadow-emerald-200 flex items-center justify-center z-40 animate-in fade-in zoom-in duration-300 backdrop-blur-md border border-white/20 active:scale-95 transition-transform"
+          className={`
+            min-[1101px]:hidden fixed right-8 w-16 h-16 bg-emerald-600 text-white rounded-full 
+            shadow-2xl shadow-emerald-200 flex items-center justify-center z-40 
+            animate-in fade-in zoom-in duration-300 backdrop-blur-md border border-white/20 
+            active:scale-95 transition-all
+            ${useSpeciesPanel().openSpeciesIds.length > 0 ? 'bottom-24' : 'bottom-8'}
+          `}
         >
           <div className="relative">
             <Filter className="w-8 h-8" />
