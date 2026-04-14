@@ -1,9 +1,10 @@
 import { useState, useMemo, useEffect } from 'react';
-import { ChevronDown, ChevronRight, Search, Filter, X, CheckCircle2 } from 'lucide-react';
+import { ChevronDown, ChevronRight, Search, Filter, X } from 'lucide-react';
 import { Species, TaxonomyLevel } from '../types/species';
 import { useLanguage } from '../context/LanguageContext';
 import { supabase } from '@/lib/supabase';
 import { getIUCNConfig, IUCN_CONFIG } from '../constants/statusStyles';
+import MultiSelectDropdown from './ui/MultiSelectDropdown';
 
 
 interface SidebarFilterProps {
@@ -171,14 +172,9 @@ export default function SidebarFilter({
     setExpanded(prev => ({ ...prev, [key]: !prev[key] }));
   };
 
-  const handleTaxonomyToggle = (level: TaxonomyLevel, value: string) => {
+  const handleTaxonomyChange = (level: TaxonomyLevel, values: string[]) => {
     const newSelected = { ...selected };
-    const current = newSelected.taxonomy[level];
-    if (current.includes(value)) {
-      newSelected.taxonomy[level] = current.filter(v => v !== value);
-    } else {
-      newSelected.taxonomy[level] = [...current, value];
-    }
+    newSelected.taxonomy[level] = values;
     setSelected(newSelected);
     onFilterChange(newSelected);
   };
@@ -271,57 +267,16 @@ export default function SidebarFilter({
               </button>
               
               {expanded.taxonomy && (
-                <div className="space-y-6 pt-2">
+                <div className="space-y-3 pt-2">
                   {(Object.keys(TAXONOMY_LABELS) as TaxonomyLevel[]).map((level) => (
-                    <div key={level} className="space-y-3">
-                      <button 
-                        onClick={() => toggleExpand(level)}
-                        className="w-full flex items-center justify-between text-xs font-bold text-emerald-900 hover:text-emerald-600 transition-colors"
-                      >
-                        <div className="flex items-center gap-2">
-                          <div className={`w-1.5 h-1.5 rounded-full ${selected.taxonomy[level].length > 0 ? 'bg-emerald-500' : 'bg-emerald-200'}`} />
-                          {TAXONOMY_LABELS[level]}
-                          {selected.taxonomy[level].length > 0 && (
-                            <span className="ml-1 text-[10px] bg-slate-100 text-emerald-600 px-1.5 py-0.5 rounded-md">
-                              {selected.taxonomy[level].length}
-                            </span>
-                          )}
-                        </div>
-                        {expanded[level] ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
-                      </button>
-
-                      {expanded[level] && (
-                        <div className="flex flex-wrap gap-2 pl-3 pb-2 transition-all duration-300 ease-in-out">
-                          {filterOptions[level].map((opt, idx) => {
-                            const isSelected = selected.taxonomy[level].includes(opt.name);
-                            // 在伺服器端模式，不根據 count === 0 隱藏，除非真的沒有資料
-                            if (opt.name === '') return null;
-                            
-                            return (
-                              <button
-                                key={opt.name}
-                                onClick={() => handleTaxonomyToggle(level, opt.name)}
-                                style={{ animationDelay: `${idx * 40}ms` }}
-                                className={`
-                                  px-3 py-1.5 rounded-xl text-xs font-bold transition-all duration-300 border shadow-sm flex items-center gap-1.5 opacity-0 animate-filter-in
-                                  ${isSelected
-                                    ? 'bg-emerald-600 border-emerald-600 text-white ring-4 ring-slate-100'
-                                    : 'bg-white border-slate-200 text-slate-700 hover:border-emerald-300 hover:bg-emerald-50'}
-                                `}
-                              >
-                                {isSelected && <CheckCircle2 className="w-3 h-3" />}
-                                {opt.display}
-                                {opt.count > 0 && (
-                                  <span className={`transition-colors duration-300 opacity-60 font-medium ${isSelected ? 'text-white/70' : 'text-slate-400'}`}>
-                                    ({opt.count})
-                                  </span>
-                                )}
-                              </button>
-                            );
-                          })}
-                        </div>
-                      )}
-                    </div>
+                    <MultiSelectDropdown
+                      key={level}
+                      label={TAXONOMY_LABELS[level]}
+                      options={taxonomyOptions[level]}
+                      selectedValues={selected.taxonomy[level]}
+                      onChange={(values) => handleTaxonomyChange(level, values)}
+                      placeholder={`${t('search.sidebar_placeholder')}...`}
+                    />
                   ))}
                 </div>
               )}
