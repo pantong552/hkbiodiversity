@@ -13,6 +13,7 @@ interface SidebarFilterProps {
   searchValue: string;
   onSearchChange: (value: string) => void;
   onSearchSubmit: () => void;
+  selectedFilters?: SelectedFilters;
 }
 
 export interface SelectedFilters {
@@ -26,7 +27,8 @@ export default function SidebarFilter({
   onFilterChange,
   searchValue,
   onSearchChange,
-  onSearchSubmit
+  onSearchSubmit,
+  selectedFilters
 }: SidebarFilterProps) {
   const { language, t } = useLanguage();
 
@@ -51,7 +53,7 @@ export default function SidebarFilter({
     genus_eng: false
   });
 
-  const [selected, setSelected] = useState<SelectedFilters>({
+  const [selected, setSelected] = useState<SelectedFilters>(selectedFilters || {
     taxonomy: {
       phylum_eng: [],
       class_eng: [],
@@ -61,6 +63,24 @@ export default function SidebarFilter({
     },
     iucn: [],
   });
+
+  // 1. Sync local selected state with external selectedFilters prop
+  useEffect(() => {
+    if (selectedFilters) {
+      setSelected(selectedFilters);
+      
+      // Auto-expand levels that have selected items
+      const newExpanded = { ...expanded };
+      let hasChange = false;
+      Object.entries(selectedFilters.taxonomy).forEach(([level, values]) => {
+        if (values.length > 0 && !expanded[level]) {
+          newExpanded[level] = true;
+          hasChange = true;
+        }
+      });
+      if (hasChange) setExpanded(newExpanded);
+    }
+  }, [selectedFilters]);
 
   const [taxonomyOptions, setTaxonomyOptions] = useState<Record<TaxonomyLevel, { name: string; display: string; count: number }[]>>({
     phylum_eng: [], class_eng: [], order_eng: [], family_eng: [], genus_eng: []

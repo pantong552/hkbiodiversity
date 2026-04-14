@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, Suspense } from 'react';
 import { Menu, Search, X, FilterX, LayoutGrid, List, ChevronLeft, ChevronRight, Filter, Table as TableIcon } from 'lucide-react';
 import SpeciesCard from '@/components/SpeciesCard';
 import SpeciesTable from '@/components/species/SpeciesTable';
@@ -15,6 +15,7 @@ import debounce from 'lodash/debounce';
 import { useAuth } from '@/context/AuthContext';
 import MobileToolbar from '@/components/search/MobileToolbar';
 import { useSpeciesPanel } from '@/context/SpeciesPanelContext';
+import { useSearchParams, useRouter } from 'next/navigation';
 
 const PAGE_SIZE_OPTIONS = {
   detail: [12, 24, 36, 48, 60],
@@ -23,8 +24,19 @@ const PAGE_SIZE_OPTIONS = {
 };
 
 export default function Home() {
+  return (
+    <Suspense fallback={<div className="flex items-center justify-center min-h-screen text-slate-400 font-bold">LOADING...</div>}>
+      <HomeContent />
+    </Suspense>
+  );
+}
+
+function HomeContent() {
   const { language, t } = useLanguage();
   const { isLoading: isAuthLoading } = useAuth();
+  const searchParams = useSearchParams();
+  const router = useRouter();
+
   const [species, setSpecies] = useState<Species[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -45,16 +57,41 @@ export default function Home() {
   const [displayMode, setDisplayMode] = useState<'detail' | 'photo' | 'table'>('detail');
   const [currentPage, setCurrentPage] = useState(1);
 
-  // Fallback：如果 OAuth code 意外落到根頁面（Supabase Dashboard redirect 設定問題），
-  // 自動重導到 /auth/callback 進行 code exchange
+  // 1. Sync Filters from URL Query Parameters
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const code = params.get('code');
-    if (code) {
-      // 保留完整的 query string 並轉送到 callback handler
-      window.location.href = `/auth/callback?${params.toString()}`;
+    const taxonomyKeys = ['phylum_eng', 'class_eng', 'order_eng', 'family_eng', 'genus_eng'];
+    let hasURLFilters = false;
+    
+    const newTaxonomy: any = { 
+      phylum_eng: [], class_eng: [], order_eng: [], family_eng: [], genus_eng: [] 
+    };
+
+    taxonomyKeys.forEach(key => {
+      const val = searchParams.get(key);
+      if (val) {
+        newTaxonomy[key] = [val];
+        hasURLFilters = true;
+      }
+    });
+
+    if (hasURLFilters) {
+      setSelectedFilters({
+        taxonomy: newTaxonomy,
+        iucn: []
+      });
+      setSearchQuery('');
+      setLocalSearch('');
+      setTableFilters({});
     }
-  }, []);
+  }, [searchParams]);
+
+  // Fallback：如果 OAuth code 意外落到根頁面
+  useEffect(() => {
+    const code = searchParams.get('code');
+    if (code) {
+      window.location.href = `/auth/callback?${searchParams.toString()}`;
+    }
+  }, [searchParams]);
 
   // Explicit search trigger
   const handleSearchTrigger = (value: string) => {
@@ -63,7 +100,6 @@ export default function Home() {
 
   const fetchSpecies = useMemo(() => {
     return async () => {
-      // 防止在認證尚未初始化時發送請求
       if (isAuthLoading) return;
 
       setIsLoading(true);
@@ -196,6 +232,7 @@ export default function Home() {
               searchValue={localSearch}
               onSearchChange={setLocalSearch}
               onSearchSubmit={() => handleSearchTrigger(localSearch)}
+              selectedFilters={selectedFilters}
             />
           </div>
 
