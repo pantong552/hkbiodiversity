@@ -12,6 +12,7 @@ import SpeciesPhotoGallery from './SpeciesPhotoGallery';
 import { useInaturalistSpeciesPhotos, InatGalleryPhoto } from '@/hooks/useInaturalistSpeciesPhotos';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useRef } from 'react';
+import SpeciesMap from './SpeciesMap';
 import { formatScientificName } from '@/utils/formatters';
 
 
@@ -205,14 +206,13 @@ export default function SpeciesContent({ species, showBreadcrumb = true }: Speci
                 {language === 'zh' ? '地理分佈' : 'Distribution'}
               </h2>
               
-              {/* MapBox Banner Placeholder */}
-              <div className="w-full h-[300px] bg-slate-200 rounded-[2.5rem] border-2 border-dashed border-slate-300 flex flex-col items-center justify-center text-slate-500 relative overflow-hidden group">
-                {/* Simulated map background grid */}
-                <div className="absolute inset-0 opacity-20" style={{ backgroundImage: 'radial-gradient(circle at 2px 2px, slate-400 1px, transparent 0)', backgroundSize: '24px 24px' }}></div>
-                <Map className="w-12 h-12 mb-3 text-slate-400 group-hover:scale-110 transition-transform" />
-                <p className="font-bold text-lg">{language === 'zh' ? 'MapBox 地圖整合即將推出' : 'MapBox Integration Coming Soon'}</p>
-                <p className="text-sm mt-1">{language === 'zh' ? '預留全站滿版展示佈局' : 'Reserved for full-width geographic display'}</p>
-              </div>
+              {species.species_id ? (
+                <SpeciesMap taxonId={species.species_id} />
+              ) : (
+                <div className="w-full h-[300px] bg-slate-200 rounded-[2.5rem] flex items-center justify-center text-slate-500">
+                  <p>{language === 'zh' ? '無 iNaturalist ID' : 'No iNaturalist ID available'}</p>
+                </div>
+              )}
 
               <div className="grid md:grid-cols-2 gap-6">
                 <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-100">
