@@ -211,18 +211,18 @@ export default function SidebarFilter({
             {activeCount > 0 && (
               <button 
                 onClick={clearFilters}
-                className="text-xs font-bold text-emerald-500 hover:text-emerald-700 bg-cyan-50 px-2 py-1 rounded-lg transition-colors"
+                className="text-xs font-bold text-emerald-600 hover:text-emerald-700 bg-emerald-50 px-2 py-1 rounded-lg transition-colors"
               >
                 {t('filter.reset')}
               </button>
             )}
-            <button onClick={onClose} className="min-[1101px]:hidden p-2 text-cyan-400 hover:bg-cyan-50 rounded-xl">
+            <button onClick={onClose} className="min-[1101px]:hidden p-2 text-slate-400 hover:bg-emerald-50 rounded-xl">
               <X className="w-6 h-6" />
             </button>
           </div>
 
           <div className="relative mb-10 group flex items-center">
-            <Search className="w-6 h-6 text-emerald-300 absolute left-4 pointer-events-none group-focus-within:text-emerald-500 transition-colors" />
+            <Search className="w-6 h-6 text-slate-400 absolute left-4 pointer-events-none group-focus-within:text-emerald-500 transition-colors" />
             <input 
               type="text" 
               placeholder={t('search.sidebar_placeholder')} 
@@ -230,7 +230,7 @@ export default function SidebarFilter({
               onChange={(e) => onSearchChange(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && onSearchSubmit()}
               suppressHydrationWarning={true}
-              className="w-full pl-12 pr-12 py-4 bg-cyan-50/50 border-2 border-transparent rounded-2xl text-emerald-900 placeholder:text-cyan-400 focus:bg-white focus:border-emerald-200 focus:ring-4 focus:ring-cyan-50 transition-all outline-none"
+              className="w-full pl-12 pr-12 py-4 bg-emerald-50/30 border-2 border-transparent rounded-2xl text-emerald-900 placeholder:text-slate-400 focus:bg-white focus:border-emerald-200 focus:ring-4 focus:ring-emerald-50/50 transition-all outline-none"
             />
             <button
               onClick={onSearchSubmit}
@@ -244,7 +244,7 @@ export default function SidebarFilter({
             <div className="space-y-4">
               <button 
                 onClick={() => toggleExpand('taxonomy')}
-                className="w-full flex items-center justify-between text-sm font-black uppercase tracking-widest text-cyan-400 hover:text-emerald-600 transition-colors"
+                className="w-full flex items-center justify-between text-sm font-black uppercase tracking-widest text-slate-400 hover:text-emerald-700 transition-colors"
               >
                 {t('filter.taxonomy')}
                 {expanded.taxonomy ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
@@ -256,7 +256,7 @@ export default function SidebarFilter({
                     <div key={level} className="space-y-3">
                       <button 
                         onClick={() => toggleExpand(level)}
-                        className="w-full flex items-center justify-between text-xs font-bold text-cyan-800 hover:text-emerald-500 transition-colors"
+                        className="w-full flex items-center justify-between text-xs font-bold text-emerald-900 hover:text-emerald-600 transition-colors"
                       >
                         <div className="flex items-center gap-2">
                           <div className={`w-1.5 h-1.5 rounded-full ${selected.taxonomy[level].length > 0 ? 'bg-emerald-500' : 'bg-emerald-200'}`} />
@@ -292,7 +292,7 @@ export default function SidebarFilter({
                                 {isSelected && <CheckCircle2 className="w-3 h-3" />}
                                 {opt.display}
                                 {opt.count > 0 && (
-                                  <span className={`transition-colors duration-300 opacity-60 font-medium ${isSelected ? 'text-slate-100' : 'text-cyan-400'}`}>
+                                  <span className={`transition-colors duration-300 opacity-60 font-medium ${isSelected ? 'text-white/70' : 'text-slate-400'}`}>
                                     ({opt.count})
                                   </span>
                                 )}
@@ -307,10 +307,10 @@ export default function SidebarFilter({
               )}
             </div>
 
-            <div className="space-y-4 pt-4 border-t border-cyan-50">
+            <div className="space-y-4 pt-4 border-t border-emerald-50">
               <button 
                 onClick={() => toggleExpand('iucn')}
-                className="w-full flex items-center justify-between text-sm font-black uppercase tracking-widest text-cyan-400 hover:text-emerald-600 transition-colors"
+                className="w-full flex items-center justify-between text-sm font-black uppercase tracking-widest text-slate-400 hover:text-emerald-700 transition-colors"
               >
                 {language === 'zh' ? 'IUCN 狀態' : 'IUCN Status'}
                 {expanded.iucn ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}

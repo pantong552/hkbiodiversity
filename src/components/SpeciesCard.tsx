@@ -145,10 +145,10 @@ export default function SpeciesCard({
         {/* Bottom Title Overlay for Detail Mode */}
         {!isPhoto && (
           <div className="absolute inset-x-0 bottom-0 p-4 pt-12 bg-gradient-to-t from-black/80 via-black/40 to-transparent z-10">
-            <h3 className="text-white text-lg font-black tracking-tight leading-tight drop-shadow-md">
+            <h3 className="text-white text-xl font-black tracking-tight leading-tight drop-shadow-md">
               {language === 'zh' ? species.common_name_chi : species.common_name_eng}
             </h3>
-            <p className="text-white/80 text-[10px] italic drop-shadow-sm font-serif">
+            <p className="text-white/80 text-xs italic drop-shadow-sm font-serif mt-1">
               {species.scientific_name}
             </p>
           </div>
@@ -301,13 +301,13 @@ export default function SpeciesCard({
       {!isPhoto ? (
         <div className="p-3 bg-white flex flex-col gap-2">
           {/* Taxonomy Tags - Ultra Compact */}
-          <div className="flex flex-wrap gap-1.5">
+          <div className="flex flex-wrap gap-2">
             {[
               language === 'zh' ? species.order_chi : species.order_eng, 
               language === 'zh' ? species.family_chi : species.family_eng,
               language === 'zh' ? species.informal_group_chi : species.informal_group_eng
             ].map((tax, i) => (
-              <span key={i} className="px-2 py-0.5 bg-slate-50 text-[9px] font-black text-slate-400 rounded-md border border-slate-100 group-hover:border-emerald-100 group-hover:bg-emerald-50/50 transition-all uppercase tracking-tighter">
+              <span key={i} className="px-2.5 py-1 bg-slate-50 text-[11px] font-bold text-slate-500 rounded-lg border border-slate-100 group-hover:border-emerald-100 group-hover:bg-emerald-50/50 transition-all uppercase tracking-tight">
                 {tax}
               </span>
             ))}

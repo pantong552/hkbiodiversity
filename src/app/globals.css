@@ -9,13 +9,15 @@
   --color-background: #f8fafc;
   --color-foreground: #020617;
   
-  /* Nature Theme Colors */
-  --color-emerald-50: #ecfdf5;
-  --color-emerald-100: #d1fae5;
-  --color-emerald-500: #10b981;
-  --color-emerald-600: #059669;
-  --color-emerald-700: #047857;
-  --color-emerald-900: #064e3b;
+  /* Nature Theme Colors (Extracted from Logo) */
+  --color-emerald-50: #f4fbf1;
+  --color-emerald-100: #e8f5e3;
+  --color-emerald-200: #d1eac6;
+  --color-emerald-400: #8eb45a; /* Logo Light Green */
+  --color-emerald-500: #74a366;
+  --color-emerald-600: #679758; /* Logo Primary Green */
+  --color-emerald-700: #3e8157; /* Logo Dark Green */
+  --color-emerald-900: #2a5a3c;
   
   --color-sky-500: #0ea5e9;
   --color-amber-500: #f59e0b;
@@ -25,9 +27,9 @@
   --animate-filter-in: filter-in 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
   --animate-grid-fade: grid-fade 0.5s ease-out forwards;
   
-  --shadow-card: 0 12px 20px -3px rgba(0, 0, 0, 0.08); /* 強化基礎陰影 */
-  --shadow-card-hover: 0 40px 80px -15px rgba(4, 120, 87, 0.2); /* 讓滑過的層次更高 */
-  --shadow-premium: 0 20px 25px -5px rgba(0, 0, 0, 10%), 0 8px 10px -6px rgba(0, 0, 0, 10%);
+  --shadow-card: 0 12px 20px -3px rgba(103, 151, 88, 0.08); /* 使用品牌色陰影 */
+  --shadow-card-hover: 0 40px 80px -15px rgba(62, 129, 87, 0.15);
+  --shadow-premium: 0 20px 25px -5px rgba(0, 0, 0, 5%), 0 8px 10px -6px rgba(0, 0, 0, 5%);
 
   @keyframes filter-in {
     from { opacity: 0; transform: translateY(10px) scale(0.95); }
@@ -41,7 +43,7 @@
 }
 
 .glass-header {
-  @apply sticky top-4 mx-4 md:mx-10 z-50 rounded-3xl border border-white/40 bg-white/70 backdrop-blur-2xl shadow-xl transition-all duration-300;
+  @apply sticky top-4 mx-4 md:mx-10 z-50 rounded-[2rem] border border-white/60 bg-white/70 backdrop-blur-3xl shadow-2xl transition-all duration-300;
 }
 
 body {

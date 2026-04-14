@@ -1,12 +1,12 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { Leaf, Menu, X, User, LogOut, Settings } from 'lucide-react';
+import { Leaf, Menu, X, User, LogOut, Settings, Globe } from 'lucide-react';
 import Link from 'next/link';
+import { motion } from 'framer-motion';
 import LoginButton from './LoginButton';
 import { useLanguage } from '@/context/LanguageContext';
 import { useAuth } from '@/context/AuthContext';
-import { Globe } from 'lucide-react';
 
 export default function Header() {
   const { language, setLanguage, t } = useLanguage();
@@ -14,14 +14,14 @@ export default function Header() {
   const [isScrolled, setIsScrolled] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isVisible, setIsVisible] = useState(true);
-  
+
   // 使用 ref 來儲存滾動位置，避免 useEffect 頻繁重新觸發
   const lastScrollYRef = useRef(0);
 
   useEffect(() => {
     const handleScroll = () => {
       const currentScrollY = window.scrollY;
-      
+
       // 切換透明度/高度
       setIsScrolled(currentScrollY > 20);
 
@@ -31,7 +31,7 @@ export default function Header() {
       } else {
         setIsVisible(true);
       }
-      
+
       lastScrollYRef.current = currentScrollY;
     };
 
@@ -62,14 +62,54 @@ export default function Header() {
       ${isVisible ? 'translate-y-0 opacity-100' : '-translate-y-32 opacity-0'}
     `}>
       <div className="container mx-auto px-6 flex items-center justify-between">
-        {/* Logo */}
-        <Link href="/" className="flex items-center gap-3 group">
-          <div className="w-10 h-10 bg-emerald-600 rounded-xl flex items-center justify-center shadow-lg shadow-emerald-200 group-hover:scale-110 transition-transform">
-            <Leaf className="w-6 h-6 text-white" />
+        {/* Logo & Branding */}
+        <Link href="/" className="flex items-center gap-5 group relative">
+          <motion.div
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
+            className="relative w-14 h-14 md:w-16 md:h-16 flex items-center justify-center"
+          >
+            {/* Ambient Glow Background */}
+            <div className="absolute inset-0 bg-emerald-500/10 blur-2xl rounded-full group-hover:bg-emerald-500/20 transition-all duration-700" />
+
+            <img
+              src="/logo.svg"
+              alt="HKBC Logo"
+              className="w-full h-full object-contain relative z-10 filter drop-shadow-[0_4px_12px_rgba(103,151,88,0.15)] group-hover:drop-shadow-[0_8px_24px_rgba(103,151,88,0.25)] transition-all duration-500"
+            />
+          </motion.div>
+
+          {/* Vertical Separator Line */}
+          <div className="h-10 w-px bg-slate-200/60 hidden md:block" />
+
+          {/* Text Identity */}
+          <div className="flex flex-col justify-center gap-0.5">
+            <div className="flex items-baseline gap-1.5">
+              <span className="text-2xl font-black tracking-tighter text-slate-900 group-hover:text-emerald-700 transition-colors duration-500">
+                HK
+              </span>
+              <motion.span
+                initial={{ letterSpacing: "0.2em" }}
+                whileHover={{ letterSpacing: "0.4em" }}
+                className="text-xs font-light uppercase text-emerald-600 transition-all duration-700"
+              >
+                Biodiversity
+              </motion.span>
+            </div>
+
+            <div className="flex items-center gap-3">
+              <span className="text-[12px] font-bold uppercase tracking-[0.25em] text-slate-500">
+                Collective
+              </span>
+              {/* Chinese Title Integration */}
+              <div className="flex items-center gap-1.5 opacity-80 group-hover:opacity-100 transition-opacity duration-700">
+                <div className="w-1 h-1 bg-emerald-500 rounded-full" />
+                <span className="text-[12px] font-medium tracking-widest text-slate-400 whitespace-nowrap">
+                  香港生物多樣性匯誌
+                </span>
+              </div>
+            </div>
           </div>
-          <span className="text-lg font-black tracking-tight text-slate-900">
-            HK <span className="text-emerald-600">Biodiversity</span> Collective
-          </span>
         </Link>
 
         {/* Desktop Nav */}
@@ -77,7 +117,7 @@ export default function Header() {
           <div className="flex items-center gap-8">
             {navLinks.map((link) => (
               link.disabled ? (
-                <span 
+                <span
                   key={link.name}
                   className="text-sm font-bold text-slate-300 cursor-not-allowed"
                   title="Coming Soon"
@@ -85,8 +125,8 @@ export default function Header() {
                   {link.name}
                 </span>
               ) : (
-                <Link 
-                  key={link.name} 
+                <Link
+                  key={link.name}
                   href={link.href}
                   className="text-sm font-bold text-slate-500 hover:text-emerald-600 transition-colors"
                 >
@@ -111,14 +151,14 @@ export default function Header() {
               EN
             </button>
           </div>
-          
+
           {user ? (
             <div className="flex items-center gap-3">
               <Link href="/account" className="flex items-center gap-2 px-4 py-2 bg-slate-50 rounded-2xl border border-slate-100 hover:border-emerald-200 hover:bg-emerald-50/50 transition-all duration-300 cursor-pointer group">
                 {user.user_metadata.avatar_url ? (
-                  <img 
-                    src={user.user_metadata.avatar_url} 
-                    alt="User Avatar" 
+                  <img
+                    src={user.user_metadata.avatar_url}
+                    alt="User Avatar"
                     className="w-6 h-6 rounded-full"
                   />
                 ) : (
@@ -135,7 +175,7 @@ export default function Header() {
               >
                 <Settings className="w-5 h-5" />
               </Link>
-              <button 
+              <button
                 onClick={handleLogout}
                 className="p-3 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all cursor-pointer"
                 title="Logout"
@@ -149,7 +189,7 @@ export default function Header() {
         </div>
 
         {/* Mobile Menu Toggle */}
-        <button 
+        <button
           className="lg:hidden p-2 text-slate-600 hover:bg-slate-100 rounded-xl"
           onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
         >
@@ -186,15 +226,15 @@ export default function Header() {
             <div className="flex flex-col gap-2">
               {navLinks.map((link) => (
                 link.disabled ? (
-                  <span 
+                  <span
                     key={link.name}
                     className="text-lg font-bold text-slate-300 px-4 py-2 rounded-xl cursor-not-allowed"
                   >
                     {link.name} <span className="text-xs text-slate-300 ml-1">(Coming Soon)</span>
                   </span>
                 ) : (
-                  <Link 
-                    key={link.name} 
+                  <Link
+                    key={link.name}
                     href={link.href}
                     onClick={() => setIsMobileMenuOpen(false)}
                     className="text-lg font-bold text-slate-700 hover:text-emerald-600 px-4 py-2 rounded-xl hover:bg-emerald-50 transition-all"
@@ -206,15 +246,15 @@ export default function Header() {
               <hr className="border-slate-100 my-2" />
               {user ? (
                 <div className="space-y-3">
-                  <Link 
-                    href="/account" 
+                  <Link
+                    href="/account"
                     onClick={() => setIsMobileMenuOpen(false)}
                     className="flex items-center gap-3 px-4 py-3 bg-slate-50 rounded-2xl border border-slate-100 hover:border-emerald-200 hover:bg-emerald-50/50 transition-all duration-300 cursor-pointer"
                   >
                     {user.user_metadata.avatar_url ? (
-                      <img 
-                        src={user.user_metadata.avatar_url} 
-                        alt="User Avatar" 
+                      <img
+                        src={user.user_metadata.avatar_url}
+                        alt="User Avatar"
                         className="w-10 h-10 rounded-full"
                       />
                     ) : (
@@ -236,7 +276,7 @@ export default function Header() {
                     <Settings className="w-4 h-4" />
                     {t('account.header_link')}
                   </Link>
-                  <button 
+                  <button
                     onClick={handleLogout}
                     className="flex items-center justify-center gap-2 w-full py-3 text-red-600 font-bold border-2 border-red-100 rounded-2xl hover:bg-red-50 transition-all cursor-pointer"
                   >

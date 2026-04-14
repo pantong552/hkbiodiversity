@@ -15,6 +15,10 @@ const workSans = Work_Sans({
 export const metadata: Metadata = {
   title: 'Hong Kong Biodiversity Collective',
   description: 'A comprehensive biodiversity encyclopedia of Hong Kong, covering approximately 10,000 species.',
+  icons: {
+    icon: '/logo.svg',
+    apple: '/logo.svg',
+  },
 };
 
 import { LanguageProvider } from '@/context/LanguageContext';
