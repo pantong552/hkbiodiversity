@@ -124,14 +124,14 @@ const BASEMAPS = [
 
 const translations = {
   zh: {
-    loadingTitle: '正在獲取分佈數據',
-    loadingDesc: '正在從 iNaturalist 抓取觀測紀錄...',
+    loadingTitle: '正在獲取分布數據',
+    loadingDesc: '正在從 iNaturalist 抓取觀測記錄...',
     obsLoaded: '已載入',
-    obsUnit: '筆觀測紀錄',
+    obsUnit: '筆觀測記錄',
     densityTitle: '觀測密度 (Grid)',
     gridId: '網格',
     totalObs: '共發現',
-    totalObsUnit: '筆觀測紀錄',
+    totalObsUnit: '筆觀測記錄',
     obsBy: '觀測者',
     viewDetails: '查看詳情',
     researchGrade: 'iNaturalist 研究級數據',

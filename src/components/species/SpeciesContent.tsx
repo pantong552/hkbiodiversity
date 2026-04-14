@@ -203,7 +203,7 @@ export default function SpeciesContent({ species, showBreadcrumb = true }: Speci
             <section className="space-y-6">
               <h2 className="text-2xl font-black text-slate-800 flex items-center gap-3">
                 <Map className="w-6 h-6 text-emerald-500" />
-                {language === 'zh' ? '地理分佈' : 'Distribution'}
+                {language === 'zh' ? '地理分布' : 'Distribution'}
               </h2>
               
               {species.species_id ? (
@@ -216,11 +216,11 @@ export default function SpeciesContent({ species, showBreadcrumb = true }: Speci
 
               <div className="grid md:grid-cols-2 gap-6">
                 <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-100">
-                  <h3 className="font-black text-slate-800 mb-2">{language === 'zh' ? '香港分佈' : 'HK Distribution'}</h3>
+                  <h3 className="font-black text-slate-800 mb-2">{language === 'zh' ? '香港分布' : 'HK Distribution'}</h3>
                   <p className="text-slate-600 text-sm">{hkDist || '-'}</p>
                 </div>
                 <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-100">
-                  <h3 className="font-black text-slate-800 mb-2">{language === 'zh' ? '全球分佈' : 'Global Distribution'}</h3>
+                  <h3 className="font-black text-slate-800 mb-2">{language === 'zh' ? '全球分布' : 'Global Distribution'}</h3>
                   <p className="text-slate-600 text-sm">{globalDist || '-'}</p>
                 </div>
               </div>
