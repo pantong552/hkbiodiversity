@@ -81,7 +81,9 @@ const translations: Record<Language, Record<string, string>> = {
     'account.bookmarks_empty_hint': '在物種卡片上點擊心形圖示即可收藏',
     'account.remove_bookmark': '移除收藏',
     'account.header_link': '帳號設定',
-    'account.profile_info': '帳號資訊'
+    'account.profile_info': '帳號資訊',
+    'nav.privacy': '隱私權政策',
+    'nav.terms': '服務條款'
   },
   en: {
     'nav.home': 'Home',
@@ -153,7 +155,9 @@ const translations: Record<Language, Record<string, string>> = {
     'account.bookmarks_empty_hint': 'Tap the heart icon on a species card to bookmark it',
     'account.remove_bookmark': 'Remove Bookmark',
     'account.header_link': 'Account',
-    'account.profile_info': 'Account Info'
+    'account.profile_info': 'Account Info',
+    'nav.privacy': 'Privacy Policy',
+    'nav.terms': 'Terms of Service'
   }
 };
 

@@ -16,6 +16,8 @@ import { useAuth } from '@/context/AuthContext';
 import MobileToolbar from '@/components/search/MobileToolbar';
 import { useSpeciesPanel } from '@/context/SpeciesPanelContext';
 import { useSearchParams, useRouter } from 'next/navigation';
+import Link from 'next/link';
+
 
 const PAGE_SIZE_OPTIONS = {
   detail: [12, 24, 36, 48, 60],
@@ -516,24 +518,36 @@ function HomeContent() {
         </div>
       </main>
 
-      {/* Floating Action Button for Mobile Filter - Visible below 1100px */}
-      {!isSidebarOpen && (
-        <button
-          onClick={() => setIsSidebarOpen(true)}
-          className={`
-            min-[1101px]:hidden fixed right-8 w-16 h-16 bg-emerald-600 text-white rounded-full 
-            shadow-2xl shadow-emerald-200 flex items-center justify-center z-40 
-            animate-in fade-in zoom-in duration-300 backdrop-blur-md border border-white/20 
-            active:scale-95 transition-all
-            ${useSpeciesPanel().openSpeciesIds.length > 0 ? 'bottom-24' : 'bottom-8'}
-          `}
-        >
-          <div className="relative">
-            <Filter className="w-8 h-8" />
-            <div className="absolute -top-1 -right-1 w-3 h-3 bg-white rounded-full border-2 border-emerald-600" />
+      <footer className="border-t border-slate-100 bg-white py-12 px-10">
+        <div className="max-w-[1920px] mx-auto flex flex-col md:flex-row justify-between items-center gap-8">
+          <div className="flex flex-col items-center md:items-start gap-2">
+            <div className="flex items-center gap-2">
+              <span className="text-xl font-black tracking-tighter text-slate-900">HK</span>
+              <span className="text-xs font-light uppercase tracking-[0.2em] text-emerald-600">Biodiversity</span>
+            </div>
+            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+              © 2026 Hong Kong Biodiversity Collective
+            </p>
           </div>
-        </button>
-      )}
+
+          <div className="flex items-center gap-8">
+            <Link href="/privacy" className="text-xs font-black text-slate-500 hover:text-emerald-600 transition-colors uppercase tracking-widest">
+              {t('nav.privacy')}
+            </Link>
+            <Link href="/terms" className="text-xs font-black text-slate-500 hover:text-emerald-600 transition-colors uppercase tracking-widest">
+              {t('nav.terms')}
+            </Link>
+          </div>
+
+          <div className="flex items-center gap-4 text-slate-300">
+            <div className="w-8 h-px bg-slate-100" />
+            <span className="text-[10px] font-medium text-slate-400 uppercase tracking-[0.3em]">
+              Jurisdiction: HKSAR
+            </span>
+            <div className="w-8 h-px bg-slate-100" />
+          </div>
+        </div>
+      </footer>
     </div>
   );
 }
