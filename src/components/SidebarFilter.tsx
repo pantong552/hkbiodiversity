@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect } from 'react';
-import { ChevronDown, ChevronRight, Search, Filter, X } from 'lucide-react';
+import { ChevronDown, ChevronRight, Search, Filter, X, CheckCircle2 } from 'lucide-react';
 import { Species, TaxonomyLevel } from '../types/species';
 import { useLanguage } from '../context/LanguageContext';
 import { supabase } from '@/lib/supabase';
