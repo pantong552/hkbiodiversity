@@ -137,7 +137,9 @@ const translations = {
     researchGrade: 'iNaturalist 研究級數據',
     noInatId: '無 iNaturalist ID',
     mapReady: '正在準備地圖渲染引擎...',
-    tooltipObs: '筆觀測'
+    tooltipObs: '筆觀測',
+    basemapTitle: '底圖切換',
+    layers: '圖層'
   },
   en: {
     loadingTitle: 'Fetching Distribution Data',
@@ -364,13 +366,13 @@ export default function SpeciesMap({ taxonId }: SpeciesMapProps) {
                   'interpolate',
                   ['linear'],
                   ['get', 'count'],
-                  1, '#ecfdf5', // emerald-50 (更淡的起始色，增加層次感)
+                  1, '#d1fae5', // emerald-100 (起始色稍微調深，確保與圖例一致)
                   5, '#10b981', // emerald-500
                   10, '#059669', // emerald-600
                   20, '#064e3b'  // emerald-900
                 ],
                 'fill-opacity': 0.8,
-                'fill-outline-color': '#b1b1b1ff'
+                'fill-outline-color': '#333333'
               }}
             />
           </Source>
@@ -556,7 +558,7 @@ export default function SpeciesMap({ taxonId }: SpeciesMapProps) {
       <div className="absolute bottom-6 left-6 z-20 bg-white/80 backdrop-blur-md px-4 py-3 rounded-2xl border border-slate-200 shadow-lg pointer-events-none">
         <h5 className="text-[10px] font-black text-slate-800 uppercase tracking-widest mb-2">{t.densityTitle}</h5>
         <div className="flex items-center gap-2">
-          <div className="w-24 h-2 bg-gradient-to-r from-[#ecfdf5] via-[#10b981] to-[#064e3b] rounded-full" />
+          <div className="w-24 h-2 bg-gradient-to-r from-[#d1fae5] via-[#10b981] to-[#064e3b] rounded-full" />
           <span className="text-[9px] font-bold text-slate-500">1 — 20+</span>
         </div>
       </div>
