@@ -85,7 +85,12 @@ const translations: Record<Language, Record<string, string>> = {
     'nav.privacy': '隱私權政策',
     'nav.terms': '服務條款',
     'loading.message': '正在從雲端載入物種資料...',
-    'loading.searching': '正在檢索自然數據庫，請稍候...'
+    'loading.searching': '正在檢索自然數據庫，請稍候...',
+    'dropdown.reset': '重設',
+    'dropdown.apply': '套用',
+    'dropdown.apply_selection': '確定選取',
+    'dropdown.no_results': '找不到符合的分類',
+    'dropdown.clear_search': '清除搜尋'
   },
   en: {
     'nav.home': 'Home',
@@ -161,7 +166,12 @@ const translations: Record<Language, Record<string, string>> = {
     'nav.privacy': 'Privacy Policy',
     'nav.terms': 'Terms of Service',
     'loading.message': 'Loading species from the database...',
-    'loading.searching': 'Exploring natural databases, please wait...'
+    'loading.searching': 'Exploring natural databases, please wait...',
+    'dropdown.reset': 'Reset',
+    'dropdown.apply': 'Apply',
+    'dropdown.apply_selection': 'Apply Selection',
+    'dropdown.no_results': 'No matching categories found',
+    'dropdown.clear_search': 'Clear Search'
   }
 };
 
