@@ -61,7 +61,7 @@ export default function Header() {
       ${isScrolled ? 'py-3' : 'py-5'}
       ${isVisible ? 'translate-y-0 opacity-100' : '-translate-y-32 opacity-0'}
     `}>
-      <div className="container mx-auto px-6 flex items-center justify-between">
+      <div className="max-w-[1920px] mx-auto px-6 md:px-8 lg:px-10 xl:px-16 flex items-center justify-between">
         {/* Logo & Branding */}
         <Link href="/" className="flex items-center gap-5 group relative">
           <motion.div
@@ -112,9 +112,9 @@ export default function Header() {
           </div>
         </Link>
 
-        {/* Desktop Nav */}
-        <div className="hidden lg:flex items-center gap-10">
-          <div className="flex items-center gap-8">
+        {/* Desktop Nav - Now only visible above 1100px */}
+        <div className="hidden min-[1101px]:flex items-center gap-6 xl:gap-10">
+          <div className="flex items-center gap-4 xl:gap-8">
             {navLinks.map((link) => (
               link.disabled ? (
                 <span
@@ -153,7 +153,7 @@ export default function Header() {
           </div>
 
           {user ? (
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2 lg:gap-3">
               <Link href="/account" className="flex items-center gap-2 px-4 py-2 bg-slate-50 rounded-2xl border border-slate-100 hover:border-emerald-200 hover:bg-emerald-50/50 transition-all duration-300 cursor-pointer group">
                 {user.user_metadata.avatar_url ? (
                   <img
@@ -188,18 +188,18 @@ export default function Header() {
           )}
         </div>
 
-        {/* Mobile Menu Toggle */}
+        {/* Mobile/Tablet Menu Toggle - Visible below 1101px */}
         <button
-          className="lg:hidden p-2 text-slate-600 hover:bg-slate-100 rounded-xl"
+          className="min-[1101px]:hidden p-2 text-slate-600 hover:bg-slate-100 rounded-xl"
           onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
         >
           {isMobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
         </button>
       </div>
 
-      {/* Mobile Menu */}
+      {/* Mobile/Tablet Menu Dropdown */}
       {isMobileMenuOpen && (
-        <div className="lg:hidden absolute top-full left-0 right-0 mt-4 mx-4 p-6 bg-white rounded-3xl shadow-2xl border border-slate-100 animate-in fade-in slide-in-from-top-4 duration-300">
+        <div className="min-[1101px]:hidden absolute top-full left-0 right-0 mt-4 mx-4 md:mx-auto md:max-w-md p-6 bg-white rounded-3xl shadow-2xl border border-slate-100 animate-in fade-in slide-in-from-top-4 duration-300">
           <div className="flex flex-col gap-6">
             {/* Language Selection - Mobile */}
             <div className="flex items-center justify-between px-2">

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo, useEffect, Suspense } from 'react';
+import { useState, useMemo, useEffect, Suspense, useRef } from 'react';
 import { Menu, Search, X, FilterX, LayoutGrid, List, ChevronLeft, ChevronRight, Filter, Table as TableIcon } from 'lucide-react';
 import SpeciesCard from '@/components/SpeciesCard';
 import SpeciesTable from '@/components/species/SpeciesTable';
@@ -46,6 +46,22 @@ function HomeContent() {
   const [searchQuery, setSearchQuery] = useState('');
   const [localSearch, setLocalSearch] = useState('');
   const [totalResultCount, setTotalResultCount] = useState(0);
+  const [toolbarWidth, setToolbarWidth] = useState(0);
+  const toolbarRef = useRef<HTMLDivElement>(null);
+
+  // Dynamic width sensing for toolbar labels
+  useEffect(() => {
+    if (!toolbarRef.current) return;
+    const observer = new ResizeObserver((entries) => {
+      for (let entry of entries) {
+        setToolbarWidth(entry.contentRect.width);
+      }
+    });
+    observer.observe(toolbarRef.current);
+    return () => observer.disconnect();
+  }, []);
+
+  const showLabels = toolbarWidth > 950;
   const [selectedFilters, setSelectedFilters] = useState<SelectedFilters>({
     taxonomy: { phylum_eng: [], class_eng: [], order_eng: [], family_eng: [], genus_eng: [] },
     iucn: []
@@ -222,8 +238,8 @@ function HomeContent() {
     <div className="min-h-screen text-slate-900 font-sans selection:bg-emerald-100 selection:text-emerald-900">
       <Header />
 
-      <main className="max-w-[1920px] mx-auto px-6 sm:px-10 min-[1101px]:px-16 md:pt-10 pb-10">
-        <div className="flex flex-col lg:flex-row gap-12 lg:gap-16">
+      <main className="max-w-[1920px] mx-auto px-6 md:px-8 lg:px-10 xl:px-16 md:pt-10 pb-10">
+        <div className="flex flex-col min-[1101px]:flex-row gap-0 min-[1101px]:gap-16">
 
           {/* Sidebar Area - Collapses at 1100px */}
           <div className="shrink-0 min-[1101px]:w-[320px]">
@@ -241,30 +257,30 @@ function HomeContent() {
           {/* Main Content Area */}
           <div className="flex-1 min-w-0">
             {/* Desktop Hero & Tools - Visible on Tablet and above */}
-            <div className="hidden md:flex flex-col gap-10 mb-8 pb-10 border-b border-slate-100">
+            <div className="hidden md:flex flex-col gap-6 lg:gap-10 mb-6 lg:mb-8 pb-6 lg:pb-10 border-b border-slate-100">
               <div className="flex justify-between items-end">
                 <div className="max-w-2xl">
-                  <div className="flex items-center gap-3 text-emerald-600 font-black text-xs uppercase tracking-[0.3em] mb-4">
+                  <div className="flex items-center gap-3 text-emerald-600 font-black text-[10px] lg:text-xs uppercase tracking-[0.3em] mb-3 lg:mb-4">
                     <div className="h-[2px] w-8 bg-emerald-600" />
                     {t('hero.badge')}
                   </div>
-                  <h1 className="text-7xl font-black text-slate-900 tracking-tight leading-[0.9] mb-6">
+                  <h1 className="text-4xl md:text-5xl lg:text-7xl font-black text-slate-900 tracking-tight leading-[0.9] mb-3 lg:mb-6">
                     {language === 'zh' ? (
                       <>香港 <span className="text-emerald-600">生物多樣性</span></>
                     ) : (
                       <>Hong Kong <span className="text-emerald-600">Biodiversity</span></>
                     )}
                   </h1>
-                  <p className="text-xl text-slate-500 font-medium leading-relaxed">
+                  <p className="text-lg lg:text-xl text-slate-500 font-medium leading-relaxed">
                     {t('hero.subtitle_part1')}
                     <span className="text-slate-900 font-bold">{t('hero.subtitle_part2')}</span>
                     {t('hero.subtitle_part3')}
                   </p>
                 </div>
-                <div className="flex flex-col items-end gap-4">
-                  <div className="bg-white shadow-xl shadow-slate-200/50 rounded-[2rem] p-2 flex items-center ring-1 ring-slate-100 group">
+                <div className="flex flex-col items-start md:items-end gap-3 lg:gap-4 shrink-0">
+                  <div className="bg-white shadow-xl shadow-slate-200/40 rounded-[2rem] p-1.5 lg:p-2 flex items-center ring-1 ring-slate-100 group">
                     <div className="relative flex items-center">
-                      <Search className="w-6 h-6 text-slate-400 absolute left-4 pointer-events-none group-focus-within:text-emerald-500 transition-colors" />
+                      <Search className="w-5 h-5 lg:w-6 lg:h-6 text-slate-400 absolute left-4 pointer-events-none group-focus-within:text-emerald-500 transition-colors" />
                       <input
                         type="text"
                         value={localSearch}
@@ -272,17 +288,17 @@ function HomeContent() {
                         onKeyDown={(e) => e.key === 'Enter' && handleSearchTrigger(localSearch)}
                         placeholder={t('search.placeholder')}
                         suppressHydrationWarning={true}
-                        className="bg-transparent pl-14 pr-24 py-3 w-[450px] outline-none text-slate-900 font-bold placeholder:text-slate-300"
+                        className="bg-transparent pl-12 lg:pl-14 pr-20 lg:pr-24 py-2.5 lg:py-3 w-full sm:w-[350px] lg:w-[450px] outline-none text-sm lg:text-base text-slate-900 font-bold placeholder:text-slate-300"
                       />
                       <button
                         onClick={() => handleSearchTrigger(localSearch)}
-                        className="absolute right-2 px-4 py-2 bg-emerald-600 text-white text-xs font-black rounded-xl shadow-lg shadow-emerald-100 opacity-0 group-focus-within:opacity-100 hover:scale-105 active:scale-95 transition-all"
+                        className="absolute right-1.5 px-3 py-1.5 bg-emerald-600 text-white text-[10px] lg:text-xs font-black rounded-xl shadow-lg shadow-emerald-100 opacity-0 group-focus-within:opacity-100 hover:scale-105 active:scale-95 transition-all"
                       >
                         ENTER
                       </button>
                     </div>
                   </div>
-                  <div className="flex items-center gap-4 text-xs font-black text-slate-400 uppercase tracking-widest">
+                  <div className="flex items-center gap-4 text-[10px] lg:text-xs font-black text-slate-400 uppercase tracking-widest">
                     <span>{t('results.found')} {totalResultCount} {t('results.unit')}</span>
                     <div className="w-1 h-1 rounded-full bg-slate-300" />
                     <span>{t('results.viewing_page')} {currentPage} {t('results.page_of')} {totalPages || 1}</span>
@@ -291,12 +307,23 @@ function HomeContent() {
               </div>
 
               {/* Advanced Toolbar: Sort & Paging */}
-              <div className="flex items-center justify-between bg-white px-8 py-5 rounded-[2rem] shadow-sm border border-slate-100 ring-1 ring-slate-50">
-                <div className="flex items-center gap-8">
+              <div 
+                ref={toolbarRef}
+                className="flex flex-nowrap items-center justify-between bg-white px-4 lg:px-8 py-3.5 lg:py-5 rounded-[2rem] shadow-sm border border-slate-100 ring-1 ring-slate-50 gap-2 lg:gap-4"
+              >
+                <div className="flex items-center gap-2 lg:gap-8 shrink-0">
                   {displayMode !== 'table' && (
                     <>
-                      <div className="flex items-center gap-3">
-                        <span className="text-[12px] font-black uppercase tracking-widest text-slate-400">{t('sort.label')}</span>
+                      <div className="flex items-center gap-2 lg:gap-3">
+                        <div 
+                          className={`overflow-hidden transition-all duration-500 ease-in-out flex items-center ${
+                            showLabels ? 'max-w-[150px] opacity-100 mr-2' : 'max-w-0 opacity-0'
+                          }`}
+                        >
+                          <span className="text-[10px] lg:text-[12px] font-black uppercase tracking-widest text-slate-400 whitespace-nowrap">
+                            {t('sort.label')}
+                          </span>
+                        </div>
                         <CustomDropdown
                           options={[
                             { value: 'common_name', label: t('sort.common_name') },
@@ -307,47 +334,63 @@ function HomeContent() {
                           onChange={(val) => setSortBy(val)}
                         />
                       </div>
-                      <div className="h-6 w-px bg-slate-100" />
+                      <div className="h-4 lg:h-6 w-px bg-slate-100" />
                     </>
                   )}
-                  <div className="flex items-center gap-3">
-                    <span className="text-[12px] font-black uppercase tracking-widest text-slate-400">{t('view.per_page')}</span>
-                    <div className="flex bg-slate-50 rounded-xl p-1">
+                  <div className="flex items-center gap-2 lg:gap-3">
+                    <div 
+                      className={`overflow-hidden transition-all duration-500 ease-in-out flex items-center ${
+                        showLabels ? 'max-w-[150px] opacity-100 mr-2' : 'max-w-0 opacity-0'
+                      }`}
+                    >
+                      <span className="text-[10px] lg:text-[12px] font-black uppercase tracking-widest text-slate-400 whitespace-nowrap">
+                        {t('view.per_page')}
+                      </span>
+                    </div>
+                    <div className="flex bg-slate-50 rounded-xl p-0.5 lg:p-1">
                       {PAGE_SIZE_OPTIONS[displayMode].map((size) => (
                         <button
                           key={size}
                           onClick={() => setItemsPerPage(size)}
-                          className={`px-3 py-1.5 rounded-lg text-xs font-black transition-all ${itemsPerPage === size ? 'bg-white text-emerald-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
+                          className={`px-2 lg:px-3 py-1 lg:py-1.5 rounded-lg text-[10px] lg:text-xs font-black transition-all ${itemsPerPage === size ? 'bg-white text-emerald-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
                         >
                           {size}
                         </button>
                       ))}
                     </div>
                   </div>
-                  <div className="h-6 w-px bg-slate-100" />
-                  <div className="flex items-center gap-3">
-                    <span className="text-[12px] font-black uppercase tracking-widest text-slate-400">{t('view.display_mode')}</span>
-                    <div className="flex bg-slate-50 rounded-xl p-1">
+                  <div className="h-4 lg:h-6 w-px bg-slate-100" />
+                  <div className="flex items-center gap-2 lg:gap-3">
+                    <div 
+                      className={`overflow-hidden transition-all duration-500 ease-in-out flex items-center ${
+                        showLabels ? 'max-w-[150px] opacity-100 mr-2' : 'max-w-0 opacity-0'
+                      }`}
+                    >
+                      <span className="text-[10px] lg:text-[12px] font-black uppercase tracking-widest text-slate-400 whitespace-nowrap">
+                        {t('view.display_mode')}
+                      </span>
+                    </div>
+                    <div className="flex bg-slate-50 rounded-xl p-0.5 lg:p-1">
                       <button
                         onClick={() => setDisplayMode('detail')}
                         title={t('view.mode_detail')}
-                        className={`p-1.5 rounded-lg transition-all ${displayMode === 'detail' ? 'bg-white text-emerald-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
+                        className={`p-1 lg:p-1.5 rounded-lg transition-all ${displayMode === 'detail' ? 'bg-white text-emerald-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
                       >
-                        <List className="w-4 h-4" />
+                        <List className="w-3.5 h-3.5 lg:w-4 lg:h-4" />
                       </button>
                       <button
                         onClick={() => setDisplayMode('photo')}
                         title={t('view.mode_photo')}
-                        className={`p-1.5 rounded-lg transition-all ${displayMode === 'photo' ? 'bg-white text-emerald-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
+                        className={`p-1 lg:p-1.5 rounded-lg transition-all ${displayMode === 'photo' ? 'bg-white text-emerald-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
                       >
-                        <LayoutGrid className="w-4 h-4" />
+                        <LayoutGrid className="w-3.5 h-3.5 lg:w-4 lg:h-4" />
                       </button>
                       <button
                         onClick={() => setDisplayMode('table')}
                         title={t('view.mode_table')}
-                        className={`p-1.5 rounded-lg transition-all ${displayMode === 'table' ? 'bg-white text-emerald-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
+                        className={`p-1 lg:p-1.5 rounded-lg transition-all ${displayMode === 'table' ? 'bg-white text-emerald-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
                       >
-                        <TableIcon className="w-4 h-4" />
+                        <TableIcon className="w-3.5 h-3.5 lg:w-4 lg:h-4" />
                       </button>
                     </div>
                   </div>
@@ -539,7 +582,7 @@ function HomeContent() {
         </button>
       )}
 
-      <footer className="border-t border-slate-100 bg-white py-12 px-10">
+      <footer className="border-t border-slate-100 bg-white py-12 px-6 md:px-8 lg:px-10 xl:px-16">
         <div className="max-w-[1920px] mx-auto flex flex-col md:flex-row justify-between items-center gap-8">
           <div className="flex flex-col items-center md:items-start gap-2">
             <div className="flex items-center gap-2">
