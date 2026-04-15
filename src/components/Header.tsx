@@ -54,14 +54,17 @@ export default function Header() {
   ];
 
   return (
-    <nav className={`
-      glass-header
-      fixed top-4 left-0 right-0 z-[100]
+    <div className={`
+      fixed top-4 inset-x-0 z-[100] 
+      px-6 md:px-8 lg:px-10 xl:px-16
       transition-all duration-500 cubic-bezier(0.16, 1, 0.3, 1)
-      ${isScrolled ? 'py-3' : 'py-5'}
       ${isVisible ? 'translate-y-0 opacity-100' : '-translate-y-32 opacity-0'}
     `}>
-      <div className="max-w-[1920px] mx-auto px-6 md:px-8 lg:px-10 xl:px-16 flex items-center justify-between">
+      <nav className={`
+        glass-header max-w-[1920px] mx-auto
+        ${isScrolled ? 'py-2 lg:py-3' : 'py-3 lg:py-5'}
+        px-6 md:px-8 flex items-center justify-between
+      `}>
         {/* Logo & Branding */}
         <Link href="/" className="flex items-center gap-5 group relative">
           <motion.div
@@ -195,11 +198,10 @@ export default function Header() {
         >
           {isMobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
         </button>
-      </div>
-
-      {/* Mobile/Tablet Menu Dropdown */}
-      {isMobileMenuOpen && (
-        <div className="min-[1101px]:hidden absolute top-full left-0 right-0 mt-4 mx-4 md:mx-auto md:max-w-md p-6 bg-white rounded-3xl shadow-2xl border border-slate-100 animate-in fade-in slide-in-from-top-4 duration-300">
+        
+        {/* Mobile/Tablet Menu Dropdown */}
+        {isMobileMenuOpen && (
+          <div className="min-[1101px]:hidden absolute top-full left-0 right-0 mt-4 mx-4 md:mx-auto md:max-w-md p-6 bg-white rounded-3xl shadow-2xl border border-slate-100 animate-in fade-in slide-in-from-top-4 duration-300">
           <div className="flex flex-col gap-6">
             {/* Language Selection - Mobile */}
             <div className="flex items-center justify-between px-2">
@@ -293,7 +295,8 @@ export default function Header() {
           </div>
         </div>
       )}
-    </nav>
+      </nav>
+    </div>
   );
 }
 

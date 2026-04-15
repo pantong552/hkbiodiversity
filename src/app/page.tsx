@@ -238,7 +238,7 @@ function HomeContent() {
     <div className="min-h-screen text-slate-900 font-sans selection:bg-emerald-100 selection:text-emerald-900">
       <Header />
 
-      <main className="max-w-[1920px] mx-auto px-6 md:px-8 lg:px-10 xl:px-16 md:pt-10 pb-10">
+      <main className="max-w-[1920px] mx-auto px-6 md:px-8 lg:px-10 xl:px-16 pt-28 md:pt-36 pb-10">
         <div className="flex flex-col min-[1101px]:flex-row gap-0 min-[1101px]:gap-16">
 
           {/* Sidebar Area - Collapses at 1100px */}
