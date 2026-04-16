@@ -79,16 +79,27 @@ export default function SpeciesFloatingPanel() {
       if (!container) return;
 
       const currentScrollY = container.scrollTop;
+      const deltaY = currentScrollY - lastScrollYRef.current;
+      const scrollHeight = container.scrollHeight;
+      const clientHeight = container.clientHeight;
 
+      // 當接近頂部時，強制顯示
       if (currentScrollY <= 50) {
         setShowHeaderSpace(true);
-      } else if (currentScrollY > lastScrollYRef.current && currentScrollY > 100) {
+      } 
+      // 底部保護：防止快速滑到底部回彈時產生的抖動
+      else if (currentScrollY + clientHeight >= scrollHeight - 30) {
         setShowHeaderSpace(false);
-      } else if (currentScrollY < lastScrollYRef.current) {
-        setShowHeaderSpace(true);
       }
-
-      lastScrollYRef.current = currentScrollY;
+      // 引入閾值 (Tolerance)：捲動超過 10px 才觸發狀態切換，減少高頻抖動
+      else if (Math.abs(deltaY) > 10) {
+        if (deltaY > 0 && currentScrollY > 100) {
+          setShowHeaderSpace(false);
+        } else if (deltaY < 0) {
+          setShowHeaderSpace(true);
+        }
+        lastScrollYRef.current = currentScrollY;
+      }
     };
 
     const container = document.getElementById('species-panel-scroll-container');

@@ -161,7 +161,7 @@ export default function CommentSection({ speciesId }: CommentSectionProps) {
   };
 
   return (
-    <div className="mt-20 pt-20 border-t border-slate-100">
+    <div id="comment-section" className="mt-20 pt-20 border-t border-slate-100">
       <div className="max-w-4xl mx-auto">
         {/* Header */}
         <div className="flex items-center justify-between mb-10">

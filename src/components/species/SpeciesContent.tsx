@@ -149,10 +149,9 @@ export default function SpeciesContent({ species, showBreadcrumb = true }: Speci
             <p className="text-lg md:text-xl text-emerald-50 font-serif tracking-wide">
               {formatScientificName(species.scientific_name)} <span className="text-emerald-200/60 text-sm ml-2">{species.author}</span>
             </p>
+            </div>
           </div>
         </div>
-      </div>
-
       {/* Main Content */}
       <div className="max-w-7xl mx-auto px-6 py-12">
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-12">
@@ -160,10 +159,11 @@ export default function SpeciesContent({ species, showBreadcrumb = true }: Speci
           {/* Left Column */}
           <div className="lg:col-span-9 space-y-12">
             
-            {/* Taxonomy Section - Mobile Only (At the very top) */}
-            <div className="lg:hidden">
+
+            {/* Taxonomy Section - Always Card Style now */}
+            <section className="bg-white p-8 rounded-[2.5rem] shadow-sm border border-slate-100">
               <TaxonomyDisplay species={species} />
-            </div>
+            </section>
 
             {/* iNaturalist Photo Gallery */}
             {species.species_id && (
@@ -228,7 +228,7 @@ export default function SpeciesContent({ species, showBreadcrumb = true }: Speci
               </div>
             </section>
 
-            {/* Conservation Status - Moved here */}
+            {/* Conservation Status - Back to original place */}
             <ConservationStatus species={species} />
 
             {/* References */}
@@ -250,10 +250,20 @@ export default function SpeciesContent({ species, showBreadcrumb = true }: Speci
             <CommentSection speciesId={species.id} />
           </div>
 
-          {/* Right Column - Taxonomy Display (Sticky) */}
+          {/* Right Column - Sticky Sidebar */}
           <div className="lg:col-span-3 hidden lg:block">
-            <div className="sticky top-8">
-              <TaxonomyDisplay species={species} />
+            <div className="sticky top-8 space-y-8">
+              {/* Same-Genus Explorer Placeholder */}
+              <div className="bg-slate-50 border-2 border-dashed border-slate-200 rounded-[2rem] p-8 flex flex-col items-center justify-center text-center min-h-[300px]">
+                <div className="w-12 h-12 bg-slate-100 rounded-full flex items-center justify-center mb-4 text-slate-400">
+                  <ImageIcon className="w-6 h-6" />
+                </div>
+                <h3 className="text-slate-500 font-bold mb-2">探索同屬物種</h3>
+                <p className="text-slate-400 text-xs leading-relaxed max-w-[200px]">
+                  (Same-Genus Explorer Placeholder)
+                  <br />功能開發中...
+                </p>
+              </div>
             </div>
           </div>
 
