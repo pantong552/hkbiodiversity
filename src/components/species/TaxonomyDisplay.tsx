@@ -57,7 +57,7 @@ export default function TaxonomyDisplay({ species }: TaxonomyDisplayProps) {
         <div className="p-2 bg-emerald-100 rounded-xl">
           <Layers className="w-5 h-5 text-emerald-600" />
         </div>
-        {language === 'zh' ? '分類學資料' : 'Taxonomy Information'}
+        {language === 'zh' ? '分類階層' : 'Classification'}
       </h2>
       
       {/* Mobile Layout - Compact Grid/Chips */}

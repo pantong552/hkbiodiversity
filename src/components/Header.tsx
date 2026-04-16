@@ -7,6 +7,7 @@ import { motion } from 'framer-motion';
 import LoginButton from './LoginButton';
 import { useLanguage } from '@/context/LanguageContext';
 import { useAuth } from '@/context/AuthContext';
+import { useSpeciesPanel } from '@/context/SpeciesPanelContext';
 
 export default function Header() {
   const { language, setLanguage, t } = useLanguage();
@@ -16,30 +17,58 @@ export default function Header() {
   const [isVisible, setIsVisible] = useState(true);
 
   // 使用 ref 來儲存滾動位置，避免 useEffect 頻繁重新觸發
+  const { isExpanded } = useSpeciesPanel();
   const lastScrollYRef = useRef(0);
 
   useEffect(() => {
-    const handleScroll = () => {
-      const currentScrollY = window.scrollY;
+    const handleScroll = (e?: Event) => {
+      let currentScrollY = window.scrollY;
+      
+      // 如果面板展開，則監聽面板內部的捲動
+      if (isExpanded) {
+        const panelContainer = document.getElementById('species-panel-scroll-container');
+        if (panelContainer) {
+          currentScrollY = panelContainer.scrollTop;
+        }
+      }
 
       // 切換透明度/高度
       setIsScrolled(currentScrollY > 20);
 
       // 智慧顯示/隱藏邏輯
-      if (currentScrollY > lastScrollYRef.current && currentScrollY > 100) {
+      // 當捲動位置非常接近頂部時（例如 < 50），強迫顯示 Header
+      if (currentScrollY <= 50) {
+        setIsVisible(true);
+      } else if (currentScrollY > lastScrollYRef.current && currentScrollY > 100) {
         setIsVisible(false);
-      } else {
+      } else if (currentScrollY < lastScrollYRef.current) {
         setIsVisible(true);
       }
 
       lastScrollYRef.current = currentScrollY;
     };
 
+    // 監聽 window
     window.addEventListener('scroll', handleScroll, { passive: true });
+    
+    // 如果面板展開，額外監聽面板容器
+    let panelContainer: HTMLElement | null = null;
+    if (isExpanded) {
+      panelContainer = document.getElementById('species-panel-scroll-container');
+      if (panelContainer) {
+        panelContainer.addEventListener('scroll', handleScroll, { passive: true });
+        // 初始化一次位置
+        handleScroll();
+      }
+    }
+
     return () => {
       window.removeEventListener('scroll', handleScroll);
+      if (panelContainer) {
+        panelContainer.removeEventListener('scroll', handleScroll);
+      }
     };
-  }, []);
+  }, [isExpanded]);
 
   const handleLogout = async () => {
     await signOut();

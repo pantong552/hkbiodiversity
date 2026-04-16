@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, ChevronUp, ChevronDown, Loader2 } from 'lucide-react';
 import { useSpeciesPanel } from '@/context/SpeciesPanelContext';
@@ -22,6 +22,8 @@ export default function SpeciesFloatingPanel() {
   const { language } = useLanguage();
   const [speciesData, setSpeciesData] = useState<Record<number, Species>>({});
   const [isLoading, setIsLoading] = useState<Record<number, boolean>>({});
+  const [showHeaderSpace, setShowHeaderSpace] = useState(true);
+  const lastScrollYRef = useRef(0);
 
   // 1. Fetch data for new IDs
   useEffect(() => {
@@ -65,6 +67,45 @@ export default function SpeciesFloatingPanel() {
     };
   }, [isExpanded, activeSpeciesId]);
 
+  // 3. Sync Header Space with Scroll
+  useEffect(() => {
+    if (!isExpanded) {
+      setShowHeaderSpace(true);
+      return;
+    }
+
+    const handleScroll = () => {
+      const container = document.getElementById('species-panel-scroll-container');
+      if (!container) return;
+
+      const currentScrollY = container.scrollTop;
+
+      if (currentScrollY <= 50) {
+        setShowHeaderSpace(true);
+      } else if (currentScrollY > lastScrollYRef.current && currentScrollY > 100) {
+        setShowHeaderSpace(false);
+      } else if (currentScrollY < lastScrollYRef.current) {
+        setShowHeaderSpace(true);
+      }
+
+      lastScrollYRef.current = currentScrollY;
+    };
+
+    const container = document.getElementById('species-panel-scroll-container');
+    if (container) {
+      container.addEventListener('scroll', handleScroll, { passive: true });
+    }
+
+    // 當重新進入或切換物種時，根據當前位置初始化
+    handleScroll();
+
+    return () => {
+      if (container) {
+        container.removeEventListener('scroll', handleScroll);
+      }
+    };
+  }, [isExpanded, activeSpeciesId]);
+
   if (openSpeciesIds.length === 0) return null;
 
   return (
@@ -77,6 +118,24 @@ export default function SpeciesFloatingPanel() {
       transition={{ type: 'spring', damping: 30, stiffness: 300 }}
       className="fixed bottom-0 left-0 w-full z-50 bg-white border-t border-slate-200 shadow-[0_-10px_40px_rgba(0,0,0,0.1)] overflow-hidden flex flex-col pointer-events-auto"
     >
+      {/* Header Safe Area - Dynamically adjusts with scroll */}
+      <AnimatePresence>
+        {isExpanded && showHeaderSpace && (
+          <motion.div 
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ 
+              height: 'auto', 
+              opacity: 1,
+            }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
+            className="w-full shrink-0 bg-white/80 backdrop-blur-xl overflow-hidden"
+          >
+            <div className="h-24 md:h-28 lg:h-32 w-full" />
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* Control Bar / Tab Bar (Always at the top of the container) */}
       <div className="w-full h-14 shrink-0 bg-white/80 backdrop-blur-xl border-b border-slate-100 px-6 flex items-center justify-between">
         <div className="flex items-center gap-2 overflow-x-auto no-scrollbar py-2">
@@ -134,7 +193,7 @@ export default function SpeciesFloatingPanel() {
       </div>
 
       {/* Main Panel Content (Only visible when expanded) */}
-      <div className="flex-1 overflow-y-auto no-scrollbar bg-slate-50">
+      <div id="species-panel-scroll-container" className="flex-1 overflow-y-auto no-scrollbar bg-slate-50">
         <AnimatePresence mode="wait">
           {isExpanded && activeSpeciesId && (
             <motion.div
