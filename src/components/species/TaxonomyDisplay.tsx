@@ -86,7 +86,7 @@ export default function TaxonomyDisplay({ species }: TaxonomyDisplayProps) {
           >
             <div className="relative w-5 h-5 flex items-center justify-center">
               <img 
-                src="/Inaturalist_logo.svg" 
+                src="/INaturalist_logo.svg" 
                 alt="iNaturalist" 
                 className="w-full h-full object-contain group-hover:scale-110 transition-transform duration-300" 
               />
