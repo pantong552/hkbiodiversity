@@ -16,12 +16,16 @@ export default function Header() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isVisible, setIsVisible] = useState(true);
 
-  // 使用 ref 來儲存滾動位置，避免 useEffect 頻繁重新觸發
   const { isExpanded } = useSpeciesPanel();
   const lastScrollYRef = useRef(0);
+  const mobileMenuRef = useRef<HTMLDivElement>(null);
+  const menuToggleRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
     const handleScroll = (e?: Event) => {
+      // 僅在真正的捲動事件觸發且選單開啟時才關閉，避免初始化調用誤觸
+      if (e && isMobileMenuOpen) setIsMobileMenuOpen(false);
+
       let currentScrollY = window.scrollY;
       
       // 如果面板展開，則監聽面板內部的捲動
@@ -68,7 +72,26 @@ export default function Header() {
         panelContainer.removeEventListener('scroll', handleScroll);
       }
     };
-  }, [isExpanded]);
+  }, [isExpanded, isMobileMenuOpen]);
+
+  // 處理點擊外部關閉選單
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      // 確保點擊的不是選單本身，也不是開關按鈕本身
+      if (
+        isMobileMenuOpen && 
+        mobileMenuRef.current && 
+        !mobileMenuRef.current.contains(event.target as Node) &&
+        menuToggleRef.current &&
+        !menuToggleRef.current.contains(event.target as Node)
+      ) {
+        setIsMobileMenuOpen(false);
+      }
+    }
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [isMobileMenuOpen]);
 
   const handleLogout = async () => {
     await signOut();
@@ -222,6 +245,7 @@ export default function Header() {
 
         {/* Mobile/Tablet Menu Toggle - Visible below 1101px */}
         <button
+          ref={menuToggleRef}
           className="min-[1101px]:hidden p-2 text-slate-600 hover:bg-slate-100 rounded-xl"
           onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
         >
@@ -230,7 +254,10 @@ export default function Header() {
         
         {/* Mobile/Tablet Menu Dropdown */}
         {isMobileMenuOpen && (
-          <div className="min-[1101px]:hidden absolute top-full left-0 right-0 mt-4 mx-4 md:mx-auto md:max-w-md p-6 bg-white rounded-3xl shadow-2xl border border-slate-100 animate-in fade-in slide-in-from-top-4 duration-300">
+          <div 
+            ref={mobileMenuRef}
+            className="min-[1101px]:hidden absolute top-full left-0 right-0 mt-4 mx-4 md:mx-auto md:max-w-md p-6 bg-white rounded-3xl shadow-2xl border border-slate-100 animate-in fade-in slide-in-from-top-4 duration-300"
+          >
           <div className="flex flex-col gap-6">
             {/* Language Selection - Mobile */}
             <div className="flex items-center justify-between px-2">

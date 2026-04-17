@@ -154,10 +154,10 @@ export default function SpeciesContent({ species, showBreadcrumb = true }: Speci
         </div>
       {/* Main Content */}
       <div className="max-w-7xl mx-auto px-6 py-12">
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-12">
+        <div className="grid grid-cols-1 xl:grid-cols-12 gap-12">
           
           {/* Left Column */}
-          <div className="lg:col-span-9 space-y-12">
+          <div className="xl:col-span-9 space-y-12">
             
 
             {/* Taxonomy Section - Always Card Style now */}
@@ -251,7 +251,7 @@ export default function SpeciesContent({ species, showBreadcrumb = true }: Speci
           </div>
 
           {/* Right Column - Sticky Sidebar */}
-          <div className="lg:col-span-3 hidden lg:block">
+          <div className="xl:col-span-3 hidden xl:block">
             <div className="sticky top-8 space-y-8">
               {/* Same-Genus Explorer Placeholder */}
               <div className="bg-slate-50 border-2 border-dashed border-slate-200 rounded-[2rem] p-8 flex flex-col items-center justify-center text-center min-h-[300px]">
