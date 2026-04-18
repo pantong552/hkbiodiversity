@@ -90,6 +90,7 @@ export default function MultiSelectDropdown({
   const handleReset = () => {
     setLocalSelected([]);
     setSearchTerm('');
+    onChange([]); // 立即觸發父組件同步，以便更新 options 統計
   };
 
   const toggleOption = (name: string) => {

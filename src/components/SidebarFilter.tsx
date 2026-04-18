@@ -90,64 +90,84 @@ export default function SidebarFilter({
 
   useEffect(() => {
     async function fetchStats() {
-      const rpcParams = {
-        p_phylum_eng: selected.taxonomy.phylum_eng,
-        p_class_eng: selected.taxonomy.class_eng,
-        p_order_eng: selected.taxonomy.order_eng,
-        p_family_eng: selected.taxonomy.family_eng,
-        p_genus_eng: selected.taxonomy.genus_eng,
-        p_iucn: selected.iucn,
-        p_search: searchValue
-      };
+      const levels: TaxonomyLevel[] = ['phylum_eng', 'class_eng', 'order_eng', 'family_eng', 'genus_eng'];
+      
+      try {
+        // 為每個層級獨立獲取統計，排除該層級自身的選取值
+        const levelPromises = levels.map(async (level) => {
+          const rpcParams = {
+            p_phylum_eng: level === 'phylum_eng' ? [] : selected.taxonomy.phylum_eng,
+            p_class_eng: level === 'class_eng' ? [] : selected.taxonomy.class_eng,
+            p_order_eng: level === 'order_eng' ? [] : selected.taxonomy.order_eng,
+            p_family_eng: level === 'family_eng' ? [] : selected.taxonomy.family_eng,
+            p_genus_eng: level === 'genus_eng' ? [] : selected.taxonomy.genus_eng,
+            p_iucn: selected.iucn,
+            p_search: searchValue
+          };
+          const { data, error } = await supabase.rpc('get_species_stats', rpcParams);
+          return { level, data, error };
+        });
 
-      const { data, error } = await supabase.rpc('get_species_stats', rpcParams);
+        // IUCN 仍然使用全過濾統計
+        const iucnPromise = supabase.rpc('get_species_stats', {
+          p_phylum_eng: selected.taxonomy.phylum_eng,
+          p_class_eng: selected.taxonomy.class_eng,
+          p_order_eng: selected.taxonomy.order_eng,
+          p_family_eng: selected.taxonomy.family_eng,
+          p_genus_eng: selected.taxonomy.genus_eng,
+          p_iucn: selected.iucn,
+          p_search: searchValue
+        });
 
-      if (!error && data) {
-        // 更新分類選項
-        const levels: TaxonomyLevel[] = ['phylum_eng', 'class_eng', 'order_eng', 'family_eng', 'genus_eng'];
+        const [levelResults, iucnResult] = await Promise.all([
+          Promise.all(levelPromises),
+          iucnPromise
+        ]);
+
         const newOptions = { ...taxonomyOptions };
-
-        levels.forEach(level => {
-          const rawData = data[level] || [];
-          const uniqueItems = new Map<string, { name: string; display: string; count: number }>();
-          
-          rawData.forEach((item: any) => {
-            const name = item.name || 'Unknown';
-            const existing = uniqueItems.get(name);
-            const count = parseInt(item.count) || 0;
-            const chiName = item.chi || name;
+        
+        levelResults.forEach(({ level, data, error }) => {
+          if (!error && data) {
+            const rawData = data[level] || [];
+            const uniqueItems = new Map<string, { name: string; display: string; count: number }>();
             
-            if (existing) {
-              existing.count += count;
-              // 策略：如果現有的顯示名稱含有亂碼（\ufffd），則用新的名稱取代
-              // 或者如果新項目的 count 遠大於原本的（代表更有代表性），也進行取代
-              const isCurrentGlitchy = existing.display.includes('\ufffd');
-              const isNewGlitchy = chiName.includes('\ufffd');
+            rawData.forEach((item: any) => {
+              const name = item.name || 'Unknown';
+              const count = parseInt(item.count) || 0;
+              const chiName = item.chi || name;
               
-              if ((isCurrentGlitchy && !isNewGlitchy) || (count > (existing.count - count) && !isNewGlitchy)) {
-                existing.display = language === 'zh' ? chiName : name;
+              const existing = uniqueItems.get(name);
+              if (existing) {
+                existing.count += count;
+                const isCurrentGlitchy = existing.display.includes('\ufffd');
+                const isNewGlitchy = chiName.includes('\ufffd');
+                if ((isCurrentGlitchy && !isNewGlitchy) || (count > (existing.count - count) && !isNewGlitchy)) {
+                  existing.display = language === 'zh' ? chiName : name;
+                }
+              } else {
+                uniqueItems.set(name, {
+                  name: name,
+                  display: language === 'zh' ? chiName : name,
+                  count: count
+                });
               }
-            } else {
-              uniqueItems.set(name, {
-                name: name,
-                display: language === 'zh' ? chiName : name,
-                count: count
-              });
-            }
-          });
+            });
 
-          // 過濾掉無意義的 Unknown 或空值
-          newOptions[level] = Array.from(uniqueItems.values())
-            .filter(opt => opt.name !== 'Unknown' && opt.display.trim() !== '')
-            .sort((a, b) => b.count - a.count);
+            newOptions[level] = Array.from(uniqueItems.values())
+              .filter(opt => opt.name !== 'Unknown' && opt.display.trim() !== '')
+              .sort((a, b) => b.count - a.count);
+          } else if (error) {
+            console.error(`RPC Error fetching stats for ${level}:`, error);
+          }
         });
 
         setTaxonomyOptions(newOptions);
         
-        // 更新 IUCN 計數
-        setIucnCounts(data.iucn || {});
-      } else if (error) {
-        console.error('RPC Error fetching species stats:', error);
+        if (!iucnResult.error && iucnResult.data) {
+          setIucnCounts(iucnResult.data.iucn || {});
+        }
+      } catch (err) {
+        console.error('Error fetching species stats:', err);
       }
     }
 
