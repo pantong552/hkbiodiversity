@@ -2,12 +2,13 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, ChevronUp, ChevronDown, Loader2 } from 'lucide-react';
+import { X, ChevronUp, ChevronDown, Loader2, Share2, Check } from 'lucide-react';
 import { useSpeciesPanel } from '@/context/SpeciesPanelContext';
 import { useLanguage } from '@/context/LanguageContext';
 import { supabase } from '@/lib/supabase';
 import { Species } from '@/types/species';
 import SpeciesContent from './SpeciesContent';
+import { useShare } from '@/hooks/useShare';
 
 export default function SpeciesFloatingPanel() {
   const { 
@@ -24,6 +25,25 @@ export default function SpeciesFloatingPanel() {
   const [isLoading, setIsLoading] = useState<Record<number, boolean>>({});
   const [showHeaderSpace, setShowHeaderSpace] = useState(true);
   const lastScrollYRef = useRef(0);
+  const { share, isCopied } = useShare();
+
+  const handleShare = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!activeSpeciesId || !speciesData[activeSpeciesId]) return;
+    
+    const species = speciesData[activeSpeciesId];
+    const commonName = language === 'zh' ? species.common_name_chi : species.common_name_eng;
+    
+    // 生成物種首頁代參數連結，確保開啟完整環境
+    const baseUrl = typeof window !== 'undefined' ? window.location.origin : '';
+    const shareUrl = `${baseUrl}/?species=${activeSpeciesId}`;
+    
+    share({
+      title: `${commonName} | HK Biodiversity`,
+      text: `在香港生物多樣性圖鑑查看 ${commonName} (${species.scientific_name}) 的詳細資料`,
+      url: shareUrl
+    });
+  };
 
   // 1. Fetch data for new IDs
   useEffect(() => {
@@ -195,12 +215,47 @@ export default function SpeciesFloatingPanel() {
           })}
         </div>
 
-        <button 
-          onClick={() => toggleExpand()}
-          className="ml-4 p-2 bg-slate-900 text-white rounded-xl shadow-lg hover:scale-105 transition-transform active:scale-95 shrink-0"
-        >
-          {isExpanded ? <ChevronDown className="w-5 h-5" /> : <ChevronUp className="w-5 h-5" />}
-        </button>
+        <div className="flex items-center gap-3 shrink-0 ml-4 relative">
+          {/* Toast Notification for Floating Panel */}
+          <AnimatePresence>
+            {isCopied && (
+              <motion.div 
+                initial={{ opacity: 0, scale: 0.9, y: 10 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.9, y: 10 }}
+                className="absolute bottom-full mb-4 right-0 z-[100] whitespace-nowrap bg-slate-900/90 backdrop-blur-xl text-white px-4 py-2 rounded-xl shadow-2xl flex items-center gap-2 border border-white/10"
+              >
+                <div className="w-5 h-5 rounded-full bg-emerald-500/20 flex items-center justify-center text-emerald-400">
+                  <Check className="w-3 h-3" />
+                </div>
+                <span className="text-[11px] font-bold tracking-wide">
+                  {language === 'zh' ? '連結已複製' : 'Link copied'}
+                </span>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          {/* Share Button */}
+          <button 
+            onClick={handleShare}
+            title={language === 'zh' ? '分享此物種' : 'Share species'}
+            className={`
+              p-2.5 rounded-xl transition-all duration-300 flex items-center justify-center
+              ${activeSpeciesId 
+                ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-200 hover:bg-emerald-700 hover:-translate-y-0.5 active:scale-95' 
+                : 'bg-slate-100 text-slate-300 cursor-not-allowed opacity-50'}
+            `}
+          >
+            <Share2 className="w-5 h-5" />
+          </button>
+
+          <button 
+            onClick={() => toggleExpand()}
+            className="p-2.5 bg-slate-900 text-white rounded-xl shadow-lg hover:scale-105 transition-transform active:scale-95"
+          >
+            {isExpanded ? <ChevronDown className="w-5 h-5" /> : <ChevronUp className="w-5 h-5" />}
+          </button>
+        </div>
       </div>
 
       {/* Main Panel Content (Only visible when expanded) */}

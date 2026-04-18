@@ -111,6 +111,26 @@ function HomeContent() {
     }
   }, [searchParams]);
 
+  // 1.1 自動偵測並開啟物種參數 (Share URL support)
+  const { addSpecies, toggleExpand } = useSpeciesPanel();
+  useEffect(() => {
+    const speciesId = searchParams.get('species');
+    if (speciesId) {
+      // 確保將 ID 轉為數字型態
+      const idNum = parseInt(speciesId, 10);
+      if (!isNaN(idNum)) {
+        addSpecies(idNum);
+        toggleExpand(true);
+        
+        // 關鍵修復：處理完畢後清除 URL 參數，避免循環觸發
+        const newParams = new URLSearchParams(searchParams.toString());
+        newParams.delete('species');
+        const newSearch = newParams.toString();
+        router.replace(newSearch ? `/?${newSearch}` : '/', { scroll: false });
+      }
+    }
+  }, [searchParams, addSpecies, toggleExpand, router]);
+
   // Explicit search trigger
   const handleSearchTrigger = (value: string) => {
     setSearchQuery(value);
