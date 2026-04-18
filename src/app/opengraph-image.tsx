@@ -34,7 +34,7 @@ export default async function Image() {
             alignItems: 'center',
             justifyContent: 'center',
             backgroundColor: '#ffffff',
-            padding: '40px',
+            paddingBottom: '60px',
             position: 'relative',
           }}
         >
