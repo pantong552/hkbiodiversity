@@ -1,14 +1,18 @@
+import { Metadata } from 'next';
 import { Suspense } from 'react';
 import HomeClient from '@/components/HomeClient';
-import { Metadata } from 'next';
 import { getSpeciesById, getSpeciesImageUrl } from '@/lib/species';
+
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
 
 export async function generateMetadata({ 
   searchParams 
 }: { 
-  searchParams: { species?: string } 
+  searchParams: Promise<{ species?: string }> 
 }): Promise<Metadata> {
-  const speciesId = searchParams.species;
+  const params = await searchParams;
+  const speciesId = params.species;
   
   // Default metadata for home page
   const defaultTitle = 'Hong Kong Biodiversity Collective | 香港生物多樣性';
