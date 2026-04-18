@@ -9,12 +9,22 @@ import { createClient } from '@/utils/supabase/client';
 import { useInaturalistPhoto } from '@/hooks/useInaturalistPhoto';
 import { formatScientificName } from '@/utils/formatters';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ChevronDown, Sparkles, Loader2 } from 'lucide-react';
+import { Sparkles, Loader2 } from 'lucide-react';
 
 interface CongenericExplorerProps {
   species: Species;
   isMobile?: boolean;
 }
+
+const SkeletonCard = () => (
+  <div className="flex items-center gap-3 p-2 rounded-2xl bg-slate-50 animate-pulse border border-slate-100">
+    <div className="w-16 h-16 rounded-xl bg-slate-200" />
+    <div className="flex flex-col flex-1 gap-2">
+      <div className="h-4 w-2/3 bg-slate-200 rounded" />
+      <div className="h-3 w-1/2 bg-slate-100 rounded" />
+    </div>
+  </div>
+);
 
 const MiniSpeciesCard = ({ species }: { species: Species }) => {
   const { language } = useLanguage();
@@ -25,34 +35,40 @@ const MiniSpeciesCard = ({ species }: { species: Species }) => {
   const commonName = language === 'zh' ? species.common_name_chi : species.common_name_eng;
 
   return (
-    <div 
+    <motion.div 
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      whileHover={{ y: -2 }}
       onClick={() => addSpecies(species.id)}
-      className="group flex items-center gap-3 p-2 rounded-2xl hover:bg-emerald-50/50 transition-all duration-300 border border-transparent hover:border-emerald-100 cursor-pointer"
+      className="group relative flex items-center gap-3 p-2.5 rounded-2xl bg-slate-50/50 hover:bg-emerald-50 border border-slate-100/60 hover:border-emerald-100 hover:shadow-lg hover:shadow-emerald-900/5 transition-all duration-300 cursor-pointer overflow-hidden shrink-0"
     >
-      <div className="relative w-16 h-16 shrink-0 rounded-xl overflow-hidden bg-slate-100 border border-slate-200/50">
+      <div className="relative w-16 h-16 shrink-0 rounded-xl overflow-hidden bg-white shadow-inner">
         <Image
           src={displayImage}
           alt={commonName || species.scientific_name}
           fill
           sizes="64px"
-          className={`object-cover transition-transform duration-500 group-hover:scale-110 ${isLoading ? 'blur-sm grayscale' : 'blur-0 grayscale-0'}`}
+          className={`object-cover transition-transform duration-700 group-hover:scale-115 ${isLoading ? 'blur-sm grayscale' : 'blur-0 grayscale-0'}`}
         />
+        <div className="absolute inset-0 border border-black/5 rounded-xl pointer-events-none" />
       </div>
       
-      <div className="flex flex-col min-w-0 flex-1">
-        <h4 className="text-sm font-bold text-slate-800 line-clamp-1 group-hover:text-emerald-600 transition-colors">
+      <div className="flex flex-col min-w-0 flex-1 px-0.5">
+        <h4 className="text-[13px] font-black text-slate-800 line-clamp-1 group-hover:text-emerald-700 transition-colors leading-snug">
           {commonName || species.scientific_name}
         </h4>
         {language === 'zh' && species.common_name_eng && (
-          <p className="text-[10px] text-slate-400 font-medium truncate uppercase tracking-tight">
+          <p className="text-[9px] text-slate-400 font-bold truncate uppercase tracking-tight mt-0.5">
             {species.common_name_eng}
           </p>
         )}
-        <p className="text-[11px] text-slate-500 font-serif italic line-clamp-1 mt-0.5">
+        <p className="text-[10px] text-slate-500 font-serif italic line-clamp-1 mt-0.5 leading-tight">
           {formatScientificName(species.scientific_name)}
         </p>
       </div>
-    </div>
+
+      <div className="absolute right-2.5 bottom-2.5 w-1 h-1 rounded-full bg-emerald-500/0 group-hover:bg-emerald-500 transition-all duration-500 scale-0 group-hover:scale-110 shadow-[0_0_8px_rgba(16,185,129,0.8)]" />
+    </motion.div>
   );
 };
 
@@ -63,13 +79,11 @@ export default function CongenericExplorer({ species, isMobile = false }: Congen
   const [congenericSpecies, setCongenericSpecies] = useState<Species[]>([]);
   const [discoveryLevel, setDiscoveryLevel] = useState<'genus' | 'subfamily' | 'family' | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [isExpanded, setIsExpanded] = useState(false);
 
   useEffect(() => {
     async function fetchRelated() {
       setIsLoading(true);
       try {
-        // 1. Try Genus
         if (species.genus_eng) {
           const { data } = await supabase
             .from('species')
@@ -86,7 +100,6 @@ export default function CongenericExplorer({ species, isMobile = false }: Congen
           }
         }
 
-        // 2. Try Sub-family
         if (species.sub_family_eng) {
           const { data } = await supabase
             .from('species')
@@ -103,7 +116,6 @@ export default function CongenericExplorer({ species, isMobile = false }: Congen
           }
         }
 
-        // 3. Try Family
         if (species.family_eng) {
           const { data } = await supabase
             .from('species')
@@ -132,9 +144,6 @@ export default function CongenericExplorer({ species, isMobile = false }: Congen
     fetchRelated();
   }, [species.genus_eng, species.sub_family_eng, species.family_eng, species.id, supabase]);
 
-  const displayedSpecies = isExpanded ? congenericSpecies : congenericSpecies.slice(0, 5);
-  const hasMore = congenericSpecies.length > 5;
-
   const getTitle = () => {
     if (language === 'zh') {
       switch (discoveryLevel) {
@@ -156,69 +165,43 @@ export default function CongenericExplorer({ species, isMobile = false }: Congen
   if (!isLoading && congenericSpecies.length === 0) return null;
 
   return (
-    <div className={`flex flex-col ${isMobile ? 'mt-12 mb-8' : ''}`}>
+    <div className={`p-6 rounded-[2.5rem] bg-white border border-slate-100 shadow-sm ${isMobile ? 'mt-12 mb-8' : ''}`}>
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center gap-3">
-          <div className="p-2 bg-emerald-100 rounded-xl">
-            <Sparkles className="w-5 h-5 text-emerald-600" />
+          <div className="p-2 bg-emerald-100 rounded-xl shadow-sm border border-emerald-200/50 text-emerald-700">
+            <Sparkles className="w-5 h-5" />
           </div>
-          <h3 className="text-lg font-black text-slate-800">
-            {getTitle()}
-          </h3>
+          
+          <div className="flex flex-col">
+            <h3 className="text-sm md:text-md font-black text-slate-800 leading-tight">
+              {getTitle()}
+            </h3>
+            <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">
+              Total {congenericSpecies.length} Records
+            </span>
+          </div>
         </div>
-        {congenericSpecies.length > 0 && (
-          <span className="px-2 py-0.5 bg-slate-100 text-[10px] font-black text-slate-500 rounded-md border border-slate-200 uppercase tracking-widest">
-            {congenericSpecies.length} {language === 'zh' ? '種' : 'Species'}
-          </span>
-        )}
       </div>
 
       <div className="space-y-1">
         {isLoading ? (
-          <div className="flex flex-col items-center py-12 gap-4">
-            <Loader2 className="w-6 h-6 text-emerald-500 animate-spin" />
-            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest animate-pulse">
-              {language === 'zh' ? '搜尋同屬物種中...' : 'Discovering related species...'}
-            </span>
+          <div className="space-y-2">
+            {[1, 2, 3, 4, 5].map((i) => <SkeletonCard key={i} />)}
           </div>
         ) : (
-          <>
-            <AnimatePresence initial={false}>
-              <motion.div 
-                layout
-                className={`
-                  ${isMobile ? 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2 max-h-[480px]' : 'flex flex-col gap-1 max-h-[600px]'} 
-                  overflow-y-auto pr-1 custom-scrollbar
-                `}
-              >
-                {displayedSpecies.map((item) => (
-                  <motion.div
-                    key={item.id}
-                    layout
-                    initial={{ opacity: 0, scale: 0.95 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    exit={{ opacity: 0, scale: 0.95 }}
-                    transition={{ duration: 0.2 }}
-                  >
-                    <MiniSpeciesCard species={item} />
-                  </motion.div>
-                ))}
-              </motion.div>
-            </AnimatePresence>
-
-            {!isExpanded && hasMore && (
-              <motion.button
-                layout
-                onClick={() => setIsExpanded(true)}
-                className="w-full mt-4 py-3 flex items-center justify-center gap-2 bg-white hover:bg-emerald-50 border border-slate-200 hover:border-emerald-200 rounded-2xl transition-all duration-300 group shadow-sm hover:shadow-md active:scale-[0.98]"
-              >
-                <span className="text-xs font-black text-slate-500 group-hover:text-emerald-700 uppercase tracking-widest transition-colors">
-                  + {language === 'zh' ? `更多 (還有 ${congenericSpecies.length - 5} 種)` : `More (${congenericSpecies.length - 5} others)`}
-                </span>
-                <ChevronDown className="w-4 h-4 text-slate-300 group-hover:text-emerald-500 group-hover:translate-y-0.5 transition-all" />
-              </motion.button>
-            )}
-          </>
+          <AnimatePresence initial={false}>
+            <motion.div 
+              layout
+              className={`
+                ${isMobile ? 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2 max-h-[480px]' : 'flex flex-col gap-2 h-[460px]'} 
+                overflow-y-auto pr-1.5 custom-scrollbar
+              `}
+            >
+              {congenericSpecies.map((item) => (
+                <MiniSpeciesCard key={item.id} species={item} />
+              ))}
+            </motion.div>
+          </AnimatePresence>
         )}
       </div>
     </div>
