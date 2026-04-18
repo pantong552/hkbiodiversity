@@ -1,108 +1,92 @@
-'use client';
-
-import { useState, useEffect, use } from 'react';
-import Image from 'next/image';
-import Link from 'next/link';
+import { Metadata } from 'next';
 import { supabase } from '@/lib/supabase';
 import { Species } from '@/types/species';
-import { ArrowLeft, Loader2 } from 'lucide-react';
-import { useLanguage } from '@/context/LanguageContext';
-import SpeciesContent from '@/components/species/SpeciesContent';
+import SpeciesDetailClient from './SpeciesDetailClient';
 
-export default function SpeciesDetailPage({ params }: { params: Promise<{ id: string }> }) {
-  const { language } = useLanguage();
-  const [species, setSpecies] = useState<Species | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const unwrappedParams = use(params);
-  
-  useEffect(() => {
-    async function fetchSpeciesDetail() {
-      if (!unwrappedParams.id) return;
-      
-      setIsLoading(true);
-      try {
-        console.log('正在根據 ID 抓取物種詳情:', unwrappedParams.id);
-        const { data, error } = await supabase
-          .from('species')
-          .select('*')
-          .eq('id', unwrappedParams.id)
-          .maybeSingle();
+interface Props {
+  params: Promise<{ id: string }>;
+}
 
-        if (error) {
-          console.error('Supabase 詳情查詢失敗:', error);
-          throw error;
-        }
-        if (data) {
-          console.log('物種詳情載入成功:', data.common_name_chi);
-          setSpecies(data as Species);
-        } else {
-          console.warn('未找到與此 ID 匹配的物種');
-        }
-      } catch (err: any) {
-        console.error('fetchSpeciesDetail 發生錯誤:', err.message || err);
-      } finally {
-        setIsLoading(false);
-      }
-    }
-    fetchSpeciesDetail();
-  }, [unwrappedParams.id]);
+async function getSpecies(id: string): Promise<Species | null> {
+  const { data, error } = await supabase
+    .from('species')
+    .select('*')
+    .eq('id', id)
+    .maybeSingle();
 
-  if (isLoading) {
-    return (
-      <div className="min-h-screen flex flex-col items-center justify-center bg-slate-50">
-        <Loader2 className="w-12 h-12 text-emerald-500 animate-spin mb-4" />
-        <p className="text-slate-500 font-medium tracking-wide">
-          {language === 'zh' ? '正在載入物種詳細資料...' : 'Loading species details...'}
-        </p>
-      </div>
-    );
+  if (error || !data) return null;
+  return data as Species;
+}
+
+// 獲取 iNaturalist 圖片的輔助函數（伺服器端）
+async function getInaturalistPhoto(taxonId: number | string): Promise<string | null> {
+  try {
+    const response = await fetch(`https://api.inaturalist.org/v1/taxa/${taxonId}`, {
+      next: { revalidate: 86400 } // 快取 24 小時
+    });
+    if (!response.ok) return null;
+    const data = await response.json();
+    const result = data.results?.[0];
+    if (!result) return null;
+
+    const photo = result.default_photo || result.taxon_photos?.[0]?.photo;
+    if (!photo) return null;
+
+    // 將 square 改為 medium 或 large
+    return (photo.medium_url || photo.url || '').replace('/square.', '/medium.');
+  } catch (error) {
+    console.error('Error fetching iNaturalist photo:', error);
+    return null;
   }
+}
+
+export async function generateMetadata({ params }: Props): Promise<Metadata> {
+  const { id } = await params;
+  const species = await getSpecies(id);
 
   if (!species) {
-    return (
-      <div className="min-h-screen flex flex-col items-center justify-center bg-slate-50 p-6 text-center">
-        <div className="w-20 h-20 bg-slate-100 rounded-full flex items-center justify-center mb-6 text-slate-300">
-          <ArrowLeft className="w-10 h-10" />
-        </div>
-        <h2 className="text-2xl font-black text-slate-800 mb-2">
-          {language === 'zh' ? '找不到該物種' : 'Species Not Found'}
-        </h2>
-        <p className="text-slate-500 mb-8 max-w-xs">
-          {language === 'zh' ? '抱歉，我們無法找到您要查看的生物資料。' : "Sorry, we couldn't find the species information you are looking for."}
-        </p>
-        <Link href="/" className="px-8 py-3 bg-emerald-600 text-white font-black rounded-2xl shadow-xl shadow-emerald-200 hover:-translate-y-1 transition-all">
-          {language === 'zh' ? '返回目錄' : 'Back to Directory'}
-        </Link>
-      </div>
-    );
+    return {
+      title: 'Species Not Found | HK Biodiversity Collective',
+    };
   }
 
-  // Formatting strings
-  const commonName = language === 'zh' ? species.common_name_chi : species.common_name_eng;
-  const phylum = language === 'zh' ? species.phylum_chi : species.phylum_eng;
-  const classTax = language === 'zh' ? species.class_chi : species.class_eng;
-  const order = language === 'zh' ? species.order_chi : species.order_eng;
-  const family = language === 'zh' ? species.family_chi : species.family_eng;
+  const title = `香港生物多樣性 | ${species.common_name_chi} (${species.scientific_name})`;
+  const description = `${species.common_name_chi} (${species.scientific_name}) - 詳盡的香港生物多樣性資料。類別：${species.class_chi} ${species.order_chi} ${species.family_chi}`;
   
-  const description = language === 'zh' ? species.description_chi : species.description_eng;
-  const remarks = language === 'zh' ? species.remarks_chi : species.remarks_eng;
-  const hkDist = language === 'zh' ? species.hk_distribution_chi : species.hk_distribution_eng;
-  const globalDist = language === 'zh' ? species.global_distribution_chi : species.global_distribution_eng;
-  const refs = language === 'zh' ? species.references_chi : species.references_eng;
+  // 獲取縮圖 URL
+  let imageUrl = species.image_url;
+  if (!imageUrl && species.species_id) {
+    imageUrl = await getInaturalistPhoto(species.species_id) || '';
+  }
+
+  // 預設縮圖（如果都沒有）
+  if (!imageUrl) {
+    imageUrl = 'https://hkbiodiversity.org/logo.svg'; // 稍後會改為自動生成的 OG 圖片
+  }
+
+  return {
+    title,
+    description,
+    openGraph: {
+      title,
+      description,
+      images: imageUrl ? [{ url: imageUrl }] : [],
+      type: 'website',
+    },
+    twitter: {
+      card: 'summary_large_image',
+      title,
+      description,
+      images: imageUrl ? [imageUrl] : [],
+    },
+  };
+}
+
+export default async function SpeciesPage({ params }: Props) {
+  const { id } = await params;
+  const species = await getSpecies(id);
 
   return (
-    <div className="min-h-screen bg-slate-50">
-      {/* Navigation Bar / Breadcrumb area */}
-      <div className="sticky top-0 z-40 bg-white/80 backdrop-blur-lg border-b border-slate-200 px-6 py-4">
-        <div className="max-w-7xl mx-auto flex items-center justify-between">
-          <Link href="/" className="inline-flex items-center gap-2 text-emerald-600 font-bold hover:text-emerald-700 transition-colors">
-            <ArrowLeft className="w-5 h-5" />
-            {language === 'zh' ? '返回圖鑑' : 'Back to Directory'}
-          </Link>
-        </div>
-      </div>
-
-      <SpeciesContent species={species} showBreadcrumb={true} />
-    </div>
+    <SpeciesDetailClient id={id} initialSpecies={species} />
   );
 }

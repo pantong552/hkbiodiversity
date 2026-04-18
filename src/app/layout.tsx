@@ -13,11 +13,27 @@ const workSans = Work_Sans({
 });
 
 export const metadata: Metadata = {
-  title: 'Hong Kong Biodiversity Collective',
+  metadataBase: new URL('https://hkbiodiversity.org'),
+  title: {
+    default: 'Hong Kong Biodiversity Collective | 香港生物多樣性',
+    template: '%s | HK Biodiversity Collective',
+  },
   description: 'A comprehensive biodiversity encyclopedia of Hong Kong, covering approximately 10,000 species.',
   icons: {
     icon: '/logo.svg',
     apple: '/logo.svg',
+  },
+  openGraph: {
+    title: 'Hong Kong Biodiversity Collective | 香港生物多樣性',
+    description: 'A comprehensive biodiversity encyclopedia of Hong Kong, covering approximately 10,000 species.',
+    siteName: 'HK Biodiversity Collective',
+    locale: 'zh-HK',
+    type: 'website',
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'Hong Kong Biodiversity Collective | 香港生物多樣性',
+    description: 'A comprehensive biodiversity encyclopedia of Hong Kong, covering approximately 10,000 species.',
   },
 };
 
