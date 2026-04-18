@@ -14,6 +14,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useRef } from 'react';
 import SpeciesMap from './SpeciesMap';
 import { formatScientificName } from '@/utils/formatters';
+import CongenericExplorer from './CongenericExplorer';
 
 
 interface SpeciesContentProps {
@@ -247,23 +248,18 @@ export default function SpeciesContent({ species, showBreadcrumb = true }: Speci
             )}
 
             {/* 社群討論系統 */}
+            <div className="xl:hidden">
+              <CongenericExplorer species={species} isMobile={true} />
+            </div>
+            
             <CommentSection speciesId={species.id} />
           </div>
 
           {/* Right Column - Sticky Sidebar */}
           <div className="xl:col-span-3 hidden xl:block">
             <div className="sticky top-8 space-y-8">
-              {/* Same-Genus Explorer Placeholder */}
-              <div className="bg-slate-50 border-2 border-dashed border-slate-200 rounded-[2rem] p-8 flex flex-col items-center justify-center text-center min-h-[300px]">
-                <div className="w-12 h-12 bg-slate-100 rounded-full flex items-center justify-center mb-4 text-slate-400">
-                  <ImageIcon className="w-6 h-6" />
-                </div>
-                <h3 className="text-slate-500 font-bold mb-2">探索同屬物種</h3>
-                <p className="text-slate-400 text-xs leading-relaxed max-w-[200px]">
-                  (Same-Genus Explorer Placeholder)
-                  <br />功能開發中...
-                </p>
-              </div>
+              {/* Same-Genus Explorer */}
+              <CongenericExplorer species={species} />
             </div>
           </div>
 
