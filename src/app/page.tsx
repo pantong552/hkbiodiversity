@@ -15,8 +15,8 @@ export async function generateMetadata({
   const speciesId = params.species;
   
   // Default metadata for home page
-  const defaultTitle = 'Hong Kong Biodiversity Collective | 香港生物多樣性';
-  const defaultDescription = 'A comprehensive biodiversity encyclopedia of Hong Kong, covering approximately 10,000 species.';
+  const defaultTitle = 'Hong Kong Biodiversity Collective | 香港自然生態匯誌';
+  const defaultDescription = 'A collaborative biodiversity encyclopedia of Hong Kong, covering approximately 10,000 species.';
   
   if (!speciesId) {
     return {
@@ -38,8 +38,8 @@ export async function generateMetadata({
   const scientificName = species.scientific_name;
   const imageUrl = await getSpeciesImageUrl(species);
 
-  const dynamicTitle = `${commonName} (${scientificName}) | HK Biodiversity`;
-  const dynamicDescription = `在香港生物多樣性圖鑑查看 ${commonName} 的詳細資料。分類：${species.class_eng || ''} ${species.order_eng || ''} ${species.family_eng || ''}`;
+  const dynamicTitle = `${commonName} (${scientificName}) | HK Biodiversity Collective`;
+  const dynamicDescription = `在香港自然生態匯誌查看 ${commonName} 的詳細資料。分類：${species.class_eng || ''} ${species.order_eng || ''} ${species.family_eng || ''}`;
 
   return {
     title: dynamicTitle,

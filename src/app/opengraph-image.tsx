@@ -33,8 +33,9 @@ export default async function Image() {
             flexDirection: 'column',
             alignItems: 'center',
             justifyContent: 'center',
-            backgroundColor: '#ffffff', // 強制白底
-            padding: '60px',
+            backgroundColor: '#ffffff',
+            padding: '40px',
+            position: 'relative',
           }}
         >
           {/* 現代化漸層裝飾背景 */}
@@ -61,15 +62,15 @@ export default async function Image() {
             }}
           />
 
-          {/* Logo 容器 - 顯著放大 */}
+          {/* Logo 容器 - 再度放大，極致壓縮間距 */}
           <div
             style={{
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              width: 420,
-              height: 380,
-              marginBottom: '30px',
+              width: 500,
+              height: 420,
+              marginBottom: '10px',
             }}
           >
             <img
@@ -83,24 +84,24 @@ export default async function Image() {
             />
           </div>
 
-          {/* 文字內容區域 */}
+          {/* 文字內容區域 - 大幅壓縮間距以確保副標題顯示 */}
           <div
             style={{
               display: 'flex',
               flexDirection: 'column',
               alignItems: 'center',
               justifyContent: 'center',
-              gap: '12px',
+              gap: '4px',
             }}
           >
             <div
               style={{
-                fontSize: 64,
+                fontSize: 68,
                 fontWeight: 900,
                 color: '#0f172a',
                 textAlign: 'center',
                 letterSpacing: '-0.03em',
-                lineHeight: 1.1,
+                lineHeight: 1,
               }}
             >
               Hong Kong Biodiversity Collective
@@ -109,28 +110,26 @@ export default async function Image() {
             {/* 中文正式名稱 */}
             <div
               style={{
-                fontSize: 42,
+                fontSize: 44,
                 fontWeight: 700,
                 color: '#475569', // Slate-600 展現專業質感
                 textAlign: 'center',
-                letterSpacing: '0.15em', // 稍微增加中文字距以顯大器
-                marginBottom: '10px',
+                letterSpacing: '0.15em',
+                marginBottom: '4px',
               }}
             >
               香港自然生態匯誌
             </div>
 
-            {/* 副標題 - 單行 */}
+            {/* 副標題 - 移除裝飾線以騰出空間 */}
             <div
               style={{
-                fontSize: 26,
+                fontSize: 24,
                 color: '#94a3b8',
                 textAlign: 'center',
-                maxWidth: '1000px', // 確保單行
+                maxWidth: '1000px',
                 fontWeight: 500,
-                letterSpacing: '0.02em',
-                borderTop: '1px solid #f1f5f9',
-                paddingTop: '20px',
+                letterSpacing: '0.01em',
                 marginTop: '10px',
               }}
             >
