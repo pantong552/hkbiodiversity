@@ -70,6 +70,7 @@ function BookmarkItem({
             alt={language === 'zh' ? species.common_name_chi : species.common_name_eng}
             fill
             sizes="56px"
+            unoptimized={displayImage ? displayImage.includes('/api/image/transform') : false}
             className="object-cover group-hover:scale-110 transition-transform duration-500"
           />
         ) : (

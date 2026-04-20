@@ -27,7 +27,20 @@ const convertInatUrl = (url: string, size: 'square' | 'small' | 'medium' | 'larg
     .replace('size=medium', `size=${size}`);
 };
 
+/**
+ * 將圖片 URL 轉換為自建的 WebP 代理 API URL
+ */
+const getProxyUrl = (url: string, id: string | number, size: string = 'medium') => {
+  if (!url) return '';
+  if (url.includes('inaturalist')) {
+    return `/api/image/transform?url=${encodeURIComponent(url)}&id=${id}&size=${size}`;
+  }
+  return url;
+};
+
+
 async function fetchWithRetry(url: string, retries = 3): Promise<any> {
+
   for (let i = 0; i <= retries; i++) {
     try {
       const response = await fetch(url);
@@ -84,12 +97,14 @@ export function useInaturalistSpeciesPhotos(taxonId: number | string | undefined
 
           return {
             id: p.id || `photo-${Math.random()}`,
-            url: p.url,
-            small_url: p.small_url || convertInatUrl(p.url, 'small'),
-            medium_url: p.medium_url || convertInatUrl(p.url, 'medium'),
-            large_url: p.large_url || convertInatUrl(p.url, 'large'),
-            original_url: p.original_url || convertInatUrl(p.url, 'original'),
+            url: getProxyUrl(p.url, taxonId || 'image', 'original'),
+            small_url: getProxyUrl(p.small_url || convertInatUrl(p.url, 'small'), taxonId || 'image', 'small'),
+            medium_url: getProxyUrl(p.medium_url || convertInatUrl(p.url, 'medium'), taxonId || 'image', 'medium'),
+            large_url: getProxyUrl(p.large_url || convertInatUrl(p.url, 'large'), taxonId || 'image', 'large'),
+            original_url: getProxyUrl(p.original_url || convertInatUrl(p.url, 'original'), taxonId || 'image', 'original'),
             attribution: `© ${author} (${p.license_code?.toUpperCase() || 'CC0'})`,
+
+
             licenseCode: p.license_code,
             nativePageUrl: `https://www.inaturalist.org/photos/${p.id}`,
             observationUrl: obs.id ? `https://www.inaturalist.org/observations/${obs.id}` : null,

@@ -62,6 +62,7 @@ const SpeciesHeroBackground = ({ photos, defaultImage }: { photos: InatGalleryPh
             alt="Species background"
             fill
             sizes="100vw"
+            unoptimized={hasPhotos ? (displayPhotos[index].large_url || displayPhotos[index].url).includes('/api/image/transform') : defaultImage.includes('/api/image/transform')}
             className="object-cover opacity-70"
             priority={index === 0}
           />

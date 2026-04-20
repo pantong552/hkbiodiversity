@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 
-const PHOTO_CACHE_KEY = 'inat_photo_cache';
+const PHOTO_CACHE_KEY = 'inat_photo_cache_v2';
 const pendingRequests = new Map<string, Promise<any>>();
 
 // --- Concurrency Control Queue ---
@@ -48,7 +48,21 @@ const convertInatUrl = (url: string, size: 'square' | 'small' | 'medium' | 'larg
 };
 
 /**
+ * 將圖片 URL 轉換為自建的 WebP 代理 API URL
+ */
+const getProxyUrl = (url: string, id: string | number, size: string = 'medium') => {
+  if (!url) return '';
+  // 僅代理 iNaturalist 的圖片
+  if (url.includes('inaturalist')) {
+    return `/api/image/transform?url=${encodeURIComponent(url)}&id=${id}&size=${size}`;
+  }
+  return url;
+};
+
+
+/**
  * Helper to fetch with retry, exponential backoff, AND concurrency control
+
  */
 async function fetchWithRetry(url: string, retries = 3, delay = 1000): Promise<any> {
   // Wait for our turn in the queue
@@ -166,8 +180,10 @@ export function useInaturalistPhoto(taxonId: number | string | undefined) {
 
           const finalData: InatPhoto = {
             // Use medium resolution for cards to balance quality and mobile loading speed
-            url: convertInatUrl(validPhoto.medium_url || validPhoto.url, 'medium'),
+            url: getProxyUrl(convertInatUrl(validPhoto.medium_url || validPhoto.url, 'medium'), tId, 'medium'),
             attribution: simplifiedAttribution,
+
+
             licenseCode: validPhoto.license_code,
             nativePageUrl: nativeUrl
           };

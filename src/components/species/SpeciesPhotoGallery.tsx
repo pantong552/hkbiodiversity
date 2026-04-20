@@ -255,6 +255,7 @@ export default function SpeciesPhotoGallery({
                 alt={commonName || 'Species observation'}
                 fill
                 className="object-contain sm:object-cover"
+                unoptimized={currentPhoto?.large_url?.includes('/api/image/transform')}
                 sizes="(max-width: 640px) 100vw, (max-width: 1024px) 80vw, 1200px"
               />
             </motion.div>
@@ -372,6 +373,7 @@ export default function SpeciesPhotoGallery({
                   src={photo.small_url || photo.url}
                   alt="Thumb"
                   fill
+                  unoptimized={(photo.small_url || photo.url)?.includes('/api/image/transform')}
                   className="object-cover pointer-events-none"
                   sizes="96px"
                 />

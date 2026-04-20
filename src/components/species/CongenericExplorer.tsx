@@ -48,6 +48,7 @@ const MiniSpeciesCard = ({ species }: { species: Species }) => {
           alt={commonName || species.scientific_name}
           fill
           sizes="64px"
+          unoptimized={displayImage.includes('/api/image/transform')}
           className={`object-cover transition-transform duration-700 group-hover:scale-115 ${isLoading ? 'blur-sm grayscale' : 'blur-0 grayscale-0'}`}
         />
         <div className="absolute inset-0 border border-black/5 rounded-xl pointer-events-none" />
