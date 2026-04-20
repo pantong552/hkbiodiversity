@@ -46,11 +46,14 @@ export async function GET(request: NextRequest) {
       .webp({ quality: 80, effort: 4 }) // quality 80 是一個效能與體積的良好平衡點
       .toBuffer();
 
+    // 轉換為 Uint8Array 以確保兼容 NextResponse (Web Response API)
+    const body = new Uint8Array(transformedBuffer);
+
     // 生成自定義檔名
     const fileName = `${id}_${size}.webp`;
 
     // 設置響應標頭
-    return new NextResponse(transformedBuffer, {
+    return new NextResponse(body, {
       status: 200,
       headers: {
         'Content-Type': 'image/webp',
