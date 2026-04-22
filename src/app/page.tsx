@@ -14,18 +14,22 @@ export async function generateMetadata({
   const params = await searchParams;
   const speciesId = params.species;
   
-  // Default metadata for home page
+  const baseUrl = 'https://hkbiodiversity.org';
   const defaultTitle = 'Hong Kong Biodiversity Collective | 香港自然生態匯誌';
   const defaultDescription = 'A collaborative biodiversity encyclopedia of Hong Kong, covering approximately 10,000 species.';
-  
+
   if (!speciesId) {
     return {
       title: defaultTitle,
       description: defaultDescription,
+      alternates: {
+        canonical: baseUrl,
+      },
       openGraph: {
         title: defaultTitle,
         description: defaultDescription,
         type: 'website',
+        url: baseUrl,
       }
     };
   }
@@ -37,6 +41,7 @@ export async function generateMetadata({
   const commonName = species.common_name_chi || species.common_name_eng || species.scientific_name;
   const scientificName = species.scientific_name;
   const imageUrl = await getSpeciesImageUrl(species);
+  const canonicalUrl = `${baseUrl}/?species=${speciesId}`;
 
   const dynamicTitle = `${commonName} (${scientificName}) | HK Biodiversity Collective`;
   const dynamicDescription = `在香港自然生態匯誌查看 ${commonName} 的詳細資料。分類：${species.class_eng || ''} ${species.order_eng || ''} ${species.family_eng || ''}`;
@@ -44,11 +49,15 @@ export async function generateMetadata({
   return {
     title: dynamicTitle,
     description: dynamicDescription,
+    alternates: {
+      canonical: canonicalUrl,
+    },
     openGraph: {
       title: dynamicTitle,
       description: dynamicDescription,
       images: imageUrl ? [{ url: imageUrl }] : [],
       type: 'article',
+      url: canonicalUrl,
     },
     twitter: {
       card: 'summary_large_image',
