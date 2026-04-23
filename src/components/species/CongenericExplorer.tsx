@@ -85,48 +85,66 @@ export default function CongenericExplorer({ species, isMobile = false }: Congen
     async function fetchRelated() {
       setIsLoading(true);
       try {
-        if (species.genus_eng) {
-          const { data } = await supabase
-            .from('species')
+        const isFlora = species.taxa_group === 'FLORA';
+        // 植物表使用 _en，動物表使用 _eng
+        const genusField = isFlora ? 'genus_en' : 'genus_eng';
+        const familyField = isFlora ? 'family_en' : 'family_eng';
+        
+        const genusValue = isFlora ? (species as any).genus_en : species.genus_eng;
+        const familyValue = isFlora ? (species as any).family_en : species.family_eng;
+
+        // Step 1: Try Genus
+        if (genusValue) {
+          const { data, error } = await supabase
+            .from(isFlora ? 'plant_species' : 'species')
             .select('*')
-            .eq('genus_eng', species.genus_eng)
-            .neq('id', species.id)
+            .eq(genusField, genusValue)
+            .neq('species_id', species.species_id)
             .limit(20);
           
           if (data && data.length > 0) {
-            setCongenericSpecies([...data].sort(() => Math.random() - 0.5));
+            const mappedData = isFlora ? data.map(p => ({
+              ...p,
+              id: p.species_id,
+              common_name_chi: p.common_name_zh,
+              common_name_eng: p.common_name_en,
+              taxa_group: 'FLORA',
+              family_chi: p.family_zh,
+              family_eng: p.family_en,
+              genus_chi: p.genus_zh,
+              genus_eng: p.genus_en,
+            })) : data;
+
+            setCongenericSpecies([...mappedData].sort(() => Math.random() - 0.5));
             setDiscoveryLevel('genus');
             setIsLoading(false);
             return;
           }
         }
 
-        if (species.sub_family_eng) {
-          const { data } = await supabase
-            .from('species')
+        // Step 2: Try Family
+        if (familyValue) {
+          const { data, error } = await supabase
+            .from(isFlora ? 'plant_species' : 'species')
             .select('*')
-            .eq('sub_family_eng', species.sub_family_eng)
-            .neq('id', species.id)
+            .eq(familyField, familyValue)
+            .neq('species_id', species.species_id)
             .limit(20);
           
           if (data && data.length > 0) {
-            setCongenericSpecies([...data].sort(() => Math.random() - 0.5));
-            setDiscoveryLevel('subfamily');
-            setIsLoading(false);
-            return;
-          }
-        }
+            const mappedData = isFlora ? data.map(p => ({
+              ...p,
+              id: p.species_id,
+              common_name_chi: p.common_name_zh,
+              common_name_eng: p.common_name_en,
+              taxa_group: 'FLORA',
+              family_chi: p.family_zh,
+              family_eng: p.family_en,
+              genus_chi: p.genus_zh,
+              genus_eng: p.genus_en,
+            })) : data;
 
-        if (species.family_eng) {
-          const { data } = await supabase
-            .from('species')
-            .select('*')
-            .eq('family_eng', species.family_eng)
-            .neq('id', species.id)
-            .limit(20);
-          
-          if (data && data.length > 0) {
-            setCongenericSpecies([...data].sort(() => Math.random() - 0.5));
+            setCongenericSpecies([...mappedData].sort(() => Math.random() - 0.5));
             setDiscoveryLevel('family');
             setIsLoading(false);
             return;
@@ -143,20 +161,19 @@ export default function CongenericExplorer({ species, isMobile = false }: Congen
     }
 
     fetchRelated();
-  }, [species.genus_eng, species.sub_family_eng, species.family_eng, species.id, supabase]);
+    // 使用 JSON.stringify 確保深度比較，或列出可能的分類欄位
+  }, [species, supabase]);
 
   const getTitle = () => {
     if (language === 'zh') {
       switch (discoveryLevel) {
         case 'genus': return '探索同屬物種';
-        case 'subfamily': return '探索同亞科物種';
         case 'family': return '探索同科物種';
         default: return '探索相關物種';
       }
     } else {
       switch (discoveryLevel) {
         case 'genus': return 'Congeneric Species';
-        case 'subfamily': return 'Subfamily Relatives';
         case 'family': return 'Family Relatives';
         default: return 'Related Species';
       }
