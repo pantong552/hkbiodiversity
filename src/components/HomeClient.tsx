@@ -9,6 +9,7 @@ import SidebarFilter, { SelectedFilters } from '@/components/SidebarFilter';
 import PlantFilterPanel from '@/components/plants/PlantFilterPanel';
 import TaxaGroupSwitcher, { TaxaType } from '@/components/search/TaxaGroupSwitcher';
 import Header from '@/components/Header';
+import MobilePlantFilter from '@/components/MobilePlantFilter';
 import CustomDropdown from '@/components/ui/CustomDropdown';
 import { Species } from '@/types/species';
 import { PlantSpecies, PlantFilterState } from '@/types/plants';
@@ -463,6 +464,7 @@ export default function HomeClient() {
               onDisplayModeChange={setDisplayMode}
               pageSizeOptions={PAGE_SIZE_OPTIONS[displayMode]}
               totalCount={totalResultCount}
+              onFilterOpen={() => setIsSidebarOpen(true)}
             />
 
             {/* Results Grid */}
@@ -568,25 +570,17 @@ export default function HomeClient() {
       </main>
 
       {/* Mobile Drawer */}
-      {taxaType === 'flora' && isSidebarOpen && (
-          <div className="fixed inset-0 z-[100] bg-slate-900/60 backdrop-blur-md min-[1101px]:hidden overflow-y-auto pt-20 pb-10 px-6">
-              <div className="bg-white rounded-[2.5rem] p-8 shadow-2xl relative">
-                  <button 
-                    onClick={() => setIsSidebarOpen(false)}
-                    className="absolute top-6 right-6 p-2 bg-slate-100 rounded-full text-slate-400"
-                  >
-                      <X className="w-6 h-6" />
-                  </button>
-                  <PlantFilterPanel 
-                      filters={plantFilters}
-                      setFilters={setPlantFilters}
-                      availableCategories={availablePlantMeta.categories}
-                      availableFamilies={availablePlantMeta.families}
-                      availableGenuses={availablePlantMeta.genuses}
-                      onReset={() => setPlantFilters(INITIAL_PLANT_FILTERS)}
-                  />
-              </div>
-          </div>
+      {taxaType === 'flora' && (
+        <MobilePlantFilter 
+          isOpen={isSidebarOpen}
+          onClose={() => setIsSidebarOpen(false)}
+          filters={plantFilters}
+          setFilters={setPlantFilters}
+          availableCategories={availablePlantMeta.categories}
+          availableFamilies={availablePlantMeta.families}
+          availableGenuses={availablePlantMeta.genuses}
+          onReset={() => setPlantFilters(INITIAL_PLANT_FILTERS)}
+        />
       )}
     </div>
   );

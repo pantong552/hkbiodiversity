@@ -14,6 +14,7 @@ interface MobileToolbarProps {
   onDisplayModeChange: (val: 'detail' | 'photo' | 'table') => void;
   pageSizeOptions: number[];
   totalCount: number;
+  onFilterOpen: () => void;
 }
 
 export default function MobileToolbar({
@@ -24,7 +25,8 @@ export default function MobileToolbar({
   displayMode,
   onDisplayModeChange,
   pageSizeOptions,
-  totalCount
+  totalCount,
+  onFilterOpen
 }: MobileToolbarProps) {
   const { t } = useLanguage();
   const { openSpeciesIds, isExpanded } = useSpeciesPanel();
@@ -61,7 +63,16 @@ export default function MobileToolbar({
       ${hasActiveTabs ? 'bottom-[80px]' : 'bottom-6'}
       ${isVisible && !shouldHideDueToPanel ? 'translate-y-0 opacity-100' : 'translate-y-32 opacity-0 pointer-events-none'}
     `}>
-      <div className="bg-white/85 backdrop-blur-2xl border border-white/40 shadow-[0_12px_40px_rgba(0,0,0,0.15)] rounded-[2.5rem] p-3 flex flex-col gap-3">
+      <div className="bg-white/90 backdrop-blur-3xl border border-white/50 shadow-[0_20px_50px_rgba(0,0,0,0.2)] rounded-[2.5rem] p-3 flex flex-col gap-3">
+        
+        {/* Row 0: Prominent Filter Button for Mobile */}
+        <button 
+          onClick={onFilterOpen}
+          className="w-full bg-emerald-600 hover:bg-emerald-700 text-white rounded-2xl py-3 flex items-center justify-center gap-2.5 shadow-lg shadow-emerald-200 active:scale-95 transition-all"
+        >
+          <Layers className="w-4 h-4" />
+          <span className="text-xs font-black uppercase tracking-[0.2em]">{t?.('filter.title') || 'Filter & Search'}</span>
+        </button>
         
         {/* Row 1: Sort (Left) & Mode (Right) */}
         <div className="flex items-center justify-between gap-2">
