@@ -97,37 +97,52 @@ export default function HomeClient() {
   useEffect(() => {
     if (taxaType === 'flora') {
         const fetchMeta = async () => {
-            const rpcParams = {
-                p_categories: plantFilters.categories,
-                p_families: plantFilters.families,
-                p_genuses: plantFilters.genuses,
-                p_is_cap96: plantFilters.isCap96,
-                p_is_cap586: plantFilters.isCap586,
-                p_is_rare: plantFilters.isRare,
-                p_is_china_red_book: plantFilters.isInChinaRedBook,
-                p_flowering_months: plantFilters.floweringMonths,
-                p_fruiting_months: plantFilters.fruitingMonths,
-                p_search: searchQuery
-            };
-
-            const { data, error } = await supabaseSingleton.rpc('get_plant_stats', rpcParams);
+            const levels = ['categories', 'families', 'genuses'];
             
-            if (data && !error) {
-                const formatOpts = (items: any[]) => (items || []).map(i => ({
-                    name: i.name, // 使用中文名作為 Filter Key
-                    display: language === 'zh' ? (i.name || i.en) : (i.en || i.name),
-                    count: i.count
-                })).sort((a, b) => b.count - a.count);
-
-                setAvailablePlantMeta({
-                    categories: (data.categories || []).map((i: any) => ({
-                        zh: i.name,
-                        en: i.en,
-                        display: language === 'zh' ? i.name : (i.en || i.name)
-                    })),
-                    families: formatOpts(data.families),
-                    genuses: formatOpts(data.genuses),
+            try {
+                const levelPromises = levels.map(async (level) => {
+                    const rpcParams = {
+                        p_categories: level === 'categories' ? [] : plantFilters.categories,
+                        p_families: level === 'families' ? [] : plantFilters.families,
+                        p_genuses: level === 'genuses' ? [] : plantFilters.genuses,
+                        p_is_cap96: plantFilters.isCap96,
+                        p_is_cap586: plantFilters.isCap586,
+                        p_is_rare: plantFilters.isRare,
+                        p_is_china_red_book: plantFilters.isInChinaRedBook,
+                        p_flowering_months: plantFilters.floweringMonths,
+                        p_fruiting_months: plantFilters.fruitingMonths,
+                        p_search: searchQuery.trim() || plantFilters.searchQuery.trim()
+                    };
+                    const { data, error } = await supabaseSingleton.rpc('get_plant_stats', rpcParams);
+                    return { level, data, error };
                 });
+
+                const results = await Promise.all(levelPromises);
+                
+                const newMeta = { categories: [], families: [], genuses: [] };
+                
+                results.forEach(({ level, data, error }) => {
+                    if (data && !error) {
+                        if (level === 'categories') {
+                            newMeta.categories = (data.categories || []).map((i: any) => ({
+                                zh: i.name,
+                                en: i.en,
+                                display: language === 'zh' ? i.name : (i.en || i.name)
+                            }));
+                        } else {
+                            const items = level === 'families' ? data.families : data.genuses;
+                            newMeta[level] = (items || []).map((i: any) => ({
+                                name: i.name,
+                                display: language === 'zh' ? (i.name || i.en) : (i.en || i.name),
+                                count: i.count
+                            })).sort((a, b) => b.count - a.count);
+                        }
+                    }
+                });
+                
+                setAvailablePlantMeta(newMeta);
+            } catch (err) {
+                console.error("Error fetching plant meta", err);
             }
         };
         fetchMeta();
@@ -154,12 +169,13 @@ export default function HomeClient() {
         const table = taxaType === 'fauna' ? 'species' : 'plant_species';
         let query = supabaseSingleton.from(table).select('*', { count: 'exact' });
 
-        // Apply Global Search
-        if (searchQuery.trim()) {
+        // Apply Global & Quick Search
+        const currentSearch = taxaType === 'fauna' ? searchQuery.trim() : (searchQuery.trim() || plantFilters.searchQuery.trim());
+        if (currentSearch) {
             if (taxaType === 'fauna') {
-                query = query.or(`common_name_chi.ilike.%${searchQuery}%,common_name_eng.ilike.%${searchQuery}%,scientific_name.ilike.%${searchQuery}%`);
+                query = query.or(`common_name_chi.ilike.%${currentSearch}%,common_name_eng.ilike.%${currentSearch}%,scientific_name.ilike.%${currentSearch}%`);
             } else {
-                query = query.textSearch('fts', searchQuery, { type: 'plain', config: 'simple' });
+                query = query.or(`scientific_name.ilike.%${currentSearch}%,common_name_zh.ilike.%${currentSearch}%,common_name_en.ilike.%${currentSearch}%`);
             }
         }
 

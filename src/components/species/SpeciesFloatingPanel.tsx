@@ -73,7 +73,7 @@ export default function SpeciesFloatingPanel() {
                 id: plantData.species_id, // 使用 species_id 作為主要 ID
                 common_name_chi: plantData.common_name_zh,
                 common_name_eng: plantData.common_name_en,
-                taxa_group: plantData.category_zh,
+                taxa_group: 'FLORA', // Set FLORA to easily identify plants
                 family_chi: plantData.family_zh,
                 family_eng: plantData.family_en,
                 genus_chi: plantData.genus_zh,
@@ -86,10 +86,21 @@ export default function SpeciesFloatingPanel() {
                 order_chi: plantData.family_zh, 
                 order_eng: plantData.family_en,
                 // 其他敘述欄位
-                description_chi: plantData.description || plantData.description_chi,
-                remarks_chi: plantData.remark || plantData.remark_chi,
-                hk_distribution_chi: plantData.distribution || plantData.distribution_chi,
-                global_distribution_chi: plantData.locality || plantData.locality_chi,
+                description_chi: plantData.description_chi,
+                description_eng: plantData.description,
+                remarks_chi: plantData.remark_chi,
+                remarks_eng: plantData.remark,
+                // 修復分布錯誤對調的問題：locality 為香港分布，distribution 為全球分布
+                hk_distribution_chi: plantData.locality_chi,
+                hk_distribution_eng: plantData.locality,
+                global_distribution_chi: plantData.distribution_chi,
+                global_distribution_eng: plantData.distribution,
+                
+                // 保育與生存狀態相關欄位 (Flora specific)
+                is_cap96: plantData.is_cap96,
+                is_cap586: plantData.is_cap586,
+                hk_rare_precious_note: plantData.hk_rare_precious_note,
+                china_red_data_book_note: plantData.china_red_data_book_note,
               } as any;
             }
           }

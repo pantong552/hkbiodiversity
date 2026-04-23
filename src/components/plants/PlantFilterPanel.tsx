@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { Calendar, Shield, RotateCcw, Star, BookOpen, Filter } from 'lucide-react';
+import { Calendar, Shield, RotateCcw, Star, BookOpen, Filter, Search } from 'lucide-react';
 import { useLanguage } from '@/context/LanguageContext';
 import { PlantFilterState } from '@/types/plants';
 import MultiSelectDropdown from '@/components/ui/MultiSelectDropdown';
@@ -71,8 +71,20 @@ export default function PlantFilterPanel({
           </h2>
       </div>
 
+      {/* Quick Search */}
+      <div className="relative group flex items-center pt-2">
+        <Search className="w-5 h-5 text-slate-400 absolute left-4 pointer-events-none group-focus-within:text-emerald-500 transition-colors" />
+        <input 
+          type="text" 
+          placeholder={language === 'zh' ? '快速搜尋植物...' : 'Quick search...'} 
+          value={filters.searchQuery}
+          onChange={(e) => setFilters(prev => ({ ...prev, searchQuery: e.target.value }))}
+          className="w-full pl-12 pr-4 py-3 bg-emerald-50/50 border-2 border-transparent rounded-xl text-sm text-emerald-900 placeholder:text-slate-400 focus:bg-white focus:border-emerald-200 focus:ring-4 focus:ring-emerald-50/50 transition-all outline-none"
+        />
+      </div>
+
       {/* Category */}
-      <div className="space-y-4">
+      <div className="space-y-4 pt-4 border-t border-emerald-50">
         <h3 className="text-sm font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
           {t.category}
         </h3>
@@ -84,10 +96,12 @@ export default function PlantFilterPanel({
                 ...prev, 
                 categories: prev.categories.includes(cat.zh) ? prev.categories.filter(c => c !== cat.zh) : [...prev.categories, cat.zh]
               }))}
-              className={`px-2.5 py-1.5 rounded-lg text-[10px] font-black transition-all border ${
-                filters.categories.includes(cat.zh)
-                  ? 'bg-emerald-600 border-emerald-600 text-white shadow-md shadow-emerald-100'
-                  : 'bg-white border-slate-100 text-slate-400 hover:bg-emerald-50 hover:text-emerald-700'
+              className={`px-3.5 py-2 rounded-xl text-sm font-bold transition-all border ${
+                filters.categories.length > 0 && !filters.categories.includes(cat.zh)
+                  ? 'bg-slate-100 border-slate-300 text-slate-500 hover:bg-emerald-50 hover:text-emerald-700' // explicitly unselected
+                  : filters.categories.includes(cat.zh)
+                    ? 'bg-emerald-600 border-emerald-600 text-white shadow-md shadow-emerald-100' // selected
+                    : 'bg-white border-slate-200 text-slate-700 hover:bg-emerald-50 hover:text-emerald-700 hover:border-emerald-200' // none selected
               }`}
             >
               {cat.display}

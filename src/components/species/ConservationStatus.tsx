@@ -10,7 +10,37 @@ interface ConservationStatusProps {
 export default function ConservationStatus({ species }: ConservationStatusProps) {
   const { language } = useLanguage();
 
-  const statuses = [
+  const isPlant = species.taxa_group === 'FLORA' || ('is_cap96' in species);
+
+  // Helper formatting for Cap 96/586 Boolean-like values
+  const formatYesNo = (val: any) => {
+    if (!val || val === 'No' || val === '沒有列入' || val === '非' || val === 'N' || val === 'n' || val === 'False' || val === false) return '-';
+    if (val === 'Y' || val === true || val === 'Yes' || val === 'y' || val === 'True') return language === 'zh' ? '是' : 'Yes';
+    return val;
+  };
+
+  const statuses = isPlant ? [
+    {
+      labelChi: '林務條例 (第96章) 保育類',
+      labelEng: 'Forests and Countryside Ordinance (Cap. 96)',
+      value: formatYesNo((species as any).is_cap96)
+    },
+    {
+      labelChi: '保護瀕危動植物物種條例 (第586章)',
+      labelEng: 'Protection of Endangered Species Ordinance (Cap. 586)',
+      value: formatYesNo((species as any).is_cap586)
+    },
+    {
+      labelChi: '香港稀有及珍貴植物',
+      labelEng: 'HK Rare and Precious Plants',
+      value: (species as any).hk_rare_precious_note === 'No' ? '-' : (species as any).hk_rare_precious_note
+    },
+    {
+      labelChi: '中國植物紅皮書',
+      labelEng: 'China Plant Red Data Book',
+      value: (species as any).china_red_data_book_note === '沒有列入' || (species as any).china_red_data_book_note === 'Not Listed' ? '-' : (species as any).china_red_data_book_note
+    }
+  ] : [
     { 
       labelChi: 'IUCN 紅皮書', 
       labelEng: 'IUCN Red List', 
@@ -47,14 +77,14 @@ export default function ConservationStatus({ species }: ConservationStatusProps)
       
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {statuses.map((status, idx) => (
-          <div key={idx} className="flex flex-col group">
-            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2 transition-colors group-hover:text-emerald-500">
+          <div key={idx} className="flex flex-col group h-full">
+            <span className="text-xs font-bold text-slate-500 tracking-tight mb-3 transition-colors group-hover:text-emerald-600 min-h-[32px] flex items-end">
               {language === 'zh' ? status.labelChi : status.labelEng}
             </span>
             <div className={`
-              text-sm font-black px-5 py-4 rounded-2xl transition-all h-full flex items-center
-              ${status.value 
-                ? 'bg-emerald-50 text-emerald-700 border border-emerald-100 group-hover:bg-emerald-100 group-hover:border-emerald-200' 
+              text-base font-black px-5 py-3.5 rounded-2xl transition-all flex items-center justify-center text-center
+              ${status.value && status.value !== '-' 
+                ? 'bg-emerald-50 text-emerald-700 border border-emerald-200 group-hover:bg-emerald-100 group-hover:border-emerald-300 shadow-sm' 
                 : 'bg-slate-50 text-slate-400 border border-slate-100'}
             `}>
               {status.value || '-'}

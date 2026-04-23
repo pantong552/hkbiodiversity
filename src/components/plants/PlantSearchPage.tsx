@@ -108,16 +108,21 @@ export default function PlantSearchPage() {
   const [loading, setLoading] = useState(true);
   const [filters, setFilters] = useState<PlantFilterState>(INITIAL_FILTERS);
   const [categories, setCategories] = useState<{ zh: string; en: string; display: string }[]>([]);
+  const [families, setFamilies] = useState<{ name: string; display: string; count: number }[]>([]);
+  const [genuses, setGenuses] = useState<{ name: string; display: string; count: number }[]>([]);
 
-  // Fetch unique categories once
+  // Fetch unique metadata once
   useEffect(() => {
     const fetchMeta = async () => {
-      const { data } = await supabase.from('plant_species').select('category_zh, category_en').not('category_zh', 'is', null);
+      const { data } = await supabase.from('plant_species').select('category_zh, category_en, family_zh, family_en, genus_zh, genus_en').not('category_zh', 'is', null);
       if (data) {
         const uniqueKeys = new Set();
         const cats: any[] = [];
-        data.forEach((item: { category_zh: string; category_en: string }) => {
-          if (!uniqueKeys.has(item.category_zh)) {
+        const famCounts = new Map<string, { display: string; count: number }>();
+        const genCounts = new Map<string, { display: string; count: number }>();
+
+        data.forEach((item: any) => {
+          if (item.category_zh && !uniqueKeys.has(item.category_zh)) {
             uniqueKeys.add(item.category_zh);
             cats.push({
               zh: item.category_zh,
@@ -125,12 +130,39 @@ export default function PlantSearchPage() {
               display: language === 'zh' ? item.category_zh : (item.category_en || item.category_zh)
             });
           }
+
+          if (item.family_zh) {
+            const fKey = item.family_zh;
+            if (famCounts.has(fKey)) {
+              famCounts.get(fKey)!.count += 1;
+            } else {
+              famCounts.set(fKey, { 
+                display: language === 'zh' ? item.family_zh : (item.family_en || item.family_zh), 
+                count: 1 
+              });
+            }
+          }
+
+          if (item.genus_zh) {
+            const gKey = item.genus_zh;
+            if (genCounts.has(gKey)) {
+              genCounts.get(gKey)!.count += 1;
+            } else {
+              genCounts.set(gKey, { 
+                display: language === 'zh' ? item.genus_zh : (item.genus_en || item.genus_zh), 
+                count: 1 
+              });
+            }
+          }
         });
+        
         setCategories(cats);
+        setFamilies(Array.from(famCounts.entries()).map(([name, {display, count}]) => ({ name, display, count })).sort((a, b) => b.count - a.count));
+        setGenuses(Array.from(genCounts.entries()).map(([name, {display, count}]) => ({ name, display, count })).sort((a, b) => b.count - a.count));
       }
     };
     fetchMeta();
-  }, [supabase, language]);
+  }, [language]); // Removed supabase to prevent re-fetching on render
 
   useEffect(() => {
     const fetchPlants = async () => {
@@ -138,10 +170,12 @@ export default function PlantSearchPage() {
       let query = supabase.from('plant_species').select('*');
 
       if (filters.searchQuery) {
-        query = query.textSearch('fts', filters.searchQuery, { type: 'plain', config: 'simple' });
+        query = query.or(`scientific_name.ilike.%${filters.searchQuery}%,common_name_zh.ilike.%${filters.searchQuery}%,common_name_en.ilike.%${filters.searchQuery}%`);
       }
 
       if (filters.categories.length > 0) query = query.in('category_zh', filters.categories);
+      if (filters.families.length > 0) query = query.in('family_zh', filters.families);
+      if (filters.genuses.length > 0) query = query.in('genus_zh', filters.genuses);
       if (filters.isCap96) query = query.eq('is_cap96', 'Y');
       if (filters.isCap586) query = query.eq('is_cap586', 'Y');
       if (filters.isRare) query = query.neq('hk_rare_precious_note', 'No');
@@ -156,7 +190,7 @@ export default function PlantSearchPage() {
 
     const timer = setTimeout(fetchPlants, 500);
     return () => clearTimeout(timer);
-  }, [filters, supabase]);
+  }, [filters]); // Removed supabase to prevent re-fetching on render
 
   return (
     <div className="max-w-7xl mx-auto px-6 py-12 space-y-12">
@@ -176,8 +210,8 @@ export default function PlantSearchPage() {
           filters={filters}
           setFilters={setFilters}
           availableCategories={categories}
-          availableFamilies={[]} 
-          availableGenuses={[]}
+          availableFamilies={families} 
+          availableGenuses={genuses}
           onReset={() => setFilters(INITIAL_FILTERS)}
         />
       </div>
