@@ -51,11 +51,48 @@ export default function SpeciesFloatingPanel() {
       if (!speciesData[id] && !isLoading[id]) {
         setIsLoading(prev => ({ ...prev, [id]: true }));
         try {
-          const { data, error } = await supabase
+          // 嘗試從動物表查詢 (Fauna)
+          let { data, error } = await supabase
             .from('species')
             .select('*')
-            .eq('id', id)
+            .eq('species_id', id)
             .maybeSingle();
+          
+          // 如果動物表沒落，嘗試從植物表查詢 (Flora)
+          if (!data && !error) {
+            const { data: plantData, error: plantError } = await supabase
+              .from('plant_species')
+              .select('*')
+              .eq('species_id', id)
+              .maybeSingle();
+            
+            if (plantData) {
+              // 映射植物欄位到 Species 結構，使 SpeciesContent 能正確顯示
+              data = {
+                ...plantData,
+                id: plantData.species_id, // 使用 species_id 作為主要 ID
+                common_name_chi: plantData.common_name_zh,
+                common_name_eng: plantData.common_name_en,
+                taxa_group: plantData.category_zh,
+                family_chi: plantData.family_zh,
+                family_eng: plantData.family_en,
+                genus_chi: plantData.genus_zh,
+                genus_eng: plantData.genus_en,
+                // 植物通常沒有 Phylum/Class 資料在我們的 CSV 裡，設為空或其分類
+                phylum_chi: '維管植物', 
+                phylum_eng: 'Tracheophyta',
+                class_chi: plantData.category_zh,
+                class_eng: plantData.category_en,
+                order_chi: plantData.family_zh, 
+                order_eng: plantData.family_en,
+                // 其他敘述欄位
+                description_chi: plantData.description || plantData.description_chi,
+                remarks_chi: plantData.remark || plantData.remark_chi,
+                hk_distribution_chi: plantData.distribution || plantData.distribution_chi,
+                global_distribution_chi: plantData.locality || plantData.locality_chi,
+              } as any;
+            }
+          }
           
           if (data) {
             setSpeciesData(prev => ({ ...prev, [id]: data as Species }));

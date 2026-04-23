@@ -1,10 +1,9 @@
-'use client';
+﻿'use client';
 
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import Image from 'next/image';
-import { Heart, Info, ExternalLink, Leaf, Loader2, X, Calendar } from 'lucide-react';
+import { Heart, Info, ExternalLink, Leaf, Loader2, X } from 'lucide-react';
 import { Species } from '../types/species';
-import { PlantSpecies } from '../types/plants';
 import { useLanguage } from '../context/LanguageContext';
 import { useSpeciesPanel } from '../context/SpeciesPanelContext';
 import { useAuth } from '../context/AuthContext';
@@ -14,19 +13,16 @@ import { supabase as supabaseSingleton } from '@/lib/supabase';
 import { createPortal } from 'react-dom';
 import { formatScientificName } from '../utils/formatters';
 
-interface SpeciesCardProps {
-  species: any; // Species | PlantSpecies
-  isPlant?: boolean;
-  mode?: 'detail' | 'photo';
-  priority?: boolean;
-}
 
 export default function SpeciesCard({ 
   species, 
-  isPlant = false,
   mode = 'detail',
   priority = false 
-}: SpeciesCardProps) {
+}: { 
+  species: Species, 
+  mode?: 'detail' | 'photo',
+  priority?: boolean
+}) {
   const { language } = useLanguage();
   const { addSpecies } = useSpeciesPanel();
   const { user } = useAuth();
@@ -36,95 +32,89 @@ export default function SpeciesCard({
   const [showTooltip, setShowTooltip] = useState(false);
   const [mounted, setMounted] = useState(false);
 
-  // Normalize data for consistent rendering
-  const normalized = useMemo(() => {
-    if (isPlant) {
-      const p = species as PlantSpecies;
-      return {
-        id: p.id,
-        species_id: p.species_id,
-        common_name_chi: p.common_name_zh,
-        common_name_eng: p.common_name_en,
-        scientific_name: p.scientific_name,
-        author: p.author,
-        taxa_group: p.category_zh,
-        order: null, // Plants don't typically display order in this UI
-        family: p.family_zh,
-        iucn: null, 
-        image_url: null, 
-        months: p.flowering_months?.length > 0 ? p.flowering_months : p.fruiting_months
-      };
-    } else {
-      const s = species as Species;
-      return {
-        id: s.id,
-        species_id: s.species_id,
-        common_name_chi: s.common_name_chi,
-        common_name_eng: s.common_name_eng,
-        scientific_name: s.scientific_name,
-        author: s.author,
-        taxa_group: language === 'zh' ? s.informal_group_chi : s.informal_group_eng,
-        order: language === 'zh' ? s.order_chi : s.order_eng,
-        family: language === 'zh' ? s.family_chi : s.family_eng,
-        iucn: s.iucn,
-        image_url: s.image_url,
-        months: null
-      };
-    }
-  }, [species, isPlant, language]);
-
   useEffect(() => {
     setMounted(true);
     return () => setMounted(false);
   }, []);
 
-  // Check bookmark status
-  useEffect(() => {
+  // 瑼Ｘ?臬撌脫??  useEffect(() => {
     let isMounted = true;
+    
     const checkBookmark = async () => {
-      if (!user || !normalized.id) {
+      if (!user || !species.id) {
         if (isMounted) setIsBookmarked(false);
         return;
       }
+
       try {
-        const { data } = await supabaseSingleton
+        const { data, error } = await supabaseSingleton
           .from('user_favorites')
           .select('id')
           .eq('user_id', user.id)
-          .eq(isPlant ? 'plant_id' : 'species_id', normalized.id)
+          .eq('species_id', species.id)
           .maybeSingle();
+        
+        if (error) throw error;
         if (isMounted) setIsBookmarked(!!data);
       } catch (err) {
-        console.error('Bookmark error:', err);
+        console.error('Error checking bookmark:', err);
       }
     };
+
     checkBookmark();
     return () => { isMounted = false; };
-  }, [user?.id, normalized.id, isPlant]);
+  }, [user?.id, species.id]);
 
   const toggleFavorite = useCallback(async (e: React.MouseEvent) => {
     e.stopPropagation();
-    if (!user) { alert(language === 'zh' ? '請先登入' : 'Login required'); return; }
+    
+    if (!user) {
+      alert(language === 'zh' ? '隢??餃隞乩蝙?冽???? : 'Please log in to use bookmarks');
+      return;
+    }
+
     if (isUpdating) return;
     setIsUpdating(true);
+
     try {
       if (isBookmarked) {
-        await supabaseSingleton.from('user_favorites').delete().eq('user_id', user.id).eq(isPlant ? 'plant_id' : 'species_id', normalized.id);
+        const { error } = await supabaseSingleton
+          .from('user_favorites')
+          .delete()
+          .eq('user_id', user.id)
+          .eq('species_id', species.id);
+        
+        if (error) throw error;
         setIsBookmarked(false);
       } else {
-        await supabaseSingleton.from('user_favorites').insert({ user_id: user.id, [isPlant ? 'plant_id' : 'species_id']: normalized.id });
+        const { error } = await supabaseSingleton
+          .from('user_favorites')
+          .insert({
+            user_id: user.id,
+            species_id: species.id
+          });
+        
+        if (error) throw error;
         setIsBookmarked(true);
       }
-    } catch (err) { console.error('Favorite error:', err); } finally { setIsUpdating(false); }
-  }, [user, normalized.id, isBookmarked, isUpdating, language, isPlant]);
+    } catch (err) {
+      console.error('Error toggling favorite:', err);
+    } finally {
+      setIsUpdating(false);
+    }
+  }, [user, species.id, isBookmarked, isUpdating, language]);
 
+  // Fetch iNaturalist photo if local image_url is missing
   const { imageUrl: inatPhoto, isLoading: isInatLoading, attribution, nativePageUrl } = useInaturalistPhoto(
-    !normalized.image_url ? normalized.species_id : undefined
+    !species.image_url ? species.species_id : undefined
   );
 
-  const displayImage = normalized.image_url || inatPhoto || 'https://images.unsplash.com/photo-1549488344-1f9b8d2bd1f3?q=80&w=1080&auto=format&fit=crop';
+  const displayImage = species.image_url || inatPhoto || 'https://images.unsplash.com/photo-1549488344-1f9b8d2bd1f3?q=80&w=1080&auto=format&fit=crop';
   
-  const iucnConfig = !isPlant && normalized.iucn ? getIUCNConfig(normalized.iucn) : null;
+  const config = getIUCNConfig(species.iucn);
+  const badgeClass = config.styles;
+  const badgeText = language === 'zh' ? config.label.zh : config.label.en;
+
   const isPhoto = mode === 'photo';
 
   const toggleTooltip = (e: React.MouseEvent) => {
@@ -134,10 +124,10 @@ export default function SpeciesCard({
 
   return (
     <div 
-      onClick={() => addSpecies(normalized.species_id)} 
+      onClick={() => addSpecies(species.id)}
       className={`
-        group relative bg-white border border-slate-200/50 overflow-hidden shadow-[0_2px_10px_rgba(0,0,0,0.06)]
-        hover:shadow-[0_10px_30px_rgba(0,0,0,0.12)] hover:-translate-y-1.5 transition-all duration-500 flex flex-col cursor-pointer
+        group relative bg-white border border-slate-200/50 overflow-hidden shadow-card 
+        hover:shadow-card-hover hover:-translate-y-1.5 transition-all duration-500 flex flex-col cursor-pointer
         ${isPhoto ? 'rounded-2xl' : 'rounded-[1.5rem]'}
       `}
     >
@@ -145,7 +135,7 @@ export default function SpeciesCard({
       <div className={`relative overflow-hidden bg-slate-100 ${isPhoto ? 'h-40 sm:h-48' : 'h-48'}`}>
         <Image
           src={displayImage}
-          alt={normalized.common_name_chi || normalized.scientific_name || 'Species Image'}
+          alt={(language === 'zh' ? species.common_name_chi : species.common_name_eng) || species.scientific_name || 'Species Image'}
           fill
           priority={priority}
           unoptimized={displayImage.includes('/api/image/transform')}
@@ -157,33 +147,29 @@ export default function SpeciesCard({
         {!isPhoto && (
           <div className="absolute inset-x-0 bottom-0 p-4 pt-12 bg-gradient-to-t from-black/80 via-black/40 to-transparent z-10">
             <h3 className="text-white text-xl font-black tracking-tight leading-tight drop-shadow-md">
-              {language === 'zh' ? normalized.common_name_chi : normalized.common_name_eng}
+              {language === 'zh' ? species.common_name_chi : species.common_name_eng}
             </h3>
             <p className="text-white/80 text-xs drop-shadow-sm font-serif mt-1">
-              {formatScientificName(normalized.scientific_name)}
+              {formatScientificName(species.scientific_name)}
             </p>
           </div>
         )}
-
+        
         {/* Top Overlay Controls */}
         <div className="absolute top-3 left-3 right-3 flex justify-between items-start z-20 pointer-events-none">
-          {/* Badges - left side */}
-          <div className="flex flex-col gap-1.5">
-            {!isPhoto && iucnConfig && (
-              <span className={`px-2 py-0.5 rounded-lg text-[9px] font-black uppercase tracking-wider backdrop-blur-md shadow-lg border pointer-events-auto ${iucnConfig.styles}`}>
-                {language === 'zh' ? iucnConfig.label.zh : iucnConfig.label.en}
-              </span>
-            )}
-            {isPlant && (
-              <span className="px-2 py-0.5 rounded-lg text-[8px] font-black uppercase tracking-widest bg-emerald-500 text-white shadow-lg flex items-center gap-1 pointer-events-auto w-max">
-                <Leaf className="w-2.5 h-2.5" /> FLORA
-              </span>
-            )}
-          </div>
+          {/* IUCN Badge - left side (Hidden in photo mode) */}
+          {!isPhoto && species.iucn && (
+            <span className={`
+              px-2 py-0.5 rounded-lg text-[9px] font-black uppercase tracking-wider backdrop-blur-md shadow-lg border pointer-events-auto
+              ${badgeClass}
+            `}>
+              {badgeText}
+            </span>
+          )}
 
           {/* Action Buttons - right side */}
           <div className="flex flex-col gap-2 items-end pointer-events-auto ml-auto">
-            {/* Heart Button */}
+            {/* Heart Button - Hidden in photo mode */}
             {!isPhoto && (
               <button 
                 onClick={toggleFavorite}
@@ -205,7 +191,6 @@ export default function SpeciesCard({
               </button>
             )}
             
-            {/* attribution tooltip */}
             {attribution && (
               <div className="group/info relative">
                 {/* Info Button Trigger */}
@@ -234,7 +219,7 @@ export default function SpeciesCard({
 
                   <div className="space-y-2.5">
                     <p className="text-[11px] text-white font-bold leading-snug break-words">
-                      © {attribution}
+                      穢 {attribution}
                     </p>
                     
                     {nativePageUrl && (
@@ -252,7 +237,7 @@ export default function SpeciesCard({
                   </div>
                 </div>
 
-                {/* Mobile Portal */}
+                {/* Mobile Portal (Ignore bounds, centered overlay) */}
                 {mounted && showTooltip && createPortal(
                   <div 
                     className="md:hidden fixed inset-0 z-[9999] flex items-center justify-center p-6 bg-black/40 backdrop-blur-sm transition-all duration-300"
@@ -309,43 +294,34 @@ export default function SpeciesCard({
           </div>
         </div>
         
-        {/* Bottom Shade Fade */}
+        {/* Bottom Shade Fade (Better text readability) */}
         {isPhoto && <div className="absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-t from-black/60 to-transparent pointer-events-none" />}
       </div>
 
-      {/* Content Area - Taxonomy tags like the old UI */}
+      {/* Content Area - Minimized for Detail Mode */}
       {!isPhoto ? (
         <div className="p-3 bg-white flex flex-col gap-2">
           {/* Taxonomy Tags - Ultra Compact */}
-          <div className="flex flex-wrap gap-1.5 items-center">
-            {[normalized.order, normalized.family, normalized.taxa_group].filter(Boolean).map((tax, i) => (
+          <div className="flex flex-wrap gap-2">
+            {[
+              language === 'zh' ? species.order_chi : species.order_eng, 
+              language === 'zh' ? species.family_chi : species.family_eng,
+              language === 'zh' ? species.informal_group_chi : species.informal_group_eng
+            ].map((tax, i) => (
               <span key={i} className="px-2.5 py-1 bg-slate-50 text-[11px] font-bold text-slate-500 rounded-lg border border-slate-100 group-hover:border-emerald-100 group-hover:bg-emerald-50/50 transition-all uppercase tracking-tight">
                 {tax}
               </span>
             ))}
-
-            {/* Plants Month tags */}
-            {isPlant && normalized.months && (
-              <div className="flex items-center gap-1.5 ml-1 select-none pointer-events-none" title="Months">
-                <Calendar className="w-3 h-3 text-emerald-400 shrink-0" />
-                <div className="flex gap-1 items-center bg-emerald-50 px-2 py-0.5 rounded-lg border border-emerald-100">
-                  {normalized.months.slice(0, 4).map((m: number) => (
-                    <span key={m} className="text-[9px] font-black text-emerald-700">{m}</span>
-                  ))}
-                  {normalized.months.length > 4 && <span className="text-[9px] text-emerald-600/50">...</span>}
-                </div>
-              </div>
-            )}
           </div>
         </div>
       ) : (
-        <div className="absolute bottom-0 inset-x-0 p-3 pt-6 pointer-events-none z-10">
+        <div className="absolute bottom-0 inset-x-0 p-3 pt-6 pointer-events-none">
           <div className="mb-0">
             <h3 className="font-black tracking-tight leading-tight group-hover:text-emerald-500 transition-colors text-white text-sm line-clamp-1 drop-shadow-md">
-              {language === 'zh' ? normalized.common_name_chi : normalized.common_name_eng}
+              {language === 'zh' ? species.common_name_chi : species.common_name_eng}
             </h3>
             <div className="text-[10px] tracking-wide truncate text-white/80 drop-shadow-sm">
-              {formatScientificName(normalized.scientific_name)}
+              {formatScientificName(species.scientific_name)}
             </div>
           </div>
         </div>
