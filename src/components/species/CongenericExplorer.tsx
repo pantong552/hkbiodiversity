@@ -103,7 +103,7 @@ export default function CongenericExplorer({ species, isMobile = false }: Congen
             .limit(20);
           
           if (data && data.length > 0) {
-            const mappedData = isFlora ? data.map(p => ({
+            const mappedData = isFlora ? data.map((p: any) => ({
               ...p,
               id: p.species_id,
               common_name_chi: p.common_name_zh,
@@ -132,7 +132,7 @@ export default function CongenericExplorer({ species, isMobile = false }: Congen
             .limit(20);
           
           if (data && data.length > 0) {
-            const mappedData = isFlora ? data.map(p => ({
+            const mappedData = isFlora ? data.map((p: any) => ({
               ...p,
               id: p.species_id,
               common_name_chi: p.common_name_zh,
