@@ -119,7 +119,14 @@ export default function HomeClient() {
 
                 const results = await Promise.all(levelPromises);
                 
-                const newMeta = { categories: [], families: [], genuses: [] };
+                interface PlantMeta {
+                    categories: any[];
+                    families: any[];
+                    genuses: any[];
+                    [key: string]: any[]; // 加入索引簽名
+                }
+                
+                const newMeta: PlantMeta = { categories: [], families: [], genuses: [] };
                 
                 results.forEach(({ level, data, error }) => {
                     if (data && !error) {
@@ -135,7 +142,7 @@ export default function HomeClient() {
                                 name: i.name,
                                 display: language === 'zh' ? (i.name || i.en) : (i.en || i.name),
                                 count: i.count
-                            })).sort((a, b) => b.count - a.count);
+                            })).sort((a: any, b: any) => b.count - a.count);
                         }
                     }
                 });
