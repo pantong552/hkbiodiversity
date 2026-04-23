@@ -232,6 +232,7 @@ export default function EnrichedLightbox({
             src={currentPhoto?.large_url || ''} 
             alt="" 
             fill 
+            unoptimized
             className="object-cover" 
             sizes="100vw"
           />
@@ -338,6 +339,7 @@ export default function EnrichedLightbox({
               alt={commonName || 'Observation'}
               fill
               priority
+              unoptimized
               className="object-contain pointer-events-none p-4 md:p-12 lg:p-20 transition-opacity duration-300"
               sizes="100vw"
               onLoad={() => setIsImageLoading(false)}

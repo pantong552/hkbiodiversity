@@ -28,6 +28,12 @@ const nextConfig: NextConfig = {
         hostname: '*.inaturalist.org',
       }
     ],
+    localPatterns: [
+      {
+        pathname: '/api/image/transform',
+        search: '',
+      },
+    ],
   },
 };
 
