@@ -56,7 +56,7 @@ function BookmarkItem({
     <div
       className="group flex items-center gap-4 p-3 bg-white hover:bg-emerald-50/50 border border-slate-100 hover:border-emerald-200 rounded-2xl transition-all duration-300 cursor-pointer animate-in fade-in slide-in-from-left-4 duration-500"
       style={{ animationDelay: `${idx * 50}ms` }}
-      onClick={() => addSpecies(species.id)}
+      onClick={() => addSpecies(species.species_id)}
     >
       {/* 物種縮圖 */}
       <div className="relative w-14 h-14 rounded-xl overflow-hidden flex-shrink-0 bg-slate-100 border border-slate-100">
@@ -133,6 +133,7 @@ export default function BookmarksSection() {
         .select(`
           id,
           species_id,
+          plant_id,
           created_at,
           species:species_id (
             id,
@@ -144,6 +145,15 @@ export default function BookmarksSection() {
             iucn,
             informal_group_eng,
             informal_group_chi
+          ),
+          plant_species:plant_id (
+            id,
+            species_id,
+            common_name_zh,
+            common_name_en,
+            scientific_name,
+            category_zh,
+            category_en
           )
         `)
         .eq('user_id', user.id)
@@ -152,12 +162,29 @@ export default function BookmarksSection() {
       if (error) throw error;
 
       const mapped = (data || [])
-        .filter((item: any) => item.species)
-        .map((item: any) => ({
-          ...item.species,
-          favorite_id: item.id,
-          bookmarked_at: item.created_at,
-        }));
+        .filter((item: any) => item.species || item.plant_species)
+        .map((item: any) => {
+          if (item.plant_species) {
+            return {
+              id: item.plant_species.id,
+              species_id: item.plant_species.species_id,
+              common_name_chi: item.plant_species.common_name_zh,
+              common_name_eng: item.plant_species.common_name_en,
+              scientific_name: item.plant_species.scientific_name,
+              image_url: '',
+              iucn: '',
+              informal_group_eng: item.plant_species.category_en,
+              informal_group_chi: item.plant_species.category_zh,
+              favorite_id: item.id,
+              bookmarked_at: item.created_at,
+            };
+          }
+          return {
+            ...item.species,
+            favorite_id: item.id,
+            bookmarked_at: item.created_at,
+          };
+        });
 
       setBookmarks(mapped);
     } catch (err) {
