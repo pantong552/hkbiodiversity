@@ -5,17 +5,54 @@ import { Species } from '@/types/species';
  * Fetch a single species by ID
  */
 export async function getSpeciesById(id: string | number): Promise<Species | null> {
-  const numericId = typeof id === 'string' ? parseInt(id, 10) : id;
-  if (isNaN(numericId)) return null;
+  const numericId = typeof id === 'string' && !isNaN(Number(id)) ? parseInt(id, 10) : null;
+  const isUuid = typeof id === 'string' && id.includes('-');
 
-  const { data, error } = await supabase
-    .from('species')
-    .select('*')
-    .eq('id', numericId)
-    .maybeSingle();
+  // 1. 嘗試從動物表 (Fauna) 查詢
+  let faunaQuery = supabase.from('species').select('*');
+  if (numericId !== null) {
+      faunaQuery = faunaQuery.or(`id.eq.${numericId},species_id.eq.${numericId}`);
+  } else {
+      // 找不到數字表示不可能在 fauna 的 ID 或 species_id 查到
+      faunaQuery = faunaQuery.eq('id', -1); // Dummy query that fails
+  }
 
-  if (error || !data) return null;
-  return data as Species;
+  const { data: faunaData } = await faunaQuery.maybeSingle();
+
+  if (faunaData) {
+      return faunaData as Species;
+  }
+
+  // 2. 如果動物表沒有，嘗試從植物表 (Flora) 查詢
+  let floraQuery = supabase.from('plant_species').select('*');
+  if (isUuid) {
+      floraQuery = floraQuery.eq('id', id);
+  } else if (numericId !== null) {
+      floraQuery = floraQuery.eq('species_id', numericId);
+  } else {
+      return null;
+  }
+
+  const { data: plantData } = await floraQuery.maybeSingle();
+
+  if (plantData) {
+      // 將植物資料映射為 Species 結構以便 Metadata 使用
+      return {
+          ...plantData,
+          id: plantData.species_id, // 使用 species_id 作為回傳的 id
+          taxa_group: 'FLORA',
+          common_name_chi: plantData.common_name_zh,
+          common_name_eng: plantData.common_name_en,
+          scientific_name: plantData.scientific_name,
+          class_eng: plantData.category_en,
+          order_eng: plantData.family_en,
+          family_eng: plantData.family_en,
+          image_url: plantData.image_url,
+          species_id: plantData.species_id
+      } as unknown as Species;
+  }
+
+  return null;
 }
 
 /**

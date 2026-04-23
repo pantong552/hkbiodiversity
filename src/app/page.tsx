@@ -29,6 +29,20 @@ export async function generateMetadata(props: {
         description: defaultDescription,
         type: 'website',
         url: baseUrl,
+        images: [
+          {
+            url: `${baseUrl}/api/og`,
+            width: 1200,
+            height: 630,
+            alt: defaultTitle,
+          }
+        ]
+      },
+      twitter: {
+        card: 'summary_large_image',
+        title: defaultTitle,
+        description: defaultDescription,
+        images: [`${baseUrl}/api/og`],
       }
     };
   }
@@ -46,7 +60,7 @@ export async function generateMetadata(props: {
   const dynamicDescription = `在香港自然生態匯誌查看 ${commonName} 的詳細資料。分類：${species.class_eng || ''} ${species.order_eng || ''} ${species.family_eng || ''}`;
   
   // Default social image fallback
-  const finalImageUrl = imageUrl || `${baseUrl}/og-image.jpg`;
+  const finalImageUrl = imageUrl || `${baseUrl}/api/og`;
 
   return {
     title: dynamicTitle,

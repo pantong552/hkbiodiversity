@@ -13,7 +13,7 @@ export const size = {
 
 export const contentType = 'image/png';
 
-export default async function Image() {
+export async function GET(request: Request) {
   try {
     // 讀取 Logo SVG
     // 由於 satori 處理 SVG 可能有難度，有兩種做法：
