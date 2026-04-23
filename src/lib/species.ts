@@ -32,7 +32,8 @@ export async function getInaturalistPhoto(taxonId: number | string): Promise<str
     if (!photo) return null;
 
     const photoUrl = (photo.medium_url || photo.url || '').replace('/square.', '/medium.');
-    return photoUrl.replace(/^http:/, 'https:');
+    if (!photoUrl) return null;
+    return photoUrl.startsWith('http:') ? photoUrl.replace('http:', 'https:') : photoUrl;
   } catch (error) {
     console.error('Error fetching iNaturalist photo:', error);
     return null;
@@ -43,12 +44,16 @@ export async function getInaturalistPhoto(taxonId: number | string): Promise<str
  * Get the best available species image URL
  */
 export async function getSpeciesImageUrl(species: Species): Promise<string | null> {
-  let finalUrl = null;
-  if (species.image_url) {
+  let finalUrl: string | null = null;
+  
+  if (species.image_url && species.image_url !== '') {
     finalUrl = species.image_url;
   } else if (species.species_id) {
     finalUrl = await getInaturalistPhoto(species.species_id);
   }
   
-  return finalUrl ? finalUrl.replace(/^http:/, 'https:') : null;
+  if (!finalUrl) return null;
+  
+  // Ensure HTTPS
+  return finalUrl.startsWith('http:') ? finalUrl.replace('http:', 'https:') : finalUrl;
 }

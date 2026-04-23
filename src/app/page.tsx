@@ -45,6 +45,9 @@ export async function generateMetadata({
 
   const dynamicTitle = `${commonName} (${scientificName}) | HK Biodiversity Collective`;
   const dynamicDescription = `在香港自然生態匯誌查看 ${commonName} 的詳細資料。分類：${species.class_eng || ''} ${species.order_eng || ''} ${species.family_eng || ''}`;
+  
+  // Default social image fallback
+  const finalImageUrl = imageUrl || `${baseUrl}/og-image.jpg`;
 
   return {
     title: dynamicTitle,
@@ -55,7 +58,14 @@ export async function generateMetadata({
     openGraph: {
       title: dynamicTitle,
       description: dynamicDescription,
-      images: imageUrl ? [{ url: imageUrl }] : [],
+      images: [
+        {
+          url: finalImageUrl,
+          width: 1200,
+          height: 630,
+          alt: commonName,
+        }
+      ],
       type: 'article',
       url: canonicalUrl,
     },
@@ -63,7 +73,7 @@ export async function generateMetadata({
       card: 'summary_large_image',
       title: dynamicTitle,
       description: dynamicDescription,
-      images: imageUrl ? [imageUrl] : [],
+      images: [finalImageUrl],
     }
   };
 }
