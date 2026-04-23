@@ -179,6 +179,12 @@ export default function PlantSearchPage() {
       if (filters.isCap96) query = query.eq('is_cap96', 'Y');
       if (filters.isCap586) query = query.eq('is_cap586', 'Y');
       if (filters.isRare) query = query.neq('hk_rare_precious_note', 'No');
+      if (filters.origins.length > 0) {
+        const expandedOrigins = filters.origins.flatMap(o => 
+          o === 'Native' ? ['Native', '原生'] : o === 'Exotic' ? ['Exotic', '外來'] : [o]
+        );
+        query = query.in('origin', expandedOrigins);
+      }
       if (filters.isInChinaRedBook) query = query.neq('china_red_data_book_note', '沒有列入');
       if (filters.floweringMonths.length > 0) query = query.overlaps('flowering_months', filters.floweringMonths);
       if (filters.fruitingMonths.length > 0) query = query.overlaps('fruiting_months', filters.fruitingMonths);

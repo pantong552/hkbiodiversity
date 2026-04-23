@@ -105,6 +105,9 @@ export default function HomeClient() {
                         p_categories: level === 'categories' ? [] : plantFilters.categories,
                         p_families: level === 'families' ? [] : plantFilters.families,
                         p_genuses: level === 'genuses' ? [] : plantFilters.genuses,
+                        p_origins: plantFilters.origins.flatMap(o => 
+                            o === 'Native' ? ['Native', '原生'] : o === 'Exotic' ? ['Exotic', '外來'] : [o]
+                        ),
                         p_is_cap96: plantFilters.isCap96,
                         p_is_cap586: plantFilters.isCap586,
                         p_is_rare: plantFilters.isRare,
@@ -197,6 +200,12 @@ export default function HomeClient() {
             if (plantFilters.categories.length > 0) query = query.in('category_zh', plantFilters.categories);
             if (plantFilters.families.length > 0) query = query.in('family_zh', plantFilters.families);
             if (plantFilters.genuses.length > 0) query = query.in('genus_zh', plantFilters.genuses);
+            if (plantFilters.origins.length > 0) {
+                const expandedOrigins = plantFilters.origins.flatMap(o => 
+                    o === 'Native' ? ['Native', '原生'] : o === 'Exotic' ? ['Exotic', '外來'] : [o]
+                );
+                query = query.in('origin', expandedOrigins);
+            }
             if (plantFilters.isCap96) query = query.eq('is_cap96', 'Y');
             if (plantFilters.isCap586) query = query.eq('is_cap586', 'Y');
             if (plantFilters.floweringMonths.length > 0) query = query.overlaps('flowering_months', plantFilters.floweringMonths);

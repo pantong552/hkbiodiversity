@@ -98,15 +98,48 @@ export default function PlantFilterPanel({
               }))}
               className={`px-3.5 py-2 rounded-xl text-sm font-bold transition-all border ${
                 filters.categories.length > 0 && !filters.categories.includes(cat.zh)
-                  ? 'bg-slate-100 border-slate-300 text-slate-500 hover:bg-emerald-50 hover:text-emerald-700' // explicitly unselected
+                  ? 'bg-slate-100 border-slate-300 text-slate-500 hover:bg-emerald-50 hover:text-emerald-700'
                   : filters.categories.includes(cat.zh)
-                    ? 'bg-emerald-600 border-emerald-600 text-white shadow-md shadow-emerald-100' // selected
-                    : 'bg-white border-slate-200 text-slate-700 hover:bg-emerald-50 hover:text-emerald-700 hover:border-emerald-200' // none selected
+                    ? 'bg-emerald-600 border-emerald-600 text-white shadow-md shadow-emerald-100'
+                    : 'bg-white border-slate-200 text-slate-700 hover:bg-emerald-50 hover:text-emerald-700 hover:border-emerald-200'
               }`}
             >
               {cat.display}
             </button>
           ))}
+        </div>
+      </div>
+
+      {/* Origin Filter */}
+      <div className="space-y-4 pt-4 border-t border-emerald-50">
+        <h3 className="text-sm font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
+          {t.origin}
+        </h3>
+        <div className="flex gap-3">
+          {[
+            { id: 'Native', zh: '原生', color: 'emerald' },
+            { id: 'Exotic', zh: '外來', color: 'indigo' }
+          ].map(orig => {
+            const isSelected = filters.origins.includes(orig.id);
+            const bgColorCls = orig.color === 'emerald' ? 'bg-emerald-600 border-emerald-600' : 'bg-indigo-600 border-indigo-600';
+            const hoverCls = orig.color === 'emerald' ? 'hover:bg-emerald-50 hover:text-emerald-700 hover:border-emerald-200 text-emerald-800' : 'hover:bg-indigo-50 hover:text-indigo-700 hover:border-indigo-200 text-indigo-800';
+            
+            return (
+              <button
+                key={orig.id}
+                onClick={() => setFilters(prev => ({
+                  ...prev,
+                  origins: isSelected ? prev.origins.filter(o => o !== orig.id) : [...prev.origins, orig.id]
+                }))}
+                className={`flex-1 py-3 px-4 rounded-2xl text-xs font-black uppercase tracking-widest transition-all border flex items-center justify-center gap-2 ${
+                  isSelected ? `${bgColorCls} text-white shadow-lg` : `bg-white border-slate-100 ${hoverCls}`
+                }`}
+              >
+                <div className={`w-2 h-2 rounded-full ${isSelected ? 'bg-white animate-pulse' : (orig.color === 'emerald' ? 'bg-emerald-400' : 'bg-indigo-400')}`} />
+                {language === 'zh' ? orig.zh : orig.id}
+              </button>
+            );
+          })}
         </div>
       </div>
 
