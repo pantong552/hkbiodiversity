@@ -6,13 +6,12 @@ import { getSpeciesById, getSpeciesImageUrl } from '@/lib/species';
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
-export async function generateMetadata({ 
-  searchParams 
-}: { 
-  searchParams: Promise<{ species?: string }> 
+export async function generateMetadata(props: { 
+  searchParams: Promise<{ [key: string]: string | string[] | undefined }> | { [key: string]: string | string[] | undefined }
 }): Promise<Metadata> {
-  const params = await searchParams;
-  const speciesId = params.species;
+  // 適配不同版本的 Next.js searchParams 處理
+  const searchParams = 'then' in props.searchParams ? await props.searchParams : props.searchParams;
+  const speciesId = typeof searchParams.species === 'string' ? searchParams.species : undefined;
   
   const baseUrl = 'https://hkbiodiversity.org';
   const defaultTitle = 'Hong Kong Biodiversity Collective | 香港自然生態匯誌';

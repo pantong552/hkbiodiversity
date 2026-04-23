@@ -5,10 +5,13 @@ import { Species } from '@/types/species';
  * Fetch a single species by ID
  */
 export async function getSpeciesById(id: string | number): Promise<Species | null> {
+  const numericId = typeof id === 'string' ? parseInt(id, 10) : id;
+  if (isNaN(numericId)) return null;
+
   const { data, error } = await supabase
     .from('species')
     .select('*')
-    .eq('id', id)
+    .eq('id', numericId)
     .maybeSingle();
 
   if (error || !data) return null;
