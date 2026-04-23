@@ -55,8 +55,8 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   
   // 獲取縮圖 URL
   let imageUrl = species.image_url;
-  if (!imageUrl && species.species_id) {
-    imageUrl = await getInaturalistPhoto(species.species_id) || '';
+  if (!imageUrl && species.inat_id) {
+    imageUrl = await getInaturalistPhoto(species.inat_id) || '';
   }
 
   // 預設縮圖（如果都沒有）

@@ -11,7 +11,7 @@ export interface Comment {
   created_at: string;
   updated_at: string;
   user_id: string;
-  species_id: number;
+  inat_id: number;
   content: string;
   parent_id: string | null;
   is_deleted: boolean;

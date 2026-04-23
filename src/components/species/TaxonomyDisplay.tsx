@@ -66,7 +66,7 @@ export default function TaxonomyDisplay({ species }: TaxonomyDisplayProps) {
           {/* Mobile Minimalism External Link Button - Hidden above sm */}
           <div className="sm:hidden">
             <a 
-              href={`https://www.inaturalist.org/taxa/${species.species_id}`}
+              href={`https://www.inaturalist.org/taxa/${species.inat_id}`}
               target="_blank"
               rel="noopener noreferrer"
               className="w-10 h-10 flex items-center justify-center bg-white border border-slate-200 rounded-xl shadow-sm active:bg-slate-50 transition-colors"
@@ -79,7 +79,7 @@ export default function TaxonomyDisplay({ species }: TaxonomyDisplayProps) {
         {/* Fill Empty Space with a useful button */}
         <div className="hidden sm:block">
           <a 
-            href={`https://www.inaturalist.org/taxa/${species.species_id}`}
+            href={`https://www.inaturalist.org/taxa/${species.inat_id}`}
             target="_blank"
             rel="noopener noreferrer"
             className="flex items-center gap-3 px-4 py-2 bg-white hover:bg-emerald-50 border border-slate-200 hover:border-emerald-200 rounded-xl transition-all duration-300 shadow-sm hover:shadow-md group overflow-hidden"

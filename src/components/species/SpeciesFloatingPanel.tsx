@@ -55,7 +55,7 @@ export default function SpeciesFloatingPanel() {
           let { data, error } = await supabase
             .from('species')
             .select('*')
-            .eq('species_id', id)
+            .eq('inat_id', id)
             .maybeSingle();
           
           // 如果動物表沒落，嘗試從植物表查詢 (Flora)
@@ -63,14 +63,14 @@ export default function SpeciesFloatingPanel() {
             const { data: plantData, error: plantError } = await supabase
               .from('plant_species')
               .select('*')
-              .eq('species_id', id)
+              .eq('inat_id', id)
               .maybeSingle();
             
             if (plantData) {
               // 映射植物欄位到 Species 結構，使 SpeciesContent 能正確顯示
               data = {
                 ...plantData,
-                id: plantData.species_id, // 使用 species_id 作為主要 ID
+                inat_id: plantData.inat_id, // 使用 inat_id 作為主要 ID
                 common_name_chi: plantData.common_name_zh,
                 common_name_eng: plantData.common_name_en,
                 taxa_group: 'FLORA', // Set FLORA to easily identify plants

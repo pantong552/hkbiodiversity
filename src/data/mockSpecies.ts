@@ -3,7 +3,7 @@ import { Species } from '../types/species';
 export const MOCK_SPECIES: Species[] = [
   {
     id: 1,
-    species_id: 70657,
+    inat_id: 70657,
     taxa_group: 'Mammal',
     common_name_chi: '棕果蝠',
     common_name_eng: "Leschenault's Rousette",
@@ -43,7 +43,7 @@ export const MOCK_SPECIES: Species[] = [
   },
   {
     id: 2,
-    species_id: 70593,
+    inat_id: 70593,
     taxa_group: 'Mammal',
     common_name_chi: '短吻果蝠',
     common_name_eng: 'Short-nosed Fruit Bat',
@@ -84,7 +84,7 @@ export const MOCK_SPECIES: Species[] = [
   },
   {
     id: 3,
-    species_id: 70665,
+    inat_id: 70665,
     taxa_group: 'Mammal',
     common_name_chi: '皺唇犬吻蝠',
     common_name_eng: 'Wrinkle-lipped Free-tailed Bat',

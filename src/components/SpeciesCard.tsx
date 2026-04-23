@@ -42,7 +42,7 @@ export default function SpeciesCard({
       const p = species as PlantSpecies;
       return {
         id: p.id,
-        species_id: p.species_id,
+        inat_id: p.inat_id,
         common_name_chi: p.common_name_zh,
         common_name_eng: p.common_name_en,
         scientific_name: p.scientific_name,
@@ -59,7 +59,7 @@ export default function SpeciesCard({
       const s = species as Species;
       return {
         id: s.id,
-        species_id: s.species_id,
+        inat_id: s.inat_id,
         common_name_chi: s.common_name_chi,
         common_name_eng: s.common_name_eng,
         scientific_name: s.scientific_name,
@@ -121,7 +121,7 @@ export default function SpeciesCard({
   }, [user, normalized.id, isBookmarked, isUpdating, language, isPlant]);
 
   const { imageUrl: inatPhoto, isLoading: isInatLoading, attribution, nativePageUrl } = useInaturalistPhoto(
-    !normalized.image_url ? normalized.species_id : undefined
+    !normalized.image_url ? normalized.inat_id : undefined
   );
 
   const displayImage = normalized.image_url || inatPhoto || 'https://images.unsplash.com/photo-1549488344-1f9b8d2bd1f3?q=80&w=1080&auto=format&fit=crop';
@@ -136,7 +136,7 @@ export default function SpeciesCard({
 
   return (
     <div 
-      onClick={() => addSpecies(normalized.species_id)} 
+      onClick={() => addSpecies(normalized.inat_id)} 
       className={`
         group relative bg-white border border-slate-200/50 overflow-hidden shadow-[0_2px_10px_rgba(0,0,0,0.06)]
         hover:shadow-[0_10px_30px_rgba(0,0,0,0.12)] hover:-translate-y-1.5 transition-all duration-500 flex flex-col cursor-pointer

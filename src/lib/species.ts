@@ -11,7 +11,7 @@ export async function getSpeciesById(id: string | number): Promise<Species | nul
   // 1. 嘗試從動物表 (Fauna) 查詢
   let faunaQuery = supabase.from('species').select('*');
   if (numericId !== null) {
-      faunaQuery = faunaQuery.or(`id.eq.${numericId},species_id.eq.${numericId}`);
+      faunaQuery = faunaQuery.or(`id.eq.${numericId},inat_id.eq.${numericId}`);
   } else {
       // 找不到數字表示不可能在 fauna 的 ID 或 species_id 查到
       faunaQuery = faunaQuery.eq('id', -1); // Dummy query that fails
@@ -28,7 +28,7 @@ export async function getSpeciesById(id: string | number): Promise<Species | nul
   if (isUuid) {
       floraQuery = floraQuery.eq('id', id);
   } else if (numericId !== null) {
-      floraQuery = floraQuery.eq('species_id', numericId);
+      floraQuery = floraQuery.eq('inat_id', numericId);
   } else {
       return null;
   }
@@ -39,7 +39,7 @@ export async function getSpeciesById(id: string | number): Promise<Species | nul
       // 將植物資料映射為 Species 結構以便 Metadata 使用
       return {
           ...plantData,
-          id: plantData.species_id, // 使用 species_id 作為回傳的 id
+          id: plantData.inat_id, // 使用 inat_id 作為回傳的 id
           taxa_group: 'FLORA',
           common_name_chi: plantData.common_name_zh,
           common_name_eng: plantData.common_name_en,
@@ -48,7 +48,7 @@ export async function getSpeciesById(id: string | number): Promise<Species | nul
           order_eng: plantData.family_en,
           family_eng: plantData.family_en,
           image_url: plantData.image_url,
-          species_id: plantData.species_id
+          inat_id: plantData.inat_id
       } as unknown as Species;
   }
 
@@ -88,8 +88,8 @@ export async function getSpeciesImageUrl(species: Species): Promise<string | nul
   
   if (species.image_url && species.image_url !== '') {
     finalUrl = species.image_url;
-  } else if (species.species_id) {
-    finalUrl = await getInaturalistPhoto(species.species_id);
+  } else if (species.inat_id) {
+    finalUrl = await getInaturalistPhoto(species.inat_id);
   }
   
   if (!finalUrl) return null;

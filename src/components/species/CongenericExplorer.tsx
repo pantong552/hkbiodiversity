@@ -29,7 +29,7 @@ const SkeletonCard = () => (
 const MiniSpeciesCard = ({ species }: { species: Species }) => {
   const { language } = useLanguage();
   const { addSpecies } = useSpeciesPanel();
-  const { imageUrl, isLoading } = useInaturalistPhoto(!species.image_url ? species.species_id : undefined);
+  const { imageUrl, isLoading } = useInaturalistPhoto(!species.image_url ? species.inat_id : undefined);
 
   const displayImage = species.image_url || imageUrl || 'https://images.unsplash.com/photo-1549488344-1f9b8d2bd1f3?q=80&w=1080&auto=format&fit=crop';
   const commonName = language === 'zh' ? species.common_name_chi : species.common_name_eng;
@@ -39,7 +39,7 @@ const MiniSpeciesCard = ({ species }: { species: Species }) => {
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
       whileHover={{ y: -2 }}
-      onClick={() => addSpecies(species.id)}
+      onClick={() => addSpecies(species.inat_id)}
       className="group relative flex items-center gap-3 p-2.5 rounded-2xl bg-slate-50/50 hover:bg-emerald-50 border border-slate-100/60 hover:border-emerald-100 hover:shadow-lg hover:shadow-emerald-900/5 transition-all duration-300 cursor-pointer overflow-hidden shrink-0"
     >
       <div className="relative w-16 h-16 shrink-0 rounded-xl overflow-hidden bg-white shadow-inner">
@@ -99,13 +99,13 @@ export default function CongenericExplorer({ species, isMobile = false }: Congen
             .from(isFlora ? 'plant_species' : 'species')
             .select('*')
             .eq(genusField, genusValue)
-            .neq('species_id', species.species_id)
+            .neq('inat_id', species.inat_id)
             .limit(20);
           
           if (data && data.length > 0) {
             const mappedData = isFlora ? data.map((p: any) => ({
               ...p,
-              id: p.species_id,
+              id: p.inat_id,
               common_name_chi: p.common_name_zh,
               common_name_eng: p.common_name_en,
               taxa_group: 'FLORA',
@@ -128,13 +128,13 @@ export default function CongenericExplorer({ species, isMobile = false }: Congen
             .from(isFlora ? 'plant_species' : 'species')
             .select('*')
             .eq(familyField, familyValue)
-            .neq('species_id', species.species_id)
+            .neq('inat_id', species.inat_id)
             .limit(20);
           
           if (data && data.length > 0) {
             const mappedData = isFlora ? data.map((p: any) => ({
               ...p,
-              id: p.species_id,
+              id: p.inat_id,
               common_name_chi: p.common_name_zh,
               common_name_eng: p.common_name_en,
               taxa_group: 'FLORA',

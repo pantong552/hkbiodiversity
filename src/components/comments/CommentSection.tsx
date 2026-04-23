@@ -10,10 +10,10 @@ import CommentInput from './CommentInput';
 import CommentItem from './CommentItem';
 
 interface CommentSectionProps {
-  speciesId: number;
+  inatId: number;
 }
 
-export default function CommentSection({ speciesId }: CommentSectionProps) {
+export default function CommentSection({ inatId }: CommentSectionProps) {
   const { language, t } = useLanguage();
   const { user, profile: userProfile } = useAuth();
   const supabase = useMemo(() => createClient(), []);
@@ -38,7 +38,7 @@ export default function CommentSection({ speciesId }: CommentSectionProps) {
             user_id
           )
         `)
-        .eq('species_id', speciesId)
+        .eq('inat_id', inatId)
         .order('created_at', { ascending: false });
 
       if (error) {
@@ -69,7 +69,7 @@ export default function CommentSection({ speciesId }: CommentSectionProps) {
     } finally {
       setIsLoading(false);
     }
-  }, [speciesId, user?.id, supabase]);
+  }, [inatId, user?.id, supabase]);
 
   useEffect(() => {
     fetchComments();
@@ -84,7 +84,7 @@ export default function CommentSection({ speciesId }: CommentSectionProps) {
         .from('comments')
         .insert({
           content,
-          species_id: speciesId,
+          inat_id: inatId,
           user_id: user.id,
           parent_id: parentId
         });

@@ -12,7 +12,7 @@ import { formatScientificName } from '@/utils/formatters';
 
 interface BookmarkedSpecies {
   id: number;
-  species_id: number;
+  inat_id: number;
   common_name_chi: string;
   common_name_eng: string;
   scientific_name: string;
@@ -42,7 +42,7 @@ function BookmarkItem({
   const { addSpecies } = useSpeciesPanel();
   
   // 獲取與 SpeciesCard 同款的動態圖片
-  const { imageUrl: inatPhoto, isLoading: isInatLoading } = useInaturalistPhoto(species.species_id);
+  const { imageUrl: inatPhoto, isLoading: isInatLoading } = useInaturalistPhoto(species.inat_id);
 
   // 將圖片解析度調整為最細 (square) 以節省列表載入資源
   const getSmallPhoto = (url: string | null) => {
@@ -56,7 +56,7 @@ function BookmarkItem({
     <div
       className="group flex items-center gap-4 p-3 bg-white hover:bg-emerald-50/50 border border-slate-100 hover:border-emerald-200 rounded-2xl transition-all duration-300 cursor-pointer animate-in fade-in slide-in-from-left-4 duration-500"
       style={{ animationDelay: `${idx * 50}ms` }}
-      onClick={() => addSpecies(species.species_id)}
+      onClick={() => addSpecies(species.inat_id)}
     >
       {/* 物種縮圖 */}
       <div className="relative w-14 h-14 rounded-xl overflow-hidden flex-shrink-0 bg-slate-100 border border-slate-100">
@@ -137,7 +137,7 @@ export default function BookmarksSection() {
           created_at,
           species:species_id (
             id,
-            species_id,
+            inat_id,
             common_name_chi,
             common_name_eng,
             scientific_name,
@@ -148,7 +148,7 @@ export default function BookmarksSection() {
           ),
           plant_species:plant_id (
             id,
-            species_id,
+            inat_id,
             common_name_zh,
             common_name_en,
             scientific_name,
@@ -167,7 +167,7 @@ export default function BookmarksSection() {
           if (item.plant_species) {
             return {
               id: item.plant_species.id,
-              species_id: item.plant_species.species_id,
+              inat_id: item.plant_species.inat_id,
               common_name_chi: item.plant_species.common_name_zh,
               common_name_eng: item.plant_species.common_name_en,
               scientific_name: item.plant_species.scientific_name,

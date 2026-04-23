@@ -100,7 +100,7 @@ const SpeciesHeroBackground = ({ photos, defaultImage }: { photos: InatGalleryPh
 
 export default function SpeciesContent({ species, showBreadcrumb = true }: SpeciesContentProps) {
   const { language } = useLanguage();
-  const { photos } = useInaturalistSpeciesPhotos(species.species_id);
+  const { photos } = useInaturalistSpeciesPhotos(species.inat_id);
 
   const commonName = language === 'zh' ? species.common_name_chi : species.common_name_eng;
   const description = language === 'zh' ? species.description_chi : species.description_eng;
@@ -136,7 +136,7 @@ export default function SpeciesContent({ species, showBreadcrumb = true }: Speci
         <div className="absolute bottom-0 left-0 w-full p-8 md:p-12 z-20 pointer-events-none">
           <div className="max-w-7xl mx-auto pointer-events-auto">
             <span className="inline-block px-3 py-1 bg-emerald-500/20 text-emerald-300 border border-emerald-400/30 rounded-full text-[10px] font-bold tracking-widest uppercase mb-4">
-              {species.taxa_group} • ID: {species.species_id}
+              {species.taxa_group} • ID: {species.inat_id}
             </span>
             <div className="flex flex-col mb-2">
               <h1 className="text-4xl md:text-5xl font-black text-white leading-tight">
@@ -168,10 +168,10 @@ export default function SpeciesContent({ species, showBreadcrumb = true }: Speci
             </section>
 
             {/* iNaturalist Photo Gallery */}
-            {species.species_id && (
+            {species.inat_id && (
               <section className="bg-white p-8 rounded-[2.5rem] shadow-sm border border-slate-100">
                 <SpeciesPhotoGallery 
-                  taxonId={species.species_id} 
+                  taxonId={species.inat_id} 
                   commonName={commonName || species.scientific_name} 
                 />
               </section>
@@ -210,8 +210,8 @@ export default function SpeciesContent({ species, showBreadcrumb = true }: Speci
                 {language === 'zh' ? '地理分布' : 'Distribution'}
               </h2>
               
-              {species.species_id ? (
-                <SpeciesMap taxonId={species.species_id} />
+              {species.inat_id ? (
+                <SpeciesMap taxonId={species.inat_id} />
               ) : (
                 <div className="w-full h-[300px] bg-slate-200 rounded-[2.5rem] flex items-center justify-center text-slate-500">
                   <p>{language === 'zh' ? '無 iNaturalist ID' : 'No iNaturalist ID available'}</p>
@@ -253,7 +253,7 @@ export default function SpeciesContent({ species, showBreadcrumb = true }: Speci
               <CongenericExplorer species={species} isMobile={true} />
             </div>
             
-            <CommentSection speciesId={species.id} />
+            <CommentSection inatId={species.inat_id} />
           </div>
 
           {/* Right Column - Sticky Sidebar */}
