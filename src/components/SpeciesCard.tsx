@@ -52,6 +52,7 @@ export default function SpeciesCard({
         family: p.family_zh,
         iucn: null, 
         image_url: null, 
+        origin: p.origin,
         months: p.flowering_months?.length > 0 ? p.flowering_months : p.fruiting_months
       };
     } else {
@@ -68,6 +69,7 @@ export default function SpeciesCard({
         family: language === 'zh' ? s.family_chi : s.family_eng,
         iucn: s.iucn,
         image_url: s.image_url,
+        origin: null,
         months: null
       };
     }
@@ -170,13 +172,22 @@ export default function SpeciesCard({
           {/* Badges - left side */}
           <div className="flex flex-col gap-1.5">
             {!isPhoto && iucnConfig && (
-              <span className={`px-2 py-0.5 rounded-lg text-[9px] font-black uppercase tracking-wider backdrop-blur-md shadow-lg border pointer-events-auto ${iucnConfig.styles}`}>
+              <span className={`px-2 py-1 rounded-lg text-[10px] font-black uppercase tracking-wider backdrop-blur-md shadow-lg border pointer-events-auto ${iucnConfig.styles}`}>
                 {language === 'zh' ? iucnConfig.label.zh : iucnConfig.label.en}
               </span>
             )}
-            {isPlant && (
-              <span className="px-2 py-0.5 rounded-lg text-[8px] font-black uppercase tracking-widest bg-emerald-500 text-white shadow-lg flex items-center gap-1 pointer-events-auto w-max">
-                <Leaf className="w-2.5 h-2.5" /> FLORA
+            {isPlant && normalized.origin && (
+              <span className={`
+                px-2.5 py-1 rounded-lg text-[10px] font-black uppercase tracking-widest shadow-lg flex items-center gap-1.5 pointer-events-auto w-max
+                ${(normalized.origin.toLowerCase() === 'native' || normalized.origin === '原生')
+                  ? 'bg-emerald-500 text-white' 
+                  : 'bg-indigo-500 text-white'}
+              `}>
+                <Leaf className="w-3 h-3" /> 
+                {language === 'zh' 
+                  ? (normalized.origin.toLowerCase() === 'native' || normalized.origin === '原生' ? '原生' : '外來')
+                  : (normalized.origin.toLowerCase() === 'native' || normalized.origin === '原生' ? 'Native' : 'Exotic')
+                }
               </span>
             )}
           </div>
@@ -324,18 +335,6 @@ export default function SpeciesCard({
               </span>
             ))}
 
-            {/* Plants Month tags */}
-            {isPlant && normalized.months && (
-              <div className="flex items-center gap-1.5 ml-1 select-none pointer-events-none" title="Months">
-                <Calendar className="w-3 h-3 text-emerald-400 shrink-0" />
-                <div className="flex gap-1 items-center bg-emerald-50 px-2 py-0.5 rounded-lg border border-emerald-100">
-                  {normalized.months.slice(0, 4).map((m: number) => (
-                    <span key={m} className="text-[9px] font-black text-emerald-700">{m}</span>
-                  ))}
-                  {normalized.months.length > 4 && <span className="text-[9px] text-emerald-600/50">...</span>}
-                </div>
-              </div>
-            )}
           </div>
         </div>
       ) : (
