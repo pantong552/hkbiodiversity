@@ -13,11 +13,14 @@ const INITIAL_FILTERS: PlantFilterState = {
   searchQuery: '',
   categories: [],
   families: [],
+  genuses: [],
   origins: [],
   floweringMonths: [],
   fruitingMonths: [],
   isCap96: null,
   isCap586: null,
+  isRare: null,
+  isInChinaRedBook: null,
 };
 
 const PlantCard = ({ plant }: { plant: PlantSpecies }) => {
@@ -74,7 +77,7 @@ const PlantCard = ({ plant }: { plant: PlantSpecies }) => {
               {plant.flowering_months?.slice(0, 4).map(m => (
                 <span key={m} className="w-5 h-5 flex items-center justify-center bg-pink-50 text-pink-500 rounded text-[10px] font-black">{m}</span>
               ))}
-              {plant.flowering_months?.length > 4 && <span className="text-[10px] text-slate-300 font-bold self-center">...</span>}
+              {(plant.flowering_months?.length ?? 0) > 4 && <span className="text-[10px] text-slate-300 font-bold self-center">...</span>}
             </div>
           </div>
           <div className="space-y-1">
@@ -83,7 +86,7 @@ const PlantCard = ({ plant }: { plant: PlantSpecies }) => {
               {plant.fruiting_months?.slice(0, 4).map(m => (
                 <span key={m} className="w-5 h-5 flex items-center justify-center bg-purple-50 text-purple-500 rounded text-[10px] font-black">{m}</span>
               ))}
-              {plant.fruiting_months?.length > 4 && <span className="text-[10px] text-slate-300 font-bold self-center">...</span>}
+              {(plant.fruiting_months?.length ?? 0) > 4 && <span className="text-[10px] text-slate-300 font-bold self-center">...</span>}
             </div>
           </div>
         </div>
@@ -104,19 +107,30 @@ export default function PlantSearchPage() {
   const [plants, setPlants] = useState<PlantSpecies[]>([]);
   const [loading, setLoading] = useState(true);
   const [filters, setFilters] = useState<PlantFilterState>(INITIAL_FILTERS);
-  const [categories, setCategories] = useState<string[]>([]);
+  const [categories, setCategories] = useState<{ zh: string; en: string; display: string }[]>([]);
 
   // Fetch unique categories once
   useEffect(() => {
     const fetchMeta = async () => {
-      const { data } = await supabase.from('plant_species').select('category_zh').not('category_zh', 'is', null);
+      const { data } = await supabase.from('plant_species').select('category_zh, category_en').not('category_zh', 'is', null);
       if (data) {
-        const unique = Array.from(new Set(data.map(item => item.category_zh)));
-        setCategories(unique);
+        const uniqueKeys = new Set();
+        const cats: any[] = [];
+        data.forEach(item => {
+          if (!uniqueKeys.has(item.category_zh)) {
+            uniqueKeys.add(item.category_zh);
+            cats.push({
+              zh: item.category_zh,
+              en: item.category_en,
+              display: language === 'zh' ? item.category_zh : (item.category_en || item.category_zh)
+            });
+          }
+        });
+        setCategories(cats);
       }
     };
     fetchMeta();
-  }, [supabase]);
+  }, [supabase, language]);
 
   useEffect(() => {
     const fetchPlants = async () => {
@@ -124,29 +138,18 @@ export default function PlantSearchPage() {
       let query = supabase.from('plant_species').select('*');
 
       if (filters.searchQuery) {
-        // Use full text search
-        query = query.textSearch('fts', filters.searchQuery, {
-          type: 'plain',
-          config: 'simple'
-        });
+        query = query.textSearch('fts', filters.searchQuery, { type: 'plain', config: 'simple' });
       }
 
-      if (filters.categories.length > 0) {
-        query = query.in('category_zh', filters.categories);
-      }
-
+      if (filters.categories.length > 0) query = query.in('category_zh', filters.categories);
       if (filters.isCap96) query = query.eq('is_cap96', 'Y');
       if (filters.isCap586) query = query.eq('is_cap586', 'Y');
+      if (filters.isRare) query = query.neq('hk_rare_precious_note', 'No');
+      if (filters.isInChinaRedBook) query = query.neq('china_red_data_book_note', '沒有列入');
+      if (filters.floweringMonths.length > 0) query = query.overlaps('flowering_months', filters.floweringMonths);
+      if (filters.fruitingMonths.length > 0) query = query.overlaps('fruiting_months', filters.fruitingMonths);
 
-      if (filters.floweringMonths.length > 0) {
-        query = query.overlaps('flowering_months', filters.floweringMonths);
-      }
-      
-      if (filters.fruitingMonths.length > 0) {
-        query = query.overlaps('fruiting_months', filters.fruitingMonths);
-      }
-
-      const { data, error } = await query.limit(100);
+      const { data } = await query.limit(100);
       if (data) setPlants(data);
       setLoading(false);
     };
@@ -173,7 +176,8 @@ export default function PlantSearchPage() {
           filters={filters}
           setFilters={setFilters}
           availableCategories={categories}
-          availableFamilies={[]} // Optionally fetch families too
+          availableFamilies={[]} 
+          availableGenuses={[]}
           onReset={() => setFilters(INITIAL_FILTERS)}
         />
       </div>
