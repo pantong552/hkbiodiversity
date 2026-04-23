@@ -116,7 +116,7 @@ export default function PlantSearchPage() {
       if (data) {
         const uniqueKeys = new Set();
         const cats: any[] = [];
-        data.forEach(item => {
+        data.forEach((item: { category_zh: string; category_en: string }) => {
           if (!uniqueKeys.has(item.category_zh)) {
             uniqueKeys.add(item.category_zh);
             cats.push({
