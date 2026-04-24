@@ -145,11 +145,8 @@ export default function SpeciesFloatingPanel() {
   const [speciesData, setSpeciesData] = useState<Record<string, Species>>({});
   const [isLoading, setIsLoading] = useState<Record<string, boolean>>({});
   const [hoveredTabId, setHoveredTabId] = useState<string | null>(null);
-  const [longPressedId, setLongPressedId] = useState<string | null>(null);
   const [tooltipX, setTooltipX] = useState<number>(0);
   const lastScrollYRef = useRef(0);
-  const longPressTimerRef = useRef<NodeJS.Timeout | null>(null);
-  const tabRefs = useRef<Record<string, HTMLDivElement | null>>({});
   const { share, isCopied } = useShare();
 
   const handleShare = (e: React.MouseEvent) => {
@@ -353,7 +350,7 @@ export default function SpeciesFloatingPanel() {
             id={id} 
             species={speciesData[id] || null} 
             language={language} 
-            visible={hoveredTabId === id || longPressedId === id} 
+            visible={hoveredTabId === id} 
             xOffset={tooltipX}
           />
         ))}
@@ -384,29 +381,6 @@ export default function SpeciesFloatingPanel() {
                     }
                   }}
                   onMouseLeave={() => setHoveredTabId(null)}
-                  onTouchStart={(e) => {
-                    // 移動端也計算位置
-                    const rect = e.currentTarget.getBoundingClientRect();
-                    const parentRect = e.currentTarget.offsetParent?.getBoundingClientRect();
-                    if (parentRect) {
-                      const centerX = rect.left + (rect.width / 2) - parentRect.left;
-                      setTooltipX(centerX);
-                    }
-                    
-                    longPressTimerRef.current = setTimeout(() => {
-                      setLongPressedId(id);
-                      if (window.navigator && window.navigator.vibrate) {
-                        window.navigator.vibrate(10);
-                      }
-                    }, 500);
-                  }}
-                  onTouchEnd={() => {
-                    if (longPressTimerRef.current) {
-                      clearTimeout(longPressTimerRef.current);
-                      longPressTimerRef.current = null;
-                    }
-                    setTimeout(() => setLongPressedId(null), 1500); // Keep visible shortly after release
-                  }}
                   className={`
                     group relative flex items-center gap-2.5 px-4 py-2.5 rounded-2xl border transition-all cursor-pointer whitespace-nowrap min-h-[44px]
                     ${isActive 

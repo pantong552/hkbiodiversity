@@ -10,10 +10,10 @@ import CommentInput from './CommentInput';
 import CommentItem from './CommentItem';
 
 interface CommentSectionProps {
-  inatId: number;
+  taxaId: string;
 }
 
-export default function CommentSection({ inatId }: CommentSectionProps) {
+export default function CommentSection({ taxaId }: CommentSectionProps) {
   const { language, t } = useLanguage();
   const { user, profile: userProfile } = useAuth();
   const supabase = useMemo(() => createClient(), []);
@@ -24,6 +24,12 @@ export default function CommentSection({ inatId }: CommentSectionProps) {
 
   // 1. Fetch Comments
   const fetchComments = useCallback(async () => {
+    // 增加守衛邏輯：如果 taxaId 無效，則不發起請求避免報錯
+    if (!taxaId) {
+      setIsLoading(false);
+      return;
+    }
+
     setIsLoading(true);
     try {
       const { data, error } = await supabase
@@ -38,7 +44,7 @@ export default function CommentSection({ inatId }: CommentSectionProps) {
             user_id
           )
         `)
-        .eq('inat_id', inatId)
+        .eq('taxa_id', taxaId)
         .order('created_at', { ascending: false });
 
       if (error) {
@@ -69,7 +75,7 @@ export default function CommentSection({ inatId }: CommentSectionProps) {
     } finally {
       setIsLoading(false);
     }
-  }, [inatId, user?.id, supabase]);
+  }, [taxaId, user?.id, supabase]);
 
   useEffect(() => {
     fetchComments();
@@ -84,7 +90,7 @@ export default function CommentSection({ inatId }: CommentSectionProps) {
         .from('comments')
         .insert({
           content,
-          inat_id: inatId,
+          taxa_id: taxaId,
           user_id: user.id,
           parent_id: parentId
         });
