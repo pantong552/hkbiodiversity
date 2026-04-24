@@ -254,7 +254,7 @@ export default function SpeciesContent({ species, showBreadcrumb = true }: Speci
               <CongenericExplorer species={species} isMobile={true} />
             </div>
             
-            <CommentSection taxaId={species.taxa_id} />
+            <CommentSection taxaId={species.taxa_id || ''} />
           </div>
 
           {/* Right Column - Sticky Sidebar */}
