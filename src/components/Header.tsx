@@ -40,16 +40,22 @@ export default function Header() {
       setIsScrolled(currentScrollY > 20);
 
       // 智慧顯示/隱藏邏輯
-      // 當捲動位置非常接近頂部時（例如 < 50），強迫顯示 Header
-      if (currentScrollY <= 50) {
-        setIsVisible(true);
-      } else if (currentScrollY > lastScrollYRef.current && currentScrollY > 100) {
-        setIsVisible(false);
-      } else if (currentScrollY < lastScrollYRef.current) {
+      const deltaY = currentScrollY - lastScrollYRef.current;
+
+      // 只有當位移超過一定像素 (10px) 時才更新狀態，避免因捲動抖動導致的頻繁閃爍
+      if (Math.abs(deltaY) > 10) {
+        if (currentScrollY <= 50) {
+          setIsVisible(true);
+        } else if (deltaY > 0 && currentScrollY > 100) {
+          setIsVisible(false);
+        } else if (deltaY < 0) {
+          setIsVisible(true);
+        }
+        lastScrollYRef.current = currentScrollY;
+      } else if (currentScrollY <= 50) {
+        // 在頂部附近時始終顯示
         setIsVisible(true);
       }
-
-      lastScrollYRef.current = currentScrollY;
     };
 
     // 監聽 window
@@ -65,6 +71,9 @@ export default function Header() {
         handleScroll();
       }
     }
+
+    // 當 isExpanded 變動時也初始化一次
+    handleScroll();
 
     return () => {
       window.removeEventListener('scroll', handleScroll);
@@ -107,10 +116,10 @@ export default function Header() {
 
   return (
     <div className={`
-      fixed top-4 inset-x-0 z-[100] 
+      fixed top-4 inset-x-0 z-[60] 
       px-6 md:px-8 lg:px-10 xl:px-16
       transition-all duration-500 cubic-bezier(0.16, 1, 0.3, 1)
-      ${(isVisible && !isGalleryOpen && !isUploadModalOpen) ? 'translate-y-0 opacity-100' : '-translate-y-32 opacity-0'}
+      ${(isVisible && !isGalleryOpen && !isUploadModalOpen) ? 'translate-y-0 opacity-100' : '-translate-y-40 opacity-0'}
     `}>
       <nav className={`
         glass-header max-w-[1920px] mx-auto

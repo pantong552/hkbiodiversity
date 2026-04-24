@@ -9,6 +9,127 @@ import { supabase } from '@/lib/supabase';
 import { Species } from '@/types/species';
 import SpeciesContent from './SpeciesContent';
 import { useShare } from '@/hooks/useShare';
+import { useInaturalistPhoto } from '@/hooks/useInaturalistPhoto';
+
+// --- Subcomponent: Species Tab Preview (Tooltip) ---
+function SpeciesTabPreview({ 
+  id, 
+  species, 
+  language, 
+  visible,
+  xOffset = 0
+}: { 
+  id: string, 
+  species: Species | null, 
+  language: string, 
+  visible: boolean,
+  xOffset?: number
+}) {
+  const { imageUrl, isLoading } = useInaturalistPhoto(species?.inat_id || undefined);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [shiftX, setShiftX] = useState(0);
+
+  // 防溢邏輯：當 Tooltip 靠近邊緣時自動位移
+  useEffect(() => {
+    if (visible && typeof window !== 'undefined') {
+      const timer = setTimeout(() => {
+        const tooltipWidth = 224; // w-56 = 14rem = 224px
+        const margin = 16; // 安全邊距
+        
+        // xOffset 是分頁中心點在容器內的位置
+        // 我們預設是以 -translate-x-1/2 對齊中心
+        const leftEdge = xOffset - (tooltipWidth / 2);
+        const rightEdge = xOffset + (tooltipWidth / 2);
+        
+        let shift = 0;
+        if (leftEdge < margin) {
+          shift = margin - leftEdge;
+        } else if (rightEdge > window.innerWidth - margin) {
+          shift = (window.innerWidth - margin) - rightEdge;
+        }
+        setShiftX(shift);
+      }, 0);
+      return () => clearTimeout(timer);
+    } else {
+      setShiftX(0);
+    }
+  }, [visible, xOffset]);
+
+  return (
+    <AnimatePresence>
+      {visible && (
+        <motion.div
+          ref={containerRef}
+          initial={{ opacity: 0, scale: 0.9, y: 10 }}
+          animate={{ opacity: 1, scale: 1, y: 0 }}
+          exit={{ opacity: 0, scale: 0.9, y: 10 }}
+          transition={{ type: 'spring', damping: 20, stiffness: 300 }}
+          style={{ 
+            left: xOffset,
+            x: `calc(-50% + ${shiftX}px)`
+          }}
+          className="absolute bottom-[calc(100%+16px)] z-[9999] pointer-events-none"
+        >
+          <div className="w-56 overflow-hidden rounded-3xl bg-white/80 backdrop-blur-2xl border border-white/40 shadow-[0_20px_50px_rgba(0,0,0,0.2)] ring-1 ring-black/5 flex flex-col">
+            {/* Visual Header / Photo */}
+            <div className="relative h-32 w-full bg-slate-100 overflow-hidden">
+              {isLoading ? (
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <Loader2 className="w-6 h-6 text-emerald-500 animate-spin" />
+                </div>
+              ) : imageUrl ? (
+                <img 
+                  src={imageUrl} 
+                  alt={species?.common_name_chi || 'Species'} 
+                  className="w-full h-full object-cover"
+                />
+              ) : (
+                <div className="absolute inset-0 flex items-center justify-center bg-slate-200">
+                  <span className="text-[10px] font-black tracking-widest text-slate-400 uppercase">No Photo</span>
+                </div>
+              )}
+              {/* Overlay Gradient */}
+              <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
+              {/* Group Badge */}
+              {species && (
+                <div className="absolute bottom-3 left-3 px-2 py-0.5 bg-emerald-500 text-white rounded-lg text-[8px] font-black tracking-widest uppercase">
+                  {species.taxa_group}
+                </div>
+              )}
+            </div>
+
+            {/* Info Area */}
+            <div className="p-4 flex flex-col gap-1">
+              <h4 className="text-sm font-black text-slate-900 leading-tight">
+                {species ? (
+                  (language === 'zh' ? species.common_name_chi : species.common_name_eng) || species.scientific_name
+                ) : 'Loading...'}
+              </h4>
+              {species && (
+                <p className="text-[10px] font-medium text-slate-500 italic leading-none whitespace-normal">
+                  {species.scientific_name}
+                </p>
+              )}
+              {species && (
+                <div className="mt-2 flex items-center gap-1.5 opacity-60">
+                   <div className="w-1 h-1 rounded-full bg-slate-400" />
+                   <span className="text-[8px] font-bold uppercase tracking-widest">
+                     {language === 'zh' ? species.family_chi : species.family_eng}
+                   </span>
+                </div>
+              )}
+            </div>
+          </div>
+          {/* Arrow - 指示位置需補償 shift 的位移以保持準確對齊 */}
+          <div 
+            className="absolute top-full left-1/2 -mt-1 border-8 border-transparent border-t-white/80 transition-transform duration-200"
+            style={{ transform: `translateX(calc(-50% - ${shiftX}px))` }}
+          />
+        </motion.div>
+      )}
+    </AnimatePresence>
+  );
+}
 
 export default function SpeciesFloatingPanel() {
   const { 
@@ -20,11 +141,15 @@ export default function SpeciesFloatingPanel() {
     toggleExpand 
   } = useSpeciesPanel();
   
-  const { language } = useLanguage();
+  const { language, t } = useLanguage();
   const [speciesData, setSpeciesData] = useState<Record<string, Species>>({});
   const [isLoading, setIsLoading] = useState<Record<string, boolean>>({});
-  const [showHeaderSpace, setShowHeaderSpace] = useState(true);
+  const [hoveredTabId, setHoveredTabId] = useState<string | null>(null);
+  const [longPressedId, setLongPressedId] = useState<string | null>(null);
+  const [tooltipX, setTooltipX] = useState<number>(0);
   const lastScrollYRef = useRef(0);
+  const longPressTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const tabRefs = useRef<Record<string, HTMLDivElement | null>>({});
   const { share, isCopied } = useShare();
 
   const handleShare = (e: React.MouseEvent) => {
@@ -155,55 +280,8 @@ export default function SpeciesFloatingPanel() {
     };
   }, [isExpanded, activeSpeciesId]);
 
-  // 3. Sync Header Space with Scroll
-  useEffect(() => {
-    if (!isExpanded) {
-      setShowHeaderSpace(true);
-      return;
-    }
-
-    const handleScroll = () => {
-      const container = document.getElementById('species-panel-scroll-container');
-      if (!container) return;
-
-      const currentScrollY = container.scrollTop;
-      const deltaY = currentScrollY - lastScrollYRef.current;
-      const scrollHeight = container.scrollHeight;
-      const clientHeight = container.clientHeight;
-
-      // 當接近頂部時，強制顯示
-      if (currentScrollY <= 50) {
-        setShowHeaderSpace(true);
-      } 
-      // 底部保護：防止快速滑到底部回彈時產生的抖動
-      else if (currentScrollY + clientHeight >= scrollHeight - 30) {
-        setShowHeaderSpace(false);
-      }
-      // 引入閾值 (Tolerance)：捲動超過 10px 才觸發狀態切換，減少高頻抖動
-      else if (Math.abs(deltaY) > 10) {
-        if (deltaY > 0 && currentScrollY > 100) {
-          setShowHeaderSpace(false);
-        } else if (deltaY < 0) {
-          setShowHeaderSpace(true);
-        }
-        lastScrollYRef.current = currentScrollY;
-      }
-    };
-
-    const container = document.getElementById('species-panel-scroll-container');
-    if (container) {
-      container.addEventListener('scroll', handleScroll, { passive: true });
-    }
-
-    // 當重新進入或切換物種時，根據當前位置初始化
-    handleScroll();
-
-    return () => {
-      if (container) {
-        container.removeEventListener('scroll', handleScroll);
-      }
-    };
-  }, [isExpanded, activeSpeciesId]);
+  // 3. (Removed Sync Header Space logic as it was causing layout thrashing and scroll flicker)
+  // Instead, we use a static spacer that naturally scrolls out of view.
 
   if (openSpeciesIds.length === 0) return null;
 
@@ -211,123 +289,37 @@ export default function SpeciesFloatingPanel() {
     <motion.div 
       initial={false}
       animate={{ 
-        height: isExpanded ? '100dvh' : '56px',
+        height: isExpanded ? '100dvh' : 'auto',
         y: 0
       }}
-      transition={{ type: 'spring', damping: 30, stiffness: 300 }}
-      className="fixed bottom-0 left-0 w-full z-50 bg-white border-t border-slate-200 shadow-[0_-10px_40px_rgba(0,0,0,0.1)] overflow-hidden flex flex-col pointer-events-auto"
+      transition={{ type: 'spring', damping: 25, stiffness: 200 }}
+      className={`fixed bottom-0 left-0 w-full z-50 flex flex-col ${isExpanded ? 'pointer-events-auto' : 'pointer-events-none'}`}
     >
-      {/* Header Safe Area - Dynamically adjusts with scroll */}
+      {/* Background Filler for Tab Bar Area (Prevents seeing content behind the container) */}
       <AnimatePresence>
-        {isExpanded && showHeaderSpace && (
+        {isExpanded && (
           <motion.div 
-            initial={{ height: 0, opacity: 0 }}
-            animate={{ 
-              height: 'auto', 
-              opacity: 1,
-            }}
-            exit={{ height: 0, opacity: 0 }}
-            transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
-            className="w-full shrink-0 bg-white/80 backdrop-blur-xl overflow-hidden"
-          >
-            <div className="h-24 md:h-28 lg:h-32 w-full" />
-          </motion.div>
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="absolute inset-0 bg-slate-50 pointer-events-none -z-10"
+          />
         )}
       </AnimatePresence>
 
-      {/* Control Bar / Tab Bar (Always at the top of the container) */}
-      <div className="w-full h-14 shrink-0 bg-white/80 backdrop-blur-xl border-b border-slate-100 px-6 flex items-center justify-between">
-        <div className="flex items-center gap-2 overflow-x-auto no-scrollbar py-2">
-          {openSpeciesIds.map((id) => {
-            const species = speciesData[id];
-            const isActive = activeSpeciesId === id;
-            const loading = isLoading[id];
-            
-            return (
-              <div 
-                key={id}
-                onClick={() => {
-                  setActiveSpecies(id);
-                  if (!isExpanded) toggleExpand(true);
-                }}
-                className={`
-                  group flex items-center gap-3 px-4 py-2 rounded-xl border transition-all cursor-pointer whitespace-nowrap
-                  ${isActive 
-                    ? 'bg-emerald-600 border-emerald-500 text-white shadow-lg shadow-emerald-200' 
-                    : 'bg-slate-50 border-slate-200 text-slate-500 hover:bg-slate-100'}
-                `}
-              >
-                {loading ? (
-                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                ) : (
-                  <span className={`text-xs font-black ${species && !(language === 'zh' ? species.common_name_chi : species.common_name_eng) ? 'italic' : ''}`}>
-                    {species ? (
-                      (language === 'zh' ? species.common_name_chi : species.common_name_eng) || species.scientific_name
-                    ) : `ID: ${id}`}
-                  </span>
-                )}
-                <button 
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    removeSpecies(id);
-                  }}
-                  className={`
-                    p-1 rounded-md transition-colors
-                    ${isActive ? 'hover:bg-white/20 text-white' : 'hover:bg-slate-200 text-slate-400'}
-                  `}
-                >
-                  <X className="w-3 h-3" />
-                </button>
-              </div>
-            );
-          })}
-        </div>
-
-        <div className="flex items-center gap-3 shrink-0 ml-4 relative">
-          {/* Toast Notification for Floating Panel */}
-          <AnimatePresence>
-            {isCopied && (
-              <motion.div 
-                initial={{ opacity: 0, scale: 0.9, y: 10 }}
-                animate={{ opacity: 1, scale: 1, y: 0 }}
-                exit={{ opacity: 0, scale: 0.9, y: 10 }}
-                className="absolute bottom-full mb-4 right-0 z-[100] whitespace-nowrap bg-slate-900/90 backdrop-blur-xl text-white px-4 py-2 rounded-xl shadow-2xl flex items-center gap-2 border border-white/10"
-              >
-                <div className="w-5 h-5 rounded-full bg-emerald-500/20 flex items-center justify-center text-emerald-400">
-                  <Check className="w-3 h-3" />
-                </div>
-                <span className="text-[11px] font-bold tracking-wide">
-                  {language === 'zh' ? '連結已複製' : 'Link copied'}
-                </span>
-              </motion.div>
-            )}
-          </AnimatePresence>
-
-          {/* Share Button */}
-          <button 
-            onClick={handleShare}
-            title={language === 'zh' ? '分享此物種' : 'Share species'}
-            className={`
-              p-2.5 rounded-xl transition-all duration-300 flex items-center justify-center
-              ${activeSpeciesId 
-                ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-200 hover:bg-emerald-700 hover:-translate-y-0.5 active:scale-95' 
-                : 'bg-slate-100 text-slate-300 cursor-not-allowed opacity-50'}
-            `}
-          >
-            <Share2 className="w-5 h-5" />
-          </button>
-
-          <button 
-            onClick={() => toggleExpand()}
-            className="p-2.5 bg-slate-900 text-white rounded-xl shadow-lg hover:scale-105 transition-transform active:scale-95"
-          >
-            {isExpanded ? <ChevronDown className="w-5 h-5" /> : <ChevronUp className="w-5 h-5" />}
-          </button>
-        </div>
-      </div>
-
       {/* Main Panel Content (Only visible when expanded) */}
-      <div id="species-panel-scroll-container" className="flex-1 overflow-y-auto no-scrollbar bg-slate-50">
+      <div 
+        id="species-panel-scroll-container" 
+        className={`
+          flex-1 overflow-y-auto no-scrollbar bg-slate-50 pointer-events-auto transition-opacity duration-300
+          ${isExpanded ? 'opacity-100 h-full' : 'opacity-0 h-0'}
+        `}
+      >
+        {/* Static Header Safe Area - Naturally scrolls out of view, preventing layout thrashing */}
+        {isExpanded && (
+          <div className="w-full shrink-0 h-24 md:h-28 lg:h-32" />
+        )}
+
         <AnimatePresence mode="wait">
           {isExpanded && activeSpeciesId && (
             <motion.div
@@ -341,7 +333,7 @@ export default function SpeciesFloatingPanel() {
               {speciesData[activeSpeciesId] ? (
                 <SpeciesContent species={speciesData[activeSpeciesId]} showBreadcrumb={true} />
               ) : (
-                <div className="h-full flex flex-col items-center justify-center">
+                <div className="h-full flex flex-col items-center justify-center py-20">
                   <Loader2 className="w-12 h-12 text-emerald-500 animate-spin mb-4" />
                   <p className="text-slate-400 font-bold uppercase tracking-widest text-xs">
                     {language === 'zh' ? '正在載入物種詳情...' : 'Loading species details...'}
@@ -351,6 +343,167 @@ export default function SpeciesFloatingPanel() {
             </motion.div>
           )}
         </AnimatePresence>
+      </div>
+
+      <div className="w-full flex justify-center pointer-events-auto relative overflow-visible">
+        {/* Global Tooltip Portal (Rendered here to escape internal Tab overflow) */}
+        {openSpeciesIds.map(id => (
+          <SpeciesTabPreview 
+            key={`tooltip-${id}`}
+            id={id} 
+            species={speciesData[id] || null} 
+            language={language} 
+            visible={hoveredTabId === id || longPressedId === id} 
+            xOffset={tooltipX}
+          />
+        ))}
+
+        <div className="w-full bg-white/80 backdrop-blur-3xl border-t border-slate-200 shadow-[0_-10px_50px_rgba(0,0,0,0.1)] px-4 md:px-8 py-2 md:py-2.5 flex items-center justify-between">
+          <div className="flex-1 min-w-0 overflow-hidden relative">
+            <div className="flex items-center gap-2 overflow-x-auto no-scrollbar py-1 scroll-smooth">
+            {openSpeciesIds.map((id) => {
+              const species = speciesData[id];
+              const isActive = activeSpeciesId === id;
+              const loading = isLoading[id];
+              
+              return (
+                <div 
+                  key={id}
+                  onClick={() => {
+                    setActiveSpecies(id);
+                    if (!isExpanded) toggleExpand(true);
+                  }}
+                  onMouseEnter={(e) => {
+                    setHoveredTabId(id);
+                    // 計算對應位置
+                    const rect = e.currentTarget.getBoundingClientRect();
+                    const parentRect = e.currentTarget.offsetParent?.getBoundingClientRect();
+                    if (parentRect) {
+                      const centerX = rect.left + (rect.width / 2) - parentRect.left;
+                      setTooltipX(centerX);
+                    }
+                  }}
+                  onMouseLeave={() => setHoveredTabId(null)}
+                  onTouchStart={(e) => {
+                    // 移動端也計算位置
+                    const rect = e.currentTarget.getBoundingClientRect();
+                    const parentRect = e.currentTarget.offsetParent?.getBoundingClientRect();
+                    if (parentRect) {
+                      const centerX = rect.left + (rect.width / 2) - parentRect.left;
+                      setTooltipX(centerX);
+                    }
+                    
+                    longPressTimerRef.current = setTimeout(() => {
+                      setLongPressedId(id);
+                      if (window.navigator && window.navigator.vibrate) {
+                        window.navigator.vibrate(10);
+                      }
+                    }, 500);
+                  }}
+                  onTouchEnd={() => {
+                    if (longPressTimerRef.current) {
+                      clearTimeout(longPressTimerRef.current);
+                      longPressTimerRef.current = null;
+                    }
+                    setTimeout(() => setLongPressedId(null), 1500); // Keep visible shortly after release
+                  }}
+                  className={`
+                    group relative flex items-center gap-2.5 px-4 py-2.5 rounded-2xl border transition-all cursor-pointer whitespace-nowrap min-h-[44px]
+                    ${isActive 
+                      ? 'bg-slate-900 border-slate-800 text-white shadow-xl shadow-slate-200' 
+                      : 'bg-white/50 border-slate-100 text-slate-500 hover:bg-white hover:border-emerald-200'}
+                  `}
+                >
+
+                  {loading ? (
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  ) : (
+                    <div className="flex flex-col items-start leading-none gap-0.5">
+                      <span className={`text-[11px] font-black tracking-tight ${species && !(language === 'zh' ? species.common_name_chi : species.common_name_eng) ? 'italic' : ''}`}>
+                        {species ? (
+                          (language === 'zh' ? species.common_name_chi : species.common_name_eng) || species.scientific_name
+                        ) : `Loading...`}
+                      </span>
+                      {!loading && species && (
+                        <span className={`text-[8px] font-bold uppercase tracking-wider opacity-60 ${isActive ? 'text-emerald-400' : 'text-slate-400'}`}>
+                          {species.taxa_group}
+                        </span>
+                      )}
+                    </div>
+                  )}
+                  <button 
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      removeSpecies(id);
+                    }}
+                    className={`
+                      p-1.5 rounded-lg transition-colors ml-1
+                      ${isActive ? 'hover:bg-white/20 text-white' : 'hover:bg-red-50 text-slate-300 hover:text-red-500'}
+                    `}
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
+                </div>
+              );
+            })}
+            </div>
+            {/* Fade effect to indicate more tabs on the right */}
+            <div className="absolute top-0 right-0 bottom-0 w-8 bg-gradient-to-l from-white/90 to-transparent pointer-events-none z-10" />
+          </div>
+
+          {/* Action Buttons - Fixed on the right */}
+          <div className="flex items-center gap-2 md:gap-2.5 shrink-0 ml-2 md:ml-4 relative">
+            <AnimatePresence>
+              {isCopied && (
+                <motion.div 
+                  initial={{ opacity: 0, scale: 0.9, y: 10 }}
+                  animate={{ opacity: 1, scale: 1, y: 0 }}
+                  exit={{ opacity: 0, scale: 0.9, y: 10 }}
+                  className="absolute bottom-full mb-6 right-0 z-[100] whitespace-nowrap bg-slate-900/95 backdrop-blur-xl text-white px-5 py-2.5 rounded-2xl shadow-2xl flex items-center gap-3 border border-white/10"
+                >
+                  <div className="w-5 h-5 rounded-full bg-emerald-500/20 flex items-center justify-center text-emerald-400">
+                    <Check className="w-3 h-3" />
+                  </div>
+                  <span className="text-[11px] font-black tracking-widest uppercase">
+                    {language === 'zh' ? '連結已複製' : 'Link copied'}
+                  </span>
+                </motion.div>
+              )}
+            </AnimatePresence>
+
+            {/* Share Button */}
+            <button 
+              onClick={handleShare}
+              title={language === 'zh' ? '分享此物種' : 'Share species'}
+              className={`
+                p-3 rounded-2xl transition-all duration-300 flex items-center justify-center border
+                ${activeSpeciesId 
+                  ? 'bg-white border-slate-100 text-slate-600 shadow-sm hover:border-emerald-200 hover:text-emerald-600 hover:-translate-y-0.5 active:scale-95' 
+                  : 'bg-slate-50 border-slate-100 text-slate-300 cursor-not-allowed opacity-50'}
+              `}
+            >
+              <Share2 className="w-5 h-5" />
+            </button>
+
+            {/* Expand/Collapse Toggle */}
+            <button 
+              onClick={() => toggleExpand()}
+              className="p-3 bg-emerald-600 text-white rounded-2xl shadow-lg shadow-emerald-600/20 hover:bg-emerald-700 hover:scale-105 transition-all active:scale-95 border border-emerald-500 flex items-center gap-1 group"
+            >
+              {isExpanded ? (
+                <>
+                  <ChevronDown className="w-5 h-5" />
+                  <span className="hidden md:inline text-[10px] font-black uppercase tracking-widest mr-1">Hide</span>
+                </>
+              ) : (
+                <>
+                  <ChevronUp className="w-5 h-5" />
+                  <span className="hidden md:inline text-[10px] font-black uppercase tracking-widest mr-1">View Details</span>
+                </>
+              )}
+            </button>
+          </div>
+        </div>
       </div>
     </motion.div>
   );
