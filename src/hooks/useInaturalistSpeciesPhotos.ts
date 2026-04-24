@@ -17,6 +17,16 @@ export interface InatGalleryPhoto {
   observedOn: string | null;
 }
 
+interface CommunityPhoto {
+  id: string;
+  created_at: string;
+  taxa_id: string;
+  image_url: string;
+  author_name: string;
+  license: string;
+  user_id: string;
+}
+
 const convertInatUrl = (url: string, size: 'square' | 'small' | 'medium' | 'large' | 'original') => {
   if (!url) return '';
   return url
@@ -85,8 +95,10 @@ export function useInaturalistSpeciesPhotos(taxonId: number | string | undefined
         .order('created_at', { ascending: false });
 
       if (error) throw error;
+      
+      const communityData = data as CommunityPhoto[];
 
-      return (data || []).map(p => {
+      return communityData.map(p => {
         let imageUrl = p.image_url;
         
         // 如果是 Cloudinary 網址，加入優化參數 (f_auto, q_auto)
