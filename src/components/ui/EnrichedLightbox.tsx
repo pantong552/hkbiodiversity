@@ -224,7 +224,7 @@ export default function EnrichedLightbox({
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
         onMouseMove={handleMouseMove}
-        className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/98 backdrop-blur-2xl select-none overflow-hidden touch-none"
+        className="fixed inset-0 z-[1000] flex items-center justify-center bg-slate-950/98 backdrop-blur-2xl select-none overflow-hidden touch-none"
       >
         {/* 背景裝飾：模糊的當前圖片 */}
         <div className="absolute inset-0 opacity-20 blur-3xl scale-110 pointer-events-none">

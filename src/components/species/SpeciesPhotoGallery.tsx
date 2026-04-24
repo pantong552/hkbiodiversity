@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import { useInaturalistSpeciesPhotos, InatGalleryPhoto } from '@/hooks/useInaturalistSpeciesPhotos';
 import { useLanguage } from '@/context/LanguageContext';
+import { useSpeciesPanel } from '@/context/SpeciesPanelContext';
 import EnrichedLightbox from '../ui/EnrichedLightbox';
 import PhotoUploadModal from './PhotoUploadModal';
 import { Upload } from 'lucide-react';
@@ -33,6 +34,7 @@ export default function SpeciesPhotoGallery({
   commonName
 }: SpeciesPhotoGalleryProps) {
   const { language } = useLanguage();
+  const { setGalleryOpen } = useSpeciesPanel();
   const { photos: fetchedPhotos, isLoading, hasMore, loadMore, dataScope, setScope, hasHkPhotos } = useInaturalistSpeciesPhotos(inatId, taxaId);
   
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
@@ -99,6 +101,9 @@ export default function SpeciesPhotoGallery({
       };
     }
   }, [photos]);
+  useEffect(() => {
+    setGalleryOpen(isLightboxOpen);
+  }, [isLightboxOpen, setGalleryOpen]);
 
   const handleMouseDown = (e: React.MouseEvent) => {
     if (!thumbRef.current) return;

@@ -16,7 +16,7 @@ export default function Header() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isVisible, setIsVisible] = useState(true);
 
-  const { isExpanded } = useSpeciesPanel();
+  const { isExpanded, isGalleryOpen } = useSpeciesPanel();
   const lastScrollYRef = useRef(0);
   const mobileMenuRef = useRef<HTMLDivElement>(null);
   const menuToggleRef = useRef<HTMLButtonElement>(null);
@@ -110,7 +110,7 @@ export default function Header() {
       fixed top-4 inset-x-0 z-[100] 
       px-6 md:px-8 lg:px-10 xl:px-16
       transition-all duration-500 cubic-bezier(0.16, 1, 0.3, 1)
-      ${isVisible ? 'translate-y-0 opacity-100' : '-translate-y-32 opacity-0'}
+      ${(isVisible && !isGalleryOpen) ? 'translate-y-0 opacity-100' : '-translate-y-32 opacity-0'}
     `}>
       <nav className={`
         glass-header max-w-[1920px] mx-auto

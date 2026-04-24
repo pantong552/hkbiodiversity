@@ -6,10 +6,12 @@ interface SpeciesPanelContextType {
   openSpeciesIds: string[];
   activeSpeciesId: string | null;
   isExpanded: boolean;
+  isGalleryOpen: boolean;
   addSpecies: (id: string) => void;
   removeSpecies: (id: string) => void;
   setActiveSpecies: (id: string) => void;
   toggleExpand: (expand?: boolean) => void;
+  setGalleryOpen: (open: boolean) => void;
 }
 
 const SpeciesPanelContext = createContext<SpeciesPanelContextType | undefined>(undefined);
@@ -18,6 +20,7 @@ export const SpeciesPanelProvider: React.FC<{ children: React.ReactNode }> = ({ 
   const [openSpeciesIds, setOpenSpeciesIds] = useState<string[]>([]);
   const [activeSpeciesId, setActiveSpeciesId] = useState<string | null>(null);
   const [isExpanded, setIsExpanded] = useState(false);
+  const [isGalleryOpen, setIsGalleryOpen] = useState(false);
 
   const addSpecies = (id: string) => {
     setOpenSpeciesIds((prev) => {
@@ -59,16 +62,22 @@ export const SpeciesPanelProvider: React.FC<{ children: React.ReactNode }> = ({ 
     setIsExpanded((prev) => (expand !== undefined ? expand : !prev));
   };
 
+  const setGalleryOpen = (open: boolean) => {
+    setIsGalleryOpen(open);
+  };
+
   return (
     <SpeciesPanelContext.Provider
       value={{
         openSpeciesIds,
         activeSpeciesId,
         isExpanded,
+        isGalleryOpen,
         addSpecies,
         removeSpecies,
         setActiveSpecies,
         toggleExpand,
+        setGalleryOpen,
       }}
     >
       {children}
