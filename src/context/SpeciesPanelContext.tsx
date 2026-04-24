@@ -12,6 +12,8 @@ interface SpeciesPanelContextType {
   setActiveSpecies: (id: string) => void;
   toggleExpand: (expand?: boolean) => void;
   setGalleryOpen: (open: boolean) => void;
+  isUploadModalOpen: boolean;
+  setUploadModalOpen: (open: boolean) => void;
 }
 
 const SpeciesPanelContext = createContext<SpeciesPanelContextType | undefined>(undefined);
@@ -21,6 +23,7 @@ export const SpeciesPanelProvider: React.FC<{ children: React.ReactNode }> = ({ 
   const [activeSpeciesId, setActiveSpeciesId] = useState<string | null>(null);
   const [isExpanded, setIsExpanded] = useState(false);
   const [isGalleryOpen, setIsGalleryOpen] = useState(false);
+  const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
 
   const addSpecies = (id: string) => {
     setOpenSpeciesIds((prev) => {
@@ -66,6 +69,10 @@ export const SpeciesPanelProvider: React.FC<{ children: React.ReactNode }> = ({ 
     setIsGalleryOpen(open);
   };
 
+  const setUploadModalOpen = (open: boolean) => {
+    setIsUploadModalOpen(open);
+  };
+
   return (
     <SpeciesPanelContext.Provider
       value={{
@@ -78,6 +85,8 @@ export const SpeciesPanelProvider: React.FC<{ children: React.ReactNode }> = ({ 
         setActiveSpecies,
         toggleExpand,
         setGalleryOpen,
+        isUploadModalOpen,
+        setUploadModalOpen,
       }}
     >
       {children}

@@ -34,10 +34,8 @@ export default function SpeciesPhotoGallery({
   commonName
 }: SpeciesPhotoGalleryProps) {
   const { language } = useLanguage();
-  const { setGalleryOpen } = useSpeciesPanel();
+  const { setGalleryOpen, isUploadModalOpen, setUploadModalOpen } = useSpeciesPanel();
   const { photos: fetchedPhotos, isLoading, hasMore, loadMore, dataScope, setScope, hasHkPhotos } = useInaturalistSpeciesPhotos(inatId, taxaId);
-  
-  const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
   
   const handleScopeToggle = () => {
     if (!hasHkPhotos && dataScope === 'global') return;
@@ -195,7 +193,7 @@ export default function SpeciesPhotoGallery({
           <div className="relative flex items-center">
             
             <button
-              onClick={() => setIsUploadModalOpen(true)}
+              onClick={() => setUploadModalOpen(true)}
               className="flex items-center justify-center gap-1.5 sm:gap-2 bg-emerald-500 text-white border border-emerald-400 h-[42px] w-[42px] sm:w-auto sm:h-auto sm:pl-3 sm:pr-4 sm:py-2 rounded-xl sm:rounded-2xl shadow-lg shadow-emerald-500/20 transition-all hover:bg-emerald-600 active:scale-95 group font-bold mr-1 sm:mr-2 shrink-0"
             >
               <div className="flex items-center justify-center shrink-0">
@@ -432,7 +430,7 @@ export default function SpeciesPhotoGallery({
 
       <PhotoUploadModal 
         isOpen={isUploadModalOpen}
-        onClose={() => setIsUploadModalOpen(false)}
+        onClose={() => setUploadModalOpen(false)}
         taxonId={taxaId}
         language={language}
         onUploadSuccess={() => setScope(dataScope)}
