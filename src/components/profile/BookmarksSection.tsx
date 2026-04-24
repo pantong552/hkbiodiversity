@@ -12,6 +12,7 @@ import { formatScientificName } from '@/utils/formatters';
 
 interface BookmarkedSpecies {
   id: number;
+  taxa_id: string;
   inat_id: number;
   common_name_chi: string;
   common_name_eng: string;
@@ -56,7 +57,7 @@ function BookmarkItem({
     <div
       className="group flex items-center gap-4 p-3 bg-white hover:bg-emerald-50/50 border border-slate-100 hover:border-emerald-200 rounded-2xl transition-all duration-300 cursor-pointer animate-in fade-in slide-in-from-left-4 duration-500"
       style={{ animationDelay: `${idx * 50}ms` }}
-      onClick={() => addSpecies(species.inat_id)}
+      onClick={() => addSpecies(species.taxa_id)}
     >
       {/* 物種縮圖 */}
       <div className="relative w-14 h-14 rounded-xl overflow-hidden flex-shrink-0 bg-slate-100 border border-slate-100">
@@ -130,63 +131,59 @@ export default function BookmarksSection() {
     try {
       const { data, error } = await supabase
         .from('user_favorites')
-        .select(`
-          id,
-          species_id,
-          plant_id,
-          created_at,
-          species:species_id (
-            id,
-            inat_id,
-            common_name_chi,
-            common_name_eng,
-            scientific_name,
-            image_url,
-            iucn,
-            informal_group_eng,
-            informal_group_chi
-          ),
-          plant_species:plant_id (
-            id,
-            inat_id,
-            common_name_zh,
-            common_name_en,
-            scientific_name,
-            category_zh,
-            category_en
-          )
-        `)
+        .select('id, taxa_id, created_at')
         .eq('user_id', user.id)
         .order('created_at', { ascending: false });
 
       if (error) throw error;
+      
+      if (!data || data.length === 0) {
+          setBookmarks([]);
+          return;
+      }
 
-      const mapped = (data || [])
-        .filter((item: any) => item.species || item.plant_species)
-        .map((item: any) => {
-          if (item.plant_species) {
-            return {
-              id: item.plant_species.id,
-              inat_id: item.plant_species.inat_id,
-              common_name_chi: item.plant_species.common_name_zh,
-              common_name_eng: item.plant_species.common_name_en,
-              scientific_name: item.plant_species.scientific_name,
-              image_url: '',
-              iucn: '',
-              informal_group_eng: item.plant_species.category_en,
-              informal_group_chi: item.plant_species.category_zh,
-              favorite_id: item.id,
-              bookmarked_at: item.created_at,
-            };
+      // 使用 taxa_id 全局獲取功能獲取物種細節
+      const fetchPromises = data.map(async (fav: any) => {
+          if (!fav.taxa_id) return null;
+          
+          const isFauna = fav.taxa_id.startsWith('fauna_');
+          const isFlora = fav.taxa_id.startsWith('flora_');
+          
+          let speciesInfo: any = null;
+          if (isFauna) {
+              const { data: s } = await supabase.from('species').select('*').eq('taxa_id', fav.taxa_id).maybeSingle();
+              if (s) {
+                  speciesInfo = {
+                      ...s,
+                      favorite_id: fav.id,
+                      bookmarked_at: fav.created_at
+                  };
+              }
+          } else if (isFlora) {
+              const { data: p } = await supabase.from('plant_species').select('*').eq('taxa_id', fav.taxa_id).maybeSingle();
+              if (p) {
+                  speciesInfo = {
+                      id: p.id,
+                      taxa_id: p.taxa_id,
+                      inat_id: p.inat_id,
+                      common_name_chi: p.common_name_zh,
+                      common_name_eng: p.common_name_en,
+                      scientific_name: p.scientific_name,
+                      image_url: '',
+                      iucn: '',
+                      informal_group_eng: p.category_en,
+                      informal_group_chi: p.category_zh,
+                      favorite_id: fav.id,
+                      bookmarked_at: fav.created_at,
+                  };
+              }
           }
-          return {
-            ...item.species,
-            favorite_id: item.id,
-            bookmarked_at: item.created_at,
-          };
-        });
+          return speciesInfo;
+      });
 
-      setBookmarks(mapped);
+      const results = await Promise.all(fetchPromises);
+      setBookmarks(results.filter(Boolean) as BookmarkedSpecies[]);
+
     } catch (err) {
       console.error('Error fetching bookmarks:', err);
     } finally {

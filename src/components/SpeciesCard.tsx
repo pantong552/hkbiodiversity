@@ -84,7 +84,7 @@ export default function SpeciesCard({
   useEffect(() => {
     let isMounted = true;
     const checkBookmark = async () => {
-      if (!user || !normalized.id) {
+      if (!user || !species.taxa_id) {
         if (isMounted) setIsBookmarked(false);
         return;
       }
@@ -93,7 +93,7 @@ export default function SpeciesCard({
           .from('user_favorites')
           .select('id')
           .eq('user_id', user.id)
-          .eq(isPlant ? 'plant_id' : 'species_id', normalized.id)
+          .eq('taxa_id', species.taxa_id)
           .maybeSingle();
         if (isMounted) setIsBookmarked(!!data);
       } catch (err) {
@@ -102,23 +102,28 @@ export default function SpeciesCard({
     };
     checkBookmark();
     return () => { isMounted = false; };
-  }, [user?.id, normalized.id, isPlant]);
+  }, [user?.id, species.taxa_id]);
 
   const toggleFavorite = useCallback(async (e: React.MouseEvent) => {
     e.stopPropagation();
     if (!user) { alert(language === 'zh' ? '請先登入' : 'Login required'); return; }
     if (isUpdating) return;
-    setIsUpdating(true);
     try {
       if (isBookmarked) {
-        await supabaseSingleton.from('user_favorites').delete().eq('user_id', user.id).eq(isPlant ? 'plant_id' : 'species_id', normalized.id);
+        await supabaseSingleton.from('user_favorites')
+            .delete()
+            .eq('user_id', user.id)
+            .eq('taxa_id', species.taxa_id);
         setIsBookmarked(false);
       } else {
-        await supabaseSingleton.from('user_favorites').insert({ user_id: user.id, [isPlant ? 'plant_id' : 'species_id']: normalized.id });
+        await supabaseSingleton.from('user_favorites').insert({ 
+            user_id: user.id, 
+            taxa_id: species.taxa_id
+        });
         setIsBookmarked(true);
       }
     } catch (err) { console.error('Favorite error:', err); } finally { setIsUpdating(false); }
-  }, [user, normalized.id, isBookmarked, isUpdating, language, isPlant]);
+  }, [user, species.taxa_id, normalized.id, isBookmarked, isUpdating, language, isPlant]);
 
   const { imageUrl: inatPhoto, isLoading: isInatLoading, attribution, nativePageUrl } = useInaturalistPhoto(
     !normalized.image_url ? normalized.inat_id : undefined
