@@ -196,12 +196,12 @@ export default function SpeciesPhotoGallery({
             
             <button
               onClick={() => setIsUploadModalOpen(true)}
-              className="flex items-center gap-1.5 sm:gap-2 bg-emerald-500 text-white border border-emerald-400 pl-2.5 sm:pl-3 pr-3 sm:pr-4 py-1.5 sm:py-2 rounded-xl sm:rounded-2xl shadow-lg shadow-emerald-500/20 transition-all hover:bg-emerald-600 active:scale-95 group font-bold mr-2"
+              className="flex items-center justify-center gap-1.5 sm:gap-2 bg-emerald-500 text-white border border-emerald-400 h-[42px] w-[42px] sm:w-auto sm:h-auto sm:pl-3 sm:pr-4 sm:py-2 rounded-xl sm:rounded-2xl shadow-lg shadow-emerald-500/20 transition-all hover:bg-emerald-600 active:scale-95 group font-bold mr-1 sm:mr-2 shrink-0"
             >
-              <div className="w-5 h-5 sm:w-6 h-6 rounded-lg bg-white/20 flex items-center justify-center shrink-0">
-                <Upload className="w-3 h-3 sm:w-4 h-4 text-white" />
+              <div className="flex items-center justify-center shrink-0">
+                <Upload className="w-5 h-5 sm:w-6 h-6 text-white stroke-[2.5]" />
               </div>
-              <div className="flex flex-col items-start leading-none gap-0.5">
+              <div className="hidden sm:flex flex-col items-start leading-none gap-0.5">
                 <span className="text-[9px] sm:text-[10px] font-black tracking-tight uppercase">Upload</span>
                 <span className="text-[7px] sm:text-[8px] font-bold uppercase opacity-80">
                   {language === 'zh' ? '相片提供' : 'Share Photo'}
@@ -214,7 +214,7 @@ export default function SpeciesPhotoGallery({
               onMouseEnter={() => setShowTooltip(true)}
               onMouseLeave={() => setShowTooltip(false)}
               disabled={isLoading || (!hasHkPhotos && dataScope === 'global')}
-              className={`flex items-center gap-1.5 sm:gap-2 bg-white/80 backdrop-blur-md border ${dataScope === 'global' ? (hasHkPhotos ? 'border-blue-100 hover:border-blue-200' : 'border-slate-200 opacity-70') : 'border-emerald-100 hover:border-emerald-200'} pl-1 sm:pl-1.5 pr-2 sm:pr-3 py-1 sm:py-1.5 rounded-xl sm:rounded-2xl shadow-sm transition-all group active:scale-95 disabled:cursor-not-allowed`}
+              className={`flex items-center gap-1.5 sm:gap-2 bg-white/80 backdrop-blur-md border ${dataScope === 'global' ? (hasHkPhotos ? 'border-blue-100 hover:border-blue-200' : 'border-slate-200 opacity-70') : 'border-emerald-100 hover:border-emerald-200'} h-[42px] pl-1 sm:pl-1.5 pr-2 sm:pr-3 py-1 sm:py-1.5 rounded-xl sm:rounded-2xl shadow-sm transition-all group active:scale-95 disabled:cursor-not-allowed`}
             >
               <div className="w-6 h-6 sm:w-7 h-7 rounded-lg bg-white flex items-center justify-center shadow-sm overflow-hidden relative shrink-0">
                 <Image 
@@ -228,7 +228,7 @@ export default function SpeciesPhotoGallery({
                 <span className="text-[8px] sm:text-[9px] font-black text-slate-700 tracking-tight uppercase">iNaturalist</span>
                 <span className={`text-[7px] sm:text-[8px] font-bold uppercase transition-colors duration-500 flex items-center gap-1 whitespace-nowrap ${dataScope === 'global' ? 'text-blue-600' : 'text-emerald-600'}`}>
                   {dataScope === 'global' ? (language === 'zh' ? '全球' : 'Global') : (language === 'zh' ? '香港' : 'HK')}
-                  <span className="opacity-50 ml-0.5 font-black">• Research Grade</span>
+                  <span className="opacity-50 ml-0.5 font-black hidden sm:inline">• Research Grade</span>
                 </span>
               </div>
             </button>
