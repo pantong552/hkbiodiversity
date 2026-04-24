@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { createClient } from '@/utils/supabase/client';
 
 export interface InatGalleryPhoto {
   id: string | number;
@@ -58,6 +59,8 @@ async function fetchWithRetry(url: string, retries = 3): Promise<any> {
 }
 
 export function useInaturalistSpeciesPhotos(taxonId: number | string | undefined) {
+  const supabase = createClient();
+  
   const [state, setState] = useState({
     photos: [] as InatGalleryPhoto[],
     isLoading: false,
@@ -71,6 +74,45 @@ export function useInaturalistSpeciesPhotos(taxonId: number | string | undefined
   // Use a ref to prevent overlapping fetches and infinite loops
   const isFetchingRef = useRef(false);
   const currentTaxonIdRef = useRef<string | number | undefined>(undefined);
+
+  const fetchCommunityPhotos = useCallback(async () => {
+    if (!taxonId) return [];
+    try {
+      const { data, error } = await supabase
+        .from('species_community_photos')
+        .select('*')
+        .eq('taxa_id', taxonId.toString())
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+
+      return (data || []).map(p => {
+        let imageUrl = p.image_url;
+        
+        // 如果是 Cloudinary 網址，加入優化參數 (f_auto, q_auto)
+        if (imageUrl.includes('res.cloudinary.com')) {
+          imageUrl = imageUrl.replace('/upload/', '/upload/f_auto,q_auto/');
+        }
+
+        return {
+          id: p.id,
+          url: imageUrl,
+          small_url: imageUrl.includes('res.cloudinary.com') ? imageUrl.replace('/upload/f_auto,q_auto/', '/upload/f_auto,q_auto,w_400,c_limit/') : imageUrl,
+          medium_url: imageUrl.includes('res.cloudinary.com') ? imageUrl.replace('/upload/f_auto,q_auto/', '/upload/f_auto,q_auto,w_800,c_limit/') : imageUrl,
+          large_url: imageUrl,
+          original_url: imageUrl,
+          attribution: `© ${p.author_name} (${p.license})`,
+          licenseCode: p.license,
+          nativePageUrl: null,
+          observationUrl: null,
+          observedOn: p.created_at
+        };
+      });
+    } catch (err) {
+      console.error('Error fetching community photos:', err);
+      return [];
+    }
+  }, [taxonId, supabase]);
 
   const fetchInternal = useCallback(async (pageNum: number, scope: 'hongkong' | 'global', isInitial: boolean) => {
     if (!taxonId) return;
@@ -138,6 +180,11 @@ export function useInaturalistSpeciesPhotos(taxonId: number | string | undefined
 
     try {
       let result = await fetchInternal(targetPage, targetScope, isInitial);
+      let communityPhotos: any[] = [];
+      
+      if (isInitial) {
+        communityPhotos = await fetchCommunityPhotos();
+      }
       
       // FALLBACK LOGIC: If HK requested but empty
       if (isInitial && targetScope === 'hongkong' && (!result || result.photos.length === 0)) {
@@ -159,7 +206,10 @@ export function useInaturalistSpeciesPhotos(taxonId: number | string | undefined
       // NORMAL UPDATE
       if (result) {
         setState(prev => {
-          const newPhotos = isInitial ? result.photos : [...prev.photos, ...result.photos];
+          const fetchedInatPhotos = result?.photos || [];
+          const newPhotos = isInitial 
+            ? [...communityPhotos, ...fetchedInatPhotos] 
+            : [...prev.photos, ...fetchedInatPhotos];
           const uniquePhotos = Array.from(new Map(newPhotos.map(p => [p.id, p])).values());
           
           return {

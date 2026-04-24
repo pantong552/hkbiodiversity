@@ -17,6 +17,8 @@ import {
 import { useInaturalistSpeciesPhotos, InatGalleryPhoto } from '@/hooks/useInaturalistSpeciesPhotos';
 import { useLanguage } from '@/context/LanguageContext';
 import EnrichedLightbox from '../ui/EnrichedLightbox';
+import PhotoUploadModal from './PhotoUploadModal';
+import { Upload } from 'lucide-react';
 
 
 interface SpeciesPhotoGalleryProps {
@@ -30,6 +32,8 @@ export default function SpeciesPhotoGallery({
 }: SpeciesPhotoGalleryProps) {
   const { language } = useLanguage();
   const { photos: fetchedPhotos, isLoading, hasMore, loadMore, dataScope, setScope, hasHkPhotos } = useInaturalistSpeciesPhotos(taxonId);
+  
+  const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
   
   const handleScopeToggle = () => {
     if (!hasHkPhotos && dataScope === 'global') return;
@@ -180,8 +184,24 @@ export default function SpeciesPhotoGallery({
           </h2>
         </div>
         
-        <div className="flex items-center shrink-0">
-          <div className="relative">
+        <div className="flex items-center gap-2 shrink-0">
+          <div className="relative flex items-center">
+            
+            <button
+              onClick={() => setIsUploadModalOpen(true)}
+              className="flex items-center gap-1.5 sm:gap-2 bg-emerald-500 text-white border border-emerald-400 pl-2.5 sm:pl-3 pr-3 sm:pr-4 py-1.5 sm:py-2 rounded-xl sm:rounded-2xl shadow-lg shadow-emerald-500/20 transition-all hover:bg-emerald-600 active:scale-95 group font-bold mr-2"
+            >
+              <div className="w-5 h-5 sm:w-6 h-6 rounded-lg bg-white/20 flex items-center justify-center shrink-0">
+                <Upload className="w-3 h-3 sm:w-4 h-4 text-white" />
+              </div>
+              <div className="flex flex-col items-start leading-none gap-0.5">
+                <span className="text-[9px] sm:text-[10px] font-black tracking-tight uppercase">Upload</span>
+                <span className="text-[7px] sm:text-[8px] font-bold uppercase opacity-80">
+                  {language === 'zh' ? '相片提供' : 'Share Photo'}
+                </span>
+              </div>
+            </button>
+
             <button 
               onClick={handleScopeToggle}
               onMouseEnter={() => setShowTooltip(true)}
@@ -402,6 +422,14 @@ export default function SpeciesPhotoGallery({
           </div>
         </div>
       </div>
+
+      <PhotoUploadModal 
+        isOpen={isUploadModalOpen}
+        onClose={() => setIsUploadModalOpen(false)}
+        taxonId={taxonId}
+        language={language}
+        onUploadSuccess={() => setScope(dataScope)}
+      />
 
       <EnrichedLightbox 
         isOpen={isLightboxOpen}
