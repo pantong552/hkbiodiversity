@@ -45,6 +45,7 @@ const INITIAL_PLANT_FILTERS: PlantFilterState = {
 export default function HomeClient() {
   const { language, t } = useLanguage();
   const { isLoading: isAuthLoading } = useAuth();
+  const { addSpecies } = useSpeciesPanel();
   const searchParams = useSearchParams();
   const router = useRouter();
 
@@ -247,6 +248,21 @@ export default function HomeClient() {
   useEffect(() => {
     if (!isAuthLoading) fetchSpecies();
   }, [fetchSpecies, isAuthLoading]);
+
+  // Handle species parameter in URL on initial load and param change
+  useEffect(() => {
+    const speciesId = searchParams.get('species');
+    if (speciesId) {
+      const id = parseInt(speciesId);
+      if (!isNaN(id)) {
+        addSpecies(id);
+        
+        // Clean up URL parameter to avoid re-opening on re-renders/collapses
+        const newUrl = window.location.pathname;
+        window.history.replaceState({}, '', newUrl);
+      }
+    }
+  }, [searchParams, addSpecies]);
 
   // Reset page when triggers change
   useEffect(() => {

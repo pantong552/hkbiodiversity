@@ -47,7 +47,13 @@ export default function SpeciesFloatingPanel() {
 
   // 1. Fetch data for new IDs
   useEffect(() => {
-    openSpeciesIds.forEach(async (id) => {
+    // 確保當前啟動的物種有資料
+    const idsToFetch = [...openSpeciesIds];
+    if (activeSpeciesId && !idsToFetch.includes(activeSpeciesId)) {
+        idsToFetch.push(activeSpeciesId);
+    }
+
+    idsToFetch.forEach(async (id) => {
       if (!speciesData[id] && !isLoading[id]) {
         setIsLoading(prev => ({ ...prev, [id]: true }));
         try {
@@ -115,7 +121,7 @@ export default function SpeciesFloatingPanel() {
         }
       }
     });
-  }, [openSpeciesIds, speciesData, isLoading, supabase]);
+  }, [openSpeciesIds, activeSpeciesId, speciesData, isLoading, supabase]);
 
   // 2. Prevent Background Scroll & Double Scrollbar
   useEffect(() => {
