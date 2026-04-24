@@ -22,16 +22,18 @@ import { Upload } from 'lucide-react';
 
 
 interface SpeciesPhotoGalleryProps {
-  taxonId: number | string;
+  taxaId: string; // 全局唯一 ID (如 fauna_123)
+  inatId: number | string; // iNaturalist ID
   commonName?: string;
 }
 
 export default function SpeciesPhotoGallery({ 
-  taxonId, 
+  taxaId,
+  inatId, 
   commonName
 }: SpeciesPhotoGalleryProps) {
   const { language } = useLanguage();
-  const { photos: fetchedPhotos, isLoading, hasMore, loadMore, dataScope, setScope, hasHkPhotos } = useInaturalistSpeciesPhotos(taxonId);
+  const { photos: fetchedPhotos, isLoading, hasMore, loadMore, dataScope, setScope, hasHkPhotos } = useInaturalistSpeciesPhotos(inatId, taxaId);
   
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
   
@@ -426,7 +428,7 @@ export default function SpeciesPhotoGallery({
       <PhotoUploadModal 
         isOpen={isUploadModalOpen}
         onClose={() => setIsUploadModalOpen(false)}
-        taxonId={taxonId}
+        taxonId={taxaId}
         language={language}
         onUploadSuccess={() => setScope(dataScope)}
       />

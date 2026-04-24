@@ -171,7 +171,8 @@ export default function SpeciesContent({ species, showBreadcrumb = true }: Speci
             {species.inat_id && (
               <section className="bg-white p-8 rounded-[2.5rem] shadow-sm border border-slate-100">
                 <SpeciesPhotoGallery 
-                  taxonId={species.inat_id} 
+                  taxaId={species.taxa_id}
+                  inatId={species.inat_id} 
                   commonName={commonName || species.scientific_name} 
                 />
               </section>

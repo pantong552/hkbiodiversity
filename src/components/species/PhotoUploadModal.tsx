@@ -109,10 +109,23 @@ export default function PhotoUploadModal({
     setError(null);
 
     try {
-      // 1. 上傳至 Cloudinary
+      // 1. 產生自訂檔名：物種ID + 作者(取代空格為底線) + 時間戳記 (格式: YYYYMMDD_HHmmss)
+      const now = new Date();
+      const dateString = now.getFullYear() + 
+        String(now.getMonth() + 1).padStart(2, '0') + 
+        String(now.getDate()).padStart(2, '0') + '_' +
+        String(now.getHours()).padStart(2, '0') + 
+        String(now.getMinutes()).padStart(2, '0') + 
+        String(now.getSeconds()).padStart(2, '0');
+
+      const cleanAuthor = author.trim().replace(/\s+/g, '_');
+      const customFilename = `${taxonId}_${cleanAuthor}_${dateString}`;
+
+      // 2. 上傳至 Cloudinary
       const formData = new FormData();
       formData.append('file', file);
       formData.append('upload_preset', process.env.NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET!);
+      formData.append('public_id', customFilename);
       
       const cloudRes = await fetch(
         `https://api.cloudinary.com/v1_1/${process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME}/image/upload`,

@@ -68,7 +68,7 @@ async function fetchWithRetry(url: string, retries = 3): Promise<any> {
   }
 }
 
-export function useInaturalistSpeciesPhotos(taxonId: number | string | undefined) {
+export function useInaturalistSpeciesPhotos(inatId: number | string | undefined, taxaId?: string) {
   const supabase = createClient();
   
   const [state, setState] = useState({
@@ -86,12 +86,13 @@ export function useInaturalistSpeciesPhotos(taxonId: number | string | undefined
   const currentTaxonIdRef = useRef<string | number | undefined>(undefined);
 
   const fetchCommunityPhotos = useCallback(async () => {
-    if (!taxonId) return [];
+    const idToUse = taxaId || inatId;
+    if (!idToUse) return [];
     try {
       const { data, error } = await supabase
         .from('species_community_photos')
         .select('*')
-        .eq('taxa_id', taxonId.toString())
+        .eq('taxa_id', idToUse.toString())
         .order('created_at', { ascending: false });
 
       if (error) throw error;
@@ -124,14 +125,14 @@ export function useInaturalistSpeciesPhotos(taxonId: number | string | undefined
       console.error('Error fetching community photos:', err);
       return [];
     }
-  }, [taxonId, supabase]);
+  }, [inatId, taxaId, supabase]);
 
   const fetchInternal = useCallback(async (pageNum: number, scope: 'hongkong' | 'global', isInitial: boolean) => {
-    if (!taxonId) return;
+    if (!inatId) return;
     
     const placeParam = scope === 'hongkong' ? '&place_id=7613' : '';
     const fields = '(id:!t,observed_on:!t,photos:(id:!t,url:!t,small_url:!t,medium_url:!t,large_url:!t,original_url:!t,attribution:!t,license_code:!t))';
-    const url = `https://api.inaturalist.org/v2/observations?taxon_id=${taxonId}&quality_grade=research${placeParam}&per_page=12&page=${pageNum}&order=desc&order_by=votes&fields=${fields}`;
+    const url = `https://api.inaturalist.org/v2/observations?taxon_id=${inatId}&quality_grade=research${placeParam}&per_page=12&page=${pageNum}&order=desc&order_by=votes&fields=${fields}`;
 
     const data = await fetchWithRetry(url);
     
@@ -151,11 +152,11 @@ export function useInaturalistSpeciesPhotos(taxonId: number | string | undefined
 
           return {
             id: p.id || `photo-${Math.random()}`,
-            url: getProxyUrl(p.url, taxonId || 'image', 'original'),
-            small_url: getProxyUrl(p.small_url || convertInatUrl(p.url, 'small'), taxonId || 'image', 'small'),
-            medium_url: getProxyUrl(p.medium_url || convertInatUrl(p.url, 'medium'), taxonId || 'image', 'medium'),
-            large_url: getProxyUrl(p.large_url || convertInatUrl(p.url, 'large'), taxonId || 'image', 'large'),
-            original_url: getProxyUrl(p.original_url || convertInatUrl(p.url, 'original'), taxonId || 'image', 'original'),
+            url: getProxyUrl(p.url, inatId || 'image', 'original'),
+            small_url: getProxyUrl(p.small_url || convertInatUrl(p.url, 'small'), inatId || 'image', 'small'),
+            medium_url: getProxyUrl(p.medium_url || convertInatUrl(p.url, 'medium'), inatId || 'image', 'medium'),
+            large_url: getProxyUrl(p.large_url || convertInatUrl(p.url, 'large'), inatId || 'image', 'large'),
+            original_url: getProxyUrl(p.original_url || convertInatUrl(p.url, 'original'), inatId || 'image', 'original'),
             attribution: `© ${author} (${p.license_code?.toUpperCase() || 'CC0'})`,
 
 
@@ -171,10 +172,10 @@ export function useInaturalistSpeciesPhotos(taxonId: number | string | undefined
       photos: mappedPhotos,
       totalResults: data.total_results || 0
     };
-  }, [taxonId]);
+  }, [inatId]);
 
   const loadData = useCallback(async (targetPage: number, targetScope: 'hongkong' | 'global', isInitial: boolean) => {
-    if (!taxonId || isFetchingRef.current) return;
+    if (!inatId || isFetchingRef.current) return;
     
     isFetchingRef.current = true;
     
@@ -241,15 +242,16 @@ export function useInaturalistSpeciesPhotos(taxonId: number | string | undefined
     } finally {
       isFetchingRef.current = false;
     }
-  }, [taxonId, fetchInternal]);
+  }, [inatId, fetchInternal, fetchCommunityPhotos]);
 
-  // Initial load when taxonId changes
+  // Initial load when inatId or taxaId changes
   useEffect(() => {
-    if (taxonId && currentTaxonIdRef.current !== taxonId) {
-      currentTaxonIdRef.current = taxonId;
+    const mainId = inatId;
+    if (mainId && currentTaxonIdRef.current !== mainId) {
+      currentTaxonIdRef.current = mainId;
       loadData(1, 'hongkong', true);
     }
-  }, [taxonId, loadData]);
+  }, [inatId, taxaId, loadData]);
 
   const loadMore = useCallback(() => {
     if (!state.isLoading && state.hasMore) {
