@@ -3,23 +3,23 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 
 interface SpeciesPanelContextType {
-  openSpeciesIds: number[];
-  activeSpeciesId: number | null;
+  openSpeciesIds: string[];
+  activeSpeciesId: string | null;
   isExpanded: boolean;
-  addSpecies: (id: number) => void;
-  removeSpecies: (id: number) => void;
-  setActiveSpecies: (id: number) => void;
+  addSpecies: (id: string) => void;
+  removeSpecies: (id: string) => void;
+  setActiveSpecies: (id: string) => void;
   toggleExpand: (expand?: boolean) => void;
 }
 
 const SpeciesPanelContext = createContext<SpeciesPanelContextType | undefined>(undefined);
 
 export const SpeciesPanelProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [openSpeciesIds, setOpenSpeciesIds] = useState<number[]>([]);
-  const [activeSpeciesId, setActiveSpeciesId] = useState<number | null>(null);
+  const [openSpeciesIds, setOpenSpeciesIds] = useState<string[]>([]);
+  const [activeSpeciesId, setActiveSpeciesId] = useState<string | null>(null);
   const [isExpanded, setIsExpanded] = useState(false);
 
-  const addSpecies = (id: number) => {
+  const addSpecies = (id: string) => {
     setOpenSpeciesIds((prev) => {
       if (prev.includes(id)) {
         setActiveSpeciesId(id);
@@ -39,7 +39,7 @@ export const SpeciesPanelProvider: React.FC<{ children: React.ReactNode }> = ({ 
     });
   };
 
-  const removeSpecies = (id: number) => {
+  const removeSpecies = (id: string) => {
     setOpenSpeciesIds((prev) => {
       const newList = prev.filter((item) => item !== id);
       if (activeSpeciesId === id) {
@@ -50,7 +50,7 @@ export const SpeciesPanelProvider: React.FC<{ children: React.ReactNode }> = ({ 
     });
   };
 
-  const setActiveSpecies = (id: number) => {
+  const setActiveSpecies = (id: string) => {
     setActiveSpeciesId(id);
     setIsExpanded(true);
   };

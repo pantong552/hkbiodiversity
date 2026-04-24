@@ -1,5 +1,6 @@
 export interface PlantSpecies {
-  id: string;
+  id: number;
+  taxa_id: string;
   inat_id: number;
   oid: number;
   category_zh: string;

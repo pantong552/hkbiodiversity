@@ -2,57 +2,53 @@ import { supabase } from './supabase';
 import { Species } from '@/types/species';
 
 /**
- * Fetch a single species by ID
+ * Fetch a single species by ID (Supports taxa_id, numeric ID, or legacy inat_id)
  */
 export async function getSpeciesById(id: string | number): Promise<Species | null> {
-  const numericId = typeof id === 'string' && !isNaN(Number(id)) ? parseInt(id, 10) : null;
-  const isUuid = typeof id === 'string' && id.includes('-');
+  const inputId = String(id);
+  const isFaunaId = inputId.startsWith('fauna_');
+  const isFloraId = inputId.startsWith('flora_');
+  const numericId = !isNaN(Number(inputId)) ? parseInt(inputId, 10) : null;
 
-  // 1. 嘗試從動物表 (Fauna) 查詢
-  let faunaQuery = supabase.from('species').select('*');
+  // 1. 嘗試依照 taxa_id 格式進行精準查詢
+  if (isFaunaId) {
+    const { data } = await supabase.from('species').select('*').eq('taxa_id', inputId).maybeSingle();
+    return data as Species | null;
+  }
+
+  if (isFloraId) {
+    const { data: plantData } = await supabase.from('plant_species').select('*').eq('taxa_id', inputId).maybeSingle();
+    if (plantData) return mapPlantToSpecies(plantData);
+  }
+
+  // 2. 兼容性查詢 (舊版數字 ID)
   if (numericId !== null) {
-      faunaQuery = faunaQuery.or(`id.eq.${numericId},inat_id.eq.${numericId}`);
-  } else {
-      // 找不到數字表示不可能在 fauna 的 ID 或 species_id 查到
-      faunaQuery = faunaQuery.eq('id', -1); // Dummy query that fails
-  }
+    // 優先查動物表 (id 或 inat_id)
+    const { data: faunaData } = await supabase.from('species').select('*')
+      .or(`id.eq.${numericId},inat_id.eq.${numericId}`).maybeSingle();
+    if (faunaData) return faunaData as Species;
 
-  const { data: faunaData } = await faunaQuery.maybeSingle();
-
-  if (faunaData) {
-      return faunaData as Species;
-  }
-
-  // 2. 如果動物表沒有，嘗試從植物表 (Flora) 查詢
-  let floraQuery = supabase.from('plant_species').select('*');
-  if (isUuid) {
-      floraQuery = floraQuery.eq('id', id);
-  } else if (numericId !== null) {
-      floraQuery = floraQuery.eq('inat_id', numericId);
-  } else {
-      return null;
-  }
-
-  const { data: plantData } = await floraQuery.maybeSingle();
-
-  if (plantData) {
-      // 將植物資料映射為 Species 結構以便 Metadata 使用
-      return {
-          ...plantData,
-          id: plantData.inat_id, // 使用 inat_id 作為回傳的 id
-          taxa_group: 'FLORA',
-          common_name_chi: plantData.common_name_zh,
-          common_name_eng: plantData.common_name_en,
-          scientific_name: plantData.scientific_name,
-          class_eng: plantData.category_en,
-          order_eng: plantData.family_en,
-          family_eng: plantData.family_en,
-          image_url: plantData.image_url,
-          inat_id: plantData.inat_id
-      } as unknown as Species;
+    // 再查植物表 (inat_id)
+    const { data: plantData } = await supabase.from('plant_species').select('*')
+      .eq('inat_id', numericId).maybeSingle();
+    if (plantData) return mapPlantToSpecies(plantData);
   }
 
   return null;
+}
+
+// 輔助函數：將植物資料映射為 Species 結構以便 Metadata 使用
+function mapPlantToSpecies(plantData: any): Species {
+  return {
+    ...plantData,
+    taxa_group: 'FLORA',
+    common_name_chi: plantData.common_name_zh,
+    common_name_eng: plantData.common_name_en,
+    scientific_name: plantData.scientific_name,
+    class_eng: plantData.category_en,
+    order_eng: plantData.family_en,
+    family_eng: plantData.family_en,
+  } as unknown as Species;
 }
 
 /**

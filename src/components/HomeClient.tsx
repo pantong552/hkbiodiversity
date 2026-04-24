@@ -253,14 +253,12 @@ export default function HomeClient() {
   useEffect(() => {
     const speciesId = searchParams.get('species');
     if (speciesId) {
-      const id = parseInt(speciesId);
-      if (!isNaN(id)) {
-        addSpecies(id);
-        
-        // Clean up URL parameter to avoid re-opening on re-renders/collapses
-        const newUrl = window.location.pathname;
-        window.history.replaceState({}, '', newUrl);
-      }
+      // Support both new taxa_id (e.g. fauna_123) and legacy numeric ID
+      addSpecies(speciesId);
+      
+      // Clean up URL parameter to avoid re-opening on re-renders/collapses
+      const newUrl = window.location.pathname;
+      window.history.replaceState({}, '', newUrl);
     }
   }, [searchParams, addSpecies]);
 

@@ -21,8 +21,8 @@ export default function SpeciesFloatingPanel() {
   } = useSpeciesPanel();
   
   const { language } = useLanguage();
-  const [speciesData, setSpeciesData] = useState<Record<number, Species>>({});
-  const [isLoading, setIsLoading] = useState<Record<number, boolean>>({});
+  const [speciesData, setSpeciesData] = useState<Record<string, Species>>({});
+  const [isLoading, setIsLoading] = useState<Record<string, boolean>>({});
   const [showHeaderSpace, setShowHeaderSpace] = useState(true);
   const lastScrollYRef = useRef(0);
   const { share, isCopied } = useShare();
@@ -54,60 +54,68 @@ export default function SpeciesFloatingPanel() {
     }
 
     idsToFetch.forEach(async (id) => {
+      // 增加 id 存在保護
+      if (!id || typeof id !== 'string') return;
+      
       if (!speciesData[id] && !isLoading[id]) {
-        setIsLoading(prev => ({ ...prev, [id]: true }));
+        // 先設置 Loading 狀態，防止觸發無限更新，我們使用函數式更新並檢查
+        setIsLoading(prev => {
+           if (prev[id]) return prev;
+           return { ...prev, [id]: true };
+        });
+
         try {
-          // 嘗試從動物表查詢 (Fauna)
-          let { data, error } = await supabase
-            .from('species')
-            .select('*')
-            .eq('inat_id', id)
-            .maybeSingle();
+          const isFauna = id.startsWith('fauna_');
+          const isFlora = id.startsWith('flora_');
           
-          // 如果動物表沒落，嘗試從植物表查詢 (Flora)
-          if (!data && !error) {
-            const { data: plantData, error: plantError } = await supabase
-              .from('plant_species')
-              .select('*')
-              .eq('inat_id', id)
-              .maybeSingle();
+          let data: any = null;
+
+          if (isFauna) {
+            const { data: faunaData } = await supabase
+                .from('species')
+                .select('*')
+                .eq('taxa_id', id)
+                .maybeSingle();
+            data = faunaData;
+          } else if (isFlora) {
+            const { data: plantData } = await supabase
+                .from('plant_species')
+                .select('*')
+                .eq('taxa_id', id)
+                .maybeSingle();
             
             if (plantData) {
-              // 映射植物欄位到 Species 結構，使 SpeciesContent 能正確顯示
-              data = {
-                ...plantData,
-                inat_id: plantData.inat_id, // 使用 inat_id 作為主要 ID
-                common_name_chi: plantData.common_name_zh,
-                common_name_eng: plantData.common_name_en,
-                taxa_group: 'FLORA', // Set FLORA to easily identify plants
-                family_chi: plantData.family_zh,
-                family_eng: plantData.family_en,
-                genus_chi: plantData.genus_zh,
-                genus_eng: plantData.genus_en,
-                // 植物通常沒有 Phylum/Class 資料在我們的 CSV 裡，設為空或其分類
-                phylum_chi: '維管植物', 
-                phylum_eng: 'Tracheophyta',
-                class_chi: plantData.category_zh,
-                class_eng: plantData.category_en,
-                order_chi: plantData.family_zh, 
-                order_eng: plantData.family_en,
-                // 其他敘述欄位
-                description_chi: plantData.description_chi,
-                description_eng: plantData.description,
-                remarks_chi: plantData.remark_chi,
-                remarks_eng: plantData.remark,
-                // 修復分布錯誤對調的問題：locality 為香港分布，distribution 為全球分布
-                hk_distribution_chi: plantData.locality_chi,
-                hk_distribution_eng: plantData.locality,
-                global_distribution_chi: plantData.distribution_chi,
-                global_distribution_eng: plantData.distribution,
-                
-                // 保育與生存狀態相關欄位 (Flora specific)
-                is_cap96: plantData.is_cap96,
-                is_cap586: plantData.is_cap586,
-                hk_rare_precious_note: plantData.hk_rare_precious_note,
-                china_red_data_book_note: plantData.china_red_data_book_note,
-              } as any;
+                // 映射植物欄位到 Species 結構，使 SpeciesContent 能正確顯示
+                data = {
+                    ...plantData,
+                    taxa_id: plantData.taxa_id,
+                    inat_id: plantData.inat_id, 
+                    common_name_chi: plantData.common_name_zh,
+                    common_name_eng: plantData.common_name_en,
+                    taxa_group: 'FLORA', 
+                    family_chi: plantData.family_zh,
+                    family_eng: plantData.family_en,
+                    genus_chi: plantData.genus_zh,
+                    genus_eng: plantData.genus_en,
+                    phylum_chi: '維管植物', 
+                    phylum_eng: 'Tracheophyta',
+                    class_chi: plantData.category_zh,
+                    class_eng: plantData.category_en,
+                    order_chi: plantData.family_zh, 
+                    order_eng: plantData.family_en,
+                    description_chi: plantData.description_chi,
+                    description_eng: plantData.description,
+                    remarks_chi: plantData.remark_chi,
+                    remarks_eng: plantData.remark,
+                    hk_distribution_chi: plantData.locality_chi,
+                    hk_distribution_eng: plantData.locality,
+                    global_distribution_chi: plantData.distribution_chi,
+                    global_distribution_eng: plantData.distribution,
+                    is_cap96: plantData.is_cap96,
+                    is_cap586: plantData.is_cap586,
+                    hk_rare_precious_note: plantData.hk_rare_precious_note,
+                    china_red_data_book_note: plantData.china_red_data_book_note,
+                };
             }
           }
           
@@ -117,11 +125,17 @@ export default function SpeciesFloatingPanel() {
         } catch (err) {
           console.error(`Failed to fetch species ${id}:`, err);
         } finally {
-          setIsLoading(prev => ({ ...prev, [id]: false }));
+          setIsLoading(prev => {
+            const newState = { ...prev };
+            delete newState[id];
+            return newState;
+          });
         }
       }
     });
-  }, [openSpeciesIds, activeSpeciesId, speciesData, isLoading, supabase]);
+    // 去除 speciesData 與 isLoading 的依賴項，避免無限地歸觸發
+    // 我們只在 ID 列表變動時檢查是否需要抓取
+  }, [openSpeciesIds, activeSpeciesId, supabase]); 
 
   // 2. Prevent Background Scroll & Double Scrollbar
   useEffect(() => {

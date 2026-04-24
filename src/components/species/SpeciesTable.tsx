@@ -156,7 +156,7 @@ export default function SpeciesTable({
               return (
                 <tr 
                   key={item.id}
-                  onClick={() => addSpecies(item.id)}
+                  onClick={() => addSpecies(item.taxa_id)}
                   className="group hover:bg-emerald-50/30 transition-colors cursor-pointer"
                 >
                   {/* Order */}
