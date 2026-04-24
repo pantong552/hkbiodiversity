@@ -1,6 +1,6 @@
 export interface Species {
   id: number;
-  taxa_id: string;
+  taxa_id?: string;
   inat_id: number;
   taxa_group: string;
   
