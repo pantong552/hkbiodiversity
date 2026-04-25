@@ -55,13 +55,13 @@ export default function SpeciesTable({
   };
 
   const iucnOptions = [
-    { value: '', label: t('filter.reset') },
-    { value: 'Critically Endangered', label: 'Critically Endangered (CR)' },
-    { value: 'Endangered', label: 'Endangered (EN)' },
-    { value: 'Vulnerable', label: 'Vulnerable (VU)' },
-    { value: 'Near Threatened', label: 'Near Threatened (NT)' },
-    { value: 'Least Concern', label: 'Least Concern (LC)' },
-    { value: 'Data Deficient', label: 'Data Deficient (DD)' },
+    { value: '', label: '' },
+    { value: 'Critically Endangered', label: 'CR' },
+    { value: 'Endangered', label: 'EN' },
+    { value: 'Vulnerable', label: 'VU' },
+    { value: 'Near Threatened', label: 'NT' },
+    { value: 'Least Concern', label: 'LC' },
+    { value: 'Data Deficient', label: 'DD' },
   ];
 
   const nativeOptions = [
@@ -77,7 +77,7 @@ export default function SpeciesTable({
     { key: 'scientific_name', label: t('table.scientific_name'), sortable: true, mobile: true },
     { key: 'common_name', label: t('table.common_name'), sortable: true, mobile: true },
     { key: 'native_status', label: t('table.native_status'), sortable: true, mobile: false },
-    { key: 'iucn', label: t('table.iucn_status'), sortable: true, mobile: true },
+    { key: 'iucn', label: 'IUCN', sortable: true, mobile: true },
   ];
 
   return (
@@ -91,13 +91,14 @@ export default function SpeciesTable({
                 <th 
                   key={col.key}
                   className={`
-                    px-6 py-5 text-[11px] font-black uppercase tracking-widest text-slate-400 
+                    px-6 py-5 text-[11px] font-black uppercase tracking-widest text-slate-400 whitespace-nowrap
                     ${!col.mobile ? 'hidden md:table-cell' : ''}
                     ${col.key === 'order' || col.key === 'family' ? 'w-[120px]' : ''}
+                    ${col.key === 'iucn' ? 'w-[100px]' : ''}
                   `}
                 >
                   <div 
-                    className={`flex items-center gap-2 ${col.sortable ? 'cursor-pointer hover:text-emerald-600 transition-colors' : ''}`}
+                    className={`flex items-center gap-2 ${col.sortable ? 'cursor-pointer hover:text-emerald-600 transition-colors' : ''} ${col.key === 'iucn' ? 'justify-end' : ''}`}
                     onClick={() => col.sortable && onSort(col.key)}
                   >
                     {col.label}
@@ -127,6 +128,7 @@ export default function SpeciesTable({
                         value={filters[col.key] || ''}
                         onChange={(val) => handleSelectChange(col.key, val)}
                         placeholder=""
+                        align={col.key === 'iucn' ? 'right' : 'left'}
                       />
                     ) : (
                       <div className="relative flex items-center">
@@ -195,9 +197,9 @@ export default function SpeciesTable({
                   </td>
 
                   {/* IUCN Status */}
-                  <td className="px-6 py-4">
+                  <td className="px-6 py-4 whitespace-nowrap text-right">
                     <span className={`px-3 py-1 rounded-xl text-[10px] font-black uppercase tracking-widest border shadow-sm ${iucnConfig.styles}`}>
-                      {language === 'zh' ? iucnConfig.label.zh : iucnConfig.label.en}
+                      {iucnConfig.label.en}
                     </span>
                   </td>
                 </tr>

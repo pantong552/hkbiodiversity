@@ -16,6 +16,7 @@ interface CustomDropdownProps {
   size?: 'normal' | 'sm';
   placeholder?: string;
   className?: string;
+  align?: 'left' | 'right';
 }
 
 export default function CustomDropdown({ 
@@ -25,7 +26,8 @@ export default function CustomDropdown({
   label, 
   size = 'normal',
   placeholder = 'Select...',
-  className = ''
+  className = '',
+  align = 'left'
 }: CustomDropdownProps) {
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -48,10 +50,10 @@ export default function CustomDropdown({
       <button
         onClick={() => setIsOpen(!isOpen)}
         className={`
-          flex items-center justify-between gap-2 transition-all duration-300
+          flex items-center justify-between gap-1 transition-all duration-300
           border outline-none group w-full
           ${isSmall 
-            ? 'px-3 py-1.5 rounded-lg text-xs font-bold min-h-[36px]' 
+            ? 'px-2 py-1.5 rounded-lg text-xs font-bold min-h-[36px]' 
             : 'px-5 py-2.5 rounded-xl text-sm font-bold min-w-[180px]'}
           ${isOpen 
             ? 'bg-white border-emerald-200 shadow-xl shadow-emerald-50 ring-4 ring-emerald-50/50' 
@@ -61,14 +63,15 @@ export default function CustomDropdown({
         <span className="truncate">
           {selectedOption ? selectedOption.label : placeholder}
         </span>
-        <ChevronDown className={`shrink-0 text-slate-400 transition-transform duration-300 ${isSmall ? 'w-3.5 h-3.5' : 'w-4 h-4'} ${isOpen ? 'rotate-180 text-emerald-500' : 'group-hover:text-slate-600'}`} />
+        <ChevronDown className={`shrink-0 text-slate-400 transition-transform duration-300 ${isSmall ? 'w-3 h-3' : 'w-4 h-4'} ${isOpen ? 'rotate-180 text-emerald-500' : 'group-hover:text-slate-600'}`} />
       </button>
 
       {/* Dropdown Menu */}
       {isOpen && (
         <div className={`
-          absolute top-full left-0 mt-2 w-full bg-white border border-slate-100 shadow-2xl shadow-slate-200/80 p-1.5 z-[100] animate-in fade-in zoom-in-95 duration-200
-          ${isSmall ? 'rounded-xl min-w-[140px]' : 'rounded-2xl min-w-[200px]'}
+          absolute top-full mt-2 bg-white border border-slate-100 shadow-2xl shadow-slate-200/80 p-1.5 z-[100] animate-in fade-in zoom-in-95 duration-200
+          ${align === 'right' ? 'right-0' : 'left-0'}
+          ${isSmall ? 'rounded-xl min-w-[90px]' : 'rounded-2xl min-w-[200px]'}
         `}>
           <div className="space-y-0.5 max-h-[300px] overflow-y-auto custom-scrollbar">
             {options.map((option) => (

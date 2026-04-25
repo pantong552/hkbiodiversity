@@ -213,6 +213,22 @@ export default function HomeClient() {
             if (plantFilters.isInChinaRedBook) query = query.neq('china_red_data_book_note', '沒有列入');
         }
 
+        // Apply Table Filters (for list mode)
+        Object.entries(tableFilters).forEach(([key, value]) => {
+          if (!value) return;
+          
+          if (key === 'iucn' || key === 'native_status') {
+            query = query.eq(key, value);
+          } else {
+            // Map table keys to actual DB columns if needed
+            const dbKey = key === 'common_name' 
+              ? (language === 'zh' ? 'common_name_chi' : 'common_name_eng')
+              : key === 'order' ? 'order_chi' : key === 'family' ? 'family_chi' : key;
+            
+            query = query.ilike(dbKey, `%${value}%`);
+          }
+        });
+
         const fieldMap: Record<string, string> = taxaType === 'fauna' ? {
           'common_name': language === 'zh' ? 'common_name_chi' : 'common_name_eng',
           'scientific_name': 'scientific_name',
@@ -240,7 +256,7 @@ export default function HomeClient() {
         setIsLoading(false);
       }
     };
-  }, [taxaType, searchQuery, selectedFilters, plantFilters, currentPage, itemsPerPage, sortBy, sortOrder, language, isAuthLoading]);
+  }, [taxaType, searchQuery, selectedFilters, plantFilters, tableFilters, currentPage, itemsPerPage, sortBy, sortOrder, language, isAuthLoading]);
 
   // Handle Sort Change
   const handleSort = (field: string) => {
