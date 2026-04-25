@@ -146,8 +146,32 @@ export default function SpeciesFloatingPanel() {
   const [isLoading, setIsLoading] = useState<Record<string, boolean>>({});
   const [hoveredTabId, setHoveredTabId] = useState<string | null>(null);
   const [tooltipX, setTooltipX] = useState<number>(0);
+  const [showRightGradient, setShowRightGradient] = useState(false);
+  const tabsRef = useRef<HTMLDivElement>(null);
   const lastScrollYRef = useRef(0);
   const { share, isCopied } = useShare();
+
+  // Check if tabs are scrollable to show gradient
+  useEffect(() => {
+    const checkScroll = () => {
+      if (tabsRef.current) {
+        const { scrollWidth, clientWidth, scrollLeft } = tabsRef.current;
+        // 只有當內容寬度大於容器寬度，且還沒滾動到底部時才顯示右側漸變
+        setShowRightGradient(scrollWidth > clientWidth && (scrollLeft + clientWidth < scrollWidth - 1));
+      }
+    };
+
+    const tabsEl = tabsRef.current;
+    if (tabsEl) {
+      checkScroll();
+      tabsEl.addEventListener('scroll', checkScroll);
+      window.addEventListener('resize', checkScroll);
+      return () => {
+        tabsEl.removeEventListener('scroll', checkScroll);
+        window.removeEventListener('resize', checkScroll);
+      };
+    }
+  }, [openSpeciesIds]);
 
   const handleShare = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -286,10 +310,13 @@ export default function SpeciesFloatingPanel() {
     <motion.div 
       initial={false}
       animate={{ 
-        height: isExpanded ? '100dvh' : 'auto',
-        y: 0
+        height: isExpanded ? '100dvh' : '82px',
       }}
-      transition={{ type: 'spring', damping: 25, stiffness: 200 }}
+      transition={{ 
+        height: isExpanded 
+          ? { type: 'spring', stiffness: 120, damping: 20, mass: 0.8 }
+          : { duration: 0.4, ease: [0.32, 0.72, 0, 1] } // Smooth cubic for collapsing
+      }}
       className={`fixed bottom-0 left-0 w-full z-50 flex flex-col ${isExpanded ? 'pointer-events-auto' : 'pointer-events-none'}`}
     >
       {/* Background Filler for Tab Bar Area (Prevents seeing content behind the container) */}
@@ -305,26 +332,36 @@ export default function SpeciesFloatingPanel() {
       </AnimatePresence>
 
       {/* Main Panel Content (Only visible when expanded) */}
-      <div 
+      <motion.div 
         id="species-panel-scroll-container" 
-        className={`
-          flex-1 overflow-y-auto no-scrollbar bg-slate-50 pointer-events-auto transition-opacity duration-300
-          ${isExpanded ? 'opacity-100 h-full' : 'opacity-0 h-0'}
-        `}
+        initial={false}
+        animate={{ 
+          opacity: isExpanded ? 1 : 0,
+          y: 0,
+          pointerEvents: isExpanded ? 'auto' : 'none'
+        }}
+        transition={{ 
+          duration: isExpanded ? 0.5 : 0.25, 
+          ease: "easeInOut"
+        }}
+        className={`flex-1 no-scrollbar bg-slate-50 relative shrink-0 ${isExpanded ? 'overflow-y-auto' : 'overflow-hidden'}`}
       >
         {/* Static Header Safe Area - Naturally scrolls out of view, preventing layout thrashing */}
         {isExpanded && (
           <div className="w-full shrink-0 h-24 md:h-28 lg:h-32" />
         )}
 
-        <AnimatePresence mode="wait">
-          {isExpanded && activeSpeciesId && (
+        <AnimatePresence mode="popLayout">
+          {activeSpeciesId && (
             <motion.div
               key={activeSpeciesId}
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -20 }}
-              transition={{ duration: 0.2 }}
+              initial={{ opacity: 0, x: 10, scale: 0.98 }}
+              animate={{ opacity: 1, x: 0, scale: 1 }}
+              exit={{ opacity: 0, x: -10, scale: 0.98 }}
+              transition={{ 
+                duration: 0.3,
+                ease: "circOut"
+              }}
               className="h-full"
             >
               {speciesData[activeSpeciesId] ? (
@@ -340,7 +377,7 @@ export default function SpeciesFloatingPanel() {
             </motion.div>
           )}
         </AnimatePresence>
-      </div>
+      </motion.div>
 
       <div className="w-full flex justify-center pointer-events-auto relative overflow-visible">
         {/* Global Tooltip Portal (Rendered here to escape internal Tab overflow) */}
@@ -357,22 +394,25 @@ export default function SpeciesFloatingPanel() {
 
         <div className="w-full bg-white/80 backdrop-blur-3xl border-t border-slate-200 shadow-[0_-10px_50px_rgba(0,0,0,0.1)] px-4 md:px-8 py-2 md:py-2.5 flex items-center justify-between">
           <div className="flex-1 min-w-0 overflow-hidden relative">
-            <div className="flex items-center gap-2 overflow-x-auto no-scrollbar py-1 scroll-smooth">
+            <div 
+              ref={tabsRef}
+              className="flex items-center gap-2 overflow-x-auto no-scrollbar py-1 scroll-smooth"
+            >
             {openSpeciesIds.map((id) => {
               const species = speciesData[id];
               const isActive = activeSpeciesId === id;
               const loading = isLoading[id];
               
               return (
-                <div 
+                <motion.div 
                   key={id}
+                  layout
                   onClick={() => {
                     setActiveSpecies(id);
                     if (!isExpanded) toggleExpand(true);
                   }}
                   onMouseEnter={(e) => {
                     setHoveredTabId(id);
-                    // 計算對應位置
                     const rect = e.currentTarget.getBoundingClientRect();
                     const parentRect = e.currentTarget.offsetParent?.getBoundingClientRect();
                     if (parentRect) {
@@ -382,12 +422,20 @@ export default function SpeciesFloatingPanel() {
                   }}
                   onMouseLeave={() => setHoveredTabId(null)}
                   className={`
-                    group relative flex items-center gap-2.5 px-4 py-2.5 rounded-2xl border transition-all cursor-pointer whitespace-nowrap min-h-[44px]
+                    group relative flex items-center gap-2.5 px-4 py-2.5 rounded-2xl border transition-colors cursor-pointer whitespace-nowrap min-h-[44px] z-10
                     ${isActive 
-                      ? 'bg-slate-900 border-slate-800 text-white shadow-xl shadow-slate-200' 
+                      ? 'border-slate-800 text-white' 
                       : 'bg-white/50 border-slate-100 text-slate-500 hover:bg-white hover:border-emerald-200'}
                   `}
                 >
+                  {/* Magic Move Background Slider */}
+                  {isActive && (
+                    <motion.div
+                      layoutId="active-tab-highlight"
+                      className="absolute inset-0 bg-slate-900 rounded-2xl -z-10 shadow-xl shadow-slate-200"
+                      transition={{ type: 'spring', stiffness: 350, damping: 30 }}
+                    />
+                  )}
 
                   {loading ? (
                     <Loader2 className="w-3.5 h-3.5 animate-spin" />
@@ -417,12 +465,21 @@ export default function SpeciesFloatingPanel() {
                   >
                     <X className="w-3 h-3" />
                   </button>
-                </div>
+                </motion.div>
               );
             })}
             </div>
-            {/* Fade effect to indicate more tabs on the right */}
-            <div className="absolute top-0 right-0 bottom-0 w-8 bg-gradient-to-l from-white/90 to-transparent pointer-events-none z-10" />
+            {/* Fade effect to indicate more tabs on the right - Only shows when scrollable */}
+            <AnimatePresence>
+              {showRightGradient && (
+                <motion.div 
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  className="absolute top-0 right-0 bottom-0 w-12 bg-gradient-to-l from-white to-transparent pointer-events-none z-20" 
+                />
+              )}
+            </AnimatePresence>
           </div>
 
           {/* Action Buttons - Fixed on the right */}
@@ -462,19 +519,29 @@ export default function SpeciesFloatingPanel() {
             {/* Expand/Collapse Toggle */}
             <button 
               onClick={() => toggleExpand()}
-              className="p-3 bg-emerald-600 text-white rounded-2xl shadow-lg shadow-emerald-600/20 hover:bg-emerald-700 hover:scale-105 transition-all active:scale-95 border border-emerald-500 flex items-center gap-1 group"
+              className="p-3 bg-emerald-600 text-white rounded-2xl shadow-lg shadow-emerald-600/20 hover:bg-emerald-700 hover:scale-105 transition-all active:scale-95 border border-emerald-500 flex items-center gap-1 group overflow-hidden"
             >
-              {isExpanded ? (
-                <>
-                  <ChevronDown className="w-5 h-5" />
-                  <span className="hidden md:inline text-[10px] font-black uppercase tracking-widest mr-1">Hide</span>
-                </>
-              ) : (
-                <>
-                  <ChevronUp className="w-5 h-5" />
-                  <span className="hidden md:inline text-[10px] font-black uppercase tracking-widest mr-1">View Details</span>
-                </>
-              )}
+              <motion.div
+                initial={false}
+                animate={{ rotate: isExpanded ? 180 : 0 }}
+                transition={{ type: 'spring', stiffness: 300, damping: 20 }}
+                className="flex items-center justify-center"
+              >
+                <ChevronUp className="w-5 h-5" />
+              </motion.div>
+              
+              <AnimatePresence mode="wait" initial={false}>
+                <motion.span 
+                  key={isExpanded ? 'hide' : 'view'}
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -10 }}
+                  transition={{ duration: 0.15 }}
+                  className="hidden md:inline-block w-12 text-center text-[10px] font-black uppercase tracking-widest"
+                >
+                  {isExpanded ? 'Hide' : 'View'}
+                </motion.span>
+              </AnimatePresence>
             </button>
           </div>
         </div>
