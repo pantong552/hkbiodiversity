@@ -130,7 +130,7 @@ export default function SpeciesContent({ species, showBreadcrumb = true }: Speci
       <div className="w-full h-[40vh] min-h-[400px] bg-slate-950 relative overflow-hidden">
         <SpeciesHeroBackground 
           photos={photos} 
-          defaultImage={species.image_url || 'https://images.unsplash.com/photo-1549488344-1f9b8d2bd1f3?q=80&w=1080&auto=format&fit=crop'} 
+          defaultImage={species.image_url || '/images/placeholder/no-species-image.svg'} 
         />
         
         <div className="absolute bottom-0 left-0 w-full p-8 md:p-12 z-20 pointer-events-none">

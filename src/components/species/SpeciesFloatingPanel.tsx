@@ -84,8 +84,12 @@ function SpeciesTabPreview({
                   className="w-full h-full object-cover"
                 />
               ) : (
-                <div className="absolute inset-0 flex items-center justify-center bg-slate-200">
-                  <span className="text-[10px] font-black tracking-widest text-slate-400 uppercase">No Photo</span>
+                <div className="absolute inset-0 flex items-center justify-center bg-slate-50">
+                  <img 
+                    src="/images/placeholder/no-species-image.svg" 
+                    alt="No species image" 
+                    className="w-full h-full object-cover opacity-80"
+                  />
                 </div>
               )}
               {/* Overlay Gradient */}

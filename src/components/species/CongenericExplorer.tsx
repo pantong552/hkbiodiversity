@@ -31,7 +31,8 @@ const MiniSpeciesCard = ({ species }: { species: Species }) => {
   const { addSpecies } = useSpeciesPanel();
   const { imageUrl, isLoading } = useInaturalistPhoto(!species.image_url ? species.inat_id : undefined);
 
-  const displayImage = species.image_url || imageUrl || 'https://images.unsplash.com/photo-1549488344-1f9b8d2bd1f3?q=80&w=1080&auto=format&fit=crop';
+  const placeholderImage = '/images/placeholder/no-species-image.svg';
+  const displayImage = species.image_url || imageUrl || placeholderImage;
   const commonName = language === 'zh' ? species.common_name_chi : species.common_name_eng;
 
   return (

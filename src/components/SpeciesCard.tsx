@@ -129,7 +129,8 @@ export default function SpeciesCard({
     !normalized.image_url ? normalized.inat_id : undefined
   );
 
-  const displayImage = normalized.image_url || inatPhoto || 'https://images.unsplash.com/photo-1549488344-1f9b8d2bd1f3?q=80&w=1080&auto=format&fit=crop';
+  const placeholderImage = '/images/placeholder/no-species-image.svg';
+  const displayImage = normalized.image_url || inatPhoto || placeholderImage;
   
   const iucnConfig = !isPlant && normalized.iucn ? getIUCNConfig(normalized.iucn) : null;
   const isPhoto = mode === 'photo';
