@@ -68,7 +68,7 @@ function SpeciesTabPreview({
             left: xOffset,
             x: `calc(-50% + ${shiftX}px)`
           }}
-          className="absolute bottom-[calc(100%+16px)] z-[9999] pointer-events-none"
+          className="hidden md:block absolute bottom-[calc(100%+16px)] z-[9999] pointer-events-none"
         >
           <div className="w-56 overflow-hidden rounded-3xl bg-white/80 backdrop-blur-2xl border border-white/40 shadow-[0_20px_50px_rgba(0,0,0,0.2)] ring-1 ring-black/5 flex flex-col">
             {/* Visual Header / Photo */}
@@ -172,6 +172,24 @@ export default function SpeciesFloatingPanel() {
       };
     }
   }, [openSpeciesIds]);
+
+  // --- Auto-scroll to active tab ---
+  useEffect(() => {
+    if (activeSpeciesId && tabsRef.current) {
+      // 稍微延遲以確保 DOM 元素已渲染且佈局穩定 (特別是新增標籤時)
+      const timer = setTimeout(() => {
+        const activeTabEl = tabsRef.current?.querySelector(`[data-active="true"]`);
+        if (activeTabEl) {
+          activeTabEl.scrollIntoView({
+            behavior: 'smooth',
+            block: 'nearest',
+            inline: 'center'
+          });
+        }
+      }, 150);
+      return () => clearTimeout(timer);
+    }
+  }, [activeSpeciesId]);
 
   const handleShare = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -421,6 +439,7 @@ export default function SpeciesFloatingPanel() {
                     }
                   }}
                   onMouseLeave={() => setHoveredTabId(null)}
+                  data-active={isActive}
                   className={`
                     group relative flex items-center gap-2.5 px-4 py-2.5 rounded-2xl border transition-colors cursor-pointer whitespace-nowrap min-h-[44px] z-10
                     ${isActive 

@@ -73,7 +73,7 @@ const SpeciesHeroBackground = ({ photos, defaultImage }: { photos: InatGalleryPh
           {/* Dynamic Photo Credit */}
           {hasPhotos && (
             <div 
-              className="absolute bottom-6 right-8 z-30 flex items-center gap-2 px-3 py-1.5 bg-black/40 backdrop-blur-md rounded-full border border-white/10 hover:bg-black/60 transition-colors group cursor-default pointer-events-auto"
+              className="absolute top-6 md:top-auto right-6 md:right-8 md:bottom-6 z-30 flex items-center gap-2 px-3 py-1.5 bg-black/40 backdrop-blur-md rounded-full border border-white/10 hover:bg-black/60 transition-colors group cursor-default pointer-events-auto"
               onClick={(e) => e.stopPropagation()}
             >
               <span className="text-[10px] font-medium text-white/90 tracking-wide drop-shadow-sm select-none">
@@ -135,9 +135,6 @@ export default function SpeciesContent({ species, showBreadcrumb = true }: Speci
         
         <div className="absolute bottom-0 left-0 w-full p-8 md:p-12 z-20 pointer-events-none">
           <div className="max-w-7xl mx-auto pointer-events-auto">
-            <span className="inline-block px-3 py-1 bg-emerald-500/20 text-emerald-300 border border-emerald-400/30 rounded-full text-[10px] font-bold tracking-widest uppercase mb-4">
-              {species.taxa_group} • ID: {species.inat_id}
-            </span>
             <div className="flex flex-col mb-2">
               <h1 className="text-4xl md:text-5xl font-black text-white leading-tight">
                 {commonName}
