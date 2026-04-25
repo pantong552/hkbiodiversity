@@ -54,7 +54,6 @@ export default function HomeClient() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
-  const [localSearch, setLocalSearch] = useState('');
   const [totalResultCount, setTotalResultCount] = useState(0);
   const [toolbarWidth, setToolbarWidth] = useState(0);
   const toolbarRef = useRef<HTMLDivElement>(null);
@@ -165,7 +164,6 @@ export default function HomeClient() {
     setTaxaType(type);
     setCurrentPage(1);
     setSearchQuery('');
-    setLocalSearch('');
     setIsFilterOpen(false);
   };
 
@@ -282,9 +280,8 @@ export default function HomeClient() {
                     isOpen={isFilterOpen}
                     onClose={() => setIsFilterOpen(false)}
                     onFilterChange={setSelectedFilters}
-                    searchValue={localSearch}
-                    onSearchChange={setLocalSearch}
-                    onSearchSubmit={() => setSearchQuery(localSearch)}
+                    onSearchSubmit={setSearchQuery}
+                    searchQuery={searchQuery}
                     selectedFilters={selectedFilters}
                 />
             ) : (

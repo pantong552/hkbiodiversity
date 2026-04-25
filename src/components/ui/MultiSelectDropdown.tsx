@@ -197,7 +197,7 @@ export default function MultiSelectDropdown({
 
       {/* 行動端選取器 - 使用 Portal 直接渲染 */}
       {isOpen && isMobileView && typeof document !== 'undefined' && createPortal(
-        <div className="fixed inset-0 z-[100] bg-white animate-in slide-in-from-bottom duration-300 flex flex-col">
+        <div className="fixed inset-0 z-[1000] bg-white animate-in slide-in-from-bottom duration-300 flex flex-col">
           <div className="p-4 border-b border-slate-100 flex items-center justify-between bg-emerald-900 text-white shadow-xl shadow-emerald-900/10">
             <div className="flex items-center gap-2">
               <button 

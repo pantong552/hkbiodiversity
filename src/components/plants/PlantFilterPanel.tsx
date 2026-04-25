@@ -5,6 +5,7 @@ import { Calendar, Shield, RotateCcw, Star, BookOpen, Filter, Search } from 'luc
 import { useLanguage } from '@/context/LanguageContext';
 import { PlantFilterState } from '@/types/plants';
 import MultiSelectDropdown from '@/components/ui/MultiSelectDropdown';
+import QuickFilterSearch from '@/components/ui/QuickFilterSearch';
 
 interface Option {
   name: string;
@@ -19,6 +20,7 @@ interface PlantFilterPanelProps {
   availableFamilies: Option[];
   availableGenuses: Option[];
   onReset: () => void;
+  hideTitle?: boolean;
 }
 
 const MONTHS = Array.from({ length: 12 }, (_, i) => i + 1);
@@ -29,9 +31,14 @@ export default function PlantFilterPanel({
   availableCategories,
   availableFamilies,
   availableGenuses,
-  onReset
+  onReset,
+  hideTitle = false
 }: PlantFilterPanelProps) {
   const { language } = useLanguage();
+
+  const handleSearchSubmit = (val: string) => {
+    setFilters(prev => ({ ...prev, searchQuery: val }));
+  };
 
   const toggleMonth = (month: number, type: 'flowering' | 'fruiting') => {
     const key = type === 'flowering' ? 'floweringMonths' : 'fruitingMonths';
@@ -44,7 +51,7 @@ export default function PlantFilterPanel({
   };
 
   const t = {
-    category: language === 'zh' ? '類別' : 'Category',
+    category: language === 'zh' ? '植物類別' : 'Plant Category',
     family: language === 'zh' ? '科' : 'Family',
     genus: language === 'zh' ? '屬' : 'Genus',
     origin: language === 'zh' ? '來源' : 'Origin',
@@ -61,30 +68,26 @@ export default function PlantFilterPanel({
   };
 
   return (
-    <div className="w-full space-y-8 animate-in fade-in slide-in-from-left-4 duration-500">
+    <div className="w-full space-y-6 animate-in fade-in slide-in-from-left-4 duration-500">
       
       {/* Title */}
-      <div className="flex items-center justify-between pb-2 border-b border-emerald-50">
-          <h2 className="text-xl font-black text-emerald-900 flex items-center gap-3">
-              <Filter className="w-5 h-5 text-emerald-500" />
-              {t.advanced}
-          </h2>
-      </div>
+      {!hideTitle && (
+        <div className="flex items-center justify-between">
+            <h2 className="text-2xl font-black text-emerald-900 flex items-center gap-3">
+                <Filter className="w-6 h-6 text-emerald-500" />
+                {language === 'zh' ? '植物篩選' : 'Plant Filter'}
+            </h2>
+        </div>
+      )}
 
       {/* Quick Search */}
-      <div className="relative group flex items-center pt-2">
-        <Search className="w-5 h-5 text-slate-400 absolute left-4 pointer-events-none group-focus-within:text-emerald-500 transition-colors" />
-        <input 
-          type="text" 
-          placeholder={language === 'zh' ? '快速搜尋植物...' : 'Quick search...'} 
-          value={filters.searchQuery}
-          onChange={(e) => setFilters(prev => ({ ...prev, searchQuery: e.target.value }))}
-          className="w-full pl-12 pr-4 py-3 bg-emerald-50/50 border-2 border-transparent rounded-xl text-sm text-emerald-900 placeholder:text-slate-400 focus:bg-white focus:border-emerald-200 focus:ring-4 focus:ring-emerald-50/50 transition-all outline-none"
-        />
-      </div>
+      <QuickFilterSearch 
+        initialValue={filters.searchQuery}
+        onSubmit={handleSearchSubmit}
+      />
 
       {/* Category */}
-      <div className="space-y-4 pt-4 border-t border-emerald-50">
+      <div className="space-y-4">
         <h3 className="text-sm font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
           {t.category}
         </h3>

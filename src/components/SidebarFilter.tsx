@@ -1,8 +1,9 @@
 import { useState, useMemo, useEffect } from 'react';
-import { ChevronDown, ChevronRight, Search, Filter, X, CheckCircle2 } from 'lucide-react';
+import { ChevronDown, ChevronRight, Search, Filter, X, CheckCircle2, RotateCcw } from 'lucide-react';
 import { Species, TaxonomyLevel } from '../types/species';
 import { useLanguage } from '../context/LanguageContext';
 import { supabase } from '@/lib/supabase';
+import QuickFilterSearch from './ui/QuickFilterSearch';
 import { getIUCNConfig, IUCN_CONFIG } from '../constants/statusStyles';
 import MultiSelectDropdown from './ui/MultiSelectDropdown';
 
@@ -11,9 +12,8 @@ interface SidebarFilterProps {
   isOpen: boolean;
   onClose: () => void;
   onFilterChange: (filters: SelectedFilters) => void;
-  searchValue: string;
-  onSearchChange: (value: string) => void;
-  onSearchSubmit: () => void;
+  onSearchSubmit: (value: string) => void;
+  searchQuery?: string;
   selectedFilters?: SelectedFilters;
 }
 
@@ -26,9 +26,8 @@ export default function SidebarFilter({
   isOpen, 
   onClose,
   onFilterChange,
-  searchValue,
-  onSearchChange,
   onSearchSubmit,
+  searchQuery = '',
   selectedFilters
 }: SidebarFilterProps) {
   const { language, t } = useLanguage();
@@ -102,7 +101,7 @@ export default function SidebarFilter({
             p_family_eng: level === 'family_eng' ? [] : selected.taxonomy.family_eng,
             p_genus_eng: level === 'genus_eng' ? [] : selected.taxonomy.genus_eng,
             p_iucn: selected.iucn,
-            p_search: searchValue
+            p_search: searchQuery
           };
           const { data, error } = await supabase.rpc('get_species_stats', rpcParams);
           return { level, data, error };
@@ -116,7 +115,7 @@ export default function SidebarFilter({
           p_family_eng: selected.taxonomy.family_eng,
           p_genus_eng: selected.taxonomy.genus_eng,
           p_iucn: selected.iucn,
-          p_search: searchValue
+          p_search: searchQuery
         });
 
         const [levelResults, iucnResult] = await Promise.all([
@@ -172,7 +171,7 @@ export default function SidebarFilter({
     }
 
     fetchStats();
-  }, [selected, language]); // 移除 searchValue，使列表統計不會在輸入時即時更新
+  }, [selected, language, searchQuery]); // 重新加入 searchQuery，確保側邊欄統計與搜尋結果同步
 
   const filterOptions = taxonomyOptions;
 
@@ -239,7 +238,7 @@ export default function SidebarFilter({
         scrollbar-thin scrollbar-thumb-slate-100 scrollbar-track-transparent
       `}>
         <div className="p-8">
-          <div className="flex items-center justify-between mb-8">
+          <div className="flex items-center justify-between mb-6">
             <h2 className="text-2xl font-black text-emerald-900 flex items-center gap-3">
               <Filter className="w-6 h-6 text-emerald-500" />
               {t('filter.title')}
@@ -257,26 +256,13 @@ export default function SidebarFilter({
             </button>
           </div>
 
-          <div className="relative mb-10 group flex items-center">
-            <Search className="w-6 h-6 text-slate-400 absolute left-4 pointer-events-none group-focus-within:text-emerald-500 transition-colors" />
-            <input 
-              type="text" 
-              placeholder={t('search.sidebar_placeholder')} 
-              value={searchValue}
-              onChange={(e) => onSearchChange(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && onSearchSubmit()}
-              suppressHydrationWarning={true}
-              className="w-full pl-12 pr-12 py-4 bg-emerald-50/30 border-2 border-transparent rounded-2xl text-emerald-900 placeholder:text-slate-400 focus:bg-white focus:border-emerald-200 focus:ring-4 focus:ring-emerald-50/50 transition-all outline-none"
-            />
-            <button
-              onClick={onSearchSubmit}
-              className="absolute right-2 p-2 bg-emerald-600 text-white rounded-xl shadow-lg shadow-emerald-100 opacity-0 group-focus-within:opacity-100 hover:scale-105 active:scale-95 transition-all text-[10px] font-black"
-            >
-              GO
-            </button>
-          </div>
+          <QuickFilterSearch 
+            initialValue={searchQuery}
+            onSubmit={onSearchSubmit}
+            className="mb-6"
+          />
 
-          <div className="space-y-8">
+          <div className="space-y-6">
             <div className="space-y-4">
               <button 
                 onClick={() => toggleExpand('taxonomy')}

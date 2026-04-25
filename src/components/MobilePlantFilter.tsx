@@ -61,8 +61,8 @@ export default function MobilePlantFilter({
         <div className="p-6 border-b border-slate-50 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <Filter className="w-5 h-5 text-emerald-600" />
-            <h2 className="text-lg font-black text-slate-800 uppercase tracking-tight">
-              {language === 'zh' ? '篩選植物' : 'Filter Plants'}
+            <h2 className="text-2xl font-black text-emerald-900 flex items-center gap-3">
+              {language === 'zh' ? '植物篩選' : 'Plant Filter'}
             </h2>
           </div>
           <button 
@@ -82,6 +82,7 @@ export default function MobilePlantFilter({
             availableFamilies={availableFamilies}
             availableGenuses={availableGenuses}
             onReset={onReset}
+            hideTitle={true}
           />
         </div>
 
