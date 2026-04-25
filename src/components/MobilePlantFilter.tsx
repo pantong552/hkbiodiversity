@@ -46,14 +46,14 @@ export default function MobilePlantFilter({
       {/* Backdrop */}
       {isOpen && (
         <div 
-          className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-[100] min-[1101px]:hidden"
+          className="fixed top-0 left-0 right-0 h-[100dvh] bg-slate-900/40 backdrop-blur-sm z-[100] min-[1101px]:hidden"
           onClick={onClose}
         />
       )}
 
       {/* Side Panel */}
       <aside className={`
-        fixed top-0 left-0 h-full w-[320px] bg-white z-[101] min-[1101px]:hidden
+        fixed top-0 left-0 h-[100dvh] w-[320px] bg-white z-[101] min-[1101px]:hidden
         shadow-2xl flex flex-col transition-all duration-500 cubic-bezier(0.4, 0, 0.2, 1)
         ${isOpen ? 'translate-x-0 opacity-100' : '-translate-x-full opacity-0 pointer-events-none'}
       `}>

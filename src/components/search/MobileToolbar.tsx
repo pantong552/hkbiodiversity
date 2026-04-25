@@ -29,7 +29,7 @@ export default function MobileToolbar({
   onFilterOpen
 }: MobileToolbarProps) {
   const { t } = useLanguage();
-  const { openSpeciesIds, isExpanded, isUploadModalOpen } = useSpeciesPanel();
+  const { openSpeciesIds, isExpanded, isUploadModalOpen, isFilterOpen } = useSpeciesPanel();
   const [isVisible, setIsVisible] = useState(true);
   const [lastScrollY, setLastScrollY] = useState(0);
 
@@ -61,7 +61,7 @@ export default function MobileToolbar({
       fixed left-1/2 -translate-x-1/2 z-50 transition-all duration-500 ease-in-out md:hidden
       w-[94%] max-w-[400px]
       ${hasActiveTabs ? 'bottom-[80px]' : 'bottom-6'}
-      ${isVisible && !shouldHideDueToPanel && !isUploadModalOpen ? 'translate-y-0 opacity-100' : 'translate-y-32 opacity-0 pointer-events-none'}
+      ${isVisible && !shouldHideDueToPanel && !isUploadModalOpen && !isFilterOpen ? 'translate-y-0 opacity-100' : 'translate-y-32 opacity-0 pointer-events-none'}
     `}>
       <div className="bg-white/90 backdrop-blur-3xl border border-white/50 shadow-[0_20px_50px_rgba(0,0,0,0.2)] rounded-[1.75rem] p-3 flex flex-col gap-3">
         

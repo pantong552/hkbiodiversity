@@ -45,7 +45,7 @@ const INITIAL_PLANT_FILTERS: PlantFilterState = {
 export default function HomeClient() {
   const { language, t } = useLanguage();
   const { isLoading: isAuthLoading } = useAuth();
-  const { addSpecies, isExpanded } = useSpeciesPanel();
+  const { addSpecies, isExpanded, isFilterOpen, setIsFilterOpen } = useSpeciesPanel();
   const searchParams = useSearchParams();
   const router = useRouter();
 
@@ -53,7 +53,6 @@ export default function HomeClient() {
   const [species, setSpecies] = useState<any[]>([]); 
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [localSearch, setLocalSearch] = useState('');
   const [totalResultCount, setTotalResultCount] = useState(0);
@@ -167,7 +166,7 @@ export default function HomeClient() {
     setCurrentPage(1);
     setSearchQuery('');
     setLocalSearch('');
-    setIsSidebarOpen(false);
+    setIsFilterOpen(false);
   };
 
   const fetchSpecies = useMemo(() => {
@@ -280,8 +279,8 @@ export default function HomeClient() {
             
             {taxaType === 'fauna' ? (
                 <SidebarFilter
-                    isOpen={isSidebarOpen}
-                    onClose={() => setIsSidebarOpen(false)}
+                    isOpen={isFilterOpen}
+                    onClose={() => setIsFilterOpen(false)}
                     onFilterChange={setSelectedFilters}
                     searchValue={localSearch}
                     onSearchChange={setLocalSearch}
@@ -315,7 +314,7 @@ export default function HomeClient() {
               >
                 <div className="flex items-center gap-2 shrink-0">
                   <button
-                    onClick={() => setIsSidebarOpen(true)}
+                    onClick={() => setIsFilterOpen(true)}
                     className="min-[1101px]:hidden p-2.5 bg-emerald-50 text-emerald-600 rounded-xl hover:bg-emerald-600 hover:text-white transition-all shadow-sm"
                     title={t('filter.title')}
                   >
@@ -422,7 +421,7 @@ export default function HomeClient() {
               onDisplayModeChange={setDisplayMode}
               pageSizeOptions={PAGE_SIZE_OPTIONS[displayMode]}
               totalCount={totalResultCount}
-              onFilterOpen={() => setIsSidebarOpen(true)}
+              onFilterOpen={() => setIsFilterOpen(true)}
             />
 
             {/* Results Grid */}
@@ -530,8 +529,8 @@ export default function HomeClient() {
       {/* Mobile Drawer */}
       {taxaType === 'flora' && (
         <MobilePlantFilter 
-          isOpen={isSidebarOpen}
-          onClose={() => setIsSidebarOpen(false)}
+          isOpen={isFilterOpen}
+          onClose={() => setIsFilterOpen(false)}
           filters={plantFilters}
           setFilters={setPlantFilters}
           availableCategories={availablePlantMeta.categories}

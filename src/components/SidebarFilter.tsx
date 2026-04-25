@@ -225,15 +225,15 @@ export default function SidebarFilter({
     <>
       {isOpen && (
         <div 
-          className="fixed inset-0 bg-emerald-900/30 backdrop-blur-md z-40 lg:hidden"
+          className="fixed top-0 left-0 right-0 h-[100dvh] bg-slate-900/40 backdrop-blur-md z-[100] min-[1101px]:hidden"
           onClick={onClose}
         />
       )}
 
       <aside className={`
-        fixed min-[1101px]:sticky top-0 min-[1101px]:top-8 left-0 h-full min-[1101px]:h-[calc(100vh-4rem)]
+        fixed min-[1101px]:sticky top-0 min-[1101px]:top-8 left-0 h-[100dvh] min-[1101px]:h-[calc(100vh-4rem)]
         w-[320px] bg-white border-r border-slate-100 min-[1101px]:border min-[1101px]:rounded-3xl
-        shadow-2xl min-[1101px]:shadow-xl overflow-y-auto z-50 min-[1101px]:z-0
+        shadow-2xl min-[1101px]:shadow-xl overflow-y-auto z-[101] min-[1101px]:z-0
         transition-all duration-500 cubic-bezier(0.4, 0, 0.2, 1)
         ${isOpen ? 'translate-x-0 opacity-100' : '-translate-x-full min-[1101px]:translate-x-0'}
         scrollbar-thin scrollbar-thumb-slate-100 scrollbar-track-transparent

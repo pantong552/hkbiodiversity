@@ -138,7 +138,8 @@ export default function SpeciesFloatingPanel() {
     isExpanded, 
     removeSpecies, 
     setActiveSpecies, 
-    toggleExpand 
+    toggleExpand,
+    isFilterOpen
   } = useSpeciesPanel();
   
   const { language, t } = useLanguage();
@@ -329,13 +330,17 @@ export default function SpeciesFloatingPanel() {
       initial={false}
       animate={{ 
         height: isExpanded ? '100dvh' : '82px',
+        opacity: isFilterOpen ? 0 : 1,
+        y: isFilterOpen ? 100 : 0
       }}
       transition={{ 
         height: isExpanded 
           ? { type: 'spring', stiffness: 120, damping: 20, mass: 0.8 }
-          : { duration: 0.4, ease: [0.32, 0.72, 0, 1] } // Smooth cubic for collapsing
+          : { duration: 0.4, ease: [0.32, 0.72, 0, 1] }, // Smooth cubic for collapsing
+        opacity: { duration: 0.2 },
+        y: { duration: 0.3 }
       }}
-      className={`fixed bottom-0 left-0 w-full z-50 flex flex-col ${isExpanded ? 'pointer-events-auto' : 'pointer-events-none'}`}
+      className={`fixed bottom-0 left-0 w-full z-50 flex flex-col ${isExpanded && !isFilterOpen ? 'pointer-events-auto' : 'pointer-events-none'}`}
     >
       {/* Background Filler for Tab Bar Area (Prevents seeing content behind the container) */}
       <AnimatePresence>
