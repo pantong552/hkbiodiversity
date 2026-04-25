@@ -75,7 +75,7 @@ export default function AccountPanel() {
   ];
 
   return (
-    <div className="min-h-screen pt-20 pb-16 px-4 sm:px-6">
+    <div className="min-h-screen pt-32 sm:pt-40 pb-16 px-4 sm:px-6">
       <div className="max-w-2xl mx-auto space-y-8">
         
         {/* 頁面標題區 */}
