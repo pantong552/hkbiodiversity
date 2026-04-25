@@ -45,7 +45,7 @@ const INITIAL_PLANT_FILTERS: PlantFilterState = {
 export default function HomeClient() {
   const { language, t } = useLanguage();
   const { isLoading: isAuthLoading } = useAuth();
-  const { addSpecies } = useSpeciesPanel();
+  const { addSpecies, isExpanded } = useSpeciesPanel();
   const searchParams = useSearchParams();
   const router = useRouter();
 
@@ -306,167 +306,111 @@ export default function HomeClient() {
 
           {/* Main Content Area */}
           <div className="flex-1 min-w-0">
-            {/* Desktop Hero */}
-            <div className="hidden md:flex flex-col gap-6 lg:gap-10 mb-6 lg:mb-8 pb-6 lg:pb-10 border-b border-slate-100">
-              <div className="flex flex-col xl:flex-row xl:items-end justify-between gap-6">
-                <div className="max-w-2xl">
-                  <div className="flex items-center gap-3 text-emerald-600 font-black text-[10px] lg:text-xs uppercase tracking-[0.3em] mb-3 lg:mb-4">
-                    <div className="h-[2px] w-8 bg-emerald-600" />
-                    {taxaType === 'fauna' ? t('hero.badge') : (language === 'zh' ? '植物資料庫' : 'PLANT DATABASE')}
-                  </div>
-                  <h1 className="text-4xl md:text-5xl lg:text-7xl font-black text-slate-900 tracking-tight leading-[0.9] mb-3 lg:mb-6 uppercase">
-                    {language === 'zh' ? (
-                      <>香港 <span className="text-emerald-600">{taxaType === 'fauna' ? '生物多樣性' : '植物資料庫'}</span></>
-                    ) : (
-                      <>Hong Kong <span className="text-emerald-600">{taxaType === 'fauna' ? 'Biodiversity' : 'Flora'}</span></>
-                    )}
-                  </h1>
-                   <p className="text-lg lg:text-xl text-slate-500 font-medium leading-relaxed">
-                    {t('hero.subtitle_part1')}
-                    <span className="text-slate-900 font-bold">{t('hero.subtitle_part2')}</span>
-                    {t('hero.subtitle_part3')}
-                  </p>
-                </div>
-                
-                <div className="flex flex-col items-start md:items-end gap-3 lg:gap-4 shrink-0">
-                  <div className="bg-white shadow-xl shadow-slate-200/40 rounded-[2rem] p-1.5 lg:p-2 flex items-center ring-1 ring-slate-100 group">
-                    <div className="relative flex items-center">
-                      <Search className="w-5 h-5 lg:w-6 lg:h-6 text-slate-400 absolute left-4 pointer-events-none group-focus-within:text-emerald-500 transition-colors" />
-                      <input
-                        type="text"
-                        value={localSearch}
-                        onChange={(e) => setLocalSearch(e.target.value)}
-                        onKeyDown={(e) => e.key === 'Enter' && setSearchQuery(localSearch)}
-                        placeholder={t('search.placeholder')}
-                        suppressHydrationWarning
-                        className="bg-transparent pl-12 lg:pl-14 pr-20 lg:pr-24 py-2.5 lg:py-3 w-full sm:w-[350px] lg:w-[400px] outline-none text-sm lg:text-base text-slate-900 font-bold placeholder:text-slate-300"
-                      />
-                      <button
-                        onClick={() => setSearchQuery(localSearch)}
-                        className="absolute right-1.5 px-3 py-1.5 bg-emerald-600 text-white text-[10px] lg:text-xs font-black rounded-xl shadow-lg shadow-emerald-100 opacity-0 group-focus-within:opacity-100 hover:scale-105 active:scale-95 transition-all"
-                      >
-                        ENTER
-                      </button>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-4 text-[10px] lg:text-xs font-black text-slate-400 uppercase tracking-widest">
-                    <span>{t('results.found')} {totalResultCount} {t('results.unit')}</span>
-                    <div className="w-1 h-1 rounded-full bg-slate-300" />
-                    <span>{t('results.viewing_page')} {currentPage} {t('results.page_of')} {totalPages || 1}</span>
-                  </div>
-                </div>
-              </div>
 
-               {/* Advanced Toolbar: Sort & Paging */}
+
+               {/* Advanced Toolbar: Sort, Results & Paging (Desktop/Tablet Only) */}
                <div 
                 ref={toolbarRef}
-                className="mt-8 flex flex-nowrap items-center justify-between bg-white px-4 lg:px-8 py-3.5 lg:py-5 rounded-[2rem] shadow-sm border border-slate-100 ring-1 ring-slate-50 gap-2 lg:gap-4 scale-in duration-500"
+                className={`hidden md:flex relative z-40 flex-nowrap items-center justify-between bg-white/80 backdrop-blur-2xl px-6 py-2.5 rounded-[1.25rem] shadow-xl shadow-slate-200/40 border border-slate-200/50 ring-1 ring-white/50 mb-8 scale-in duration-500 gap-4 transition-opacity ${isExpanded ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}
               >
-                <div className="flex items-center gap-2 lg:gap-8 shrink-0">
+                <div className="flex items-center gap-2 shrink-0">
+                  <button
+                    onClick={() => setIsSidebarOpen(true)}
+                    className="min-[1101px]:hidden p-2.5 bg-emerald-50 text-emerald-600 rounded-xl hover:bg-emerald-600 hover:text-white transition-all shadow-sm"
+                    title={t('filter.title')}
+                  >
+                    <Filter className="w-4 h-4" />
+                  </button>
+                </div>
+
+                {/* Center: Controls Grouped Tightly */}
+                <div className="flex items-center gap-2 lg:gap-4 bg-slate-50/50 p-1 rounded-2xl border border-slate-100/50">
                   {displayMode !== 'table' && (
-                    <>
-                      <div className="flex items-center gap-2 lg:gap-3">
-                        <div 
-                          className={`overflow-hidden transition-all duration-500 ease-in-out flex items-center ${
-                            showLabels ? 'max-w-[150px] opacity-100 mr-2' : 'max-w-0 opacity-0'
-                          }`}
-                        >
-                          <span className="text-[10px] lg:text-[12px] font-black uppercase tracking-widest text-slate-400 whitespace-nowrap">
-                            {t('sort.label')}
-                          </span>
-                        </div>
-                        <CustomDropdown
-                          options={[
-                            { value: 'common_name', label: t('sort.common_name') },
-                            { value: 'scientific_name', label: t('sort.scientific_name') },
-                            { value: 'rarity', label: t('sort.rarity') }
-                          ]}
-                          value={sortBy}
-                          onChange={(val) => setSortBy(val)}
-                        />
-                      </div>
-                      <div className="h-4 lg:h-6 w-px bg-slate-100" />
-                    </>
-                  )}
-                  <div className="flex items-center gap-2 lg:gap-3">
-                    <div 
-                      className={`overflow-hidden transition-all duration-500 ease-in-out flex items-center ${
-                        showLabels ? 'max-w-[150px] opacity-100 mr-2' : 'max-w-0 opacity-0'
-                      }`}
-                    >
-                      <span className="text-[10px] lg:text-[12px] font-black uppercase tracking-widest text-slate-400 whitespace-nowrap">
-                        {t('view.per_page')}
-                      </span>
+                    <div className="flex items-center gap-2 pl-2">
+                      {showLabels && <span className="text-[10px] font-black uppercase tracking-widest text-slate-400 whitespace-nowrap">{t('sort.label')}</span>}
+                      <CustomDropdown
+                        size="sm"
+                        options={[
+                          { value: 'common_name', label: t('sort.common_name') },
+                          { value: 'scientific_name', label: t('sort.scientific_name') },
+                          { value: 'rarity', label: t('sort.rarity') }
+                        ]}
+                        value={sortBy}
+                        onChange={(val) => setSortBy(val)}
+                        className="min-w-[120px] lg:min-w-[160px]"
+                      />
                     </div>
-                    <div className="flex bg-slate-50 rounded-xl p-0.5 lg:p-1">
+                  )}
+
+                  {(displayMode !== 'table' && showLabels) && <div className="h-4 w-px bg-slate-200/60" />}
+
+                  <div className="flex items-center gap-2 px-1">
+                    {showLabels && <span className="text-[10px] font-black uppercase tracking-widest text-slate-400 whitespace-nowrap">{t('view.per_page')}</span>}
+                    <div className="flex bg-white shadow-sm ring-1 ring-slate-100 rounded-lg p-0.5">
                       {PAGE_SIZE_OPTIONS[displayMode].map((size) => (
                         <button
                           key={size}
                           onClick={() => setItemsPerPage(size)}
-                          className={`px-2 lg:px-3 py-1 lg:py-1.5 rounded-lg text-[10px] lg:text-xs font-black transition-all ${itemsPerPage === size ? 'bg-white text-emerald-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
+                          className={`px-2 py-1 rounded-md text-[10px] font-black transition-all ${itemsPerPage === size ? 'bg-emerald-600 text-white shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
                         >
                           {size}
                         </button>
                       ))}
                     </div>
                   </div>
-                  <div className="h-4 lg:h-6 w-px bg-slate-100" />
-                  <div className="flex items-center gap-2 lg:gap-3">
-                    <div 
-                      className={`overflow-hidden transition-all duration-500 ease-in-out flex items-center ${
-                        showLabels ? 'max-w-[150px] opacity-100 mr-2' : 'max-w-0 opacity-0'
-                      }`}
-                    >
-                      <span className="text-[10px] lg:text-[12px] font-black uppercase tracking-widest text-slate-400 whitespace-nowrap">
-                        {t('view.display_mode')}
-                      </span>
-                    </div>
-                    <div className="flex bg-slate-50 rounded-xl p-0.5 lg:p-1">
-                      <button
-                        onClick={() => setDisplayMode('detail')}
-                        title={t('view.mode_detail')}
-                        className={`p-1 lg:p-1.5 rounded-lg transition-all ${displayMode === 'detail' ? 'bg-white text-emerald-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
-                      >
-                        <List className="w-3.5 h-3.5 lg:w-4 lg:h-4" />
-                      </button>
-                      <button
-                        onClick={() => setDisplayMode('photo')}
-                        title={t('view.mode_photo')}
-                        className={`p-1 lg:p-1.5 rounded-lg transition-all ${displayMode === 'photo' ? 'bg-white text-emerald-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
-                      >
-                        <LayoutGrid className="w-3.5 h-3.5 lg:w-4 lg:h-4" />
-                      </button>
-                      <button
-                        onClick={() => setDisplayMode('table')}
-                        title={t('view.mode_table')}
-                        className={`p-1 lg:p-1.5 rounded-lg transition-all ${displayMode === 'table' ? 'bg-white text-emerald-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
-                      >
-                        <TableIcon className="w-3.5 h-3.5 lg:w-4 lg:h-4" />
-                      </button>
+
+                  <div className="h-4 w-px bg-slate-200/60" />
+
+                  <div className="flex items-center gap-2 px-1 text-slate-300">
+                    {showLabels && <span className="text-[10px] font-black uppercase tracking-widest text-slate-400 whitespace-nowrap">{t('view.display_mode')}</span>}
+                    <div className="flex bg-white shadow-sm ring-1 ring-slate-100 rounded-lg p-0.5">
+                      {[
+                        { id: 'detail', icon: List, title: t('view.mode_detail') },
+                        { id: 'photo', icon: LayoutGrid, title: t('view.mode_photo') },
+                        { id: 'table', icon: TableIcon, title: t('view.mode_table') }
+                      ].map((mode) => (
+                        <button
+                          key={mode.id}
+                          onClick={() => setDisplayMode(mode.id as any)}
+                          title={mode.title}
+                          className={`p-1.5 rounded-md transition-all ${displayMode === mode.id ? 'bg-emerald-600 text-white shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
+                        >
+                          <mode.icon className="w-3.5 h-3.5" />
+                        </button>
+                      ))}
                     </div>
                   </div>
                 </div>
 
-                {/* Mini pagination for top toolbar */}
-                <div className="flex items-center gap-2">
-                  <button
-                    disabled={currentPage === 1}
-                    onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-                    className="p-2 rounded-xl border border-slate-100 text-slate-400 hover:bg-slate-50 disabled:opacity-30 disabled:hover:bg-transparent transition-all"
-                  >
-                    <ChevronLeft className="w-4 h-4" />
-                  </button>
-                  <span className="text-xs font-black text-slate-700 px-2">{currentPage} / {totalPages || 1}</span>
-                  <button
-                    disabled={currentPage === totalPages || totalPages === 0}
-                    onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
-                    className="p-2 rounded-xl border border-slate-100 text-slate-400 hover:bg-slate-50 disabled:opacity-30 disabled:hover:bg-transparent transition-all"
-                  >
-                    <ChevronRight className="w-4 h-4" />
-                  </button>
+                {/* Right: Compact Pagination & Results Count */}
+                <div className="flex items-center gap-4 shrink-0">
+                  <div className="flex items-center gap-1 bg-white ring-1 ring-slate-100 rounded-xl p-1 shadow-sm">
+                    <button
+                      disabled={currentPage === 1}
+                      onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                      className="p-1 rounded-lg text-slate-400 hover:bg-slate-50 disabled:opacity-30 transition-all"
+                    >
+                      <ChevronLeft className="w-4 h-4" />
+                    </button>
+                    <span className="text-[11px] font-black text-slate-700 px-2 min-w-[50px] text-center whitespace-nowrap">
+                      {currentPage} <span className="text-slate-300 mx-0.5">/</span> {totalPages || 1}
+                    </span>
+                    <button
+                      disabled={currentPage === totalPages || totalPages === 0}
+                      onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                      className="p-1 rounded-lg text-slate-400 hover:bg-slate-50 disabled:opacity-30 transition-all"
+                    >
+                      <ChevronRight className="w-4 h-4" />
+                    </button>
+                  </div>
+
+                  <div className="bg-slate-900 text-white px-4 py-2 rounded-xl flex items-center gap-2 shadow-lg shadow-slate-200">
+                    <span className="text-xs font-black tracking-tight whitespace-nowrap">
+                      {totalResultCount} <span className="opacity-60 text-[10px] ml-1 uppercase">{t('results.unit')}</span>
+                    </span>
+                  </div>
                 </div>
               </div>
-            </div>
 
             {/* Mobile Specialized Toolbar */}
             <MobileToolbar

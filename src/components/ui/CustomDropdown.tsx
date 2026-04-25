@@ -67,7 +67,7 @@ export default function CustomDropdown({
       {/* Dropdown Menu */}
       {isOpen && (
         <div className={`
-          absolute top-full left-0 mt-2 w-full bg-white/95 backdrop-blur-2xl border border-slate-100 shadow-2xl shadow-slate-200/80 p-1.5 z-[100] animate-in fade-in zoom-in-95 duration-200
+          absolute top-full left-0 mt-2 w-full bg-white border border-slate-100 shadow-2xl shadow-slate-200/80 p-1.5 z-[100] animate-in fade-in zoom-in-95 duration-200
           ${isSmall ? 'rounded-xl min-w-[140px]' : 'rounded-2xl min-w-[200px]'}
         `}>
           <div className="space-y-0.5 max-h-[300px] overflow-y-auto custom-scrollbar">
