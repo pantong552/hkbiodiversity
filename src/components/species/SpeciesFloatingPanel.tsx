@@ -70,7 +70,7 @@ function SpeciesTabPreview({
           }}
           className="hidden md:block absolute bottom-[calc(100%+16px)] z-[9999] pointer-events-none"
         >
-          <div className="w-56 overflow-hidden rounded-3xl bg-white/80 backdrop-blur-2xl border border-white/40 shadow-[0_20px_50px_rgba(0,0,0,0.2)] ring-1 ring-black/5 flex flex-col">
+          <div className="w-56 overflow-hidden rounded-3xl bg-white border border-white/40 shadow-[0_20px_50px_rgba(0,0,0,0.2)] ring-1 ring-black/5 flex flex-col">
             {/* Visual Header / Photo */}
             <div className="relative h-32 w-full bg-slate-100 overflow-hidden">
               {isLoading ? (
@@ -126,7 +126,7 @@ function SpeciesTabPreview({
           </div>
           {/* Arrow - 指示位置需補償 shift 的位移以保持準確對齊 */}
           <div 
-            className="absolute top-full left-1/2 -mt-1 border-8 border-transparent border-t-white/80 transition-transform duration-200"
+            className="absolute top-full left-1/2 -mt-1 border-8 border-transparent border-t-white transition-transform duration-200"
             style={{ transform: `translateX(calc(-50% - ${shiftX}px))` }}
           />
         </motion.div>
@@ -177,6 +177,74 @@ export default function SpeciesFloatingPanel() {
       };
     }
   }, [openSpeciesIds]);
+
+  // --- Keyboard & Browser Navigation Hijacking ---
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Backspace to collapse (if not in input)
+      if (isExpanded && e.key === 'Backspace') {
+        const target = e.target as HTMLElement;
+        const isInput = target.tagName === 'INPUT' || 
+                        target.tagName === 'TEXTAREA' || 
+                        target.isContentEditable ||
+                        target.closest('.prose');
+        
+        if (!isInput) {
+          e.preventDefault();
+          toggleExpand(false);
+        }
+      }
+      
+      // ESC key to collapse
+      if (isExpanded && e.key === 'Escape') {
+        toggleExpand(false);
+      }
+    };
+
+    // --- Browser Back Hijacking ---
+    const handlePopState = (event: PopStateEvent) => {
+      // When user presses back button, the browser pops the state.
+      // If our dummy state is gone but the panel is still open in UI, close the UI.
+      if (isExpanded) {
+        // Here we just update the UI state. 
+        // We don't need history.back() because the browser ALREADY went back.
+        toggleExpand(false);
+      }
+    };
+
+    // Manage history stack based on expanded state
+    // We only push a state if we don't already have ours on top
+    if (isExpanded) {
+      if (window.history.state?.panelOpen !== true) {
+        window.history.pushState({ panelOpen: true }, '');
+      }
+      window.addEventListener('popstate', handlePopState);
+    } 
+
+    window.addEventListener('keydown', handleKeyDown);
+    
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('popstate', handlePopState);
+      
+      // If we are unmounting or closing via UI click, and our dummy state is still in history,
+      // we don't handle it here to avoid race conditions during rapid clicks.
+      // Instead, we let the NEXT render cycle or popstate handle it if possible.
+    };
+  }, [isExpanded, toggleExpand]);
+
+  // Handle history cleanup when panel closes via UI
+  useEffect(() => {
+    if (!isExpanded && typeof window !== 'undefined' && window.history.state?.panelOpen === true) {
+      // Small delay to ensure any pending navigations are settled
+      const timer = setTimeout(() => {
+        if (window.history.state?.panelOpen === true) {
+          window.history.back();
+        }
+      }, 50);
+      return () => clearTimeout(timer);
+    }
+  }, [isExpanded]);
 
   // --- Auto-scroll to active tab ---
   useEffect(() => {

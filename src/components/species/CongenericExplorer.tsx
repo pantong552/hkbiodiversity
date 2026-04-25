@@ -9,7 +9,7 @@ import { createClient } from '@/utils/supabase/client';
 import { useInaturalistPhoto } from '@/hooks/useInaturalistPhoto';
 import { formatScientificName } from '@/utils/formatters';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Sparkles, Loader2 } from 'lucide-react';
+import { Sparkles, Loader2, Leaf } from 'lucide-react';
 
 interface CongenericExplorerProps {
   species: Species;
@@ -29,11 +29,32 @@ const SkeletonCard = () => (
 const MiniSpeciesCard = ({ species }: { species: Species }) => {
   const { language } = useLanguage();
   const { addSpecies } = useSpeciesPanel();
-  const { imageUrl, isLoading } = useInaturalistPhoto(!species.image_url ? species.inat_id : undefined);
+  const { imageUrl, isLoading: isInatLoading } = useInaturalistPhoto(!species.image_url ? species.inat_id : undefined);
+  
+  const [imgLoaded, setImgLoaded] = useState(false);
+  const [isFullyReady, setIsFullyReady] = useState(false);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+    return () => setMounted(false);
+  }, []);
 
   const placeholderImage = '/images/placeholder/no-species-image.svg';
-  const displayImage = species.image_url || imageUrl || placeholderImage;
+  const isUsingInat = !species.image_url && !!species.inat_id;
+  
+  // displayImage should be: Local URL > iNaturalist URL > (Optional) Placeholder
+  // Crucially, don't fallback to placeholder while we are still waiting for INAT results
+  const displayImage = species.image_url || imageUrl || (isInatLoading ? '' : placeholderImage);
   const commonName = language === 'zh' ? species.common_name_chi : species.common_name_eng;
+
+  // Handle seamless transition delay
+  useEffect(() => {
+    if (imgLoaded || (!isUsingInat && mounted)) {
+      const timer = setTimeout(() => setIsFullyReady(true), 250);
+      return () => clearTimeout(timer);
+    }
+  }, [imgLoaded, isUsingInat, mounted]);
 
   return (
     <motion.div 
@@ -43,15 +64,49 @@ const MiniSpeciesCard = ({ species }: { species: Species }) => {
       onClick={() => species.taxa_id && addSpecies(species.taxa_id)}
       className="group relative flex items-center gap-3 p-2.5 rounded-2xl bg-slate-50/50 hover:bg-emerald-50 border border-slate-100/60 hover:border-emerald-100 hover:shadow-lg hover:shadow-emerald-900/5 transition-all duration-300 cursor-pointer overflow-hidden shrink-0"
     >
-      <div className="relative w-16 h-16 shrink-0 rounded-xl overflow-hidden bg-white shadow-inner">
-        <Image
-          src={displayImage}
-          alt={commonName || species.scientific_name}
-          fill
-          sizes="64px"
-          unoptimized={displayImage.includes('/api/image/transform')}
-          className={`object-cover transition-transform duration-700 group-hover:scale-115 ${isLoading ? 'blur-sm grayscale' : 'blur-0 grayscale-0'}`}
-        />
+      <div className="relative w-16 h-16 shrink-0 rounded-xl overflow-hidden bg-white shadow-inner flex items-center justify-center">
+        {/* Actual Image */}
+        {displayImage && (
+          <Image
+            src={displayImage}
+            alt={commonName || species.scientific_name}
+            fill
+            sizes="64px"
+            onLoadingComplete={() => setImgLoaded(true)}
+            unoptimized={displayImage.includes('/api/image/transform')}
+            className={`
+              object-cover transition-all duration-700 group-hover:scale-115
+              ${!isFullyReady ? 'opacity-0 scale-110 blur-md' : 'opacity-100 scale-100 blur-0'}
+            `}
+          />
+        )}
+
+        {/* Nature Loader Overlay (Seamless Transition) */}
+        {!isFullyReady && (
+          <div className={`
+            absolute inset-0 flex flex-col items-center justify-center bg-slate-50 z-10 overflow-hidden
+            transition-all duration-500 ease-in-out
+            ${imgLoaded ? 'opacity-0 scale-105 blur-sm' : 'opacity-100 scale-100 blur-0'}
+          `}>
+            {/* Spinning Rings - Scaled Down */}
+            <div className="relative w-10 h-10 flex items-center justify-center scale-75">
+              <div className="absolute inset-0 border-t border-emerald-500/40 border-r border-emerald-500/10 rounded-full animate-spin duration-[1500ms]"></div>
+              <div className="absolute inset-1.5 border-b border-emerald-500/50 border-l border-emerald-500/5 rounded-full animate-spin-reverse duration-[2000ms]"></div>
+              
+              {/* Pulsing Leaf Center */}
+              <div className="relative bg-white p-1.5 rounded-full shadow-lg shadow-emerald-900/20 animate-pulse">
+                <Leaf className="w-3.5 h-3.5 text-emerald-500 fill-emerald-500/10" />
+              </div>
+            </div>
+            
+            {/* Tiny Dots */}
+            <div className="mt-1.5 flex gap-1 animate-pulse">
+              <span className="w-0.5 h-0.5 bg-emerald-500/40 rounded-full"></span>
+              <span className="w-0.5 h-0.5 bg-emerald-500/40 rounded-full"></span>
+            </div>
+          </div>
+        )}
+        
         <div className="absolute inset-0 border border-black/5 rounded-xl pointer-events-none" />
       </div>
       

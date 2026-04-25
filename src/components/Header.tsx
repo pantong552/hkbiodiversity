@@ -16,7 +16,7 @@ export default function Header() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isVisible, setIsVisible] = useState(true);
 
-  const { isExpanded, isGalleryOpen, isUploadModalOpen, isFilterOpen } = useSpeciesPanel();
+  const { isExpanded, isGalleryOpen, isUploadModalOpen, isFilterOpen, toggleExpand } = useSpeciesPanel();
   const lastScrollYRef = useRef(0);
   const mobileMenuRef = useRef<HTMLDivElement>(null);
   const menuToggleRef = useRef<HTMLButtonElement>(null);
@@ -128,7 +128,11 @@ export default function Header() {
         bg-white border-slate-100
       `}>
         {/* Logo & Branding */}
-        <Link href="/" className="flex items-center gap-5 group relative">
+        <Link 
+          href="/" 
+          onClick={() => toggleExpand(false)}
+          className="flex items-center gap-5 group relative"
+        >
           <motion.div
             whileHover={{ scale: 1.02 }}
             whileTap={{ scale: 0.98 }}
@@ -193,6 +197,7 @@ export default function Header() {
                 <Link
                   key={link.name}
                   href={link.href}
+                  onClick={() => toggleExpand(false)}
                   className="text-sm font-bold text-slate-500 hover:text-emerald-600 transition-colors"
                 >
                   {link.name}
@@ -219,7 +224,11 @@ export default function Header() {
 
           {user ? (
             <div className="flex items-center gap-2 lg:gap-3">
-              <Link href="/account" className="flex items-center gap-2 px-4 py-2 bg-slate-50 rounded-2xl border border-slate-100 hover:border-emerald-200 hover:bg-emerald-50/50 transition-all duration-300 cursor-pointer group">
+              <Link 
+                href="/account" 
+                onClick={() => toggleExpand(false)}
+                className="flex items-center gap-2 px-4 py-2 bg-slate-50 rounded-2xl border border-slate-100 hover:border-emerald-200 hover:bg-emerald-50/50 transition-all duration-300 cursor-pointer group"
+              >
                 {user.user_metadata.avatar_url ? (
                   <img
                     src={user.user_metadata.avatar_url}
@@ -232,13 +241,6 @@ export default function Header() {
                 <span className="text-sm font-bold text-slate-700 group-hover:text-emerald-700 transition-colors">
                   {user.user_metadata.full_name || user.email}
                 </span>
-              </Link>
-              <Link
-                href="/account"
-                className="p-3 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-xl transition-all duration-300 cursor-pointer"
-                title={t('account.header_link')}
-              >
-                <Settings className="w-5 h-5" />
               </Link>
               <button
                 onClick={handleLogout}
@@ -304,7 +306,10 @@ export default function Header() {
                   <Link
                     key={link.name}
                     href={link.href}
-                    onClick={() => setIsMobileMenuOpen(false)}
+                    onClick={() => {
+                      setIsMobileMenuOpen(false);
+                      toggleExpand(false);
+                    }}
                     className="text-lg font-bold text-slate-700 hover:text-emerald-600 px-4 py-2 rounded-xl hover:bg-emerald-50 transition-all"
                   >
                     {link.name}
@@ -316,7 +321,10 @@ export default function Header() {
                 <div className="space-y-3">
                   <Link
                     href="/account"
-                    onClick={() => setIsMobileMenuOpen(false)}
+                    onClick={() => {
+                      setIsMobileMenuOpen(false);
+                      toggleExpand(false);
+                    }}
                     className="flex items-center gap-3 px-4 py-3 bg-slate-50 rounded-2xl border border-slate-100 hover:border-emerald-200 hover:bg-emerald-50/50 transition-all duration-300 cursor-pointer"
                   >
                     {user.user_metadata.avatar_url ? (
