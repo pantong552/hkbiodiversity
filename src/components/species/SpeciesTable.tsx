@@ -1,100 +1,95 @@
+'use client';
+
 import { useMemo, useEffect, useState } from 'react';
-import { ChevronUp, ChevronDown, Search, ArrowUpDown, ExternalLink } from 'lucide-react';
+import { ChevronUp, ChevronDown, ArrowUpDown } from 'lucide-react';
 import { Species } from '@/types/species';
 import { useLanguage } from '@/context/LanguageContext';
 import { useSpeciesPanel } from '@/context/SpeciesPanelContext';
 import { getIUCNConfig } from '@/constants/statusStyles';
-import CustomDropdown from '@/components/ui/CustomDropdown';
-import debounce from 'lodash/debounce';
+import MultiSelectDropdown from '@/components/ui/MultiSelectDropdown';
 import { formatScientificName } from '@/utils/formatters';
+import { TaxaType } from '@/components/search/TaxaGroupSwitcher';
 
 interface SpeciesTableProps {
+  taxaType: TaxaType;
   species: Species[];
   sortBy: string;
   sortOrder: 'asc' | 'desc';
-  filters: Record<string, string>;
-  onFilterChange: (filters: Record<string, string>) => void;
+  filters: Record<string, any>;
+  metadata: Record<string, any[]>;
+  onFilterChange: (filters: Record<string, any>) => void;
   onSort: (field: string) => void;
 }
 
 export default function SpeciesTable({ 
+  taxaType,
   species, 
   sortBy, 
   sortOrder, 
   filters,
+  metadata,
   onFilterChange,
   onSort 
 }: SpeciesTableProps) {
   const { language, t } = useLanguage();
   const { addSpecies } = useSpeciesPanel();
-  
-  // Local state for immediate UI feedback on text inputs
-  const [localSearchValues, setLocalSearchValues] = useState<Record<string, string>>(filters);
+  const isPlant = taxaType === 'flora';
 
-  // Sync local state when external filters change (e.g. on clear all)
-  useEffect(() => {
-    setLocalSearchValues(filters);
-  }, [filters]);
-
-  const applyFilter = (key: string) => {
-    onFilterChange({ ...filters, [key]: localSearchValues[key] || '' });
-  };
-
-  const handleInputChange = (key: string, value: string) => {
-    setLocalSearchValues(prev => ({ ...prev, [key]: value }));
-  };
-
-  const handleKeyDown = (e: React.KeyboardEvent, key: string) => {
-    if (e.key === 'Enter') {
-      applyFilter(key);
-    }
-  };
-
-  const handleSelectChange = (key: string, value: string) => {
+  const handleSelectChange = (key: string, value: string | string[]) => {
     onFilterChange({ ...filters, [key]: value });
   };
 
   const iucnOptions = [
-    { value: '', label: '' },
-    { value: 'Critically Endangered', label: 'CR' },
-    { value: 'Endangered', label: 'EN' },
-    { value: 'Vulnerable', label: 'VU' },
-    { value: 'Near Threatened', label: 'NT' },
-    { value: 'Least Concern', label: 'LC' },
-    { value: 'Data Deficient', label: 'DD' },
+    { name: 'Critically Endangered', display: 'CR', count: 0 },
+    { name: 'Endangered', display: 'EN', count: 0 },
+    { name: 'Vulnerable', display: 'VU', count: 0 },
+    { name: 'Near Threatened', display: 'NT', count: 0 },
+    { name: 'Least Concern', display: 'LC', count: 0 },
+    { name: 'Data Deficient', display: 'DD', count: 0 },
   ];
 
   const nativeOptions = [
-    { value: '', label: t('filter.reset') },
-    { value: 'Native', label: 'Native' },
-    { value: 'Exotic', label: 'Exotic' },
-    { value: 'Reintroduced', label: 'Reintroduced' },
+    { name: 'Native', display: 'Native', count: 0 },
+    { name: 'Exotic', display: 'Exotic', count: 0 },
+    { name: 'Reintroduced', display: 'Reintroduced', count: 0 },
   ];
 
-  const columns = [
-    { key: 'order', label: t('table.order'), sortable: true, mobile: false },
-    { key: 'family', label: t('table.family'), sortable: true, mobile: false },
-    { key: 'scientific_name', label: t('table.scientific_name'), sortable: true, mobile: true },
-    { key: 'common_name', label: t('table.common_name'), sortable: true, mobile: true },
-    { key: 'native_status', label: t('table.native_status'), sortable: true, mobile: false },
-    { key: 'iucn', label: 'IUCN', sortable: true, mobile: true },
-  ];
+  const columns = useMemo(() => {
+    if (isPlant) {
+      return [
+        { key: 'family', label: t('table.family'), sortable: true, mobile: false },
+        { key: 'genus', label: language === 'zh' ? '屬 Genus' : 'Genus', sortable: true, mobile: false },
+        { key: 'scientific_name', label: t('table.scientific_name'), sortable: true, mobile: true },
+        { key: 'common_name', label: t('table.common_name'), sortable: true, mobile: true },
+        { key: 'native_status', label: t('table.native_status'), sortable: true, mobile: false },
+        { key: 'iucn', label: language === 'zh' ? '珍稀 Rarity' : 'Rarity', sortable: true, mobile: true },
+      ];
+    }
+    return [
+      { key: 'order', label: t('table.order'), sortable: true, mobile: false },
+      { key: 'family', label: t('table.family'), sortable: true, mobile: false },
+      { key: 'scientific_name', label: t('table.scientific_name'), sortable: true, mobile: true },
+      { key: 'common_name', label: t('table.common_name'), sortable: true, mobile: true },
+      { key: 'native_status', label: t('table.native_status'), sortable: true, mobile: false },
+      { key: 'iucn', label: 'IUCN', sortable: true, mobile: true },
+    ];
+  }, [isPlant, language, t]);
 
   return (
     <div className="w-full bg-white rounded-[2rem] border border-slate-100 shadow-xl shadow-slate-200/50 overflow-hidden animate-in fade-in duration-500">
       <div className="overflow-x-auto">
-        <table className="w-full text-left border-collapse min-w-[800px] md:min-w-full">
+        <table className="w-full text-left border-collapse min-w-[1000px]">
           <thead>
             {/* Header Labels & Sorting */}
             <tr className="bg-slate-50/50 border-b border-slate-100">
               {columns.map((col) => (
                 <th 
-                  key={col.key}
+                  key={col.key} 
                   className={`
                     px-6 py-5 text-[11px] font-black uppercase tracking-widest text-slate-400 whitespace-nowrap
                     ${!col.mobile ? 'hidden md:table-cell' : ''}
-                    ${col.key === 'order' || col.key === 'family' ? 'w-[120px]' : ''}
-                    ${col.key === 'iucn' ? 'w-[100px]' : ''}
+                    ${col.key === 'order' || col.key === 'family' || col.key === 'genus' ? 'w-[140px]' : ''}
+                    ${col.key === 'iucn' ? 'w-[120px]' : ''}
                   `}
                 >
                   <div 
@@ -115,36 +110,40 @@ export default function SpeciesTable({
                 </th>
               ))}
             </tr>
-
-            {/* Header Filters */}
+            {/* Header Filters Row */}
             <tr className="bg-white border-b border-slate-50">
               {columns.map((col) => (
-                <th key={col.key} className={`px-4 py-3 ${!col.mobile ? 'hidden md:table-cell' : ''} ${col.key === 'order' || col.key === 'family' ? 'w-[120px]' : ''}`}>
-                  <div className="relative group">
-                    {col.key === 'iucn' || col.key === 'native_status' ? (
-                      <CustomDropdown
-                        size="sm"
-                        options={col.key === 'iucn' ? iucnOptions : nativeOptions}
-                        value={filters[col.key] || ''}
-                        onChange={(val) => handleSelectChange(col.key, val)}
+                <th key={col.key} className={`px-4 py-3 ${!col.mobile ? 'hidden md:table-cell' : ''} ${col.key === 'order' || col.key === 'family' || col.key === 'genus' ? 'w-[140px]' : ''}`}>
+                  <div className="px-2">
+                    {col.key === 'native_status' ? (
+                      <MultiSelectDropdown
+                        label={t('table.native_status')}
+                        options={metadata.native_status || nativeOptions}
+                        selectedValues={filters.native_status || []}
+                        onChange={(vals) => handleSelectChange('native_status', vals)}
                         placeholder=""
-                        align={col.key === 'iucn' ? 'right' : 'left'}
+                        minWidth="200px"
+                      />
+                    ) : col.key === 'iucn' ? (
+                      <MultiSelectDropdown
+                        label={isPlant ? (language === 'zh' ? '珍稀' : 'Rarity') : "IUCN"}
+                        options={metadata.iucn || iucnOptions}
+                        selectedValues={filters.iucn || []}
+                        onChange={(vals) => handleSelectChange('iucn', vals)}
+                        placeholder=""
+                        align="right"
+                        minWidth="160px"
                       />
                     ) : (
-                      <div className="relative flex items-center">
-                        <Search 
-                          className="absolute left-3 w-3.5 h-3.5 text-slate-300 group-focus-within:text-emerald-500 transition-colors cursor-pointer hover:scale-110 active:scale-95" 
-                          onClick={() => applyFilter(col.key)}
-                        />
-                        <input 
-                          type="text"
-                          placeholder=""
-                          value={localSearchValues[col.key] || ''}
-                          onChange={(e) => handleInputChange(col.key, e.target.value)}
-                          onKeyDown={(e) => handleKeyDown(e, col.key)}
-                          className="w-full bg-slate-50/50 border border-transparent focus:border-emerald-100 focus:bg-white rounded-xl pl-9 pr-4 py-2 text-xs font-medium outline-none transition-all placeholder:text-slate-300"
-                        />
-                      </div>
+                      <MultiSelectDropdown
+                        label={col.label}
+                        options={metadata[col.key] || []}
+                        selectedValues={filters[col.key] || []}
+                        onChange={(vals) => handleSelectChange(col.key, vals)}
+                        placeholder=""
+                        minWidth="220px"
+                        align={col.key === 'iucn' ? 'right' : 'left'}
+                      />
                     )}
                   </div>
                 </th>
@@ -154,26 +153,37 @@ export default function SpeciesTable({
           
           <tbody className="divide-y divide-slate-50">
             {species.map((item) => {
-              const iucnConfig = getIUCNConfig(item.iucn);
+              const iucnConfig = !isPlant ? getIUCNConfig(item.iucn) : null;
               return (
                 <tr 
                   key={item.id}
                   onClick={() => item.taxa_id && addSpecies(item.taxa_id)}
                   className="group hover:bg-emerald-50/30 transition-colors cursor-pointer"
                 >
-                  {/* Order */}
-                  <td className="px-6 py-4 hidden md:table-cell w-[120px]">
-                    <span className="text-[13px] font-bold text-slate-600 line-clamp-1">
-                      {language === 'zh' ? item.order_chi : item.order_eng}
-                    </span>
-                  </td>
+                  {/* fauna Order only */}
+                  {!isPlant && (
+                    <td className="px-6 py-4 hidden md:table-cell w-[120px]">
+                      <span className="text-[13px] font-bold text-slate-600 line-clamp-1">
+                        {language === 'zh' ? item.order_chi : item.order_eng}
+                      </span>
+                    </td>
+                  )}
                   
-                  {/* Family */}
+                  {/* Family (Both) */}
                   <td className="px-6 py-4 hidden md:table-cell w-[120px]">
                     <span className="text-[13px] font-medium text-slate-500 line-clamp-1">
-                      {language === 'zh' ? item.family_chi : item.family_eng}
+                      {language === 'zh' ? (item.family_chi || item.family_zh) : (item.family_eng || item.family_en)}
                     </span>
                   </td>
+
+                  {/* flora Genus only */}
+                  {isPlant && (
+                    <td className="px-6 py-4 hidden md:table-cell w-[120px]">
+                      <span className="text-[13px] font-medium text-slate-400 line-clamp-1">
+                        {language === 'zh' ? item.genus_zh : item.genus_en}
+                      </span>
+                    </td>
+                  )}
 
                   {/* Scientific Name */}
                   <td className="px-6 py-4">
@@ -185,22 +195,28 @@ export default function SpeciesTable({
                   {/* Common Name */}
                   <td className="px-6 py-4">
                     <span className="text-[14px] font-black text-slate-900 whitespace-nowrap">
-                      {language === 'zh' ? item.common_name_chi : item.common_name_eng}
+                      {language === 'zh' ? (item.common_name_chi || item.common_name_zh) : (item.common_name_eng || item.common_name_en)}
                     </span>
                   </td>
 
                   {/* Native Status */}
                   <td className="px-6 py-4 hidden md:table-cell">
-                    <span className={`px-2.5 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wider ${item.native_status?.includes('Native') ? 'bg-emerald-50 text-emerald-600' : 'bg-slate-50 text-slate-500'}`}>
-                      {item.native_status || 'Unknown'}
+                    <span className={`px-2.5 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wider ${item.native_status?.includes('Native') || item.origin?.includes('Native') || item.origin?.includes('原生') ? 'bg-emerald-50 text-emerald-600' : 'bg-slate-50 text-slate-500'}`}>
+                      {item.origin || item.native_status || 'Unknown'}
                     </span>
                   </td>
 
-                  {/* IUCN Status */}
+                  {/* Status (IUCN or Rarity) */}
                   <td className="px-6 py-4 whitespace-nowrap text-right">
-                    <span className={`px-3 py-1 rounded-xl text-[10px] font-black uppercase tracking-widest border shadow-sm ${iucnConfig.styles}`}>
-                      {iucnConfig.label.en}
-                    </span>
+                    {isPlant ? (
+                       <span className={`px-3 py-1 rounded-xl text-[10px] font-black uppercase tracking-widest border shadow-sm ${item.hk_rare_precious_note && item.hk_rare_precious_note !== 'No' ? 'bg-rose-50 text-rose-600 border-rose-100' : 'bg-slate-50 text-slate-400 border-slate-100'}`}>
+                        {item.hk_rare_precious_note || 'N/A'}
+                      </span>
+                    ) : (
+                      <span className={`px-3 py-1 rounded-xl text-[10px] font-black uppercase tracking-widest border shadow-sm ${iucnConfig?.styles}`}>
+                        {iucnConfig?.label.en}
+                      </span>
+                    )}
                   </td>
                 </tr>
               );
@@ -211,7 +227,7 @@ export default function SpeciesTable({
       
       {species.length === 0 && (
         <div className="py-20 text-center">
-          <p className="text-slate-400 font-medium">找不到配合條件的物種</p>
+          <p className="text-slate-400 font-medium">找不到符合條件的物種</p>
         </div>
       )}
     </div>

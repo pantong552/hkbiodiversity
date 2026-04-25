@@ -80,9 +80,13 @@ export default function HomeClient() {
 
   // Flora Filters
   const [plantFilters, setPlantFilters] = useState<PlantFilterState>(INITIAL_PLANT_FILTERS);
-  const [availablePlantMeta, setAvailablePlantMeta] = useState<any>({ categories: [], families: [], genuses: [] });
-
-  const [tableFilters, setTableFilters] = useState<Record<string, string>>({});
+  const [availablePlantMeta, setAvailablePlantMeta] = useState<{
+    categories: any[];
+    families: any[];
+    genuses: any[];
+  }>({ categories: [], families: [], genuses: [] });
+  const [tableMetadata, setTableMetadata] = useState<Record<string, any[]>>({});
+  const [tableFilters, setTableFilters] = useState<Record<string, any>>({});
 
   // Sorting and Pagination State
   const [sortBy, setSortBy] = useState<string>('common_name');
@@ -164,6 +168,7 @@ export default function HomeClient() {
     setTaxaType(type);
     setCurrentPage(1);
     setSearchQuery('');
+    setTableFilters({}); // 切換物種類型時清空表格篩選，以便 Metadata 重新初始化為全選
     setIsFilterOpen(false);
   };
 
@@ -215,17 +220,26 @@ export default function HomeClient() {
 
         // Apply Table Filters (for list mode)
         Object.entries(tableFilters).forEach(([key, value]) => {
-          if (!value) return;
+          if (!value || (Array.isArray(value) && value.length === 0)) return;
           
-          if (key === 'iucn' || key === 'native_status') {
-            query = query.eq(key, value);
-          } else {
-            // Map table keys to actual DB columns if needed
-            const dbKey = key === 'common_name' 
-              ? (language === 'zh' ? 'common_name_chi' : 'common_name_eng')
-              : key === 'order' ? 'order_chi' : key === 'family' ? 'family_chi' : key;
-            
-            query = query.ilike(dbKey, `%${value}%`);
+          // 如果該欄位是「全選」，則不加入 .in 過濾器以提升效能
+          const availableOptions = tableMetadata[key] || [];
+          if (Array.isArray(value) && availableOptions.length > 0 && value.length >= availableOptions.length) {
+            return;
+          }
+
+          // Map table keys to actual DB columns
+          const dbKey = key === 'common_name' 
+            ? (taxaType === 'fauna' ? 'common_name_chi' : 'common_name_zh')
+            : key === 'scientific_name' ? 'scientific_name'
+            : key === 'order' ? (taxaType === 'fauna' ? (language === 'zh' ? 'order_chi' : 'order_eng') : 'order_zh')
+            : key === 'family' ? (taxaType === 'fauna' ? (language === 'zh' ? 'family_chi' : 'family_eng') : 'family_zh')
+            : key === 'genus' ? (taxaType === 'fauna' ? 'genus_eng' : 'genus_zh')
+            : key === 'iucn' ? (taxaType === 'fauna' ? 'iucn' : 'hk_rare_precious_note')
+            : key;
+
+          if (Array.isArray(value)) {
+            query = query.in(dbKey, value);
           }
         });
 
@@ -236,7 +250,7 @@ export default function HomeClient() {
         } : {
           'common_name': language === 'zh' ? 'common_name_zh' : 'common_name_en',
           'scientific_name': 'scientific_name',
-          'rarity': 'china_red_data_book_note',
+          'rarity': 'hk_rare_precious_note',
         };
 
         const sortField = fieldMap[sortBy] || sortBy;
@@ -258,6 +272,60 @@ export default function HomeClient() {
     };
   }, [taxaType, searchQuery, selectedFilters, plantFilters, tableFilters, currentPage, itemsPerPage, sortBy, sortOrder, language, isAuthLoading]);
 
+  // 獲取表格專用的中繼資料 (All unique values for filters)
+  useEffect(() => {
+    const fetchTableMetadata = async () => {
+      if (isAuthLoading) return;
+      
+      const rpcName = taxaType === 'fauna' ? 'get_fauna_table_metadata' : 'get_flora_table_metadata';
+      const currentSearch = taxaType === 'fauna' ? searchQuery.trim() : (searchQuery.trim() || plantFilters.searchQuery.trim());
+      
+      const params = taxaType === 'fauna' ? {
+        p_search: currentSearch,
+        p_phylum: selectedFilters.taxonomy.phylum_eng,
+        p_class: selectedFilters.taxonomy.class_eng
+      } : {
+        p_search: currentSearch,
+        p_categories: plantFilters.categories
+      };
+
+      try {
+        const { data, error } = await supabaseSingleton.rpc(rpcName, params);
+        
+        if (error) throw error;
+        
+        // Data 為一個包含了各個欄位統計資訊的 JSON 對象
+        const metadata = data || {};
+        
+        // 確保每個欄位都有一個空的 array 以免渲染崩潰
+        const safeMetadata: Record<string, any[]> = {};
+        const keys = taxaType === 'fauna' 
+            ? ['order', 'family', 'scientific_name', 'common_name', 'iucn', 'native_status']
+            : ['family', 'genus', 'scientific_name', 'common_name', 'iucn', 'native_status'];
+        
+        keys.forEach(key => {
+            safeMetadata[key] = metadata[key] || [];
+        });
+
+        setTableMetadata(safeMetadata);
+        
+        // 預設全選 (僅在切換物種或初始化時執行)
+        setTableFilters(prev => {
+          const newF = { ...prev };
+          Object.entries(safeMetadata).forEach(([key, opts]) => {
+            if (!newF[key] || newF[key].length === 0) {
+              newF[key] = opts.map(o => o.name);
+            }
+          });
+          return newF;
+        });
+      } catch (err) {
+        console.error("Error fetching table metadata via RPC", err);
+      }
+    };
+
+    fetchTableMetadata();
+  }, [taxaType, searchQuery, selectedFilters, plantFilters, isAuthLoading]);
   // Handle Sort Change
   const handleSort = (field: string) => {
     if (sortBy === field) {
@@ -277,10 +345,7 @@ export default function HomeClient() {
   useEffect(() => {
     const speciesId = searchParams.get('species');
     if (speciesId) {
-      // Support both new taxa_id (e.g. fauna_123) and legacy numeric ID
       addSpecies(speciesId);
-      
-      // Clean up URL parameter to avoid re-opening on re-renders/collapses
       const newUrl = window.location.pathname;
       window.history.replaceState({}, '', newUrl);
     }
@@ -397,9 +462,9 @@ export default function HomeClient() {
                     {showLabels && <span className="text-[10px] font-black uppercase tracking-widest text-slate-400 whitespace-nowrap">{t('view.display_mode')}</span>}
                     <div className="flex bg-white shadow-sm ring-1 ring-slate-100 rounded-lg p-0.5">
                       {[
-                        { id: 'detail', icon: List, title: t('view.mode_detail') },
+                        { id: 'detail', icon: TableIcon, title: t('view.mode_detail') },
                         { id: 'photo', icon: LayoutGrid, title: t('view.mode_photo') },
-                        { id: 'table', icon: TableIcon, title: t('view.mode_table') }
+                        { id: 'table', icon: List, title: t('view.mode_table') }
                       ].map((mode) => (
                         <button
                           key={mode.id}
@@ -469,10 +534,12 @@ export default function HomeClient() {
                 <>
                    {displayMode === 'table' ? (
                         <SpeciesTable
+                            taxaType={taxaType}
                             species={species}
                             sortBy={sortBy}
                             sortOrder={sortOrder}
                             filters={tableFilters}
+                            metadata={tableMetadata}
                             onFilterChange={setTableFilters}
                             onSort={(field) => {
                             if (sortBy === field) {
