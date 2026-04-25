@@ -26,6 +26,7 @@
   --font-mono: var(--font-geist-mono);
   --animate-filter-in: filter-in 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
   --animate-grid-fade: grid-fade 0.5s ease-out forwards;
+  --animate-spin-reverse: spin-reverse 1.5s linear infinite;
   
   --shadow-card: 0 12px 20px -3px rgba(103, 151, 88, 0.08); /* 使用品牌色陰影 */
   --shadow-card-hover: 0 40px 80px -15px rgba(62, 129, 87, 0.15);
@@ -39,6 +40,11 @@
   @keyframes grid-fade {
     from { opacity: 0; transform: translateY(20px); }
     to { opacity: 1; transform: translateY(0); }
+  }
+
+  @keyframes spin-reverse {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(-360deg); }
   }
 }
 

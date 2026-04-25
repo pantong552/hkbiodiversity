@@ -35,6 +35,8 @@ export default function SpeciesCard({
   const [isUpdating, setIsUpdating] = useState(false);
   const [showTooltip, setShowTooltip] = useState(false);
   const [mounted, setMounted] = useState(false);
+  const [imgLoaded, setImgLoaded] = useState(false);
+  const [isFullyReady, setIsFullyReady] = useState(false);
 
   // Normalize data for consistent rendering
   const normalized = useMemo(() => {
@@ -80,6 +82,24 @@ export default function SpeciesCard({
     return () => setMounted(false);
   }, []);
 
+  const { imageUrl: inatPhoto, isLoading: isInatLoading, attribution, nativePageUrl } = useInaturalistPhoto(
+    !normalized.image_url ? normalized.inat_id : undefined
+  );
+
+  const placeholderImage = '/images/placeholder/no-species-image.svg';
+  
+  // Current logic for determining if we should use iNaturalist
+  const isUsingInat = !normalized.image_url && !!normalized.inat_id;
+  
+  // Show loader if we are in INAT mode and the fade-out isn't finished
+  const showLoader = isUsingInat && !isFullyReady;
+  
+  // displayImage should be: Local URL > iNaturalist URL > (Optional) Placeholder
+  // Crucially, don't fallback to placeholder while we are still waiting for INAT results
+  const displayImage = normalized.image_url || inatPhoto || (isInatLoading ? '' : placeholderImage);
+  
+  const isPlaceholder = displayImage === placeholderImage;
+
   // Check bookmark status
   useEffect(() => {
     let isMounted = true;
@@ -104,6 +124,14 @@ export default function SpeciesCard({
     return () => { isMounted = false; };
   }, [user?.id, species.taxa_id]);
 
+  // Handle seamless transition delay
+  useEffect(() => {
+    if (imgLoaded || (!isUsingInat && mounted)) {
+      const timer = setTimeout(() => setIsFullyReady(true), 200);
+      return () => clearTimeout(timer);
+    }
+  }, [imgLoaded, isUsingInat, mounted]);
+
   const toggleFavorite = useCallback(async (e: React.MouseEvent) => {
     e.stopPropagation();
     if (!user) { alert(language === 'zh' ? '請先登入' : 'Login required'); return; }
@@ -125,13 +153,6 @@ export default function SpeciesCard({
     } catch (err) { console.error('Favorite error:', err); } finally { setIsUpdating(false); }
   }, [user, species.taxa_id, normalized.id, isBookmarked, isUpdating, language, isPlant]);
 
-  const { imageUrl: inatPhoto, isLoading: isInatLoading, attribution, nativePageUrl } = useInaturalistPhoto(
-    !normalized.image_url ? normalized.inat_id : undefined
-  );
-
-  const placeholderImage = '/images/placeholder/no-species-image.svg';
-  const displayImage = normalized.image_url || inatPhoto || placeholderImage;
-  
   const iucnConfig = !isPlant && normalized.iucn ? getIUCNConfig(normalized.iucn) : null;
   const isPhoto = mode === 'photo';
 
@@ -150,24 +171,73 @@ export default function SpeciesCard({
       `}
     >
       {/* Image Container with Overlay */}
-      <div className={`relative overflow-hidden bg-slate-100 ${isPhoto ? 'h-40 sm:h-48' : 'h-48'}`}>
-        <Image
-          src={displayImage}
-          alt={normalized.common_name_chi || normalized.scientific_name || 'Species Image'}
-          fill
-          priority={priority}
-          unoptimized={displayImage.includes('/api/image/transform')}
-          sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, (max-width: 1280px) 33vw, 25vw"
-          className={`object-cover transition-all duration-700 group-hover:scale-110 ${isInatLoading ? 'blur-sm grayscale' : 'blur-0 grayscale-0'}`}
-        />
+      <div className={`relative overflow-hidden bg-slate-100 transition-colors duration-500 ${isPhoto ? 'h-40 sm:h-48' : 'h-48'} ${isPlaceholder ? 'bg-slate-50' : 'bg-slate-100'}`}>
+        {/* Image Component (Hidden until ready if using INAT) */}
+        {displayImage && (
+          <Image
+            src={displayImage}
+            alt={normalized.common_name_chi || normalized.scientific_name || 'Species Image'}
+            fill
+            priority={priority}
+            unoptimized={displayImage.includes('/api/image/transform')}
+            onLoadingComplete={() => setImgLoaded(true)}
+            sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, (max-width: 1280px) 33vw, 25vw"
+            className={`
+              object-cover transition-all duration-1000 group-hover:scale-110
+              ${(isUsingInat && !isFullyReady) ? 'opacity-0' : 'opacity-100'}
+              ${isInatLoading ? 'blur-sm grayscale' : 'blur-0 grayscale-0'}
+            `}
+          />
+        )}
+
+        {/* Professional Nature Loader Overlay (Fade Out) */}
+        {isUsingInat && !isFullyReady && (
+          <div className={`
+            absolute inset-0 flex flex-col items-center justify-center bg-slate-50 z-20 overflow-hidden
+            transition-all duration-500 ease-in-out
+            ${imgLoaded ? 'opacity-0 scale-105 blur-sm' : 'opacity-100 scale-100 blur-0'}
+          `}>
+            {/* Spinning Rings */}
+            <div className="relative w-16 h-16 flex items-center justify-center scale-90 sm:scale-100">
+              <div className="absolute inset-0 border-t-2 border-emerald-500/30 border-r-2 border-emerald-500/10 rounded-full animate-spin duration-1000"></div>
+              <div className="absolute inset-2 border-b-2 border-emerald-500/40 border-l-2 border-emerald-500/5 rounded-full animate-spin-reverse duration-[1500ms]"></div>
+              
+              {/* Pulsing Leaf Center */}
+              <div className="relative bg-white p-2.5 rounded-full shadow-xl shadow-emerald-100/50 animate-pulse">
+                <Leaf className="w-6 h-6 text-emerald-600 fill-emerald-50/50" />
+              </div>
+            </div>
+            
+            {/* Dot Animation */}
+            <div className="mt-4 flex flex-col items-center gap-1.5">
+              <span className="text-[10px] font-black uppercase tracking-[0.2em] text-emerald-800/40">Exploring</span>
+              <span className="flex gap-1.5">
+                <span className="w-1.5 h-1.5 bg-emerald-400 rounded-full animate-bounce [animation-delay:-0.3s]"></span>
+                <span className="w-1.5 h-1.5 bg-emerald-400 rounded-full animate-bounce [animation-delay:-0.15s]"></span>
+                <span className="w-1.5 h-1.5 bg-emerald-400 rounded-full animate-bounce"></span>
+              </span>
+            </div>
+          </div>
+        )}
         
         {/* Bottom Title Overlay for Detail Mode */}
         {!isPhoto && (
-          <div className="absolute inset-x-0 bottom-0 p-4 pt-12 bg-gradient-to-t from-black/80 via-black/40 to-transparent z-10">
-            <h3 className="text-white text-xl font-black tracking-tight leading-tight drop-shadow-md">
+          <div className={`
+            absolute inset-x-0 bottom-0 p-4 pt-12 z-10 transition-colors duration-500
+            ${isPlaceholder 
+              ? 'bg-gradient-to-t from-slate-100/80 via-slate-50/20 to-transparent' 
+              : 'bg-gradient-to-t from-black/80 via-black/40 to-transparent'}
+          `}>
+            <h3 className={`
+              text-xl font-black tracking-tight leading-tight transition-colors duration-500
+              ${isPlaceholder ? 'text-slate-900' : 'text-white drop-shadow-md'}
+            `}>
               {language === 'zh' ? normalized.common_name_chi : normalized.common_name_eng}
             </h3>
-            <p className="text-white/80 text-xs drop-shadow-sm font-serif mt-1">
+            <p className={`
+              text-xs font-serif mt-1 transition-colors duration-500
+              ${isPlaceholder ? 'text-slate-500' : 'text-white/80 drop-shadow-sm'}
+            `}>
               {formatScientificName(normalized.scientific_name)}
             </p>
           </div>
@@ -210,7 +280,9 @@ export default function SpeciesCard({
                   ${isUpdating ? 'opacity-50 cursor-not-allowed' : ''}
                   ${isBookmarked 
                     ? 'text-rose-500 border-rose-200 bg-rose-50/90 shadow-sm' 
-                    : 'text-white/90 border-white/20 bg-black/20 hover:bg-rose-50 hover:text-rose-500 hover:border-rose-100 shadow-sm'
+                    : isPlaceholder
+                      ? 'text-slate-400 border-slate-200 bg-white/60 hover:bg-rose-50 hover:text-rose-500 hover:border-rose-100 shadow-sm'
+                      : 'text-white/90 border-white/20 bg-black/20 hover:bg-rose-50 hover:text-rose-500 hover:border-rose-100 shadow-sm'
                   }
                 `}
               >
