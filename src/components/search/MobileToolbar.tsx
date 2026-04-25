@@ -7,6 +7,7 @@ import { useSpeciesPanel } from '@/context/SpeciesPanelContext';
 
 interface MobileToolbarProps {
   sortBy: string;
+  sortOrder: 'asc' | 'desc';
   onSortChange: (val: string) => void;
   itemsPerPage: number;
   onItemsPerPageChange: (val: number) => void;
@@ -19,6 +20,7 @@ interface MobileToolbarProps {
 
 export default function MobileToolbar({
   sortBy,
+  sortOrder,
   onSortChange,
   itemsPerPage,
   onItemsPerPageChange,
@@ -51,9 +53,18 @@ export default function MobileToolbar({
   }, [lastScrollY]);
 
   const sortOptions = [
-    { value: 'common_name', label: t('sort.common_name').split('(')[0].trim() },
-    { value: 'scientific_name', label: t('sort.scientific_name').split('(')[0].trim() },
-    { value: 'rarity', label: t('sort.rarity').split('(')[0].trim() }
+    { 
+      value: 'common_name', 
+      label: (sortBy === 'common_name' && sortOrder === 'desc') ? t('sort.common_name').replace('A-Z', 'Z-A') : t('sort.common_name')
+    },
+    { 
+      value: 'scientific_name', 
+      label: (sortBy === 'scientific_name' && sortOrder === 'desc') ? t('sort.scientific_name').replace('A-Z', 'Z-A') : t('sort.scientific_name')
+    },
+    { 
+      value: 'rarity', 
+      label: (sortBy === 'rarity' && sortOrder === 'desc') ? t('sort.rarity').replace('High First', 'Low First') : t('sort.rarity')
+    }
   ];
 
   return (

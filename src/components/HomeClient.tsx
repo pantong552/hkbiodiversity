@@ -242,6 +242,17 @@ export default function HomeClient() {
     };
   }, [taxaType, searchQuery, selectedFilters, plantFilters, currentPage, itemsPerPage, sortBy, sortOrder, language, isAuthLoading]);
 
+  // Handle Sort Change
+  const handleSort = (field: string) => {
+    if (sortBy === field) {
+      setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortBy(field);
+      setSortOrder('asc');
+    }
+    setCurrentPage(1);
+  };
+
   useEffect(() => {
     if (!isAuthLoading) fetchSpecies();
   }, [fetchSpecies, isAuthLoading]);
@@ -327,12 +338,21 @@ export default function HomeClient() {
                       <CustomDropdown
                         size="sm"
                         options={[
-                          { value: 'common_name', label: t('sort.common_name') },
-                          { value: 'scientific_name', label: t('sort.scientific_name') },
-                          { value: 'rarity', label: t('sort.rarity') }
+                          { 
+                            value: 'common_name', 
+                            label: (sortBy === 'common_name' && sortOrder === 'desc') ? t('sort.common_name').replace('A-Z', 'Z-A') : t('sort.common_name')
+                          },
+                          { 
+                            value: 'scientific_name', 
+                            label: (sortBy === 'scientific_name' && sortOrder === 'desc') ? t('sort.scientific_name').replace('A-Z', 'Z-A') : t('sort.scientific_name')
+                          },
+                          { 
+                            value: 'rarity', 
+                            label: (sortBy === 'rarity' && sortOrder === 'desc') ? t('sort.rarity').replace('High First', 'Low First') : t('sort.rarity')
+                          }
                         ]}
                         value={sortBy}
-                        onChange={(val) => setSortBy(val)}
+                        onChange={handleSort}
                         className="min-w-[120px] lg:min-w-[160px]"
                       />
                     </div>
@@ -411,7 +431,8 @@ export default function HomeClient() {
             {/* Mobile Specialized Toolbar */}
             <MobileToolbar
               sortBy={sortBy}
-              onSortChange={setSortBy}
+              sortOrder={sortOrder}
+              onSortChange={handleSort}
               itemsPerPage={itemsPerPage}
               onItemsPerPageChange={setItemsPerPage}
               displayMode={displayMode}
