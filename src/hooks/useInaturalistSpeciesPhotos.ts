@@ -175,7 +175,7 @@ export function useInaturalistSpeciesPhotos(inatId: number | string | undefined,
   }, [inatId]);
 
   const loadData = useCallback(async (targetPage: number, targetScope: 'hongkong' | 'global', isInitial: boolean) => {
-    if (!inatId || isFetchingRef.current) return;
+    if ((!inatId && !taxaId) || isFetchingRef.current) return;
     
     isFetchingRef.current = true;
     
@@ -192,7 +192,7 @@ export function useInaturalistSpeciesPhotos(inatId: number | string | undefined,
     }
 
     try {
-      let result = await fetchInternal(targetPage, targetScope, isInitial);
+      let result = inatId ? await fetchInternal(targetPage, targetScope, isInitial) : null;
       let communityPhotos: any[] = [];
       
       if (isInitial) {
@@ -235,6 +235,17 @@ export function useInaturalistSpeciesPhotos(inatId: number | string | undefined,
             page: targetPage
           };
         });
+      } else if (isInitial) {
+        // No inatId case - just community photos
+        setState(prev => ({
+          ...prev,
+          photos: communityPhotos,
+          isLoading: false,
+          hasMore: false,
+          totalCount: communityPhotos.length,
+          hasHkPhotos: communityPhotos.length > 0,
+          page: 1
+        }));
       }
     } catch (err) {
       console.error('Fetch error:', err);
@@ -246,7 +257,7 @@ export function useInaturalistSpeciesPhotos(inatId: number | string | undefined,
 
   // Initial load when inatId or taxaId changes
   useEffect(() => {
-    const mainId = inatId;
+    const mainId = inatId || taxaId;
     if (mainId && currentTaxonIdRef.current !== mainId) {
       currentTaxonIdRef.current = mainId;
       loadData(1, 'hongkong', true);

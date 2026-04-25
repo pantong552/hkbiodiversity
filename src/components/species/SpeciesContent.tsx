@@ -165,15 +165,13 @@ export default function SpeciesContent({ species, showBreadcrumb = true }: Speci
             </section>
 
             {/* iNaturalist Photo Gallery */}
-            {species.inat_id && (
-              <section className="bg-white p-8 rounded-[2.5rem] shadow-sm border border-slate-100">
-                <SpeciesPhotoGallery 
-                  taxaId={species.taxa_id || ''}
-                  inatId={species.inat_id || ''} 
-                  commonName={commonName || species.scientific_name} 
-                />
-              </section>
-            )}
+            <section className="bg-white p-8 rounded-[2.5rem] shadow-sm border border-slate-100">
+              <SpeciesPhotoGallery 
+                taxaId={species.taxa_id || ''}
+                inatId={species.inat_id || ''} 
+                commonName={commonName || species.scientific_name} 
+              />
+            </section>
 
 
             {/* Description */}
