@@ -336,14 +336,6 @@ export default function Header() {
                     </div>
                     <Settings className="w-5 h-5 text-slate-300" />
                   </Link>
-                  <Link
-                    href="/account"
-                    onClick={() => setIsMobileMenuOpen(false)}
-                    className="flex items-center justify-center gap-2 w-full py-3 text-emerald-700 font-bold border-2 border-emerald-100 rounded-2xl hover:bg-emerald-50 transition-all cursor-pointer"
-                  >
-                    <Settings className="w-4 h-4" />
-                    {t('account.header_link')}
-                  </Link>
                   <button
                     onClick={handleLogout}
                     className="flex items-center justify-center gap-2 w-full py-3 text-red-600 font-bold border-2 border-red-100 rounded-2xl hover:bg-red-50 transition-all cursor-pointer"
