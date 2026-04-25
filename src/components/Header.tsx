@@ -123,8 +123,9 @@ export default function Header() {
     `}>
       <nav className={`
         glass-header max-w-[1920px] mx-auto
-        ${isScrolled ? 'py-2 lg:py-3' : 'py-3 lg:py-5'}
+        ${isScrolled ? 'py-2 lg:py-3 shadow-2xl shadow-slate-200/50' : 'py-3 lg:py-5 shadow-none'}
         px-6 md:px-8 flex items-center justify-between
+        bg-white border-slate-100
       `}>
         {/* Logo & Branding */}
         <Link href="/" className="flex items-center gap-5 group relative">
