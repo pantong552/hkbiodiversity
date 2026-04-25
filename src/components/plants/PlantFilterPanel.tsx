@@ -52,8 +52,8 @@ export default function PlantFilterPanel({
 
   const t = {
     category: language === 'zh' ? '植物類別' : 'Plant Category',
-    family: language === 'zh' ? '科' : 'Family',
-    genus: language === 'zh' ? '屬' : 'Genus',
+    family: language === 'zh' ? '科 (Family)' : 'Family',
+    genus: language === 'zh' ? '屬 (Genus)' : 'Genus',
     origin: language === 'zh' ? '來源' : 'Origin',
     flowering: language === 'zh' ? '花期' : 'Flowering',
     fruiting: language === 'zh' ? '果期' : 'Fruiting',
@@ -157,14 +157,14 @@ export default function PlantFilterPanel({
                 options={availableFamilies}
                 selectedValues={filters.families}
                 onChange={(values) => setFilters(prev => ({ ...prev, families: values }))}
-                placeholder={`${t.family}...`}
+                placeholder={t.family}
             />
             <MultiSelectDropdown 
                 label={t.genus}
                 options={availableGenuses}
                 selectedValues={filters.genuses}
                 onChange={(values) => setFilters(prev => ({ ...prev, genuses: values }))}
-                placeholder={`${t.genus}...`}
+                placeholder={t.genus}
             />
         </div>
       </div>

@@ -281,7 +281,7 @@ export default function SidebarFilter({
                       options={taxonomyOptions[level]}
                       selectedValues={selected.taxonomy[level]}
                       onChange={(values) => handleTaxonomyChange(level, values)}
-                      placeholder={`${t('search.sidebar_placeholder')}...`}
+                      placeholder={TAXONOMY_LABELS[level]}
                     />
                   ))}
                 </div>
