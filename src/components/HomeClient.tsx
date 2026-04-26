@@ -57,6 +57,7 @@ export default function HomeClient() {
   const [totalResultCount, setTotalResultCount] = useState(0);
   const [toolbarWidth, setToolbarWidth] = useState(0);
   const toolbarRef = useRef<HTMLDivElement>(null);
+  const fetchIdRef = useRef(0); // 用於追踪請求序號以防止 Race Condition
 
   // Dynamic width sensing for toolbar labels
   useEffect(() => {
@@ -176,6 +177,7 @@ export default function HomeClient() {
     return async () => {
       if (isAuthLoading) return;
 
+      const currentFetchId = ++fetchIdRef.current; // 更新目前請求 ID
       setIsLoading(true);
       setError(null);
 
@@ -272,6 +274,9 @@ export default function HomeClient() {
         const { data, error: fetchError, count } = await query;
         if (fetchError) throw fetchError;
 
+        // 檢查此請求是否過時 (這就是解決載入兩次的關鍵)
+        if (currentFetchId !== fetchIdRef.current) return;
+
         setSpecies(data || []);
         setTotalResultCount(count || 0);
       } catch (err: any) {
@@ -318,17 +323,6 @@ export default function HomeClient() {
         });
 
         setTableMetadata(safeMetadata);
-        
-        // 預設全選 (僅在切換物種或初始化時執行)
-        setTableFilters(prev => {
-          const newF = { ...prev };
-          Object.entries(safeMetadata).forEach(([key, opts]) => {
-            if (!newF[key] || newF[key].length === 0) {
-              newF[key] = opts.map(o => o.name);
-            }
-          });
-          return newF;
-        });
       } catch (err) {
         console.error("Error fetching table metadata via RPC", err);
       }
@@ -348,7 +342,12 @@ export default function HomeClient() {
   };
 
   useEffect(() => {
-    if (!isAuthLoading) fetchSpecies();
+    if (!isAuthLoading) {
+      const timer = setTimeout(() => {
+        fetchSpecies();
+      }, 50); // 50ms 防抖延遲，足以合併多個同步/異步狀態變動引發的請求
+      return () => clearTimeout(timer);
+    }
   }, [fetchSpecies, isAuthLoading]);
 
   // Handle species parameter in URL on initial load and param change

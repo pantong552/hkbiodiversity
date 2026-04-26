@@ -110,7 +110,7 @@ export default function MultiSelectDropdown({
   const localCount = localSelected.length;
   const isAllSelected = localSelected.length === options.length && options.length > 0;
   const isSomeSelected = localSelected.length > 0 && localSelected.length < options.length;
-  const displayPlaceholder = placeholder || t('search.sidebar_placeholder');
+  const displayPlaceholder = placeholder !== undefined ? placeholder : t('search.sidebar_placeholder');
 
   const triggerLabel = useMemo(() => {
     if (selectedCount === 0) return displayPlaceholder;
