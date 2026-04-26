@@ -5,6 +5,7 @@ import { ChevronDown, Search, Check, X, Filter, RotateCcw } from 'lucide-react';
 import { createPortal } from 'react-dom';
 import { useLanguage } from '../../context/LanguageContext';
 import { motion, AnimatePresence } from 'framer-motion';
+import { formatScientificName } from '../../utils/formatters';
 
 interface Option {
   name: string;
@@ -31,7 +32,7 @@ export default function MultiSelectDropdown({
   align = 'left',
   minWidth = '240px',
 }: MultiSelectDropdownProps) {
-  const { t } = useLanguage();
+  const { language, t } = useLanguage();
   const [isOpen, setIsOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [isMobileView, setIsMobileView] = useState(false);
@@ -114,7 +115,7 @@ export default function MultiSelectDropdown({
 
   const triggerLabel = useMemo(() => {
     if (selectedCount === 0) return displayPlaceholder;
-    if (options.length > 0 && selectedValues.length >= options.length) return "全部";
+    if (options.length > 0 && selectedValues.length >= options.length) return language === 'zh' ? "全部" : "All";
     
     if (selectedCount <= 2) {
       return options
@@ -123,8 +124,8 @@ export default function MultiSelectDropdown({
         .join(', ');
     }
     
-    return `${selectedCount} ${t('filter.selected') || '項'}`;
-  }, [selectedCount, options, selectedValues, displayPlaceholder, t]);
+    return `${selectedCount} ${language === 'zh' ? (t('filter.selected') || '項') : 'items'}`;
+  }, [selectedCount, options, selectedValues, displayPlaceholder, t, language]);
 
   return (
     <div className="relative w-full" ref={dropdownRef}>
@@ -172,9 +173,9 @@ export default function MultiSelectDropdown({
               <div className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 transition-all ${isAllSelected ? 'bg-emerald-600 border-emerald-600 text-white' : isSomeSelected ? 'bg-emerald-50 border-emerald-500 text-emerald-600' : 'bg-white border-slate-200 group-hover/all:border-emerald-300'}`}>
                 {isAllSelected ? <Check className="w-3 h-3 stroke-[3px]" /> : isSomeSelected ? <div className="w-2 h-0.5 bg-emerald-600 rounded-full" /> : null}
               </div>
-              <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest group-hover/all:text-emerald-700">全選</span>
+              <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest group-hover/all:text-emerald-700">{language === 'zh' ? '全選' : 'All'}</span>
             </button>
-            <span className="text-[9px] font-bold text-slate-300 uppercase tracking-widest">{filteredOptions.length} 個項目</span>
+            <span className="text-[9px] font-bold text-slate-300 uppercase tracking-widest">{filteredOptions.length} {language === 'zh' ? '個項目' : 'items'}</span>
           </div>
           
           <div className="max-h-[260px] overflow-y-auto scrollbar-thin scrollbar-thumb-slate-200 p-1.5 space-y-0.5">
@@ -186,6 +187,8 @@ export default function MultiSelectDropdown({
               <>
                 {filteredOptions.slice(0, 500).map((opt) => {
                   const isSelected = localSelected.includes(opt.name);
+                  const isScientific = label.toLowerCase().includes('scientific name') || label.includes('學名');
+                  const displayLabel = isScientific ? formatScientificName(opt.display) : opt.display;
                   return (
                     <button
                       key={opt.name}
@@ -201,7 +204,7 @@ export default function MultiSelectDropdown({
                           <Check className="w-3 h-3 stroke-[3px]" />
                         </div>
                         <span className={`text-xs font-bold truncate ${isSelected ? 'text-emerald-700' : 'text-slate-700'}`}>
-                          {opt.display}
+                          {displayLabel}
                         </span>
                       </div>
                       <span className={`text-[9px] font-bold shrink-0 ${isSelected ? 'text-emerald-600/70' : 'text-slate-300'}`}>
@@ -212,8 +215,10 @@ export default function MultiSelectDropdown({
                 })}
                 {filteredOptions.length > 500 && (
                   <div className="text-center py-2 bg-slate-50/50 rounded-lg mt-1">
-                    <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest italic">
-                      僅顯示前 500 個項目，請透過搜尋縮細範圍
+                    <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest italic px-2">
+                      {language === 'zh' 
+                        ? '僅顯示前 500 個項目，請透過搜尋縮細範圍' 
+                        : 'Showing top 500 items only. Use search to refine.'}
                     </p>
                   </div>
                 )}
@@ -227,13 +232,13 @@ export default function MultiSelectDropdown({
               onClick={() => setIsOpen(false)}
               className="flex-1 py-2 text-[10px] font-black text-slate-400 hover:text-slate-600 transition-colors uppercase tracking-widest"
             >
-              取消
+              {language === 'zh' ? '取消' : 'Cancel'}
             </button>
             <button 
               onClick={handleApply}
               className="flex-1 py-2 bg-emerald-600 text-white rounded-xl text-[10px] font-black hover:bg-emerald-700 transition-all shadow-md shadow-emerald-200 uppercase tracking-widest active:scale-95"
             >
-              確定
+              {language === 'zh' ? '確定' : 'OK'}
             </button>
           </div>
         </div>
@@ -256,7 +261,9 @@ export default function MultiSelectDropdown({
               onClick={toggleAll}
               className="px-3 py-2 bg-slate-50 rounded-xl text-[10px] font-black uppercase tracking-widest text-slate-500 border border-slate-100"
             >
-              {isAllSelected ? '取消全選' : '全選'}
+              {isAllSelected 
+                ? (language === 'zh' ? '取消全選' : 'Deselect All') 
+                : (language === 'zh' ? '全選' : 'Select All')}
             </button>
           </div>
           
@@ -266,7 +273,7 @@ export default function MultiSelectDropdown({
               <input
                 ref={inputRef}
                 type="text"
-                placeholder="搜尋項目..."
+                placeholder={language === 'zh' ? "搜尋項目..." : "Search items..."}
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="w-full pl-12 pr-4 py-4 bg-white border border-slate-200 rounded-2xl focus:border-emerald-500 outline-none shadow-sm text-sm font-bold placeholder:text-slate-300"
@@ -278,12 +285,16 @@ export default function MultiSelectDropdown({
             {filteredOptions.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-20 text-slate-300">
                 <Search className="w-12 h-12 mb-4 opacity-10" />
-                <p className="font-black text-xs uppercase tracking-widest">找不到結果</p>
+                <p className="font-black text-xs uppercase tracking-widest">
+                  {language === 'zh' ? '找不到結果' : 'No results found'}
+                </p>
               </div>
             ) : (
               <>
                 {filteredOptions.slice(0, 500).map((opt) => {
                   const isSelected = localSelected.includes(opt.name);
+                  const isScientific = label.toLowerCase().includes('scientific name') || label.includes('學名');
+                  const displayValue = isScientific ? formatScientificName(opt.display) : opt.display;
                   return (
                     <button
                       key={opt.name}
@@ -298,18 +309,20 @@ export default function MultiSelectDropdown({
                         <div className={`w-6 h-6 rounded-lg border-2 flex items-center justify-center shrink-0 transition-all ${isSelected ? 'bg-emerald-600 border-emerald-600 text-white' : 'bg-white border-slate-200 text-transparent'}`}>
                           <Check className="w-4 h-4 stroke-[3px]" />
                         </div>
-                        <span className={`font-black text-sm ${isSelected ? 'text-emerald-900' : 'text-slate-700'}`}>{opt.display}</span>
+                        <span className={`font-black text-sm ${isSelected ? 'text-emerald-900' : 'text-slate-700'}`}>{displayValue}</span>
                       </div>
                       <span className={`text-[10px] font-bold ${isSelected ? 'text-emerald-600/70' : 'text-slate-300'}`}>
-                        {opt.count} 個結果
+                        {opt.count} {language === 'zh' ? '個結果' : 'results'}
                       </span>
                     </button>
                   );
                 })}
                 {filteredOptions.length > 500 && (
                   <div className="text-center py-4 bg-slate-50 rounded-2xl mt-4">
-                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest italic">
-                      僅顯示前 500 個項目，請利用搜尋縮小範圍
+                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest italic px-4">
+                      {language === 'zh' 
+                        ? '僅顯示前 500 個項目，請利用搜尋縮小範圍' 
+                        : 'Showing top 500 items only. Use search to refine.'}
                     </p>
                   </div>
                 )}
@@ -322,13 +335,13 @@ export default function MultiSelectDropdown({
               onClick={() => setIsOpen(false)}
               className="flex-1 py-4 text-xs font-black text-slate-400 uppercase tracking-widest"
             >
-              取消
+              {language === 'zh' ? '取消' : 'Cancel'}
             </button>
             <button 
               onClick={handleApply}
               className="flex-[2] py-4 bg-emerald-600 text-white rounded-2xl font-black text-sm uppercase tracking-[0.2em] shadow-xl shadow-emerald-600/20 active:scale-[0.98] transition-all"
             >
-              套用所選 ({localCount})
+              {language === 'zh' ? `套用所選 (${localCount})` : `Apply Selection (${localCount})`}
             </button>
           </div>
         </div>,

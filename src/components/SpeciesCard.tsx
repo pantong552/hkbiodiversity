@@ -184,8 +184,7 @@ export default function SpeciesCard({
             sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, (max-width: 1280px) 33vw, 25vw"
             className={`
               object-cover transition-all duration-1000 ease-out
-              ${!imgLoaded ? 'opacity-0 scale-95' : 'opacity-100 group-hover:scale-110'}
-              ${isInatLoading ? 'blur-sm grayscale' : 'blur-0 grayscale-0'}
+              ${!imgLoaded ? 'opacity-0 scale-95 blur-sm grayscale' : 'opacity-100 group-hover:scale-110 blur-0 grayscale-0'}
             `}
           />
         )}

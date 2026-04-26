@@ -136,7 +136,7 @@ export default function SpeciesTable({
                         options={metadata.native_status || nativeOptions}
                         selectedValues={filters.native_status || []}
                         onChange={(vals) => handleSelectChange('native_status', vals)}
-                        placeholder="全部"
+                        placeholder={language === 'zh' ? "全部" : "All"}
                         minWidth="140px"
                       />
                     ) : col.key === 'iucn' ? (
@@ -145,17 +145,24 @@ export default function SpeciesTable({
                         options={metadata.iucn || iucnOptions}
                         selectedValues={filters.iucn || []}
                         onChange={(vals) => handleSelectChange('iucn', vals)}
-                        placeholder="全部"
+                        placeholder={language === 'zh' ? "全部" : "All"}
                         align="right"
-                        minWidth="100px"
+                        minWidth="140px"
                       />
                     ) : (
                       <MultiSelectDropdown
                         label={col.label}
-                        options={metadata[col.key] || []}
+                        options={(metadata[col.key] || []).map(item => {
+                          const isEnMode = language === 'en';
+                          const isLocalizable = col.key === 'common_name' || col.key === 'family' || col.key === 'order' || col.key === 'genus';
+                          return {
+                            ...item,
+                            display: (isEnMode && isLocalizable && item.en) ? item.en : item.display
+                          };
+                        })}
                         selectedValues={filters[col.key] || []}
                         onChange={(vals) => handleSelectChange(col.key, vals)}
-                        placeholder="全部"
+                        placeholder={language === 'zh' ? "全部" : "All"}
                         minWidth={col.key === 'scientific_name' || col.key === 'common_name' ? '120px' : '160px'}
                         align={col.key === 'iucn' ? 'right' : 'left'}
                       />
