@@ -410,6 +410,7 @@ export default function HomeClient() {
                 ref={toolbarRef}
                 className={`hidden md:flex relative z-40 flex-nowrap items-center justify-between bg-white/80 backdrop-blur-2xl px-6 py-2.5 rounded-[1.25rem] shadow-xl shadow-slate-200/40 border border-slate-200/50 ring-1 ring-white/50 mb-8 scale-in duration-500 gap-4 transition-opacity ${isExpanded ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}
               >
+                {/* Left: Filter Toggle (visible when needed) */}
                 <div className="flex items-center gap-2 shrink-0">
                   <button
                     onClick={() => setIsFilterOpen(true)}
@@ -420,13 +421,14 @@ export default function HomeClient() {
                   </button>
                 </div>
 
-                {/* Center: Controls Grouped Tightly */}
-                <div className="flex items-center gap-2 lg:gap-4 bg-slate-50/50 p-1 rounded-2xl border border-slate-100/50">
-                  {displayMode !== 'table' && (
-                    <div className="flex items-center gap-2 pl-2">
+                {/* Center: Controls Grouped Tightly with Custom Scroll */}
+                <div className="flex-1 min-w-0 flex items-center justify-center">
+                  <div className="flex items-center gap-2 lg:gap-4 bg-slate-50/50 p-1 rounded-2xl border border-slate-100/50 overflow-x-auto custom-scrollbar scroll-smooth">
+                    <div className="flex items-center gap-2 pl-2 shrink-0">
                       {showLabels && <span className="text-[10px] font-black uppercase tracking-widest text-slate-400 whitespace-nowrap">{t('sort.label')}</span>}
                       <CustomDropdown
                         size="sm"
+                        disabled={displayMode === 'table'}
                         options={[
                           { 
                             value: 'common_name', 
@@ -446,50 +448,50 @@ export default function HomeClient() {
                         className="min-w-[120px] lg:min-w-[160px]"
                       />
                     </div>
-                  )}
 
-                  {(displayMode !== 'table' && showLabels) && <div className="h-4 w-px bg-slate-200/60" />}
+                    {showLabels && <div className="h-4 w-px bg-slate-200/60 shrink-0" />}
 
-                  <div className="flex items-center gap-2 px-1">
-                    {showLabels && <span className="text-[10px] font-black uppercase tracking-widest text-slate-400 whitespace-nowrap">{t('view.per_page')}</span>}
-                    <div className="flex bg-white shadow-sm ring-1 ring-slate-100 rounded-lg p-0.5">
-                      {PAGE_SIZE_OPTIONS[displayMode].map((size) => (
-                        <button
-                          key={size}
-                          onClick={() => setItemsPerPage(size)}
-                          className={`px-2 py-1 rounded-md text-[10px] font-black transition-all ${itemsPerPage === size ? 'bg-emerald-600 text-white shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
-                        >
-                          {size}
-                        </button>
-                      ))}
+                    <div className="flex items-center gap-2 px-1 shrink-0">
+                      {showLabels && <span className="text-[10px] font-black uppercase tracking-widest text-slate-400 whitespace-nowrap">{t('view.per_page')}</span>}
+                      <div className="flex bg-white shadow-sm ring-1 ring-slate-100 rounded-lg p-0.5">
+                        {PAGE_SIZE_OPTIONS[displayMode].map((size) => (
+                          <button
+                            key={size}
+                            onClick={() => setItemsPerPage(size)}
+                            className={`px-2 py-1 rounded-md text-[10px] font-black transition-all ${itemsPerPage === size ? 'bg-emerald-600 text-white shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
+                          >
+                            {size}
+                          </button>
+                        ))}
+                      </div>
                     </div>
-                  </div>
 
-                  <div className="h-4 w-px bg-slate-200/60" />
+                    <div className="h-4 w-px bg-slate-200/60 shrink-0" />
 
-                  <div className="flex items-center gap-2 px-1 text-slate-300">
-                    {showLabels && <span className="text-[10px] font-black uppercase tracking-widest text-slate-400 whitespace-nowrap">{t('view.display_mode')}</span>}
-                    <div className="flex bg-white shadow-sm ring-1 ring-slate-100 rounded-lg p-0.5">
-                      {[
-                        { id: 'detail', icon: TableIcon, title: t('view.mode_detail') },
-                        { id: 'photo', icon: LayoutGrid, title: t('view.mode_photo') },
-                        { id: 'table', icon: List, title: t('view.mode_table') }
-                      ].map((mode) => (
-                        <button
-                          key={mode.id}
-                          onClick={() => setDisplayMode(mode.id as any)}
-                          title={mode.title}
-                          className={`p-1.5 rounded-md transition-all ${displayMode === mode.id ? 'bg-emerald-600 text-white shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
-                        >
-                          <mode.icon className="w-3.5 h-3.5" />
-                        </button>
-                      ))}
+                    <div className="flex items-center gap-2 px-1 text-slate-300 shrink-0">
+                      {showLabels && <span className="text-[10px] font-black uppercase tracking-widest text-slate-400 whitespace-nowrap">{t('view.display_mode')}</span>}
+                      <div className="flex bg-white shadow-sm ring-1 ring-slate-100 rounded-lg p-0.5">
+                        {[
+                          { id: 'detail', icon: TableIcon, title: t('view.mode_detail') },
+                          { id: 'photo', icon: LayoutGrid, title: t('view.mode_photo') },
+                          { id: 'table', icon: List, title: t('view.mode_table') }
+                        ].map((mode) => (
+                          <button
+                            key={mode.id}
+                            onClick={() => setDisplayMode(mode.id as any)}
+                            title={mode.title}
+                            className={`p-1.5 rounded-md transition-all ${displayMode === mode.id ? 'bg-emerald-600 text-white shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
+                          >
+                            <mode.icon className="w-3.5 h-3.5" />
+                          </button>
+                        ))}
+                      </div>
                     </div>
                   </div>
                 </div>
 
                 {/* Right: Compact Pagination & Results Count */}
-                <div className="flex items-center gap-4 shrink-0">
+                <div className="flex items-center gap-4 shrink-0 bg-white/80 md:bg-transparent pl-2">
                   <div className="flex items-center gap-1 bg-white ring-1 ring-slate-100 rounded-xl p-1 shadow-sm">
                     <button
                       disabled={currentPage === 1}

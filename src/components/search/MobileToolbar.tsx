@@ -88,7 +88,7 @@ export default function MobileToolbar({
         {/* Row 1: Sort (Left) & Mode (Right) */}
         <div className="flex items-center justify-between gap-2 overflow-hidden">
           {/* Sorting Control */}
-          <div className="flex flex-1 items-center bg-slate-100/80 rounded-2xl p-1 gap-1 overflow-hidden h-[38px]">
+          <div className={`flex flex-1 items-center bg-slate-100/80 rounded-2xl p-1 gap-1 overflow-hidden h-[38px] transition-opacity duration-300 ${displayMode === 'table' ? 'opacity-40 pointer-events-none' : 'opacity-100'}`}>
             <div className="pl-2 pr-1 text-slate-400 shrink-0">
               <ArrowUpDown className="w-3 h-3" />
             </div>

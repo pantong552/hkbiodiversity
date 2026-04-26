@@ -87,7 +87,7 @@ export default function SpeciesTable({
 
   return (
     <div className={`
-      w-full bg-white rounded-[1.5rem] md:rounded-[2rem] border border-slate-100 shadow-xl shadow-slate-200/50 overflow-hidden 
+      w-full bg-white rounded-[1.25rem] border border-slate-100 shadow-xl shadow-slate-200/50 overflow-hidden 
       transition-all duration-300 min-h-[400px]
       ${isChanging ? 'opacity-0 scale-[0.99]' : 'opacity-100 scale-100'}
     `}>
