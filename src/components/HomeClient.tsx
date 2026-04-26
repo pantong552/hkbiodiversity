@@ -239,7 +239,17 @@ export default function HomeClient() {
             : key;
 
           if (Array.isArray(value)) {
-            query = query.in(dbKey, value);
+            if (dbKey === 'iucn' && value.includes('NE')) {
+              // 處理 NE: 包含簡寫 'NE'、NULL 或空字串
+              const otherValues = value.filter(v => v !== 'NE');
+              const filterParts = [`iucn.is.null`, `iucn.eq.""` , `iucn.eq.NE` ];
+              if (otherValues.length > 0) {
+                filterParts.push(`iucn.in.(${otherValues.map(v => `"${v}"`).join(',')})`);
+              }
+              query = query.or(filterParts.join(','));
+            } else {
+              query = query.in(dbKey, value);
+            }
           }
         });
 

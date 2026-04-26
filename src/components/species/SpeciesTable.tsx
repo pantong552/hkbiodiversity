@@ -41,12 +41,13 @@ export default function SpeciesTable({
   };
 
   const iucnOptions = [
-    { name: 'Critically Endangered', display: 'CR', count: 0 },
-    { name: 'Endangered', display: 'EN', count: 0 },
-    { name: 'Vulnerable', display: 'VU', count: 0 },
-    { name: 'Near Threatened', display: 'NT', count: 0 },
-    { name: 'Least Concern', display: 'LC', count: 0 },
-    { name: 'Data Deficient', display: 'DD', count: 0 },
+    { name: 'CR', display: 'CR', count: 0 },
+    { name: 'EN', display: 'EN', count: 0 },
+    { name: 'VU', display: 'VU', count: 0 },
+    { name: 'NT', display: 'NT', count: 0 },
+    { name: 'LC', display: 'LC', count: 0 },
+    { name: 'DD', display: 'DD', count: 0 },
+    { name: 'NE', display: 'NE', count: 0 },
   ];
 
   const nativeOptions = [
@@ -156,7 +157,8 @@ export default function SpeciesTable({
             {species.map((item) => {
               const faunaItem = item as Species;
               const floraItem = item as PlantSpecies;
-              const iucnConfig = !isPlant ? getIUCNConfig(faunaItem.iucn) : null;
+              const itemIUCN = !isPlant ? (faunaItem.iucn || 'NE') : null;
+              const iucnConfig = !isPlant ? getIUCNConfig(itemIUCN!) : null;
               
               return (
                 <tr 
