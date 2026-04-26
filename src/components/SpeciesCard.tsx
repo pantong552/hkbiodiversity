@@ -398,8 +398,15 @@ export default function SpeciesCard({
           </div>
         </div>
         
-        {/* Bottom Shade Fade */}
-        {isPhoto && <div className="absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-t from-black/60 to-transparent pointer-events-none" />}
+        {/* Bottom Shade Fade for Photo Mode */}
+        {isPhoto && (
+          <div className={`
+            absolute inset-x-0 bottom-0 h-1/2 pointer-events-none transition-colors duration-500
+            ${isPlaceholder 
+              ? 'bg-gradient-to-t from-slate-100/80 via-slate-50/20 to-transparent' 
+              : 'bg-gradient-to-t from-black/80 via-black/40 to-transparent'}
+          `} />
+        )}
       </div>
 
       {/* Content Area - Taxonomy tags like the old UI */}
@@ -418,10 +425,16 @@ export default function SpeciesCard({
       ) : (
         <div className="absolute bottom-0 inset-x-0 p-3 pt-6 pointer-events-none z-10">
           <div className="mb-0">
-            <h3 className="font-black tracking-tight leading-tight group-hover:text-emerald-500 transition-colors text-white text-sm line-clamp-1 drop-shadow-md">
+            <h3 className={`
+              font-black tracking-tight leading-tight transition-colors duration-500 text-sm line-clamp-1
+              ${isPlaceholder ? 'text-slate-900' : 'text-white text-sm drop-shadow-md group-hover:text-emerald-400'}
+            `}>
               {language === 'zh' ? normalized.common_name_chi : normalized.common_name_eng}
             </h3>
-            <div className="text-[10px] tracking-wide truncate text-white/80 drop-shadow-sm">
+            <div className={`
+              text-[10px] tracking-wide truncate transition-colors duration-500
+              ${isPlaceholder ? 'text-slate-500' : 'text-white/80 drop-shadow-sm'}
+            `}>
               {formatScientificName(normalized.scientific_name)}
             </div>
           </div>
