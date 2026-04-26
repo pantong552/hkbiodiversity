@@ -101,7 +101,8 @@ async function fetchWithRetry(url: string, retries = 3, delay = 1000): Promise<a
  */
 export function useInaturalistPhoto(taxonId: number | string | undefined) {
   const [photoData, setPhotoData] = useState<InatPhoto | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
+  // 若有 taxonId，初始就是載入中狀態，避免短暫 placeholder 閃爍的 Race Condition
+  const [isLoading, setIsLoading] = useState(!!taxonId);
 
   useEffect(() => {
     if (!taxonId) return;

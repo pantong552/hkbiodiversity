@@ -36,7 +36,6 @@ export default function SpeciesCard({
   const [showTooltip, setShowTooltip] = useState(false);
   const [mounted, setMounted] = useState(false);
   const [imgLoaded, setImgLoaded] = useState(false);
-  const [isFullyReady, setIsFullyReady] = useState(false);
 
   // Normalize data for consistent rendering
   const normalized = useMemo(() => {
@@ -92,13 +91,21 @@ export default function SpeciesCard({
   const isUsingInat = !normalized.image_url && !!normalized.inat_id;
   
   // Show loader if we are in INAT mode and the fade-out isn't finished
-  const showLoader = isUsingInat && !isFullyReady;
+  const showLoader = isUsingInat && !imgLoaded;
   
   // displayImage should be: Local URL > iNaturalist URL > (Optional) Placeholder
   // Crucially, don't fallback to placeholder while we are still waiting for INAT results
   const displayImage = normalized.image_url || inatPhoto || (isInatLoading ? '' : placeholderImage);
   
   const isPlaceholder = displayImage === placeholderImage;
+
+  // 如果是 placeholder（無圖片），直接標記為已載入
+  // 注意：imgLoaded 由 <Image> 的 onLoad 負責觸發（有實際圖片時）
+  useEffect(() => {
+    if (isPlaceholder) {
+      setImgLoaded(true);
+    }
+  }, [isPlaceholder]);
 
   // Check bookmark status
   useEffect(() => {
@@ -123,14 +130,6 @@ export default function SpeciesCard({
     checkBookmark();
     return () => { isMounted = false; };
   }, [user?.id, species.taxa_id]);
-
-  // Handle seamless transition delay
-  useEffect(() => {
-    if (imgLoaded || (!isUsingInat && mounted)) {
-      const timer = setTimeout(() => setIsFullyReady(true), 200);
-      return () => clearTimeout(timer);
-    }
-  }, [imgLoaded, isUsingInat, mounted]);
 
   const toggleFavorite = useCallback(async (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -180,23 +179,23 @@ export default function SpeciesCard({
             fill
             priority={priority}
             unoptimized={displayImage.includes('/api/image/transform')}
-            onLoadingComplete={() => setImgLoaded(true)}
+            onLoad={() => setImgLoaded(true)}
+            onError={() => setImgLoaded(true)}
             sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, (max-width: 1280px) 33vw, 25vw"
             className={`
-              object-cover transition-all duration-1000 group-hover:scale-110
-              ${(isUsingInat && !isFullyReady) ? 'opacity-0' : 'opacity-100'}
+              object-cover transition-all duration-1000 ease-out
+              ${!imgLoaded ? 'opacity-0 scale-95' : 'opacity-100 group-hover:scale-110'}
               ${isInatLoading ? 'blur-sm grayscale' : 'blur-0 grayscale-0'}
             `}
           />
         )}
 
-        {/* Professional Nature Loader Overlay (Fade Out) */}
-        {isUsingInat && !isFullyReady && (
-          <div className={`
-            absolute inset-0 flex flex-col items-center justify-center bg-slate-50 z-20 overflow-hidden
-            transition-all duration-500 ease-in-out
-            ${imgLoaded ? 'opacity-0 scale-105 blur-sm' : 'opacity-100 scale-100 blur-0'}
-          `}>
+        {/* Professional Nature Loader Overlay：純 CSS crossfade，imgLoaded 後漸隱但不被 unmount */}
+        <div className={`
+          absolute inset-0 flex flex-col items-center justify-center bg-slate-50 z-20 overflow-hidden
+          transition-opacity duration-700 ease-in-out
+          ${imgLoaded ? 'opacity-0 pointer-events-none' : 'opacity-100'}
+        `}>
             {/* Spinning Rings */}
             <div className="relative w-16 h-16 flex items-center justify-center scale-90 sm:scale-100">
               <div className="absolute inset-0 border-t-2 border-emerald-500/30 border-r-2 border-emerald-500/10 rounded-full animate-spin duration-1000"></div>
@@ -217,8 +216,7 @@ export default function SpeciesCard({
                 <span className="w-1.5 h-1.5 bg-emerald-400 rounded-full animate-bounce"></span>
               </span>
             </div>
-          </div>
-        )}
+        </div>
         
         {/* Bottom Title Overlay for Detail Mode */}
         {!isPhoto && (
