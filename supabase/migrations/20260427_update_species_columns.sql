@@ -5,7 +5,7 @@ ADD COLUMN IF NOT EXISTS host_plants_chi text,
 ADD COLUMN IF NOT EXISTS host_plants_eng text,
 ADD COLUMN IF NOT EXISTS habitat_chi text,
 ADD COLUMN IF NOT EXISTS habitat_eng text,
-ADD COLUMN IF NOT EXISTS "HKBWS_cat" text;
+ADD COLUMN IF NOT EXISTS hkbws_cat text;
 
 -- 移除舊欄位
 ALTER TABLE species 

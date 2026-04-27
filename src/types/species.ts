@@ -39,7 +39,7 @@ export interface Species {
 
   // Status & Conservation
   afcd?: string;
-  HKBWS_cat?: string;
+  hkbws_cat?: string;
   china_red_list?: string;
   cites?: string;
   endemic?: string;

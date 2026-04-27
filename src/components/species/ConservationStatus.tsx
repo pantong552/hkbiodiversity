@@ -69,7 +69,7 @@ export default function ConservationStatus({ species }: ConservationStatusProps)
     { 
       labelChi: '鳥種類別（香港觀鳥會）', 
       labelEng: 'Category (HKBWS)', 
-      value: species.HKBWS_cat 
+      value: species.hkbws_cat 
     },
   ];
 
