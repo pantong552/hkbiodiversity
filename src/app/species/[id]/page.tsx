@@ -54,8 +54,8 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const description = `${species.common_name_chi} (${species.scientific_name}) - 詳盡的香港生物多樣性資料。類別：${species.class_chi} ${species.order_chi} ${species.family_chi}`;
   
   // 獲取縮圖 URL
-  let imageUrl = species.image_url;
-  if (!imageUrl && species.inat_id) {
+  let imageUrl = '';
+  if (species.inat_id) {
     imageUrl = await getInaturalistPhoto(species.inat_id) || '';
   }
 
