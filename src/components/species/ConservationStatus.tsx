@@ -103,7 +103,7 @@ export default function ConservationStatus({ species }: ConservationStatusProps)
             {species.endemic && (
               <div className="group">
                 <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2 block">
-                  {language === 'zh' ? '特有性' : 'Endemicity'}
+                  {language === 'zh' ? '特有種' : 'Endemicity'}
                 </span>
                 <div className="flex justify-between items-center px-5 py-4 bg-amber-50 rounded-2xl border border-amber-100 group-hover:bg-amber-100 transition-colors">
                   <span className="text-sm font-black text-amber-900">{species.endemic}</span>
