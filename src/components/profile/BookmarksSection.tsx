@@ -17,7 +17,6 @@ interface BookmarkedSpecies {
   common_name_chi: string;
   common_name_eng: string;
   scientific_name: string;
-  image_url: string;
   iucn: string;
   informal_group_eng: string;
   informal_group_chi: string;
@@ -51,7 +50,7 @@ function BookmarkItem({
     return url.replace('/medium.', '/square.').replace('/large.', '/square.').replace('size=medium', 'size=square');
   };
 
-  const displayImage = getSmallPhoto(species.image_url || inatPhoto);
+  const displayImage = getSmallPhoto(inatPhoto);
 
   return (
     <div
@@ -171,7 +170,6 @@ export default function BookmarksSection() {
                       common_name_chi: p.common_name_zh,
                       common_name_eng: p.common_name_en,
                       scientific_name: p.scientific_name,
-                      image_url: '',
                       iucn: '',
                       informal_group_eng: p.category_en,
                       informal_group_chi: p.category_zh,

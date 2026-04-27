@@ -37,9 +37,7 @@ export const MOCK_SPECIES: Species[] = [
     global_distribution_eng: 'Sri Lanka, Pakistan to Vietnam and southern China, Malay Peninsula, Sumatra, Java, Bali, and Mentawai Islands.',
     global_distribution_chi: '斯里蘭卡、巴基斯坦、越南、華南、馬來半島、蘇門答臘、爪哇、峇里島及明打威群島。',
     references_eng: 'Shek, C. T. (2006). A Field Guide to the Terrestrial Mammals of Hong Kong. / Ades, G. W. (1999).',
-    references_chi: '石仲堂（2006）。《香港陸上哺乳動物圖鑑》。香港郊野之友會、天地圖書有限公司。',
-    image_url: 'https://images.unsplash.com/photo-1629856111811-9a74aa96df13?q=80&w=1080&auto=format&fit=crop',
-    slug: 'rousettus-leschenaultii'
+    references_chi: '石仲堂（2006）。《香港陸上哺乳動物圖鑑》。香港郊野之友會、天地圖書有限公司。'
   },
   {
     id: 2,
@@ -78,9 +76,7 @@ export const MOCK_SPECIES: Species[] = [
     global_distribution_eng: 'Sri Lanka, Pakistan, Bangladesh, India, southern China, Burma... and adjacent small islands.',
     global_distribution_chi: '斯里蘭卡、巴基斯坦、孟加拉、印度、華南、緬甸、越南、柬埔寨、西馬來西亞、蘇門答臘及鄰近島嶼。',
     references_eng: 'Ades, G. W. (1999). The species composition, distribution, and population size of Hong Kong bats.',
-    references_chi: '汪松（1998）。《中國瀕危動物紅皮書：獸類》。科學出版社。',
-    image_url: 'https://images.unsplash.com/photo-1594247854228-57bd636f452d?q=80&w=1080&auto=format&fit=crop',
-    slug: 'cynopterus-sphinx'
+    references_chi: '汪松（1998）。《中國瀕危動物紅皮書：獸類》。科學出版社。'
   },
   {
     id: 3,
@@ -122,8 +118,6 @@ export const MOCK_SPECIES: Species[] = [
     global_distribution_eng: 'India, Sri Lanka, Myanmar, China, Thailand, Laos, Vietnam, Cambodia, Borneo, Java, Lesser Sunda Islands.',
     global_distribution_chi: '印度、斯里蘭卡、緬甸、中國、泰國、老撾、越南、柬埔寨、婆羅洲、 爪哇、小巽他群島。',
     references_eng: 'Taylor, P., Lim, B., Pennay, M., Soisook, P., Kingston, T.',
-    references_chi: '石仲堂（2006）。《香港陸上哺乳動物圖鑑》。香港郊野之友會、天地圖書有限公司。',
-    image_url: 'https://images.unsplash.com/photo-1549488344-1f9b8d2bd1f3?q=80&w=1080&auto=format&fit=crop',
-    slug: 'mops-plicatus'
-  }
+    references_chi: '石仲堂（2006）。《香港陸上哺乳動物圖鑑》。香港郊野之友會、天地圖書有限公司。'
+  },
 ];

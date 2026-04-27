@@ -48,6 +48,8 @@ function mapPlantToSpecies(plantData: any): Species {
     class_eng: plantData.category_en,
     order_eng: plantData.family_en,
     family_eng: plantData.family_en,
+    habitat_chi: plantData.habitat_chi,
+    habitat_eng: plantData.habitat,
   } as unknown as Species;
 }
 
@@ -77,14 +79,12 @@ export async function getInaturalistPhoto(taxonId: number | string): Promise<str
 }
 
 /**
- * Get the best available species image URL
+ * Get the best available species image URL (Now fully dynamic via iNaturalist)
  */
 export async function getSpeciesImageUrl(species: Species): Promise<string | null> {
   let finalUrl: string | null = null;
   
-  if (species.image_url && species.image_url !== '') {
-    finalUrl = species.image_url;
-  } else if (species.inat_id) {
+  if (species.inat_id) {
     finalUrl = await getInaturalistPhoto(species.inat_id);
   }
   

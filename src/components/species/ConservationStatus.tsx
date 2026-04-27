@@ -66,6 +66,11 @@ export default function ConservationStatus({ species }: ConservationStatusProps)
       labelEng: 'HK Native Status', 
       value: species.native_status 
     },
+    { 
+      labelChi: '鳥種類別（香港觀鳥會）', 
+      labelEng: 'Category (HKBWS)', 
+      value: species.HKBWS_cat 
+    },
   ];
 
   return (

@@ -52,7 +52,6 @@ export default function SpeciesCard({
         order: null, // Plants don't typically display order in this UI
         family: p.family_zh,
         iucn: null, 
-        image_url: null, 
         origin: p.origin,
         months: p.flowering_months?.length > 0 ? p.flowering_months : p.fruiting_months
       };
@@ -69,7 +68,6 @@ export default function SpeciesCard({
         order: language === 'zh' ? s.order_chi : s.order_eng,
         family: language === 'zh' ? s.family_chi : s.family_eng,
         iucn: s.iucn,
-        image_url: s.image_url,
         origin: null,
         months: null
       };
@@ -82,20 +80,20 @@ export default function SpeciesCard({
   }, []);
 
   const { imageUrl: inatPhoto, isLoading: isInatLoading, attribution, nativePageUrl } = useInaturalistPhoto(
-    !normalized.image_url ? normalized.inat_id : undefined
+    normalized.inat_id
   );
 
   const placeholderImage = '/images/placeholder/no-species-image.svg';
   
   // Current logic for determining if we should use iNaturalist
-  const isUsingInat = !normalized.image_url && !!normalized.inat_id;
+  const isUsingInat = !!normalized.inat_id;
   
   // Show loader if we are in INAT mode and the fade-out isn't finished
   const showLoader = isUsingInat && !imgLoaded;
   
   // displayImage should be: Local URL > iNaturalist URL > (Optional) Placeholder
   // Crucially, don't fallback to placeholder while we are still waiting for INAT results
-  const displayImage = normalized.image_url || inatPhoto || (isInatLoading ? '' : placeholderImage);
+  const displayImage = inatPhoto || (isInatLoading ? '' : placeholderImage);
   
   const isPlaceholder = displayImage === placeholderImage;
 

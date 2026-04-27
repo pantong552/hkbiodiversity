@@ -156,6 +156,8 @@ export default function SpeciesContent({ species, showBreadcrumb = true }: Speci
 
   const commonName = language === 'zh' ? species.common_name_chi : species.common_name_eng;
   const description = language === 'zh' ? species.description_chi : species.description_eng;
+  const habitat = language === 'zh' ? species.habitat_chi : species.habitat_eng;
+  const hostPlants = language === 'zh' ? species.host_plants_chi : species.host_plants_eng;
   const remarks = language === 'zh' ? species.remarks_chi : species.remarks_eng;
   const hkDist = language === 'zh' ? species.hk_distribution_chi : species.hk_distribution_eng;
   const globalDist = language === 'zh' ? species.global_distribution_chi : species.global_distribution_eng;
@@ -182,7 +184,7 @@ export default function SpeciesContent({ species, showBreadcrumb = true }: Speci
       <div className="w-full h-[40vh] min-h-[400px] bg-slate-950 relative overflow-hidden">
         <SpeciesHeroBackground 
           photos={photos} 
-          defaultImage={species.image_url || '/images/placeholder/no-species-image.svg'} 
+          defaultImage={'/images/placeholder/no-species-image.svg'} 
           isLoading={isLoading}
         />
         
@@ -228,15 +230,43 @@ export default function SpeciesContent({ species, showBreadcrumb = true }: Speci
 
 
             {/* Description */}
-            {description && (
-              <section className="bg-white p-8 rounded-[2.5rem] shadow-sm border border-slate-100">
-                <h2 className="text-2xl font-black text-slate-800 mb-6 flex items-center gap-3">
-                  <Bookmark className="w-6 h-6 text-emerald-500" />
-                  {language === 'zh' ? '形態特徵' : 'Description'}
-                </h2>
-                <div className="prose prose-slate max-w-none text-slate-600 leading-relaxed">
-                  <p>{description}</p>
-                </div>
+            {(description || habitat || hostPlants) && (
+              <section className="bg-white p-8 rounded-[2.5rem] shadow-sm border border-slate-100 divide-y divide-slate-50">
+                {description && (
+                  <div className="pb-8">
+                    <h2 className="text-2xl font-black text-slate-800 mb-6 flex items-center gap-3">
+                      <Bookmark className="w-6 h-6 text-emerald-500" />
+                      {language === 'zh' ? '形態特徵' : 'Description'}
+                    </h2>
+                    <div className="prose prose-slate max-w-none text-slate-600 leading-relaxed">
+                      <p>{description}</p>
+                    </div>
+                  </div>
+                )}
+
+                {habitat && (
+                  <div className="py-8">
+                    <h2 className="text-2xl font-black text-slate-800 mb-6 flex items-center gap-3">
+                      <Map className="w-6 h-6 text-emerald-500" />
+                      {language === 'zh' ? '棲息地' : 'Habitat'}
+                    </h2>
+                    <div className="prose prose-slate max-w-none text-slate-600 leading-relaxed">
+                      <p>{habitat}</p>
+                    </div>
+                  </div>
+                )}
+
+                {hostPlants && (
+                  <div className="pt-8">
+                    <h2 className="text-2xl font-black text-slate-800 mb-6 flex items-center gap-3">
+                      <Leaf className="w-6 h-6 text-emerald-500" />
+                      {language === 'zh' ? '寄主植物' : 'Host Plants'}
+                    </h2>
+                    <div className="prose prose-slate max-w-none text-slate-600 leading-relaxed">
+                      <p>{hostPlants}</p>
+                    </div>
+                  </div>
+                )}
               </section>
             )}
 

@@ -39,6 +39,7 @@ export interface Species {
 
   // Status & Conservation
   afcd?: string;
+  HKBWS_cat?: string;
   china_red_list?: string;
   cites?: string;
   endemic?: string;
@@ -51,6 +52,10 @@ export interface Species {
   // Descriptions & Info (Eng / Chi)
   description_eng?: string;
   description_chi?: string;
+  habitat_eng?: string;
+  habitat_chi?: string;
+  host_plants_eng?: string;
+  host_plants_chi?: string;
   remarks_eng?: string;
   remarks_chi?: string;
   hk_distribution_eng?: string;
@@ -59,10 +64,6 @@ export interface Species {
   global_distribution_chi?: string;
   references_eng?: string;
   references_chi?: string;
-
-  // Media
-  image_url: string; // Placeholder for main image
-  slug: string; // Optional for URL routing
 }
 
 export type TaxonomyLevel = 'phylum_eng' | 'class_eng' | 'order_eng' | 'family_eng' | 'genus_eng';
