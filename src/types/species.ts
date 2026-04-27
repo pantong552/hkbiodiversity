@@ -32,7 +32,7 @@ export interface Species {
   sub_family_chi?: string;
   genus_eng: string;
   genus_chi: string;
-  species_eng: string; // specific epithet
+  species_eng: string;
   sub_species_eng?: string;
   informal_group_eng: string;
   informal_group_chi: string;
