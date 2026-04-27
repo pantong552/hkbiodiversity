@@ -37,6 +37,7 @@ export default function MultiSelectDropdown({
   const [searchTerm, setSearchTerm] = useState('');
   const [isMobileView, setIsMobileView] = useState(false);
   const [localSelected, setLocalSelected] = useState<string[]>(selectedValues);
+  const [coords, setCoords] = useState({ top: 0, left: 0, width: 0 });
   
   const dropdownRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -61,17 +62,46 @@ export default function MultiSelectDropdown({
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
 
-  // 點擊外部關閉
+  // 更新位置邏輯
+  const updatePosition = () => {
+    if (dropdownRef.current) {
+      const rect = dropdownRef.current.getBoundingClientRect();
+      setCoords({
+        top: rect.bottom + window.scrollY,
+        left: rect.left + window.scrollX,
+        width: rect.width
+      });
+    }
+  };
+
+  // 點擊外部關閉與位置更新
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
-        setIsOpen(false);
+        // 也要檢查是否點擊在 Portal 內容上 (透過 z-index 和 fixed 定位通常沒問題，但保險起見)
+        const portalElements = document.querySelectorAll('.dropdown-portal-content');
+        let clickedInsidePortal = false;
+        portalElements.forEach(el => {
+          if (el.contains(event.target as Node)) clickedInsidePortal = true;
+        });
+        
+        if (!clickedInsidePortal) {
+          setIsOpen(false);
+        }
       }
     };
+
     if (isOpen && !isMobileView) {
+      updatePosition();
       document.addEventListener('mousedown', handleClickOutside);
+      window.addEventListener('scroll', updatePosition, true);
+      window.addEventListener('resize', updatePosition);
     }
-    return () => document.removeEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      window.removeEventListener('scroll', updatePosition, true);
+      window.removeEventListener('resize', updatePosition);
+    };
   }, [isOpen, isMobileView]);
 
   // 自動聚焦 (僅限桌面端)
@@ -131,7 +161,10 @@ export default function MultiSelectDropdown({
     <div className="relative w-full" ref={dropdownRef}>
       {/* 觸發按鈕 */}
       <button
-        onClick={() => setIsOpen(!isOpen)}
+        onClick={() => {
+          if (!isOpen) updatePosition();
+          setIsOpen(!isOpen);
+        }}
         className={`w-full flex items-center justify-between px-3 py-1.5 rounded-xl text-[11px] font-black transition-all border group uppercase tracking-widest ${
           isOpen || selectedCount > 0 
             ? 'bg-white border-emerald-200 shadow-xl shadow-emerald-50/50 ring-4 ring-emerald-50/30' 
@@ -145,104 +178,120 @@ export default function MultiSelectDropdown({
         <ChevronDown className={`w-3 h-3 text-slate-400 transition-transform duration-300 ${isOpen ? 'rotate-180 text-emerald-600' : 'group-hover:text-slate-600'}`} />
       </button>
 
-      {/* 桌面端下拉內容 */}
-      {isOpen && !isMobileView && (
-        <div 
-          className={`absolute top-full mt-2 bg-white border border-slate-100 rounded-2xl shadow-2xl z-[100] animate-in fade-in zoom-in-95 duration-200 overflow-hidden outline-none ${align === 'right' ? 'right-0' : 'left-0'}`}
-          style={{ minWidth }}
-        >
-          {/* 搜尋欄 */}
-          <div className="p-3 border-b border-slate-50 flex items-center bg-slate-50/30">
-            <Search className="w-3.5 h-3.5 text-slate-400 ml-1 shrink-0" />
-            <input
-              ref={inputRef}
-              type="text"
-              placeholder={displayPlaceholder}
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full bg-transparent border-none focus:ring-0 text-[11px] font-bold placeholder:text-slate-400 text-emerald-900 ml-2 py-1 outline-none"
-            />
-          </div>
+      {/* 桌面端下拉內容 - 使用 Portal + Framer Motion */}
+      {typeof document !== 'undefined' && createPortal(
+        <AnimatePresence>
+          {isOpen && !isMobileView && (
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95, y: -10 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: -10 }}
+              transition={{ duration: 0.15, ease: "easeOut" }}
+              className={`fixed bg-white border border-slate-100 rounded-2xl shadow-2xl z-[9999] overflow-hidden outline-none dropdown-portal-content ${align === 'right' ? 'origin-top-right' : 'origin-top-left'}`}
+              style={{ 
+                top: coords.top - window.scrollY + 8,
+                left: align === 'right' ? (coords.left + coords.width) : coords.left,
+                x: align === 'right' ? '-100%' : '0%',
+                minWidth,
+                pointerEvents: 'auto'
+              }}
+            >
+              {/* 搜尋欄 */}
+              <div className="p-3 border-b border-slate-50 flex items-center bg-slate-50/30">
+                <Search className="w-3.5 h-3.5 text-slate-400 ml-1 shrink-0" />
+                <input
+                  ref={inputRef}
+                  type="text"
+                  placeholder={displayPlaceholder}
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="w-full bg-transparent border-none focus:ring-0 text-[11px] font-bold placeholder:text-slate-400 text-emerald-900 ml-2 py-1 outline-none"
+                />
+              </div>
 
-          {/* 全選欄 */}
-          <div className="px-3 py-2 border-b border-slate-50 flex items-center justify-between">
-            <button 
-              onClick={toggleAll}
-              className="flex items-center gap-2 group/all"
-            >
-              <div className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 transition-all ${isAllSelected ? 'bg-emerald-600 border-emerald-600 text-white' : isSomeSelected ? 'bg-emerald-50 border-emerald-500 text-emerald-600' : 'bg-white border-slate-200 group-hover/all:border-emerald-300'}`}>
-                {isAllSelected ? <Check className="w-3 h-3 stroke-[3px]" /> : isSomeSelected ? <div className="w-2 h-0.5 bg-emerald-600 rounded-full" /> : null}
-              </div>
-              <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest group-hover/all:text-emerald-700">{language === 'zh' ? '全選' : 'All'}</span>
-            </button>
-            <span className="text-[9px] font-bold text-slate-300 uppercase tracking-widest">{filteredOptions.length} {language === 'zh' ? '個項目' : 'items'}</span>
-          </div>
-          
-          <div className="max-h-[260px] overflow-y-auto scrollbar-thin scrollbar-thumb-slate-200 p-1.5 space-y-0.5">
-            {filteredOptions.length === 0 ? (
-              <div className="text-center py-6 text-slate-400 text-[10px] font-bold uppercase tracking-widest">
-                {t('dropdown.no_results')}
-              </div>
-            ) : (
-              <>
-                {filteredOptions.slice(0, 500).map((opt) => {
-                  const isSelected = localSelected.includes(opt.name);
-                  const isScientific = label.toLowerCase().includes('scientific name') || label.includes('學名');
-                  const displayLabel = isScientific ? formatScientificName(opt.display) : opt.display;
-                  return (
-                    <button
-                      key={opt.name}
-                      onClick={() => toggleOption(opt.name)}
-                      className={`w-full flex items-center justify-between px-3 py-2 rounded-xl transition-all text-left group/item ${
-                        isSelected 
-                          ? 'bg-emerald-50/50 text-emerald-700' 
-                          : 'text-slate-600 hover:bg-slate-50 hover:text-emerald-900'
-                      }`}
-                    >
-                      <div className="flex items-center gap-2 overflow-hidden">
-                        <div className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 transition-all ${isSelected ? 'bg-emerald-600 border-emerald-600 text-white' : 'bg-white border-slate-200 text-transparent group-hover/item:border-emerald-300'}`}>
-                          <Check className="w-3 h-3 stroke-[3px]" />
-                        </div>
-                        <span className={`text-xs font-bold truncate ${isSelected ? 'text-emerald-700' : 'text-slate-700'}`}>
-                          {displayLabel}
-                        </span>
-                      </div>
-                      <span className={`text-[9px] font-bold shrink-0 ${isSelected ? 'text-emerald-600/70' : 'text-slate-300'}`}>
-                        {opt.count}
-                      </span>
-                    </button>
-                  );
-                })}
-                {filteredOptions.length > 500 && (
-                  <div className="text-center py-2 bg-slate-50/50 rounded-lg mt-1">
-                    <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest italic px-2">
-                      {language === 'zh' 
-                        ? '僅顯示前 500 個項目，請透過搜尋縮細範圍' 
-                        : 'Showing top 500 items only. Use search to refine.'}
-                    </p>
+              {/* 全選欄 */}
+              <div className="px-3 py-2 border-b border-slate-50 flex items-center justify-between">
+                <button 
+                  onClick={toggleAll}
+                  className="flex items-center gap-2 group/all"
+                >
+                  <div className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 transition-all ${isAllSelected ? 'bg-emerald-600 border-emerald-600 text-white' : isSomeSelected ? 'bg-emerald-50 border-emerald-500 text-emerald-600' : 'bg-white border-slate-200 group-hover/all:border-emerald-300'}`}>
+                    {isAllSelected ? <Check className="w-3 h-3 stroke-[3px]" /> : isSomeSelected ? <div className="w-2 h-0.5 bg-emerald-600 rounded-full" /> : null}
                   </div>
+                  <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest group-hover/all:text-emerald-700">{language === 'zh' ? '全選' : 'All'}</span>
+                </button>
+                <span className="text-[9px] font-bold text-slate-300 uppercase tracking-widest">{filteredOptions.length} {language === 'zh' ? '個項目' : 'items'}</span>
+              </div>
+              
+              <div className="max-h-[260px] overflow-y-auto scrollbar-thin scrollbar-thumb-slate-200 p-1.5 space-y-0.5">
+                {filteredOptions.length === 0 ? (
+                  <div className="text-center py-6 text-slate-400 text-[10px] font-bold uppercase tracking-widest">
+                    {t('dropdown.no_results')}
+                  </div>
+                ) : (
+                  <>
+                    {filteredOptions.slice(0, 500).map((opt) => {
+                      const isSelected = localSelected.includes(opt.name);
+                      const isScientific = label.toLowerCase().includes('scientific name') || label.includes('學名');
+                      const displayLabel = isScientific ? formatScientificName(opt.display) : opt.display;
+                      return (
+                        <button
+                          key={opt.name}
+                          onClick={() => toggleOption(opt.name)}
+                          className={`w-full flex items-center justify-between px-3 py-2 rounded-xl transition-all text-left group/item ${
+                            isSelected 
+                              ? 'bg-emerald-50/50 text-emerald-700' 
+                              : 'text-slate-600 hover:bg-slate-50 hover:text-emerald-900'
+                          }`}
+                        >
+                          <div className="flex items-center gap-2 overflow-hidden">
+                            <div className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 transition-all ${isSelected ? 'bg-emerald-600 border-emerald-600 text-white' : 'bg-white border-slate-200 text-transparent group-hover/item:border-emerald-300'}`}>
+                              <Check className="w-3 h-3 stroke-[3px]" />
+                            </div>
+                            <span className={`text-xs font-bold truncate ${isSelected ? 'text-emerald-700' : 'text-slate-700'}`}>
+                              {displayLabel}
+                            </span>
+                          </div>
+                          <span className={`text-[9px] font-bold shrink-0 ${isSelected ? 'text-emerald-600/70' : 'text-slate-300'}`}>
+                            {opt.count}
+                          </span>
+                        </button>
+                      );
+                    })}
+                    {filteredOptions.length > 500 && (
+                      <div className="text-center py-2 bg-slate-50/50 rounded-lg mt-1">
+                        <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest italic px-2">
+                          {language === 'zh' 
+                            ? '僅顯示前 500 個項目，請透過搜尋縮細範圍' 
+                            : 'Showing top 500 items only. Use search to refine.'}
+                        </p>
+                      </div>
+                    )}
+                  </>
                 )}
-              </>
-            )}
-          </div>
-          
-          {/* 操作按鈕 */}
-          <div className="p-3 border-t border-slate-50 bg-slate-50/30 flex items-center gap-2">
-            <button 
-              onClick={() => setIsOpen(false)}
-              className="flex-1 py-2 text-[10px] font-black text-slate-400 hover:text-slate-600 transition-colors uppercase tracking-widest"
-            >
-              {language === 'zh' ? '取消' : 'Cancel'}
-            </button>
-            <button 
-              onClick={handleApply}
-              className="flex-1 py-2 bg-emerald-600 text-white rounded-xl text-[10px] font-black hover:bg-emerald-700 transition-all shadow-md shadow-emerald-200 uppercase tracking-widest active:scale-95"
-            >
-              {language === 'zh' ? '確定' : 'OK'}
-            </button>
-          </div>
-        </div>
+              </div>
+              
+              {/* 操作按鈕 */}
+              <div className="p-3 border-t border-slate-50 bg-slate-50/30 flex items-center gap-2">
+                <button 
+                  onClick={() => setIsOpen(false)}
+                  className="flex-1 py-2 text-[10px] font-black text-slate-400 hover:text-slate-600 transition-colors uppercase tracking-widest"
+                >
+                  {language === 'zh' ? '取消' : 'Cancel'}
+                </button>
+                <button 
+                  onClick={handleApply}
+                  className="flex-1 py-2 bg-emerald-600 text-white rounded-xl text-[10px] font-black hover:bg-emerald-700 transition-all shadow-md shadow-emerald-200 uppercase tracking-widest active:scale-95"
+                >
+                  {language === 'zh' ? '確定' : 'OK'}
+                </button>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>,
+        document.body
       )}
+
 
       {/* 行動端選取器 */}
       {isOpen && isMobileView && typeof document !== 'undefined' && createPortal(

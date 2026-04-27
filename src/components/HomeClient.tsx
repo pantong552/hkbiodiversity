@@ -189,7 +189,7 @@ export default function HomeClient() {
         const currentSearch = taxaType === 'fauna' ? searchQuery.trim() : (searchQuery.trim() || plantFilters.searchQuery.trim());
         if (currentSearch) {
             if (taxaType === 'fauna') {
-                query = query.or(`common_name_chi.ilike.%${currentSearch}%,common_name_eng.ilike.%${currentSearch}%,scientific_name.ilike.%${currentSearch}%`);
+                query = query.or(`common_name_chi.ilike.%${currentSearch}%,common_name_eng.ilike.%${currentSearch}%,scientific_name.ilike.%${currentSearch}%,alias_common_name_chi.ilike.%${currentSearch}%,alias_common_name_eng.ilike.%${currentSearch}%,alias_scientific_name.ilike.%${currentSearch}%`);
             } else {
                 query = query.or(`scientific_name.ilike.%${currentSearch}%,common_name_zh.ilike.%${currentSearch}%,common_name_en.ilike.%${currentSearch}%`);
             }
