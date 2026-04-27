@@ -40,17 +40,12 @@ function BookmarkItem({
 }) {
   const { language } = useLanguage();
   const { addSpecies } = useSpeciesPanel();
+  const [imgLoaded, setImgLoaded] = useState(false);
   
   // 獲取與 SpeciesCard 同款的動態圖片
   const { imageUrl: inatPhoto, isLoading: isInatLoading } = useInaturalistPhoto(species.inat_id);
 
-  // 將圖片解析度調整為最細 (square) 以節省列表載入資源
-  const getSmallPhoto = (url: string | null) => {
-    if (!url) return null;
-    return url.replace('/medium.', '/square.').replace('/large.', '/square.').replace('size=medium', 'size=square');
-  };
-
-  const displayImage = getSmallPhoto(inatPhoto);
+  const displayImage = inatPhoto;
 
   return (
     <div
@@ -59,25 +54,30 @@ function BookmarkItem({
       onClick={() => addSpecies(species.taxa_id)}
     >
       {/* 物種縮圖 */}
-      <div className="relative w-14 h-14 rounded-xl overflow-hidden flex-shrink-0 bg-slate-100 border border-slate-100">
-        {isInatLoading ? (
-          <div className="w-full h-full flex items-center justify-center bg-slate-50">
-            <Loader2 className="w-4 h-4 text-emerald-300 animate-spin" />
+      <div className="relative w-14 h-14 rounded-xl overflow-hidden flex-shrink-0 bg-slate-50 border border-slate-100 flex items-center justify-center">
+        {(!displayImage || !imgLoaded) && (
+          <div className="absolute inset-0 flex items-center justify-center bg-slate-50 z-10">
+            {isInatLoading ? (
+              <Loader2 className="w-4 h-4 text-emerald-300 animate-spin" />
+            ) : !displayImage ? (
+              <img 
+                src="/images/placeholder/no-species-image.svg" 
+                alt="No species image" 
+                className="w-full h-full object-cover opacity-80"
+              />
+            ) : null}
           </div>
-        ) : displayImage ? (
+        )}
+        
+        {displayImage && (
           <Image
             src={displayImage}
             alt={language === 'zh' ? species.common_name_chi : species.common_name_eng}
             fill
             sizes="56px"
-            unoptimized={displayImage ? displayImage.includes('/api/image/transform') : false}
-            className="object-cover group-hover:scale-110 transition-transform duration-500"
-          />
-        ) : (
-          <img 
-            src="/images/placeholder/no-species-image.svg" 
-            alt="No species image" 
-            className="w-full h-full object-cover opacity-80"
+            unoptimized={displayImage.includes('/api/image/transform')}
+            className={`object-cover group-hover:scale-110 transition-all duration-500 ${imgLoaded ? 'opacity-100' : 'opacity-0'}`}
+            onLoad={() => setImgLoaded(true)}
           />
         )}
       </div>
@@ -140,6 +140,7 @@ export default function BookmarksSection() {
       
       if (!data || data.length === 0) {
           setBookmarks([]);
+          setIsLoading(false);
           return;
       }
 
@@ -182,8 +183,8 @@ export default function BookmarksSection() {
       });
 
       const results = await Promise.all(fetchPromises);
-      setBookmarks(results.filter(Boolean) as BookmarkedSpecies[]);
-
+      const validResults = results.filter(r => r !== null && r.inat_id !== undefined) as BookmarkedSpecies[];
+      setBookmarks(validResults);
     } catch (err) {
       console.error('Error fetching bookmarks:', err);
     } finally {
