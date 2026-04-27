@@ -29,7 +29,7 @@ const SkeletonCard = () => (
 const MiniSpeciesCard = ({ species }: { species: Species }) => {
   const { language } = useLanguage();
   const { addSpecies } = useSpeciesPanel();
-  const { imageUrl, isLoading: isInatLoading } = useInaturalistPhoto(!species.image_url ? species.inat_id : undefined);
+  const { imageUrl, isLoading: isInatLoading } = useInaturalistPhoto(species.inat_id);
   
   const [imgLoaded, setImgLoaded] = useState(false);
   const [isFullyReady, setIsFullyReady] = useState(false);
@@ -41,11 +41,11 @@ const MiniSpeciesCard = ({ species }: { species: Species }) => {
   }, []);
 
   const placeholderImage = '/images/placeholder/no-species-image.svg';
-  const isUsingInat = !species.image_url && !!species.inat_id;
+  const isUsingInat = !!species.inat_id;
   
-  // displayImage should be: Local URL > iNaturalist URL > (Optional) Placeholder
+  // displayImage should be: iNaturalist URL > (Optional) Placeholder
   // Crucially, don't fallback to placeholder while we are still waiting for INAT results
-  const displayImage = species.image_url || imageUrl || (isInatLoading ? '' : placeholderImage);
+  const displayImage = imageUrl || (isInatLoading ? '' : placeholderImage);
   const commonName = language === 'zh' ? species.common_name_chi : species.common_name_eng;
 
   // Handle seamless transition delay
