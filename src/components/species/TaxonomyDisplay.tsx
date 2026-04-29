@@ -1,19 +1,32 @@
-import React from 'react';
+import { useState } from 'react';
 import { Species } from '@/types/species';
 import { useLanguage } from '@/context/LanguageContext';
-import { Layers, ChevronDown, Dna, Search } from 'lucide-react';
+import { Layers, ChevronDown, Dna, Search, Loader2, Sparkles, AlertCircle, Info } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useSpeciesPanel } from '@/context/SpeciesPanelContext';
 import { formatScientificName } from '@/utils/formatters';
+import { motion, AnimatePresence } from 'framer-motion';
 
 interface TaxonomyDisplayProps {
   species: Species;
+}
+
+interface FullTaxonomyData {
+  usageId: string;
+  classification: { rank: string; name: string; id: string; authorship?: string }[];
+  synonyms: string[];
+  subspecies: string[];
 }
 
 export default function TaxonomyDisplay({ species }: TaxonomyDisplayProps) {
   const { language } = useLanguage();
   const router = useRouter();
   const { toggleExpand } = useSpeciesPanel();
+  
+  const [isExpanded, setIsExpanded] = useState(false);
+  const [fullData, setFullData] = useState<FullTaxonomyData | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const levels = [
     { 
@@ -52,6 +65,29 @@ export default function TaxonomyDisplay({ species }: TaxonomyDisplayProps) {
     router.push(`/?${levelId}=${encodeURIComponent(value)}`);
   };
 
+  const toggleFullTaxonomy = async () => {
+    if (isExpanded) {
+      setIsExpanded(false);
+      return;
+    }
+
+    setIsExpanded(true);
+    if (!fullData) {
+      setIsLoading(true);
+      setError(null);
+      try {
+        const response = await fetch(`/api/species/taxonomy?name=${encodeURIComponent(species.scientific_name)}`);
+        if (!response.ok) throw new Error('Failed to fetch taxonomy data');
+        const data = await response.json();
+        setFullData(data);
+      } catch (err: any) {
+        setError(err.message);
+      } finally {
+        setIsLoading(false);
+      }
+    }
+  };
+
   return (
     <div className="flex flex-col">
       <div className="flex items-center justify-between gap-4 mb-8">
@@ -63,7 +99,6 @@ export default function TaxonomyDisplay({ species }: TaxonomyDisplayProps) {
             {language === 'zh' ? '分類階層' : 'Classification'}
           </div>
 
-          {/* Mobile Minimalism External Link Button - Hidden above sm */}
           <div className="sm:hidden">
             <a 
               href={`https://www.inaturalist.org/taxa/${species.inat_id}`}
@@ -76,7 +111,6 @@ export default function TaxonomyDisplay({ species }: TaxonomyDisplayProps) {
           </div>
         </h2>
         
-        {/* Fill Empty Space with a useful button */}
         <div className="hidden sm:block">
           <a 
             href={`https://www.inaturalist.org/taxa/${species.inat_id}`}
@@ -99,70 +133,39 @@ export default function TaxonomyDisplay({ species }: TaxonomyDisplayProps) {
         </div>
       </div>
       
-      {/* Mobile Layout - Professional Minimalist Path */}
+      {/* Mobile Path */}
       <div className="lg:hidden flex flex-col space-y-1.5 relative pl-1.5">
-        {/* Main Backbone Line - Ultra Thin */}
         <div className="absolute left-[7px] top-6 bottom-6 w-[1px] bg-slate-200/50 rounded-full" />
-        
         {levels.map((level, idx) => {
           if (!level.chi && !level.eng) return null;
           const isClickable = !level.isCurrent;
-          
           return (
-            <div 
-              key={idx} 
-              className="relative flex items-center group/item py-1"
-            >
-              {/* Branch Connection Line (Right Angle) */}
+            <div key={idx} className="relative flex items-center group/item py-1">
               <div className="absolute left-[7px] top-1/2 -translate-y-1/2 w-3 h-[1px] bg-slate-200/50" />
-              
-              {/* Secondary Status Accent */}
               {level.isCurrent && (
                 <div className="absolute left-[-2px] top-1/2 -translate-y-1/2 w-[3px] h-[18px] bg-emerald-500 rounded-full z-20" />
               )}
-              
               <div 
                 onClick={() => isClickable && handleTaxonomyClick(level.id, level.eng)}
                 className={`flex-1 ml-6 py-2.5 px-3.5 rounded-xl border transition-all ${
-                  level.isCurrent 
-                    ? 'bg-emerald-50 border-emerald-100 shadow-sm' 
-                    : 'bg-white border-slate-100 shadow-[0_1px_2px_rgba(0,0,0,0.02)]'
-                } ${isClickable ? 'active:scale-[0.98] active:bg-slate-50' : ''}`}
+                  level.isCurrent ? 'bg-emerald-50 border-emerald-100 shadow-sm' : 'bg-white border-slate-100'
+                }`}
               >
                 <div className="flex items-center justify-between gap-3">
                   <div className="flex items-center gap-3 flex-1 min-w-0">
-                    {/* Level Badge - Now Perfectly Centered Relative to All Text */}
                     <div className="shrink-0">
-                      <div className={`
-                        flex items-center justify-center min-w-[32px] h-[18px] px-1.5 rounded-md border text-center
-                        ${level.isCurrent ? 'bg-emerald-600 border-emerald-500' : 'bg-slate-100 border-slate-200'}
-                      `}>
-                        <span className={`text-[9px] font-black uppercase tracking-widest leading-[0] mb-[-1px] ${level.isCurrent ? 'text-white' : 'text-slate-500'}`}>
+                      <div className={`flex items-center justify-center min-w-[32px] h-[18px] px-1.5 rounded-md border text-center ${level.isCurrent ? 'bg-emerald-600 border-emerald-500' : 'bg-slate-100 border-slate-200'}`}>
+                        <span className={`text-[9px] font-black uppercase tracking-widest ${level.isCurrent ? 'text-white' : 'text-slate-500'}`}>
                           {language === 'zh' ? level.labelChi : level.labelEng}
                         </span>
                       </div>
                     </div>
-
                     <div className="flex flex-col min-w-0">
-                      <span className={`text-[13px] font-bold truncate leading-tight ${level.isCurrent ? 'text-emerald-900' : 'text-slate-800'} ${language !== 'zh' && level.id === 'genus_eng' ? 'italic font-serif' : ''}`}>
-                        {level.id === 'species' 
-                          ? formatScientificName(level.chi) 
-                          : (language === 'zh' ? (level.chi || level.eng) : level.eng)
-                        }
+                      <span className={`text-[13px] font-bold truncate leading-tight ${level.isCurrent ? 'text-emerald-900' : 'text-slate-800'}`}>
+                        {level.id === 'species' ? formatScientificName(level.chi) : (language === 'zh' ? (level.chi || level.eng) : level.eng)}
                       </span>
-                      {language === 'zh' && level.eng && level.id !== 'species' && (
-                        <span className={`text-[10px] font-medium text-slate-400 leading-tight mt-0.5 ${level.id === 'genus_eng' ? 'italic font-serif' : ''}`}>
-                          {level.eng}
-                        </span>
-                      )}
                     </div>
                   </div>
-
-                  {isClickable && (
-                    <div className="shrink-0 w-6 h-6 flex items-center justify-center border border-slate-100 text-slate-300 rounded-full transition-colors active:bg-emerald-100 active:text-emerald-600">
-                      <Search className="w-2.5 h-2.5" />
-                    </div>
-                  )}
                 </div>
               </div>
             </div>
@@ -170,83 +173,41 @@ export default function TaxonomyDisplay({ species }: TaxonomyDisplayProps) {
         })}
       </div>
 
-      {/* Desktop Layout - Professional Compact Hierarchical Path */}
+      {/* Desktop Path */}
       <div className="hidden lg:block w-full">
         <div className="grid grid-cols-5 gap-10">
-          {/* Left: Hierarchical Path */}
           <div className="col-span-3 flex flex-col space-y-2">
             {levels.map((level, idx) => {
               if (!level.chi && !level.eng) return null;
               const isClickable = !level.isCurrent;
-              const isScientist = level.isScientific && language !== 'zh';
-              
               return (
-                <div 
-                  key={idx} 
-                  className="flex items-center group relative h-10"
-                  style={{ marginLeft: `${idx * 24}px` }}
-                >
-                  {/* L-Tree Line Connector - Enhanced */}
-                  {idx > 0 && (
-                    <div className="absolute -left-4 top-[-24px] w-4 h-8 border-l-2 border-b-2 border-slate-100 rounded-bl-xl pointer-events-none" />
-                  )}
-
+                <div key={idx} className="flex items-center group relative h-10" style={{ marginLeft: `${idx * 24}px` }}>
+                  {idx > 0 && <div className="absolute -left-4 top-[-24px] w-4 h-8 border-l-2 border-b-2 border-slate-100 rounded-bl-xl pointer-events-none" />}
                   <div 
                     onClick={() => isClickable && handleTaxonomyClick(level.id, level.eng)}
-                    className={`
-                      flex items-center gap-4 px-5 py-2.5 rounded-2xl transition-all duration-300
-                      ${isClickable ? 'hover:bg-emerald-50 hover:shadow-sm cursor-pointer' : 'bg-transparent'}
-                      ${level.isCurrent ? 'bg-emerald-50/50 border border-emerald-100 shadow-sm' : ''}
-                    `}
+                    className={`flex items-center gap-4 px-5 py-2.5 rounded-2xl transition-all duration-300 ${isClickable ? 'hover:bg-emerald-50 hover:shadow-sm cursor-pointer' : ''} ${level.isCurrent ? 'bg-emerald-50/50 border border-emerald-100 shadow-sm' : ''}`}
                   >
-                    {/* Category Label - Modern Badge */}
                     <div className="shrink-0">
-                      <div className={`
-                        flex items-center justify-center min-w-[54px] h-[18px] px-2 rounded-md border text-center
-                        ${level.isCurrent ? 'bg-emerald-600 border-emerald-500 shadow-md shadow-emerald-200/50' : 'bg-slate-100 border-slate-200'}
-                      `}>
-                        <span className={`text-[9px] font-black uppercase tracking-widest leading-[0] mb-[-1px] ${level.isCurrent ? 'text-white' : 'text-slate-500'}`}>
+                      <div className={`flex items-center justify-center min-w-[54px] h-[18px] px-2 rounded-md border text-center ${level.isCurrent ? 'bg-emerald-600 border-emerald-500 shadow-md' : 'bg-slate-100 border-slate-200'}`}>
+                        <span className={`text-[9px] font-black uppercase tracking-widest ${level.isCurrent ? 'text-white' : 'text-slate-500'}`}>
                           {language === 'zh' ? level.labelChi : level.labelEng}
                         </span>
                       </div>
                     </div>
-
-                    {/* Classification Names - Text Group for better centering */}
                     <div className="flex items-center gap-3">
-                      <span className={`text-[15px] font-bold ${level.isCurrent ? 'text-emerald-900' : 'text-slate-700'} ${isScientist || level.id === 'species' ? 'italic font-serif' : ''}`}>
-                        {level.id === 'species' 
-                          ? formatScientificName(level.chi) 
-                          : (language === 'zh' ? (level.chi || level.eng) : level.eng)
-                        }
+                      <span className={`text-[15px] font-bold ${level.isCurrent ? 'text-emerald-900' : 'text-slate-700'} ${level.isScientific || level.id === 'species' ? 'italic font-serif' : ''}`}>
+                        {level.id === 'species' ? formatScientificName(level.chi) : (language === 'zh' ? (level.chi || level.eng) : level.eng)}
                       </span>
-                      
-                      {language === 'zh' && level.eng && level.id !== 'species' && (
-                        <span className={`text-[11px] font-medium text-slate-400 group-hover:text-emerald-400 transition-colors ${level.isScientific ? 'italic font-serif' : ''}`}>
-                          {level.eng}
-                        </span>
-                      )}
                     </div>
-
-                    {/* Search Interaction Button */}
-                    {isClickable && (
-                      <div className="opacity-0 group-hover:opacity-100 transition-all duration-300 ml-4 translate-x-[-10px] group-hover:translate-x-0">
-                        <div className="w-8 h-8 flex items-center justify-center bg-emerald-100/60 text-emerald-700 rounded-full hover:bg-emerald-500 hover:text-white transition-all duration-200 shadow-sm active:scale-90 group/btn">
-                          <Search className="w-3.5 h-3.5" />
-                        </div>
-                      </div>
-                    )}
                   </div>
                 </div>
               );
             })}
           </div>
-
-          {/* Right: Scientific Note & Feedback CTA */}
           <div className="col-span-2 border-l border-slate-100 pl-10 flex flex-col justify-center relative">
-            <div className="absolute inset-0 flex items-center justify-center opacity-[0.03] pointer-events-none overflow-hidden">
+            <div className="absolute inset-0 flex items-center justify-center opacity-[0.03] pointer-events-none">
                <Dna className="w-64 h-64 text-slate-950 rotate-[-15deg]" />
             </div>
-            
             <div className="relative z-10 space-y-8">
               <div className="space-y-4">
                 <div className="inline-flex items-center gap-2 px-3 py-1 bg-amber-50 rounded-lg border border-amber-100/50">
@@ -255,42 +216,152 @@ export default function TaxonomyDisplay({ species }: TaxonomyDisplayProps) {
                     {language === 'zh' ? '生物分類學' : 'Biological Taxonomy'}
                   </span>
                 </div>
-                
-                <div className="space-y-4">
-                  <p className="text-[13px] font-bold text-slate-700 leading-relaxed">
-                    {language === 'zh' 
-                      ? '生物分類並非一成不變，而是一個隨科研進展不斷更新、修正的動態過程。' 
-                      : 'Biological taxonomy is not static; it is a dynamic process continually refined by new scientific discoveries.'}
-                  </p>
-                  <p className="text-[12px] font-medium text-slate-500 leading-relaxed">
-                    {language === 'zh'
-                      ? '如果您掌握此物種最新的分類變動或權威資訊，歡迎提供給我們參考。'
-                      : 'If you have access to more recent or authoritative taxonomic updates for this species, we value your contribution.'}
-                  </p>
-                </div>
-              </div>
-
-              <div className="pt-2 flex justify-end">
-                <button 
-                  onClick={() => {
-                    const commentSection = document.getElementById('comment-section');
-                    if (commentSection) {
-                      commentSection.scrollIntoView({ behavior: 'smooth' });
-                    }
-                  }}
-                  className="flex items-center gap-3 px-6 py-3 bg-slate-950 hover:bg-emerald-600 text-white rounded-2xl transition-all duration-300 shadow-lg shadow-slate-200 hover:shadow-emerald-200 group active:scale-95"
-                >
-                  <span className="text-xs font-black uppercase tracking-widest whitespace-nowrap">
-                    {language === 'zh' ? '提供最新資訊' : 'Submit Feedback'}
-                  </span>
-                  <div className="p-1 bg-white/10 rounded-lg group-hover:bg-white/20 transition-colors">
-                    <ChevronDown className="w-3 h-3 rotate-[-90deg]" />
-                  </div>
-                </button>
+                <p className="text-[13px] font-bold text-slate-700 leading-relaxed">
+                  {language === 'zh' ? '生物分類並非一成不變，而是一個隨科研進展不斷更新、修正的動態過程。' : 'Biological taxonomy is not static; it is a dynamic process continually refined by new scientific discoveries.'}
+                </p>
               </div>
             </div>
           </div>
         </div>
+      </div>
+
+      {/* Expandable Area */}
+      <div className="mt-10 pt-6 border-t border-slate-100">
+        <button
+          onClick={toggleFullTaxonomy}
+          className={`w-full flex items-center justify-between px-6 py-4 rounded-2xl transition-all duration-500 group ${isExpanded ? 'bg-slate-900 text-white shadow-xl ring-4 ring-slate-100' : 'bg-slate-50 text-slate-600 hover:bg-emerald-50'}`}
+        >
+          <div className="flex items-center gap-4">
+            <div className={`p-2 rounded-xl transition-colors ${isExpanded ? 'bg-white/10 text-emerald-400' : 'bg-white text-slate-400 shadow-sm'}`}>
+              <Sparkles className="w-5 h-5" />
+            </div>
+            <div className="flex flex-col items-start">
+              <span className="text-sm font-black uppercase tracking-widest leading-tight">{language === 'zh' ? '完整分類階層' : 'Full Taxonomy Tree'}</span>
+              <span className={`text-[10px] font-medium opacity-60 leading-tight mt-0.5 ${isExpanded ? 'text-white' : 'text-slate-500'}`}>
+                {language === 'zh' ? '來自 Catalogue of Life 的詳細數據' : 'Detailed data from Catalogue of Life'}
+              </span>
+            </div>
+          </div>
+          <ChevronDown className={`w-5 h-5 transition-transform duration-500 ${isExpanded ? 'rotate-180' : ''}`} />
+        </button>
+
+        <AnimatePresence>
+          {isExpanded && (
+            <motion.div
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: 'auto', opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              transition={{ duration: 0.5 }}
+              className="overflow-hidden"
+            >
+              <div className="pt-6 space-y-6">
+                {isLoading ? (
+                  <div className="py-20 flex flex-col items-center justify-center gap-4 bg-white/50 rounded-[2rem] border border-slate-100">
+                    <Loader2 className="w-10 h-10 text-emerald-500 animate-spin" />
+                    <span className="text-xs font-black text-slate-400 uppercase tracking-[0.2em]">
+                      {language === 'zh' ? '正在獲取全球資料庫數據...' : 'Fetching Global Database...'}
+                    </span>
+                  </div>
+                ) : error ? (
+                  <div className="p-8 bg-red-50 rounded-[2rem] border border-red-100 flex items-center gap-4 text-red-700">
+                    <AlertCircle className="w-6 h-6" />
+                    <p className="text-sm font-bold">{language === 'zh' ? `載入失敗: ${error}` : `Failed: ${error}`}</p>
+                  </div>
+                ) : fullData && (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-stretch">
+                    {/* Left: Classification Path */}
+                    <div className="bg-white rounded-[2rem] p-8 shadow-sm border border-slate-100 relative overflow-hidden group flex flex-col">
+                      <div className="absolute top-0 right-0 p-8 opacity-[0.03]">
+                        <Layers className="w-32 h-32 text-slate-900" />
+                      </div>
+                      <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-6 flex items-center gap-2">
+                        <div className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                        {language === 'zh' ? '完整階層路徑' : 'Full Hierarchy Path'}
+                      </h3>
+                      <div className="space-y-1 relative flex-1">
+                        <div className="absolute left-[101px] top-2 bottom-2 w-[1px] bg-slate-100" />
+                        {fullData.classification.map((item, idx) => {
+                          const rankLower = item.rank.toLowerCase();
+                          const rankMap: Record<string, string> = {
+                            domain: '域', kingdom: '界', subkingdom: '亞界', phylum: '門', subphylum: '亞門',
+                            infraphylum: '下門', parvphylum: '小門', superclass: '總綱',
+                            class: '綱', subclass: '亞綱', infraclass: '下綱', megaclass: '巨綱',
+                            superorder: '總目', order: '目', suborder: '亞目', infraorder: '下目',
+                            parvorder: '小目', superfamily: '總科', family: '科', subfamily: '亞科',
+                            supertribe: '總族', tribe: '族', subtribe: '亞族', genus: '屬',
+                            subgenus: '亞屬', section: '節', subsection: '亞節', species: '種',
+                            subspecies: '亞種'
+                          };
+                          const rankChi = rankMap[rankLower] || '';
+                          const needsItalic = ['genus', 'subgenus', 'species', 'subspecies'].includes(rankLower);
+
+                          return (
+                            <div key={idx} className="grid grid-cols-[90px_24px_1fr] items-center group/line hover:bg-slate-50/50 rounded-lg py-1 px-1 transition-colors">
+                              <div className="text-center pr-2">
+                                {language === 'zh' && rankChi && (
+                                  <span className="text-[9px] font-bold text-slate-500 uppercase tracking-tighter block leading-tight">{rankChi}</span>
+                                )}
+                                <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest block leading-tight">{item.rank}</span>
+                              </div>
+                              <div className="flex justify-center relative">
+                                <div className="w-1.5 h-1.5 rounded-full bg-slate-200 group-hover/line:bg-emerald-400 transition-colors z-10" />
+                              </div>
+                              <div className="text-[13px] text-slate-600 leading-normal pl-1">
+                                {formatScientificName(item.authorship ? `${item.name} ${item.authorship}` : item.name, needsItalic, true)}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    {/* Right: Subspecies & Synonyms */}
+                    <div className="flex flex-col gap-6">
+                      <div className="bg-emerald-50/50 rounded-[2rem] p-8 border border-emerald-100/50 relative overflow-hidden group">
+                        <h3 className="text-xs font-black text-emerald-600 uppercase tracking-widest mb-6 flex items-center gap-2">
+                          <Sparkles className="w-4 h-4" />
+                          {language === 'zh' ? '已知亞種' : 'Known Subspecies'}
+                        </h3>
+                        {fullData.subspecies.length > 0 ? (
+                          <div className="flex flex-wrap gap-2">
+                            {fullData.subspecies.map((sub, idx) => (
+                              <div key={idx} className="px-3 py-1.5 bg-white rounded-xl border border-emerald-100 text-[12px] text-emerald-800 shadow-sm">
+                                {formatScientificName(sub, true, true)}
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <p className="text-sm font-bold text-emerald-600/40">{language === 'zh' ? '查無亞種資訊' : 'No subspecies recorded'}</p>
+                        )}
+                      </div>
+
+                      <div className="bg-white rounded-[2rem] p-8 shadow-sm border border-slate-100 group flex-1 flex flex-col overflow-hidden">
+                        <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-6 flex items-center gap-2">
+                          <Info className="w-4 h-4" />
+                          {language === 'zh' ? '同物異名' : 'Synonyms'}
+                        </h3>
+                        <div className="flex-1 overflow-y-auto pr-4 scrollbar-thin scrollbar-thumb-slate-200">
+                          <div className="space-y-3 pb-2">
+                            {fullData.synonyms.map((syn, idx) => (
+                              <div key={idx} className="text-[11px] font-medium text-slate-500 leading-relaxed pb-2 border-b border-slate-50 last:border-0">
+                                {formatScientificName(syn, true, true)}
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+                <div className="flex justify-center pb-4">
+                   <p className="text-[10px] font-medium text-slate-400 flex items-center gap-2">
+                     Source: Catalogue of Life (COL) • Usage ID: <code className="bg-slate-100 px-1.5 py-0.5 rounded text-emerald-600 font-mono">{fullData?.usageId}</code>
+                   </p>
+                </div>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
     </div>
   );
