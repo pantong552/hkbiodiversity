@@ -1,0 +1,26 @@
+{
+  "name": "Hong Kong Biodiversity Collective",
+  "short_name": "HKBC",
+  "description": "A collaborative biodiversity encyclopedia of Hong Kong, covering approximately 10,000 species.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#083344",
+  "icons": [
+    {
+      "src": "/logo/favicon.ico",
+      "sizes": "any",
+      "type": "image/x-icon"
+    },
+    {
+      "src": "/logo/apple-touch-icon-180x180.png",
+      "sizes": "180x180",
+      "type": "image/png"
+    },
+    {
+      "src": "/logo/apple-touch-icon-152x152.png",
+      "sizes": "152x152",
+      "type": "image/png"
+    }
+  ]
+}
