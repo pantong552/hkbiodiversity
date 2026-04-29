@@ -142,20 +142,44 @@ export function useInaturalistPhoto(taxonId: number | string | undefined) {
         const result = data.results?.[0];
         if (!result) return;
 
-        const allPhotos = [
+        const allTaxonPhotos = [
           result.default_photo,
           ...(result.taxon_photos || []).map((tp: any) => tp.photo)
         ].filter(p => p !== undefined && p !== null);
 
-        let validPhoto = allPhotos.find((p: any) => p.license_code !== null);
+        // 優先從 Taxa 官方圖中找有授權的
+        let validPhoto = allTaxonPhotos.find((p: any) => p.license_code !== null);
 
-        // --- FALLBACK: Try Observations API if no valid taxon photo found ---
-        // This solves issues like ID 708162 where taxon has only RR photos but observations have CC photos
+        // --- FALLBACK: Try Observations API ---
         if (!validPhoto) {
-          const obsData = await fetchWithRetry(`https://api.inaturalist.org/v1/observations?taxon_id=${tId}&quality_grade=research&per_page=1&order_by=votes`);
-          const firstObs = obsData.results?.[0];
-          if (firstObs && firstObs.photos?.length > 0) {
-            validPhoto = firstObs.photos.find((p: any) => p.license_code !== null);
+          // 1. 嘗試抓取香港區域 (place_id=7613) 的研究級觀測
+          const hkObsUrl = `https://api.inaturalist.org/v1/observations?taxon_id=${tId}&quality_grade=research&place_id=7613&per_page=5&order_by=votes`;
+          const hkObsData = await fetchWithRetry(hkObsUrl);
+          
+          if (hkObsData.results && hkObsData.results.length > 0) {
+            for (const obs of hkObsData.results) {
+              const p = obs.photos?.find((p: any) => p.license_code !== null);
+              if (p) {
+                validPhoto = p;
+                break;
+              }
+            }
+          }
+
+          // 2. 如果香港沒有，嘗試抓取全球 (Global) 的研究級觀測
+          if (!validPhoto) {
+            const globalObsUrl = `https://api.inaturalist.org/v1/observations?taxon_id=${tId}&quality_grade=research&per_page=5&order_by=votes`;
+            const globalObsData = await fetchWithRetry(globalObsUrl);
+            
+            if (globalObsData.results && globalObsData.results.length > 0) {
+              for (const obs of globalObsData.results) {
+                const p = obs.photos?.find((p: any) => p.license_code !== null);
+                if (p) {
+                  validPhoto = p;
+                  break;
+                }
+              }
+            }
           }
         }
 
