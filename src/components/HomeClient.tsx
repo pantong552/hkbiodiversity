@@ -186,7 +186,7 @@ export default function HomeClient() {
         let query = supabaseSingleton.from(table).select('*', { count: 'exact' });
 
         // Apply Global & Quick Search
-        const currentSearch = taxaType === 'fauna' ? searchQuery.trim() : (searchQuery.trim() || plantFilters.searchQuery.trim());
+        const currentSearch = searchQuery.trim();
         if (currentSearch) {
             if (taxaType === 'fauna') {
                 query = query.or(`common_name_chi.ilike.%${currentSearch}%,common_name_eng.ilike.%${currentSearch}%,scientific_name.ilike.%${currentSearch}%,alias_common_name_chi.ilike.%${currentSearch}%,alias_common_name_eng.ilike.%${currentSearch}%,alias_scientific_name.ilike.%${currentSearch}%`);
@@ -196,13 +196,23 @@ export default function HomeClient() {
         }
 
         if (taxaType === 'fauna') {
+            // Taxonomy Filters (Phylum, Class, Order, Family, Genus)
             Object.entries(selectedFilters.taxonomy).forEach(([level, values]) => {
-                if (values && values.length > 0) query = query.in(level, values);
+                if (values && values.length > 0) {
+                    query = query.in(level, values);
+                }
             });
+
+            // IUCN Filters
             if (selectedFilters.iucn && selectedFilters.iucn.length > 0) {
                 query = query.in('iucn', selectedFilters.iucn);
             }
         } else {
+            // Flora Filters
+            if (plantFilters.searchQuery.trim()) {
+                const ps = plantFilters.searchQuery.trim();
+                query = query.or(`scientific_name.ilike.%${ps}%,common_name_zh.ilike.%${ps}%,common_name_en.ilike.%${ps}%`);
+            }
             if (plantFilters.categories.length > 0) query = query.in('category_zh', plantFilters.categories);
             if (plantFilters.families.length > 0) query = query.in('family_zh', plantFilters.families);
             if (plantFilters.genuses.length > 0) query = query.in('genus_zh', plantFilters.genuses);

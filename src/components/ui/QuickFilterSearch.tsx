@@ -56,6 +56,7 @@ export default function QuickFilterSearch({
         value={localValue}
         onChange={(e) => setLocalValue(e.target.value)}
         onKeyDown={(e) => e.key === 'Enter' && handleSubmit()}
+        onBlur={() => setLocalValue(initialValue)}
         suppressHydrationWarning={true}
         className="w-full pl-12 pr-12 py-4 bg-emerald-50/30 border-2 border-transparent rounded-2xl text-emerald-900 placeholder:text-slate-400 focus:bg-white focus:border-emerald-200 focus:ring-4 focus:ring-emerald-50/50 transition-all outline-none text-sm"
       />
