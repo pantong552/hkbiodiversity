@@ -66,11 +66,11 @@ export default function ConservationStatus({ species }: ConservationStatusProps)
       labelEng: 'HK Native Status', 
       value: species.native_status 
     },
-    { 
+    ...(species.class_eng === 'Aves' ? [{ 
       labelChi: '鳥種類別（香港觀鳥會）', 
       labelEng: 'Category (HKBWS)', 
       value: species.hkbws_cat 
-    },
+    }] : []),
   ];
 
   return (

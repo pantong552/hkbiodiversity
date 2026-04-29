@@ -162,8 +162,16 @@ export default function TaxonomyDisplay({ species }: TaxonomyDisplayProps) {
                     </div>
                     <div className="flex flex-col min-w-0">
                       <span className={`text-[13px] font-bold truncate leading-tight ${level.isCurrent ? 'text-emerald-900' : 'text-slate-800'}`}>
-                        {level.id === 'species' ? formatScientificName(level.chi) : (language === 'zh' ? (level.chi || level.eng) : level.eng)}
+                        {level.id === 'species' 
+                          ? formatScientificName(level.chi) 
+                          : (language === 'zh' ? (level.chi || level.eng) : level.eng)
+                        }
                       </span>
+                      {language === 'zh' && level.eng && level.id !== 'species' && (
+                        <span className={`text-[10px] font-medium text-slate-400 leading-tight mt-0.5 ${level.isScientific ? 'italic font-serif' : ''}`}>
+                          {level.eng}
+                        </span>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -195,9 +203,19 @@ export default function TaxonomyDisplay({ species }: TaxonomyDisplayProps) {
                       </div>
                     </div>
                     <div className="flex items-center gap-3">
-                      <span className={`text-[15px] font-bold ${level.isCurrent ? 'text-emerald-900' : 'text-slate-700'} ${level.isScientific || level.id === 'species' ? 'italic font-serif' : ''}`}>
-                        {level.id === 'species' ? formatScientificName(level.chi) : (language === 'zh' ? (level.chi || level.eng) : level.eng)}
+                      <span className={`text-[15px] font-bold ${level.isCurrent ? 'text-emerald-900' : 'text-slate-700'} 
+                        ${(level.id === 'species' || (level.isScientific && language !== 'zh')) ? 'italic font-serif' : ''}`}>
+                        {level.id === 'species' 
+                          ? formatScientificName(level.chi) 
+                          : (language === 'zh' ? (level.chi || level.eng) : level.eng)
+                        }
                       </span>
+                      
+                      {language === 'zh' && level.eng && level.id !== 'species' && (
+                        <span className={`text-[11px] font-medium text-slate-400 group-hover:text-emerald-400 transition-colors ${level.isScientific ? 'italic font-serif' : ''}`}>
+                          {level.eng}
+                        </span>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -219,6 +237,30 @@ export default function TaxonomyDisplay({ species }: TaxonomyDisplayProps) {
                 <p className="text-[13px] font-bold text-slate-700 leading-relaxed">
                   {language === 'zh' ? '生物分類並非一成不變，而是一個隨科研進展不斷更新、修正的動態過程。' : 'Biological taxonomy is not static; it is a dynamic process continually refined by new scientific discoveries.'}
                 </p>
+                <p className="text-[12px] font-medium text-slate-500 leading-relaxed">
+                  {language === 'zh'
+                    ? '如果您掌握此物種最新的分類變動或權威資訊，歡迎提供給我們參考。'
+                    : 'If you have access to more recent or authoritative taxonomic updates for this species, we value your contribution.'}
+                </p>
+              </div>
+
+              <div className="pt-2 flex justify-end">
+                <button 
+                  onClick={() => {
+                    const commentSection = document.getElementById('comment-section');
+                    if (commentSection) {
+                      commentSection.scrollIntoView({ behavior: 'smooth' });
+                    }
+                  }}
+                  className="flex items-center gap-3 px-6 py-3 bg-slate-950 hover:bg-emerald-600 text-white rounded-2xl transition-all duration-300 shadow-lg shadow-slate-200 hover:shadow-emerald-200 group active:scale-95"
+                >
+                  <span className="text-xs font-black uppercase tracking-widest whitespace-nowrap">
+                    {language === 'zh' ? '提供最新資訊' : 'Submit Feedback'}
+                  </span>
+                  <div className="p-1 bg-white/10 rounded-lg group-hover:bg-white/20 transition-colors">
+                    <ChevronDown className="w-3 h-3 rotate-[-90deg]" />
+                  </div>
+                </button>
               </div>
             </div>
           </div>
@@ -279,7 +321,6 @@ export default function TaxonomyDisplay({ species }: TaxonomyDisplayProps) {
                         {language === 'zh' ? '完整階層路徑' : 'Full Hierarchy Path'}
                       </h3>
                       <div className="space-y-1 relative flex-1">
-                        <div className="absolute left-[101px] top-2 bottom-2 w-[1px] bg-slate-100" />
                         {fullData.classification.map((item, idx) => {
                           const rankLower = item.rank.toLowerCase();
                           const rankMap: Record<string, string> = {
@@ -296,17 +337,25 @@ export default function TaxonomyDisplay({ species }: TaxonomyDisplayProps) {
                           const needsItalic = ['genus', 'subgenus', 'species', 'subspecies'].includes(rankLower);
 
                           return (
-                            <div key={idx} className="grid grid-cols-[90px_24px_1fr] items-center group/line hover:bg-slate-50/50 rounded-lg py-1 px-1 transition-colors">
+                            <div key={idx} className="grid grid-cols-[90px_24px_1fr] items-center group/line hover:bg-emerald-50/40 rounded-lg py-1 px-1 transition-all duration-300">
                               <div className="text-center pr-2">
                                 {language === 'zh' && rankChi && (
-                                  <span className="text-[9px] font-bold text-slate-500 uppercase tracking-tighter block leading-tight">{rankChi}</span>
+                                  <span className="text-[9px] font-bold text-slate-400 uppercase tracking-tighter block leading-tight">{rankChi}</span>
                                 )}
-                                <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest block leading-tight">{item.rank}</span>
+                                <span className="text-[8px] font-black text-slate-300 uppercase tracking-widest block leading-tight">{item.rank}</span>
                               </div>
-                              <div className="flex justify-center relative">
-                                <div className="w-1.5 h-1.5 rounded-full bg-slate-200 group-hover/line:bg-emerald-400 transition-colors z-10" />
+                              
+                              {/* Modern Step Connector */}
+                              <div className="relative flex justify-center h-full items-center">
+                                {/* Vertical segments for tree continuity */}
+                                <div className={`absolute w-[1px] bg-slate-100 ${idx === 0 ? 'top-1/2 h-1/2' : idx === fullData.classification.length - 1 ? 'top-0 h-1/2' : 'top-0 h-full'}`} />
+                                {/* Horizontal connector */}
+                                <div className="absolute left-1/2 w-2 h-[1px] bg-slate-100" />
+                                {/* Diamond Node */}
+                                <div className="relative w-1.5 h-1.5 bg-slate-200 rounded-sm rotate-45 group-hover/line:bg-emerald-500 group-hover/line:rotate-0 transition-all duration-300 z-10 shadow-sm" />
                               </div>
-                              <div className="text-[13px] text-slate-600 leading-normal pl-1">
+
+                              <div className="text-[13px] text-slate-600 leading-normal pl-2 group-hover/line:translate-x-0.5 transition-transform">
                                 {formatScientificName(item.authorship ? `${item.name} ${item.authorship}` : item.name, needsItalic, true)}
                               </div>
                             </div>
