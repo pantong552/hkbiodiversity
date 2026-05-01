@@ -5,6 +5,7 @@ import { User, Heart, Calendar, Clock, Mail, ArrowLeft, Settings } from 'lucide-
 import Link from 'next/link';
 import { useAuth } from '@/context/AuthContext';
 import { useLanguage } from '@/context/LanguageContext';
+import { useSpeciesPanel } from '@/context/SpeciesPanelContext';
 import UsernameForm from './UsernameForm';
 import BookmarksSection from './BookmarksSection';
 
@@ -13,6 +14,7 @@ type TabType = 'profile' | 'bookmarks';
 export default function AccountPanel() {
   const { user, profile, isLoading } = useAuth();
   const { t, language } = useLanguage();
+  const { openSpeciesIds } = useSpeciesPanel();
   const [activeTab, setActiveTab] = useState<TabType>('profile');
 
   if (isLoading) {
@@ -75,7 +77,7 @@ export default function AccountPanel() {
   ];
 
   return (
-    <div className="min-h-screen pt-32 sm:pt-40 pb-16 px-4 sm:px-6">
+    <div className={`min-h-screen pt-32 sm:pt-40 transition-all duration-500 px-4 sm:px-6 ${openSpeciesIds.length > 0 ? 'pb-32' : 'pb-16'}`}>
       <div className="max-w-2xl mx-auto space-y-8">
         
         {/* 頁面標題區 */}
