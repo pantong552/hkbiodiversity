@@ -572,7 +572,7 @@ export default function SpeciesFloatingPanel() {
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
                   exit={{ opacity: 0 }}
-                  className="absolute top-0 right-0 bottom-0 w-12 bg-gradient-to-l from-white to-transparent pointer-events-none z-20" 
+                  className="absolute top-0 -right-1 bottom-0 w-12 bg-gradient-to-l from-white to-transparent pointer-events-none z-20" 
                 />
               )}
             </AnimatePresence>

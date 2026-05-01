@@ -389,7 +389,7 @@ export default function SpeciesPhotoGallery({
               onMouseMove={handleMouseMove}
               onMouseUp={handleMouseUp}
               onMouseLeave={handleMouseUp}
-              className={`flex gap-4 overflow-x-auto pb-4 pt-4 no-scrollbar scroll-smooth px-6 items-center cursor-grab active:cursor-grabbing ${isDragging ? 'select-none' : ''}`}
+              className={`flex gap-4 overflow-x-auto pb-4 pt-4 no-scrollbar scroll-smooth px-3 items-center cursor-grab active:cursor-grabbing ${isDragging ? 'select-none' : ''}`}
             >
               {photos.map((photo, index) => (
                 <button

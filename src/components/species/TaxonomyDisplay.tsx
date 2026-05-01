@@ -312,15 +312,15 @@ export default function TaxonomyDisplay({ species }: TaxonomyDisplayProps) {
                 ) : fullData && (
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-stretch">
                     {/* Left: Classification Path */}
-                    <div className="bg-white rounded-[2rem] p-8 shadow-sm border border-slate-100 relative overflow-hidden group flex flex-col">
+                    <div className="bg-white rounded-[2rem] p-5 md:p-8 shadow-sm border border-slate-100 relative overflow-hidden group flex flex-col">
                       <div className="absolute top-0 right-0 p-8 opacity-[0.03]">
                         <Layers className="w-32 h-32 text-slate-900" />
                       </div>
-                      <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-6 flex items-center gap-2">
+                      <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-6 flex items-center gap-2 px-1">
                         <div className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
                         {language === 'zh' ? '完整階層路徑' : 'Full Hierarchy Path'}
                       </h3>
-                      <div className="space-y-1 relative flex-1">
+                      <div className="space-y-1 relative flex-1 -mx-2 md:mx-0">
                         {fullData.classification.map((item, idx) => {
                           const rankLower = item.rank.toLowerCase();
                           const rankMap: Record<string, string> = {
