@@ -326,7 +326,7 @@ export default function TaxonomyDisplay({ species }: TaxonomyDisplayProps) {
                           const rankMap: Record<string, string> = {
                             domain: '域', kingdom: '界', subkingdom: '亞界', phylum: '門', subphylum: '亞門',
                             infraphylum: '下門', parvphylum: '小門', superclass: '總綱',
-                            class: '綱', subclass: '亞綱', infraclass: '下綱', megaclass: '巨綱',
+                            class: '綱', subclass: '亞綱', infraclass: '下綱', megaclass: '巨綱', gigaclass: '大綱',
                             superorder: '總目', order: '目', suborder: '亞目', infraorder: '下目',
                             parvorder: '小目', superfamily: '總科', family: '科', subfamily: '亞科',
                             supertribe: '總族', tribe: '族', subtribe: '亞族', genus: '屬',

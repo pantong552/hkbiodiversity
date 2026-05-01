@@ -18,18 +18,10 @@ export interface Species {
   phylum_chi: string;
   class_eng: string;
   class_chi: string;
-  sub_class_eng?: string;
-  sub_class_chi?: string;
   order_eng: string;
   order_chi: string;
-  sub_order_eng?: string;
-  sub_order_chi?: string;
-  superfamily_eng?: string;
-  superfamily_chi?: string;
   family_eng: string;
   family_chi: string;
-  sub_family_eng?: string;
-  sub_family_chi?: string;
   genus_eng: string;
   genus_chi: string;
   species_eng: string;
