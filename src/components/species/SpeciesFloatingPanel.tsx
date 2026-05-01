@@ -10,6 +10,7 @@ import { Species } from '@/types/species';
 import SpeciesContent from './SpeciesContent';
 import { useShare } from '@/hooks/useShare';
 import { useInaturalistPhoto } from '@/hooks/useInaturalistPhoto';
+import { usePathname } from 'next/navigation';
 
 // --- Subcomponent: Species Tab Preview (Tooltip) ---
 function SpeciesTabPreview({ 
@@ -147,6 +148,7 @@ export default function SpeciesFloatingPanel() {
   } = useSpeciesPanel();
   
   const { language, t } = useLanguage();
+  const pathname = usePathname();
   const [speciesData, setSpeciesData] = useState<Record<string, Species>>({});
   const [isLoading, setIsLoading] = useState<Record<string, boolean>>({});
   const [hoveredTabId, setHoveredTabId] = useState<string | null>(null);
@@ -235,16 +237,26 @@ export default function SpeciesFloatingPanel() {
 
   // Handle history cleanup when panel closes via UI
   useEffect(() => {
-    if (!isExpanded && typeof window !== 'undefined' && window.history.state?.panelOpen === true) {
+    // Only go back if we are still on the same page where the panel was opened
+    // and if the panel was manually closed via UI (not via browser back button)
+    if (!isExpanded && pathname === '/' && typeof window !== 'undefined' && window.history.state?.panelOpen === true) {
       // Small delay to ensure any pending navigations are settled
       const timer = setTimeout(() => {
-        if (window.history.state?.panelOpen === true) {
+        // Double check: if we've already navigated away, don't go back
+        if (window.location.pathname === '/' && window.history.state?.panelOpen === true) {
           window.history.back();
         }
-      }, 50);
+      }, 100);
       return () => clearTimeout(timer);
     }
-  }, [isExpanded]);
+  }, [isExpanded, pathname]);
+
+  // Auto-collapse panel when navigating away from home
+  useEffect(() => {
+    if (isExpanded && pathname !== '/') {
+      toggleExpand(false);
+    }
+  }, [pathname, isExpanded, toggleExpand]);
 
   // --- Auto-scroll to active tab ---
   useEffect(() => {

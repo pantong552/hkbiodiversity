@@ -16,6 +16,8 @@ interface SpeciesPanelContextType {
   setUploadModalOpen: (open: boolean) => void;
   isFilterOpen: boolean;
   setIsFilterOpen: (open: boolean) => void;
+  isAccountOpen: boolean;
+  setIsAccountOpen: (open: boolean) => void;
 }
 
 const SpeciesPanelContext = createContext<SpeciesPanelContextType | undefined>(undefined);
@@ -27,6 +29,7 @@ export const SpeciesPanelProvider: React.FC<{ children: React.ReactNode }> = ({ 
   const [isGalleryOpen, setIsGalleryOpen] = useState(false);
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
   const [isFilterOpen, setIsFilterOpen] = useState(false);
+  const [isAccountOpen, setIsAccountOpen] = useState(false);
 
   const addSpecies = (id: string) => {
     setOpenSpeciesIds((prev) => {
@@ -92,6 +95,8 @@ export const SpeciesPanelProvider: React.FC<{ children: React.ReactNode }> = ({ 
         setUploadModalOpen,
         isFilterOpen,
         setIsFilterOpen,
+        isAccountOpen,
+        setIsAccountOpen,
       }}
     >
       {children}

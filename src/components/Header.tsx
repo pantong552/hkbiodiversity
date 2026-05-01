@@ -16,7 +16,7 @@ export default function Header() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isVisible, setIsVisible] = useState(true);
 
-  const { isExpanded, isGalleryOpen, isUploadModalOpen, isFilterOpen, toggleExpand } = useSpeciesPanel();
+  const { isExpanded, isGalleryOpen, isUploadModalOpen, isFilterOpen, toggleExpand, setIsAccountOpen, isAccountOpen } = useSpeciesPanel();
   const lastScrollYRef = useRef(0);
   const mobileMenuRef = useRef<HTMLDivElement>(null);
   const menuToggleRef = useRef<HTMLButtonElement>(null);
@@ -119,7 +119,7 @@ export default function Header() {
       fixed top-4 inset-x-0 z-[60] 
       px-6 md:px-8 lg:px-10 xl:px-16
       transition-all duration-500 cubic-bezier(0.16, 1, 0.3, 1)
-      ${(isVisible && !isGalleryOpen && !isUploadModalOpen && !isFilterOpen) ? 'translate-y-0 opacity-100' : '-translate-y-40 opacity-0'}
+      ${(isVisible && !isGalleryOpen && !isUploadModalOpen && !isFilterOpen && !isAccountOpen) ? 'translate-y-0 opacity-100' : '-translate-y-40 opacity-0'}
     `}>
       <nav className={`
         glass-header max-w-[1920px] mx-auto
@@ -197,7 +197,6 @@ export default function Header() {
                 <Link
                   key={link.name}
                   href={link.href}
-                  onClick={() => toggleExpand(false)}
                   className="text-sm font-bold text-slate-500 hover:text-emerald-600 transition-colors"
                 >
                   {link.name}
@@ -224,9 +223,8 @@ export default function Header() {
 
           {user ? (
             <div className="flex items-center gap-2 lg:gap-3">
-              <Link 
-                href="/account" 
-                onClick={() => toggleExpand(false)}
+              <button 
+                onClick={() => setIsAccountOpen(true)}
                 className="flex items-center gap-2 px-4 py-2 bg-slate-50 rounded-2xl border border-slate-100 hover:border-emerald-200 hover:bg-emerald-50/50 transition-all duration-300 cursor-pointer group"
               >
                 {user.user_metadata.avatar_url ? (
@@ -241,7 +239,7 @@ export default function Header() {
                 <span className="text-sm font-bold text-slate-700 group-hover:text-emerald-700 transition-colors">
                   {user.user_metadata.full_name || user.email}
                 </span>
-              </Link>
+              </button>
               <button
                 onClick={handleLogout}
                 className="p-3 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all cursor-pointer"
@@ -308,7 +306,6 @@ export default function Header() {
                     href={link.href}
                     onClick={() => {
                       setIsMobileMenuOpen(false);
-                      toggleExpand(false);
                     }}
                     className="text-lg font-bold text-slate-700 hover:text-emerald-600 px-4 py-2 rounded-xl hover:bg-emerald-50 transition-all"
                   >
@@ -319,11 +316,10 @@ export default function Header() {
               <hr className="border-slate-100 my-2" />
               {user ? (
                 <div className="space-y-3">
-                  <Link
-                    href="/account"
+                  <button
                     onClick={() => {
                       setIsMobileMenuOpen(false);
-                      toggleExpand(false);
+                      setIsAccountOpen(true);
                     }}
                     className="flex items-center gap-3 px-4 py-3 bg-slate-50 rounded-2xl border border-slate-100 hover:border-emerald-200 hover:bg-emerald-50/50 transition-all duration-300 cursor-pointer"
                   >
@@ -338,12 +334,12 @@ export default function Header() {
                         <User className="w-6 h-6 text-slate-500" />
                       </div>
                     )}
-                    <div className="flex flex-col flex-1">
+                    <div className="flex flex-col flex-1 text-left">
                       <span className="font-bold text-slate-900">{user.user_metadata.full_name || 'Member'}</span>
                       <span className="text-xs text-slate-500">{user.email}</span>
                     </div>
                     <Settings className="w-5 h-5 text-slate-300" />
-                  </Link>
+                  </button>
                   <button
                     onClick={handleLogout}
                     className="flex items-center justify-center gap-2 w-full py-3 text-red-600 font-bold border-2 border-red-100 rounded-2xl hover:bg-red-50 transition-all cursor-pointer"

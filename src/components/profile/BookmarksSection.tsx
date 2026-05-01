@@ -39,7 +39,7 @@ function BookmarkItem({
   idx: number
 }) {
   const { language } = useLanguage();
-  const { addSpecies } = useSpeciesPanel();
+  const { addSpecies, setIsAccountOpen } = useSpeciesPanel();
   const [imgLoaded, setImgLoaded] = useState(false);
   
   // 獲取與 SpeciesCard 同款的動態圖片
@@ -51,7 +51,10 @@ function BookmarkItem({
     <div
       className="group flex items-center gap-4 p-3 bg-white hover:bg-emerald-50/50 border border-slate-100 hover:border-emerald-200 rounded-2xl transition-all duration-300 cursor-pointer animate-in fade-in slide-in-from-left-4 duration-500"
       style={{ animationDelay: `${idx * 50}ms` }}
-      onClick={() => addSpecies(species.taxa_id)}
+      onClick={() => {
+        addSpecies(species.taxa_id);
+        setIsAccountOpen(false);
+      }}
     >
       {/* 物種縮圖 */}
       <div className="relative w-14 h-14 rounded-xl overflow-hidden flex-shrink-0 bg-slate-50 border border-slate-100 flex items-center justify-center">

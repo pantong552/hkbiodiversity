@@ -53,6 +53,7 @@ import { LanguageProvider } from '@/context/LanguageContext';
 import { SpeciesPanelProvider } from '@/context/SpeciesPanelContext';
 import { AuthProvider } from '@/context/AuthContext';
 import SpeciesFloatingPanel from '@/components/species/SpeciesFloatingPanel';
+import AccountModule from '@/components/profile/AccountModule';
 
 export default function RootLayout({
   children,
@@ -67,6 +68,7 @@ export default function RootLayout({
             <SpeciesPanelProvider>
               {children}
               <SpeciesFloatingPanel />
+              <AccountModule />
             </SpeciesPanelProvider>
           </LanguageProvider>
         </AuthProvider>
