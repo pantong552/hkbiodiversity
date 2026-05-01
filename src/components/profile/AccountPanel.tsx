@@ -136,7 +136,7 @@ export default function AccountPanel() {
         </div>
 
         {/* Tabs 切換區 */}
-        <div className="flex p-1.5 bg-slate-100/80 rounded-2xl border border-slate-200/50">
+        <div className="flex p-1.5 bg-slate-100/80 rounded-2xl border border-slate-200/50 mt-8">
           {tabs.map((tab) => (
             <button
               key={tab.id}

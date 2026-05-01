@@ -130,6 +130,24 @@ export function useInaturalistSpeciesPhotos(inatId: number | string | undefined,
   const fetchInternal = useCallback(async (pageNum: number, scope: 'hongkong' | 'global', isInitial: boolean) => {
     if (!inatId) return;
     
+    // 獲取當前登入使用者的授權資訊
+    const { data: { session } } = await supabase.auth.getSession();
+    let currentUserInatName = '';
+    let allowAllRightsReserved = false;
+
+    if (session?.user) {
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('inaturalist_username, allow_all_rights_reserved_usage')
+        .eq('id', session.user.id)
+        .maybeSingle();
+      
+      if (profile) {
+        currentUserInatName = profile.inaturalist_username || '';
+        allowAllRightsReserved = profile.allow_all_rights_reserved_usage || false;
+      }
+    }
+    
     const placeParam = scope === 'hongkong' ? '&place_id=7613' : '';
     const fields = '(id:!t,observed_on:!t,photos:(id:!t,url:!t,small_url:!t,medium_url:!t,large_url:!t,original_url:!t,attribution:!t,license_code:!t))';
     const url = `https://api.inaturalist.org/v2/observations?taxon_id=${inatId}&quality_grade=research${placeParam}&per_page=12&page=${pageNum}&order=desc&order_by=votes&fields=${fields}`;
@@ -138,7 +156,21 @@ export function useInaturalistSpeciesPhotos(inatId: number | string | undefined,
     
     const mappedPhotos: InatGalleryPhoto[] = (data.results || []).flatMap((obs: any) => 
       (obs.photos || [])
-        .filter((p: any) => p.license_code !== null)
+        .filter((p: any) => {
+          // 如果照片本身有授權 (非 null)，則允許顯示
+          if (p.license_code !== null) return true;
+
+          // 如果照片是 All Rights Reserved (license_code 為 null)，檢查目前使用者是否為作者且已授權
+          if (allowAllRightsReserved && currentUserInatName) {
+            const attribution = (p.attribution || '').toLowerCase();
+            const searchName = currentUserInatName.toLowerCase();
+            
+            // 檢查作者名稱是否包含填寫的 iNat 帳號
+            return attribution.includes(searchName);
+          }
+
+          return false;
+        })
         .map((p: any) => {
           let author = 'Unknown';
           if (p.attribution) {
@@ -157,8 +189,7 @@ export function useInaturalistSpeciesPhotos(inatId: number | string | undefined,
             medium_url: getProxyUrl(p.medium_url || convertInatUrl(p.url, 'medium'), inatId || 'image', 'medium'),
             large_url: getProxyUrl(p.large_url || convertInatUrl(p.url, 'large'), inatId || 'image', 'large'),
             original_url: getProxyUrl(p.original_url || convertInatUrl(p.url, 'original'), inatId || 'image', 'original'),
-            attribution: `© ${author} (${p.license_code?.toUpperCase() || 'CC0'})`,
-
+            attribution: `© ${author} (${p.license_code?.toUpperCase() || 'All Rights Reserved'})`,
 
             licenseCode: p.license_code,
             nativePageUrl: `https://www.inaturalist.org/photos/${p.id}`,
@@ -172,7 +203,7 @@ export function useInaturalistSpeciesPhotos(inatId: number | string | undefined,
       photos: mappedPhotos,
       totalResults: data.total_results || 0
     };
-  }, [inatId]);
+  }, [inatId, supabase]);
 
   const loadData = useCallback(async (targetPage: number, targetScope: 'hongkong' | 'global', isInitial: boolean) => {
     if ((!inatId && !taxaId) || isFetchingRef.current) return;

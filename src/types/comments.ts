@@ -4,6 +4,8 @@ export interface Profile {
   avatar_url: string | null;
   updated_at: string;
   last_online_at?: string | null;
+  inaturalist_username?: string | null;
+  allow_all_rights_reserved_usage?: boolean;
 }
 
 export interface Comment {
