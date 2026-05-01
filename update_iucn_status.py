@@ -85,14 +85,25 @@ def get_iucn_status(scientific_name):
         if response.status_code == 200:
             data = response.json()
             # v4 API 結構解析: 尋找 assessments 列表中 latest 為 true 的評估
-            assessments = data.get("assessments", [])
-            latest_assessment = next((a for a in assessments if a.get("latest")), None)
-            
-            if latest_assessment:
-                code = latest_assessment.get("red_list_category_code")
-                if code:
-                    # 轉換為完整標籤 (Label)
-                    return IUCN_MAP.get(code, code)
+                assessments = data.get("assessments", [])
+                
+                # 篩選出所有 latest 為 True 的評估
+                latest_assessments = [a for a in assessments if a.get("latest")]
+                
+                if latest_assessments:
+                    # 優先尋找 Global (scope code "1") 的評估
+                    global_assessment = next(
+                        (a for a in latest_assessments if any(s.get("code") == "1" for s in a.get("scopes", []))), 
+                        None
+                    )
+                    
+                    # 如果有 Global 則用 Global，否則用第一個 latest
+                    target_assessment = global_assessment if global_assessment else latest_assessments[0]
+                    
+                    code = target_assessment.get("red_list_category_code")
+                    if code:
+                        # 轉換為完整標籤 (Label)
+                        return IUCN_MAP.get(code, code)
         elif response.status_code == 404:
             return None
         elif response.status_code == 401:
