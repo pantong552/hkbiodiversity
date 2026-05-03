@@ -164,7 +164,7 @@ export default function SpeciesTable({
                         onChange={(vals) => handleSelectChange(col.key, vals)}
                         placeholder={language === 'zh' ? "全部" : "All"}
                         minWidth={col.key === 'scientific_name' || col.key === 'common_name' ? '120px' : '160px'}
-                        align={col.key === 'iucn' || col.key === 'native_status' ? 'center' : 'left'}
+                        align="left"
                       />
                     )}
                   </div>
