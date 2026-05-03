@@ -411,6 +411,8 @@ export default function HomeClient() {
       
       if (faunaTaxaLevels.includes(level)) {
         setTaxaType('fauna');
+        setPlantFilters(INITIAL_PLANT_FILTERS); // 清空植物過濾器，避免衝突
+        
         const cleanTaxonomy: any = { 
           phylum_eng: [], class_eng: [], order_eng: [], family_eng: [], genus_eng: [], informal_group_eng: [] 
         };
@@ -421,6 +423,12 @@ export default function HomeClient() {
         });
       } else {
         setTaxaType('flora');
+        // 清空動物過濾器，避免衝突
+        setSelectedFilters({
+          taxonomy: { phylum_eng: [], class_eng: [], order_eng: [], family_eng: [], genus_eng: [], informal_group_eng: [] },
+          iucn: []
+        });
+        
         setPlantFilters({
           ...INITIAL_PLANT_FILTERS,
           [level]: [value],

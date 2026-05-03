@@ -28,8 +28,8 @@ export default function TaxonomyDisplay({ species }: TaxonomyDisplayProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // 判斷是否為植物
-  const isPlant = !species.phylum_eng && !!(species as any).family_chi;
+  // 判斷是否為植物 - 使用更明確的類群標記
+  const isPlant = species.taxa_group === 'FLORA' || (!species.phylum_eng && !!(species as any).family_chi);
 
   const levels = isPlant ? [
     { 
