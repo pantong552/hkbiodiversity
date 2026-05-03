@@ -99,7 +99,11 @@ const translations: Record<Language, Record<string, string>> = {
     'dropdown.apply': '套用',
     'dropdown.apply_selection': '確定選取',
     'dropdown.no_results': '找不到符合的分類',
-    'dropdown.clear_search': '清除搜尋'
+    'dropdown.clear_search': '清除搜尋',
+    'gallery.set_profile_picture': '設為封面照片',
+    'gallery.set_profile_success': '封面照片更新成功！',
+    'gallery.set_profile_error': '封面照片更新失敗',
+    'gallery.current_profile': '目前封面'
   },
   en: {
     'nav.home': 'Home',
@@ -189,7 +193,11 @@ const translations: Record<Language, Record<string, string>> = {
     'dropdown.apply': 'Apply',
     'dropdown.apply_selection': 'Apply Selection',
     'dropdown.no_results': 'No matching categories found',
-    'dropdown.clear_search': 'Clear Search'
+    'dropdown.clear_search': 'Clear Search',
+    'gallery.set_profile_picture': 'Set as Cover Photo',
+    'gallery.set_profile_success': 'Cover photo updated!',
+    'gallery.set_profile_error': 'Update failed',
+    'gallery.current_profile': 'Current Cover'
   }
 };
 

@@ -163,6 +163,12 @@ const SpeciesHeroBackground = ({ photos, defaultImage, isLoading }: { photos: In
 export default function SpeciesContent({ species, showBreadcrumb = true }: SpeciesContentProps) {
   const { language } = useLanguage();
   const { photos, isLoading } = useInaturalistSpeciesPhotos(species.inat_id);
+  const [currentProfilePic, setCurrentProfilePic] = React.useState(species.profile_picture);
+
+  // 當傳入的 species 改變時重置狀態
+  React.useEffect(() => {
+    setCurrentProfilePic(species.profile_picture);
+  }, [species.taxa_id, species.profile_picture]);
 
   const commonName = language === 'zh' ? species.common_name_chi : species.common_name_eng;
   const description = language === 'zh' ? species.description_chi : species.description_eng;
@@ -235,6 +241,8 @@ export default function SpeciesContent({ species, showBreadcrumb = true }: Speci
                 taxaId={species.taxa_id || ''}
                 inatId={species.inat_id || ''} 
                 commonName={commonName || species.scientific_name} 
+                profilePicture={currentProfilePic}
+                onProfilePictureUpdate={setCurrentProfilePic}
               />
             </section>
 

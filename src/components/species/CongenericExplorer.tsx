@@ -7,7 +7,7 @@ import { useLanguage } from '@/context/LanguageContext';
 import { useSpeciesPanel } from '@/context/SpeciesPanelContext';
 import { createClient } from '@/utils/supabase/client';
 import { useInaturalistPhoto } from '@/hooks/useInaturalistPhoto';
-import { formatScientificName } from '@/utils/formatters';
+import { formatScientificName, getSpeciesImageUrl } from '@/utils/formatters';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Sparkles, Loader2, Leaf } from 'lucide-react';
 
@@ -28,7 +28,7 @@ const SkeletonCard = () => (
 
 const MiniSpeciesCard = ({ species }: { species: Species }) => {
   const { language } = useLanguage();
-  const { addSpecies } = useSpeciesPanel();
+  const { addSpecies, profilePictureMap } = useSpeciesPanel();
   const { imageUrl, isLoading: isInatLoading } = useInaturalistPhoto(species.inat_id);
   
   const [imgLoaded, setImgLoaded] = useState(false);
@@ -41,11 +41,9 @@ const MiniSpeciesCard = ({ species }: { species: Species }) => {
   }, []);
 
   const placeholderImage = '/images/placeholder/no-species-image.svg';
+  // displayImage should be: profile_picture > iNaturalist URL > (Optional) Placeholder
+  const displayImage = getSpeciesImageUrl(species, 'square');
   const isUsingInat = !!species.inat_id;
-  
-  // displayImage should be: iNaturalist URL > (Optional) Placeholder
-  // Crucially, don't fallback to placeholder while we are still waiting for INAT results
-  const displayImage = imageUrl || (isInatLoading ? '' : placeholderImage);
   const commonName = language === 'zh' ? species.common_name_chi : species.common_name_eng;
 
   // Handle seamless transition delay
@@ -66,20 +64,29 @@ const MiniSpeciesCard = ({ species }: { species: Species }) => {
     >
       <div className="relative w-16 h-16 shrink-0 rounded-xl overflow-hidden bg-white shadow-inner flex items-center justify-center">
         {/* Actual Image */}
-        {displayImage && (
-          <Image
-            src={displayImage}
-            alt={commonName || species.scientific_name}
-            fill
-            sizes="64px"
-            onLoadingComplete={() => setImgLoaded(true)}
-            unoptimized={displayImage.includes('/api/image/transform')}
-            className={`
-              object-cover transition-all duration-700 group-hover:scale-115
-              ${!isFullyReady ? 'opacity-0 scale-110 blur-md' : 'opacity-100 scale-100 blur-0'}
-            `}
-          />
-        )}
+        {(() => {
+          const globalProfilePic = profilePictureMap[species.taxa_id];
+          const effectiveSpecies = globalProfilePic !== undefined ? { ...species, profile_picture: globalProfilePic } : species;
+          const displayImage = getSpeciesImageUrl(effectiveSpecies, 'square');
+          const finalImage = displayImage || imageUrl || (isInatLoading ? '' : placeholderImage);
+          
+          if (!finalImage) return null;
+          
+          return (
+            <Image
+              src={finalImage}
+              alt={commonName || species.scientific_name}
+              fill
+              sizes="64px"
+              onLoadingComplete={() => setImgLoaded(true)}
+              unoptimized={finalImage.includes('/api/image/transform')}
+              className={`
+                object-cover transition-all duration-700 group-hover:scale-115
+                ${!isFullyReady ? 'opacity-0 scale-110 blur-md' : 'opacity-100 scale-100 blur-0'}
+              `}
+            />
+          );
+        })()}
 
         {/* Nature Loader Overlay (Seamless Transition) */}
         {!isFullyReady && (

@@ -11,6 +11,7 @@ import SpeciesContent from './SpeciesContent';
 import { useShare } from '@/hooks/useShare';
 import { useInaturalistPhoto } from '@/hooks/useInaturalistPhoto';
 import { usePathname } from 'next/navigation';
+import { getSpeciesImageUrl } from '@/utils/formatters';
 
 // --- Subcomponent: Species Tab Preview (Tooltip) ---
 function SpeciesTabPreview({ 
@@ -27,6 +28,7 @@ function SpeciesTabPreview({
   xOffset?: number
 }) {
   const { imageUrl, isLoading } = useInaturalistPhoto(species?.inat_id || undefined);
+  const { profilePictureMap } = useSpeciesPanel();
   const containerRef = useRef<HTMLDivElement>(null);
   const [shiftX, setShiftX] = useState(0);
 
@@ -74,25 +76,40 @@ function SpeciesTabPreview({
           <div className="w-56 overflow-hidden rounded-3xl bg-white border border-white/40 shadow-[0_20px_50px_rgba(0,0,0,0.2)] ring-1 ring-black/5 flex flex-col">
             {/* Visual Header / Photo */}
             <div className="relative h-32 w-full bg-slate-100 overflow-hidden">
-              {isLoading ? (
-                <div className="absolute inset-0 flex items-center justify-center">
-                  <Loader2 className="w-6 h-6 text-emerald-500 animate-spin" />
-                </div>
-              ) : imageUrl ? (
-                <img 
-                  src={imageUrl} 
-                  alt={species?.common_name_chi || 'Species'} 
-                  className="w-full h-full object-cover"
-                />
-              ) : (
-                <div className="absolute inset-0 flex items-center justify-center bg-slate-50">
-                  <img 
-                    src="/images/placeholder/no-species-image.svg" 
-                    alt="No species image" 
-                    className="w-full h-full object-cover opacity-80"
-                  />
-                </div>
-              )}
+              {(() => {
+                // 優先序：全局即時狀態 > 資料庫原始資料 > iNaturalist
+                const globalProfilePic = species ? profilePictureMap[species.taxa_id] : undefined;
+                const effectiveSpecies = globalProfilePic !== undefined ? { ...species, profile_picture: globalProfilePic } : species;
+                
+                // 提升尺寸至 medium 以解決模糊問題
+                const displayImage = getSpeciesImageUrl(effectiveSpecies, 'medium');
+                if (isLoading || (species?.inat_id && !displayImage && !imageUrl)) {
+                  return (
+                    <div className="absolute inset-0 flex items-center justify-center">
+                      <Loader2 className="w-6 h-6 text-emerald-500 animate-spin" />
+                    </div>
+                  );
+                }
+                const finalImage = displayImage || imageUrl;
+                if (finalImage) {
+                  return (
+                    <img 
+                      src={finalImage} 
+                      alt={species?.common_name_chi || 'Species'} 
+                      className="w-full h-full object-cover"
+                    />
+                  );
+                }
+                return (
+                  <div className="absolute inset-0 flex items-center justify-center bg-slate-50">
+                    <img 
+                      src="/images/placeholder/no-species-image.svg" 
+                      alt="No species image" 
+                      className="w-full h-full object-cover opacity-80"
+                    />
+                  </div>
+                );
+              })()}
               {/* Overlay Gradient */}
               <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
               {/* Group Badge */}

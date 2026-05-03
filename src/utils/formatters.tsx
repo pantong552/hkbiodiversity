@@ -93,3 +93,47 @@ export function formatNativeStatus(status: string | undefined | null, language: 
   
   return statusMap[trimmedStatus] || statusMap[capitalizedStatus] || status;
 }
+
+/**
+ * 統一處理物種圖片 URL
+ * 優先序：指定封面 (profile_picture) > iNaturalist 圖片 > 預設圖片
+ * @param species 物種物件
+ * @param size 所需尺寸 ('square' | 'medium' | 'large')
+ * @returns 最終圖片 URL
+ */
+export function getSpeciesImageUrl(species: any, size: 'square' | 'medium' | 'large' = 'medium'): string {
+  const profilePic = species?.profile_picture;
+  const inatId = species?.inat_id;
+  const placeholder = '/images/placeholder/no-species-image.svg';
+
+  let url = profilePic || (inatId ? `https://api.inaturalist.org/v1/taxa/${inatId}` : placeholder);
+
+  // 如果是 API URL (待轉換)，返回空字串或由 hook 處理
+  // 這裡回傳空字串，讓組件知道需要依賴 hook (inatPhoto)
+  if (url.includes('api.inaturalist.org/v1/taxa')) {
+    return '';
+  }
+
+  // 如果是 placeholder，直接返回
+  if (url === placeholder) {
+    return url;
+  }
+
+  // 處理 iNaturalist URL 轉換尺寸
+  if (url.includes('inaturalist')) {
+    // 移除可能存在的代理路徑
+    if (url.includes('/api/image/transform')) {
+      const urlParams = new URLSearchParams(url.split('?')[1]);
+      url = urlParams.get('url') || url;
+    }
+    // 轉換尺寸
+    url = url.replace(/\/(square|large|medium|small|original)\./, `/${size}.`);
+  }
+
+  // 封裝代理路徑 (這部分維持動態生成，不存入 DB)
+  if (url.includes('inaturalist')) {
+    return `/api/image/transform?url=${encodeURIComponent(url)}&size=${size}`;
+  }
+
+  return url;
+}

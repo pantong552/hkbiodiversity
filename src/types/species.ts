@@ -56,6 +56,7 @@ export interface Species {
   global_distribution_chi?: string;
   references_eng?: string;
   references_chi?: string;
+  profile_picture?: string;
 }
 
 export type TaxonomyLevel = 'phylum_eng' | 'class_eng' | 'order_eng' | 'family_eng' | 'genus_eng';

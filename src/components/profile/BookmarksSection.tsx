@@ -8,7 +8,7 @@ import { useAuth } from '@/context/AuthContext';
 import { useLanguage } from '@/context/LanguageContext';
 import { useSpeciesPanel } from '@/context/SpeciesPanelContext';
 import { useInaturalistPhoto } from '@/hooks/useInaturalistPhoto';
-import { formatScientificName } from '@/utils/formatters';
+import { formatScientificName, getSpeciesImageUrl } from '@/utils/formatters';
 
 interface BookmarkedSpecies {
   id: number;
@@ -22,6 +22,7 @@ interface BookmarkedSpecies {
   informal_group_chi: string;
   favorite_id: string;
   bookmarked_at: string;
+  profile_picture?: string;
 }
 
 /**
@@ -44,8 +45,12 @@ function BookmarkItem({
   
   // 獲取與 SpeciesCard 同款的動態圖片
   const { imageUrl: inatPhoto, isLoading: isInatLoading } = useInaturalistPhoto(species.inat_id);
+  const { profilePictureMap } = useSpeciesPanel();
 
-  const displayImage = inatPhoto;
+  // 優先序：全局即時狀態 > 指定封面 > iNaturalist
+  const globalProfilePic = profilePictureMap[species.taxa_id];
+  const effectiveSpecies = globalProfilePic !== undefined ? { ...species, profile_picture: globalProfilePic } : species;
+  const displayImage = getSpeciesImageUrl(effectiveSpecies, 'square') || inatPhoto;
 
   return (
     <div
@@ -75,7 +80,7 @@ function BookmarkItem({
         {displayImage && (
           <Image
             src={displayImage}
-            alt={language === 'zh' ? species.common_name_chi : species.common_name_eng}
+            alt={(language === 'zh' ? species.common_name_chi : species.common_name_eng) || species.scientific_name || 'Species Image'}
             fill
             sizes="56px"
             unoptimized={displayImage.includes('/api/image/transform')}
@@ -177,9 +182,9 @@ export default function BookmarksSection() {
                       iucn: '',
                       informal_group_eng: p.category_eng,
                       informal_group_chi: p.category_chi,
+                      profile_picture: p.profile_picture,
                       favorite_id: fav.id,
                       bookmarked_at: fav.created_at,
-
                   };
               }
           }

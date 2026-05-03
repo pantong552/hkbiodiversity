@@ -37,6 +37,7 @@ export interface PlantSpecies {
 
   created_at: string;
   updated_at: string;
+  profile_picture?: string;
 }
 
 export interface PlantFilterState {

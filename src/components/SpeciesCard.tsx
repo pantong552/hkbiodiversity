@@ -12,7 +12,7 @@ import { useInaturalistPhoto } from '../hooks/useInaturalistPhoto';
 import { getIUCNConfig } from '../constants/statusStyles';
 import { supabase as supabaseSingleton } from '@/lib/supabase';
 import { createPortal } from 'react-dom';
-import { formatScientificName, formatNativeStatus } from '../utils/formatters';
+import { formatScientificName, formatNativeStatus, getSpeciesImageUrl } from '../utils/formatters';
 
 interface SpeciesCardProps {
   species: any; // Species | PlantSpecies
@@ -28,7 +28,7 @@ export default function SpeciesCard({
   priority = false 
 }: SpeciesCardProps) {
   const { language } = useLanguage();
-  const { addSpecies } = useSpeciesPanel();
+  const { addSpecies, profilePictureMap } = useSpeciesPanel();
   const { user } = useAuth();
   
   const [isBookmarked, setIsBookmarked] = useState(false);
@@ -92,9 +92,15 @@ export default function SpeciesCard({
   // Show loader if we are in INAT mode and the fade-out isn't finished
   const showLoader = isUsingInat && !imgLoaded;
   
-  // displayImage should be: Local URL > iNaturalist URL > (Optional) Placeholder
-  // Crucially, don't fallback to placeholder while we are still waiting for INAT results
-  const displayImage = inatPhoto || (isInatLoading ? '' : placeholderImage);
+  // 尺寸判斷：圖庫模式使用 medium，詳情卡片使用 large
+  const isPhoto = mode === 'photo';
+  
+  // displayImage 優先序：全局即時狀態 > 資料庫原始資料 > iNaturalist Hook > 佔位圖
+  const globalProfilePic = profilePictureMap[species.taxa_id];
+  const effectiveSpecies = globalProfilePic !== undefined ? { ...species, profile_picture: globalProfilePic } : species;
+  
+  const formattedUrl = getSpeciesImageUrl(effectiveSpecies, isPhoto ? 'medium' : 'large');
+  const displayImage = formattedUrl || inatPhoto || (isInatLoading ? '' : placeholderImage);
   
   const isPlaceholder = displayImage === placeholderImage;
 
@@ -152,7 +158,6 @@ export default function SpeciesCard({
   }, [user, species.taxa_id, normalized.id, isBookmarked, isUpdating, language, isPlant]);
 
   const iucnConfig = !isPlant && normalized.iucn ? getIUCNConfig(normalized.iucn) : null;
-  const isPhoto = mode === 'photo';
 
   const toggleTooltip = (e: React.MouseEvent) => {
     e.stopPropagation();
