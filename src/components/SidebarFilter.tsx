@@ -57,6 +57,9 @@ export default function SidebarFilter({
 
   const [selected, setSelected] = useState<SelectedFilters>(selectedFilters || {
     taxonomy: {
+      phylum_eng: [],
+      class_eng: [],
+      order_eng: [],
       family_eng: [],
       genus_eng: [],
       informal_group_eng: [],
