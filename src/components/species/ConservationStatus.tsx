@@ -2,6 +2,7 @@ import React from 'react';
 import { Species } from '@/types/species';
 import { useLanguage } from '@/context/LanguageContext';
 import { Shield, Info } from 'lucide-react';
+import { formatNativeStatus } from '@/utils/formatters';
 
 interface ConservationStatusProps {
   species: Species;
@@ -64,7 +65,7 @@ export default function ConservationStatus({ species }: ConservationStatusProps)
     { 
       labelChi: '香港原生概況', 
       labelEng: 'HK Native Status', 
-      value: species.native_status 
+      value: formatNativeStatus(species.native_status, language) 
     },
     ...(species.class_eng === 'Aves' ? [{ 
       labelChi: '鳥種類別（香港觀鳥會）', 

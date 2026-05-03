@@ -12,7 +12,7 @@ import { useInaturalistPhoto } from '../hooks/useInaturalistPhoto';
 import { getIUCNConfig } from '../constants/statusStyles';
 import { supabase as supabaseSingleton } from '@/lib/supabase';
 import { createPortal } from 'react-dom';
-import { formatScientificName } from '../utils/formatters';
+import { formatScientificName, formatNativeStatus } from '../utils/formatters';
 
 interface SpeciesCardProps {
   species: any; // Species | PlantSpecies
@@ -255,10 +255,7 @@ export default function SpeciesCard({
                   : 'bg-indigo-500 text-white'}
               `}>
                 <Leaf className="w-3 h-3" /> 
-                {language === 'zh' 
-                  ? (normalized.origin.toLowerCase() === 'native' || normalized.origin === '原生' ? '原生' : '外來')
-                  : (normalized.origin.toLowerCase() === 'native' || normalized.origin === '原生' ? 'Native' : 'Exotic')
-                }
+                {formatNativeStatus(normalized.origin, language)}
               </span>
             )}
           </div>

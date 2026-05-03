@@ -8,7 +8,7 @@ import { useLanguage } from '@/context/LanguageContext';
 import { useSpeciesPanel } from '@/context/SpeciesPanelContext';
 import { getIUCNConfig } from '@/constants/statusStyles';
 import MultiSelectDropdown from '@/components/ui/MultiSelectDropdown';
-import { formatScientificName } from '@/utils/formatters';
+import { formatScientificName, formatNativeStatus } from '@/utils/formatters';
 import { TaxaType } from '@/components/search/TaxaGroupSwitcher';
 
 interface SpeciesTableProps {
@@ -59,9 +59,9 @@ export default function SpeciesTable({
   ];
 
   const nativeOptions = [
-    { name: 'Native', display: 'Native', count: 0 },
-    { name: 'Exotic', display: 'Exotic', count: 0 },
-    { name: 'Reintroduced', display: 'Reintroduced', count: 0 },
+    { name: 'Native', display: language === 'zh' ? '原生' : 'Native', count: 0 },
+    { name: 'Exotic', display: language === 'zh' ? '外來' : 'Exotic', count: 0 },
+    { name: 'Reintroduced', display: language === 'zh' ? '重新引入' : 'Reintroduced', count: 0 },
   ];
 
   const columns = useMemo(() => {
@@ -228,7 +228,7 @@ export default function SpeciesTable({
                   {/* Native Status */}
                   <td className="px-3 py-2.5 md:px-6 md:py-4 hidden md:table-cell">
                     <span className={`px-2 md:px-2.5 py-0.5 md:py-1 rounded-lg text-[9px] md:text-[10px] font-bold uppercase tracking-wider ${faunaItem.native_status?.includes('Native') || floraItem.origin?.includes('Native') || floraItem.origin?.includes('原生') ? 'bg-emerald-50 text-emerald-600' : 'bg-slate-50 text-slate-500'}`}>
-                      {floraItem.origin || faunaItem.native_status || 'Unknown'}
+                      {formatNativeStatus(floraItem.origin || faunaItem.native_status, language)}
                     </span>
                   </td>
 

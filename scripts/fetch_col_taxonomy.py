@@ -89,7 +89,8 @@ def get_classification_info(usage_id):
 
 def process_species(row, original_fields):
     """處理單個物種資料列"""
-    scientific_name_orig = row.get("scientific_name", "").strip()
+    # 移除不可見的特殊空白字元 (Non-breaking space)
+    scientific_name_orig = row.get("scientific_name", "").replace('\xa0', ' ').strip()
     if not scientific_name_orig:
         return {**row, "remark": "Empty Scientific Name"}
     

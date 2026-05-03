@@ -69,3 +69,27 @@ export function formatScientificName(
     </>
   );
 }
+
+/**
+ * 格式化原生狀態，根據語言環境將英文狀態轉換為中文。
+ * @param status 原始狀態字串 (如 Native, Exotic, Reintroduced, Introduced)
+ * @param language 當前語言 ('zh' | 'en')
+ * @returns 格式化後的狀態字串
+ */
+export function formatNativeStatus(status: string | undefined | null, language: string): string {
+  if (!status) return '-';
+  if (language !== 'zh') return status;
+
+  const statusMap: Record<string, string> = {
+    'Native': '原生',
+    'Exotic': '外來',
+    'Reintroduced': '重新引入',
+    'Introduced': '引入'
+  };
+
+  // 處理可能的複合字串或大小寫問題
+  const trimmedStatus = status.trim();
+  const capitalizedStatus = trimmedStatus.charAt(0).toUpperCase() + trimmedStatus.slice(1).toLowerCase();
+  
+  return statusMap[trimmedStatus] || statusMap[capitalizedStatus] || status;
+}
