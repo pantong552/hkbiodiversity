@@ -21,14 +21,37 @@ interface FullTaxonomyData {
 export default function TaxonomyDisplay({ species }: TaxonomyDisplayProps) {
   const { language } = useLanguage();
   const router = useRouter();
-  const { toggleExpand } = useSpeciesPanel();
+  const { toggleExpand, setPendingTaxonomyFilter } = useSpeciesPanel();
   
   const [isExpanded, setIsExpanded] = useState(false);
   const [fullData, setFullData] = useState<FullTaxonomyData | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const levels = [
+  // 判斷是否為植物
+  const isPlant = !species.phylum_eng && !!(species as any).family_chi;
+
+  const levels = isPlant ? [
+    { 
+      id: 'categories', labelChi: '類別', labelEng: 'Category',
+      chi: (species as any).category_chi, eng: (species as any).category_eng 
+    },
+    { 
+      id: 'families', labelChi: '科', labelEng: 'Family',
+      chi: (species as any).family_chi, eng: (species as any).family_eng 
+    },
+    { 
+      id: 'genuses', labelChi: '屬', labelEng: 'Genus',
+      chi: (species as any).genus_chi, eng: (species as any).genus_eng,
+      isScientific: true
+    },
+    { 
+      id: 'species', labelChi: '種', labelEng: 'Species',
+      chi: species.scientific_name, eng: species.species_eng,
+      isScientific: true,
+      isCurrent: true
+    },
+  ] : [
     { 
       id: 'phylum_eng', labelChi: '門', labelEng: 'Phylum',
       chi: species.phylum_chi, eng: species.phylum_eng 
@@ -58,11 +81,13 @@ export default function TaxonomyDisplay({ species }: TaxonomyDisplayProps) {
     },
   ];
 
-  const handleTaxonomyClick = (levelId: string, value: string) => {
-    if (!value || levelId === 'species') return;
+  const handleTaxonomyClick = (levelId: string, value: string, chiValue?: string) => {
+    const searchValue = isPlant ? (chiValue || value) : value;
+    if (!searchValue || levelId === 'species') return;
     
+    setPendingTaxonomyFilter({ level: levelId, value: searchValue });
     toggleExpand(false);
-    router.push(`/?${levelId}=${encodeURIComponent(value)}`);
+    router.push('/');
   };
 
   const toggleFullTaxonomy = async () => {
@@ -146,7 +171,7 @@ export default function TaxonomyDisplay({ species }: TaxonomyDisplayProps) {
                 <div className="absolute left-[-2px] top-1/2 -translate-y-1/2 w-[3px] h-[18px] bg-emerald-500 rounded-full z-20" />
               )}
               <div 
-                onClick={() => isClickable && handleTaxonomyClick(level.id, level.eng)}
+                onClick={() => isClickable && handleTaxonomyClick(level.id, level.eng, level.chi)}
                 className={`flex-1 ml-6 py-2.5 px-3.5 rounded-xl border transition-all ${
                   level.isCurrent ? 'bg-emerald-50 border-emerald-100 shadow-sm' : 'bg-white border-slate-100'
                 }`}
@@ -192,7 +217,7 @@ export default function TaxonomyDisplay({ species }: TaxonomyDisplayProps) {
                 <div key={idx} className="flex items-center group relative h-10" style={{ marginLeft: `${idx * 24}px` }}>
                   {idx > 0 && <div className="absolute -left-4 top-[-24px] w-4 h-8 border-l-2 border-b-2 border-slate-100 rounded-bl-xl pointer-events-none" />}
                   <div 
-                    onClick={() => isClickable && handleTaxonomyClick(level.id, level.eng)}
+                    onClick={() => isClickable && handleTaxonomyClick(level.id, level.eng, level.chi)}
                     className={`flex items-center gap-4 px-5 py-2.5 rounded-2xl transition-all duration-300 ${isClickable ? 'hover:bg-emerald-50 hover:shadow-sm cursor-pointer' : ''} ${level.isCurrent ? 'bg-emerald-50/50 border border-emerald-100 shadow-sm' : ''}`}
                   >
                     <div className="shrink-0">

@@ -59,4 +59,4 @@ export interface Species {
   profile_picture?: string;
 }
 
-export type TaxonomyLevel = 'phylum_eng' | 'class_eng' | 'order_eng' | 'family_eng' | 'genus_eng';
+export type TaxonomyLevel = 'phylum_eng' | 'class_eng' | 'order_eng' | 'family_eng' | 'genus_eng' | 'informal_group_eng';

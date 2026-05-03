@@ -55,11 +55,9 @@ export default function SidebarFilter({
 
   const [selected, setSelected] = useState<SelectedFilters>(selectedFilters || {
     taxonomy: {
-      phylum_eng: [],
-      class_eng: [],
-      order_eng: [],
       family_eng: [],
       genus_eng: [],
+      informal_group_eng: [],
     },
     iucn: [],
   });
@@ -83,7 +81,7 @@ export default function SidebarFilter({
   }, [selectedFilters]);
 
   const [taxonomyOptions, setTaxonomyOptions] = useState<Record<TaxonomyLevel, { name: string; display: string; count: number }[]>>({
-    phylum_eng: [], class_eng: [], order_eng: [], family_eng: [], genus_eng: []
+    phylum_eng: [], class_eng: [], order_eng: [], family_eng: [], genus_eng: [], informal_group_eng: []
   });
   const [iucnCounts, setIucnCounts] = useState<Record<string, number>>({});
 
@@ -211,7 +209,7 @@ export default function SidebarFilter({
 
   const clearFilters = () => {
     const reset = {
-      taxonomy: { phylum_eng: [], class_eng: [], order_eng: [], family_eng: [], genus_eng: [] },
+      taxonomy: { phylum_eng: [], class_eng: [], order_eng: [], family_eng: [], genus_eng: [], informal_group_eng: [] },
       iucn: [],
     };
     setSelected(reset);

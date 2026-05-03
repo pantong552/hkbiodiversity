@@ -119,7 +119,7 @@ export default function Header() {
       fixed top-4 inset-x-0 z-[60] 
       px-6 md:px-8 lg:px-10 xl:px-16
       transition-all duration-500 cubic-bezier(0.16, 1, 0.3, 1)
-      ${(isVisible && !isGalleryOpen && !isUploadModalOpen && !isFilterOpen && !isAccountOpen) ? 'translate-y-0 opacity-100' : '-translate-y-40 opacity-0'}
+      ${(isVisible && !isGalleryOpen && !isUploadModalOpen && !isAccountOpen) ? 'translate-y-0 opacity-100' : '-translate-y-40 opacity-0'}
     `}>
       <nav className={`
         glass-header max-w-[1920px] mx-auto

@@ -19,13 +19,15 @@ interface SpeciesCardProps {
   isPlant?: boolean;
   mode?: 'detail' | 'photo';
   priority?: boolean;
+  onTaxonomyClick?: (level: string, value: string) => void;
 }
 
 export default function SpeciesCard({ 
   species, 
   isPlant = false,
   mode = 'detail',
-  priority = false 
+  priority = false,
+  onTaxonomyClick
 }: SpeciesCardProps) {
   const { language } = useLanguage();
   const { addSpecies, profilePictureMap } = useSpeciesPanel();
@@ -48,9 +50,9 @@ export default function SpeciesCard({
         common_name_eng: p.common_name_eng,
         scientific_name: p.scientific_name,
         author: p.author,
-        taxa_group: p.category_chi,
+        taxa_group: p.category_chi ? { label: p.category_chi, value: p.category_chi, level: 'categories' } : null,
         order: null, // Plants don't typically display order in this UI
-        family: p.family_chi,
+        family: p.family_chi ? { label: p.family_chi, value: p.family_chi, level: 'families' } : null,
         iucn: null, 
         origin: p.origin,
         months: p.flowering_months?.length > 0 ? p.flowering_months : p.fruiting_months
@@ -65,9 +67,21 @@ export default function SpeciesCard({
         common_name_eng: s.common_name_eng,
         scientific_name: s.scientific_name,
         author: s.author,
-        taxa_group: language === 'zh' ? s.informal_group_chi : s.informal_group_eng,
-        order: language === 'zh' ? s.order_chi : s.order_eng,
-        family: language === 'zh' ? s.family_chi : s.family_eng,
+        taxa_group: (s.informal_group_eng || s.informal_group_chi) ? { 
+          label: language === 'zh' ? (s.informal_group_chi || s.informal_group_eng) : (s.informal_group_eng || s.informal_group_chi),
+          value: s.informal_group_eng || s.informal_group_chi,
+          level: 'informal_group_eng'
+        } : null,
+        order: (s.order_eng || s.order_chi) ? { 
+          label: language === 'zh' ? (s.order_chi || s.order_eng) : (s.order_eng || s.order_chi),
+          value: s.order_eng || s.order_chi,
+          level: 'order_eng'
+        } : null,
+        family: (s.family_eng || s.family_chi) ? { 
+          label: language === 'zh' ? (s.family_chi || s.family_eng) : (s.family_eng || s.family_chi),
+          value: s.family_eng || s.family_chi,
+          level: 'family_eng'
+        } : null,
         iucn: s.iucn,
         origin: null,
         months: null
@@ -411,11 +425,28 @@ export default function SpeciesCard({
       {!isPhoto ? (
         <div className="p-3 bg-white flex flex-col gap-2">
           {/* Taxonomy Tags - Ultra Compact */}
-          <div className="flex flex-wrap gap-1.5 items-center">
-            {[normalized.order, normalized.family, normalized.taxa_group].filter(Boolean).map((tax, i) => (
-              <span key={i} className="px-2.5 py-1 bg-slate-50 text-[11px] font-bold text-slate-500 rounded-lg border border-slate-100 group-hover:border-emerald-100 group-hover:bg-emerald-50/50 transition-all uppercase tracking-tight">
-                {tax}
-              </span>
+          <div className="flex flex-wrap gap-1.5 items-center relative z-30">
+            {[normalized.order, normalized.family, normalized.taxa_group].filter(Boolean).map((tax: any, i) => (
+              <button 
+                key={i}
+                type="button"
+                onClick={(e) => {
+                  if (onTaxonomyClick && tax.level && tax.value) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    onTaxonomyClick(tax.level, tax.value);
+                  }
+                }}
+                className={`
+                  px-2.5 py-1 bg-slate-50 text-[11px] font-bold text-slate-500 rounded-lg border border-slate-100 uppercase tracking-tight transition-all relative z-40
+                  ${onTaxonomyClick 
+                    ? 'hover:bg-emerald-500 hover:text-white hover:border-emerald-500 cursor-pointer active:scale-95 shadow-sm hover:shadow-md pointer-events-auto' 
+                    : 'group-hover:border-emerald-100 group-hover:bg-emerald-50/50'
+                  }
+                `}
+              >
+                {tax.label}
+              </button>
             ))}
 
           </div>

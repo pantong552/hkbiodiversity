@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo, useEffect, useRef } from 'react';
+import { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Search, X, FilterX, LayoutGrid, List, ChevronLeft, ChevronRight, Filter, Table as TableIcon } from 'lucide-react';
 import SpeciesCard from '@/components/SpeciesCard';
@@ -45,7 +45,7 @@ const INITIAL_PLANT_FILTERS: PlantFilterState = {
 export default function HomeClient() {
   const { language, t } = useLanguage();
   const { isLoading: isAuthLoading } = useAuth();
-  const { addSpecies, openSpeciesIds, isExpanded, isFilterOpen, setIsFilterOpen } = useSpeciesPanel();
+  const { addSpecies, openSpeciesIds, isExpanded, isFilterOpen, setIsFilterOpen, pendingTaxonomyFilter, setPendingTaxonomyFilter } = useSpeciesPanel();
   const searchParams = useSearchParams();
   const router = useRouter();
 
@@ -75,7 +75,7 @@ export default function HomeClient() {
 
   // Fauna Filters
   const [selectedFilters, setSelectedFilters] = useState<SelectedFilters>({
-    taxonomy: { phylum_eng: [], class_eng: [], order_eng: [], family_eng: [], genus_eng: [] },
+    taxonomy: { phylum_eng: [], class_eng: [], order_eng: [], family_eng: [], genus_eng: [], informal_group_eng: [] },
     iucn: []
   });
 
@@ -172,6 +172,49 @@ export default function HomeClient() {
     setTableFilters({}); // 切換物種類型時清空表格篩選，以便 Metadata 重新初始化為全選
     setIsFilterOpen(false);
   };
+
+  // Handle Taxonomy Click from Species Card
+  const handleTaxonomyClick = useCallback((level: string, value: string) => {
+    // 立即反應：重設分頁與清空搜尋關鍵字
+    setCurrentPage(1);
+    setSearchQuery('');
+    setTableFilters({});
+
+    // 根據 level 自動判定是動物還是植物過濾
+    const isFaunaLevel = ['phylum_eng', 'class_eng', 'order_eng', 'family_eng', 'genus_eng', 'informal_group_eng'].includes(level);
+    const isFloraLevel = ['categories', 'families', 'genuses'].includes(level);
+
+    if (isFaunaLevel) {
+      // 強制切換至動物模式（如果目前不在動物模式）
+      if (taxaType !== 'fauna') setTaxaType('fauna');
+
+      const cleanTaxonomy: any = { 
+        phylum_eng: [], class_eng: [], order_eng: [], family_eng: [], genus_eng: [], informal_group_eng: [] 
+      };
+      cleanTaxonomy[level] = [value];
+
+      setSelectedFilters({
+        taxonomy: cleanTaxonomy,
+        iucn: []
+      });
+      
+      setIsFilterOpen(true);
+    } else if (isFloraLevel) {
+      // 強制切換至植物模式（如果目前不在植物模式）
+      if (taxaType !== 'flora') setTaxaType('flora');
+
+      setPlantFilters({
+        ...INITIAL_PLANT_FILTERS,
+        [level]: [value],
+        searchQuery: ''
+      });
+      
+      setIsFilterOpen(true);
+    }
+
+    // 捲動至頂部
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }, [taxaType, setIsFilterOpen, setSelectedFilters, setPlantFilters, setSearchQuery, setTableFilters, setCurrentPage, setTaxaType]);
 
   const fetchSpecies = useMemo(() => {
     return async () => {
@@ -360,15 +403,100 @@ export default function HomeClient() {
     }
   }, [fetchSpecies, isAuthLoading]);
 
-  // Handle species parameter in URL on initial load and param change
+  // 處理來自物種面板的過濾請求 (使用 Context 通訊比 URL 參數更穩定，避免 Race Condition)
+  useEffect(() => {
+    if (pendingTaxonomyFilter) {
+      const { level, value } = pendingTaxonomyFilter;
+      const faunaTaxaLevels = ['phylum_eng', 'class_eng', 'order_eng', 'family_eng', 'genus_eng', 'informal_group_eng'];
+      
+      if (faunaTaxaLevels.includes(level)) {
+        setTaxaType('fauna');
+        const cleanTaxonomy: any = { 
+          phylum_eng: [], class_eng: [], order_eng: [], family_eng: [], genus_eng: [], informal_group_eng: [] 
+        };
+        cleanTaxonomy[level] = [value];
+        setSelectedFilters({
+          taxonomy: cleanTaxonomy,
+          iucn: []
+        });
+      } else {
+        setTaxaType('flora');
+        setPlantFilters({
+          ...INITIAL_PLANT_FILTERS,
+          [level]: [value],
+          searchQuery: ''
+        });
+      }
+      
+      setSearchQuery('');
+      setIsFilterOpen(true);
+      setCurrentPage(1);
+      
+      // 重要：處理完畢後清空請求，防止重複觸發
+      setPendingTaxonomyFilter(null);
+    }
+  }, [pendingTaxonomyFilter, setPendingTaxonomyFilter, setIsFilterOpen]);
+
+  // Handle species and taxonomy parameters in URL on initial load and param change (Fallback)
   useEffect(() => {
     const speciesId = searchParams.get('species');
     if (speciesId) {
       addSpecies(speciesId);
-      const newUrl = window.location.pathname;
-      window.history.replaceState({}, '', newUrl);
     }
-  }, [searchParams, addSpecies]);
+
+    // 處理分類搜尋參數
+    const faunaTaxaLevels = ['phylum_eng', 'class_eng', 'order_eng', 'family_eng', 'genus_eng', 'informal_group_eng'];
+    const floraTaxaLevels = ['categories', 'families', 'genuses'];
+    
+    let hasTaxonomyParam = false;
+    
+    // 檢查動物分類
+    for (const level of faunaTaxaLevels) {
+      const val = searchParams.get(level);
+      if (val) {
+        setTaxaType('fauna');
+        const cleanTaxonomy: any = { 
+          phylum_eng: [], class_eng: [], order_eng: [], family_eng: [], genus_eng: [], informal_group_eng: [] 
+        };
+        cleanTaxonomy[level] = [val];
+        setSelectedFilters({
+          taxonomy: cleanTaxonomy,
+          iucn: []
+        });
+        setSearchQuery('');
+        setIsFilterOpen(true);
+        hasTaxonomyParam = true;
+        break;
+      }
+    }
+    
+    // 檢查植物分類 (如果還沒被動物參數佔用)
+    if (!hasTaxonomyParam) {
+      for (const level of floraTaxaLevels) {
+        const val = searchParams.get(level);
+        if (val) {
+          setTaxaType('flora');
+          setPlantFilters({
+            ...INITIAL_PLANT_FILTERS,
+            [level]: [val],
+            searchQuery: ''
+          });
+          setSearchQuery('');
+          setIsFilterOpen(true);
+          hasTaxonomyParam = true;
+          break;
+        }
+      }
+    }
+
+    // 清理 URL 參數：僅清理 species 參數，保留分類參數以增強穩定性與支援重新整理
+    if (speciesId) {
+      const params = new URLSearchParams(window.location.search);
+      params.delete('species');
+      const newQuery = params.toString();
+      router.replace(newQuery ? `/?${newQuery}` : '/', { scroll: false });
+    }
+  }, [searchParams, addSpecies, setIsFilterOpen, router]);
 
   // Reset page when triggers change
   useEffect(() => {
@@ -585,6 +713,7 @@ export default function HomeClient() {
                                 isPlant={taxaType === 'flora'} 
                                 mode={displayMode}
                                 priority={idx < 4}
+                                onTaxonomyClick={handleTaxonomyClick}
                             />
                             ))}
                         </div>

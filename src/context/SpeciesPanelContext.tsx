@@ -20,6 +20,8 @@ interface SpeciesPanelContextType {
   setIsAccountOpen: (open: boolean) => void;
   profilePictureMap: Record<string, string | null>;
   updateProfilePicture: (taxaId: string, url: string | null) => void;
+  pendingTaxonomyFilter: { level: string; value: string } | null;
+  setPendingTaxonomyFilter: (filter: { level: string; value: string } | null) => void;
 }
 
 const SpeciesPanelContext = createContext<SpeciesPanelContextType | undefined>(undefined);
@@ -33,6 +35,7 @@ export const SpeciesPanelProvider: React.FC<{ children: React.ReactNode }> = ({ 
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   const [isAccountOpen, setIsAccountOpen] = useState(false);
   const [profilePictureMap, setProfilePictureMap] = useState<Record<string, string | null>>({});
+  const [pendingTaxonomyFilter, setPendingTaxonomyFilter] = useState<{ level: string; value: string } | null>(null);
 
   const updateProfilePicture = (taxaId: string, url: string | null) => {
     setProfilePictureMap(prev => ({
@@ -109,6 +112,8 @@ export const SpeciesPanelProvider: React.FC<{ children: React.ReactNode }> = ({ 
         setIsAccountOpen,
         profilePictureMap,
         updateProfilePicture,
+        pendingTaxonomyFilter,
+        setPendingTaxonomyFilter,
       }}
     >
       {children}

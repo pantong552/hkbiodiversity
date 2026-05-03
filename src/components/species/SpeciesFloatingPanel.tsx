@@ -433,8 +433,8 @@ export default function SpeciesFloatingPanel() {
       initial={false}
       animate={{ 
         height: isExpanded ? '100dvh' : '82px',
-        opacity: isFilterOpen ? 0 : 1,
-        y: isFilterOpen ? 100 : 0
+        opacity: 1,
+        y: 0
       }}
       transition={{ 
         height: isExpanded 
