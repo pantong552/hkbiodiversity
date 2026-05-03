@@ -584,7 +584,6 @@ export default function SpeciesPhotoGallery({
         currentIndex={currentIndex}
         onNavigate={(index) => setCurrentIndex(index)}
         commonName={commonName}
-        language={language}
         taxaId={taxaId}
         currentProfilePicture={profilePicture}
         onProfilePictureUpdate={(newUrl) => {
