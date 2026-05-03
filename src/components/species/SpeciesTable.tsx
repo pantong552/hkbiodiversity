@@ -108,7 +108,7 @@ export default function SpeciesTable({
                   `}
                 >
                   <div 
-                    className={`flex items-center gap-1.5 md:gap-2 ${col.sortable ? 'cursor-pointer hover:text-emerald-600 transition-colors' : ''} ${col.key === 'iucn' ? 'justify-end' : ''}`}
+                    className={`flex items-center gap-1.5 md:gap-2 ${col.sortable ? 'cursor-pointer hover:text-emerald-600 transition-colors' : ''} ${col.key === 'iucn' || col.key === 'native_status' ? 'justify-center' : ''}`}
                     onClick={() => col.sortable && onSort(col.key)}
                   >
                     {col.label}
@@ -164,7 +164,7 @@ export default function SpeciesTable({
                         onChange={(vals) => handleSelectChange(col.key, vals)}
                         placeholder={language === 'zh' ? "全部" : "All"}
                         minWidth={col.key === 'scientific_name' || col.key === 'common_name' ? '120px' : '160px'}
-                        align={col.key === 'iucn' ? 'right' : 'left'}
+                        align={col.key === 'iucn' || col.key === 'native_status' ? 'center' : 'left'}
                       />
                     )}
                   </div>
@@ -226,14 +226,14 @@ export default function SpeciesTable({
                   </td>
 
                   {/* Native Status */}
-                  <td className="px-3 py-2.5 md:px-6 md:py-4 hidden md:table-cell">
+                  <td className="px-3 py-2.5 md:px-6 md:py-4 hidden md:table-cell text-center">
                     <span className={`px-2 md:px-2.5 py-0.5 md:py-1 rounded-lg text-[9px] md:text-[10px] font-bold uppercase tracking-wider ${faunaItem.native_status?.includes('Native') || floraItem.origin?.includes('Native') || floraItem.origin?.includes('原生') ? 'bg-emerald-50 text-emerald-600' : 'bg-slate-50 text-slate-500'}`}>
                       {formatNativeStatus(floraItem.origin || faunaItem.native_status, language)}
                     </span>
                   </td>
 
                   {/* Status (IUCN or Rarity) */}
-                  <td className="px-3 py-2.5 md:px-6 md:py-4 whitespace-nowrap text-right">
+                  <td className="px-3 py-2.5 md:px-6 md:py-4 whitespace-nowrap text-center">
                     {isPlant ? (
                        <span className={`px-2 py-0.5 md:px-3 md:py-1 rounded-lg md:rounded-xl text-[9px] md:text-[10px] font-black uppercase tracking-widest border shadow-sm ${floraItem.hk_rare_precious_note && floraItem.hk_rare_precious_note !== 'No' ? 'bg-rose-50 text-rose-600 border-rose-100' : 'bg-slate-50 text-slate-400 border-slate-100'}`}>
                         {floraItem.hk_rare_precious_note || 'N/A'}
