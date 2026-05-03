@@ -38,6 +38,7 @@ export default function SidebarFilter({
     order_eng: language === 'zh' ? '目 (Order)' : 'Order',
     family_eng: language === 'zh' ? '科 (Family)' : 'Family',
     genus_eng: language === 'zh' ? '屬 (Genus)' : 'Genus',
+    informal_group_eng: language === 'zh' ? '非正式類群' : 'Informal Group',
   };
 
   const IUCN_STATUSES = Object.keys(IUCN_CONFIG);
@@ -50,7 +51,8 @@ export default function SidebarFilter({
     class_eng: false,
     order_eng: false,
     family_eng: false,
-    genus_eng: false
+    genus_eng: false,
+    informal_group_eng: false
   });
 
   const [selected, setSelected] = useState<SelectedFilters>(selectedFilters || {
