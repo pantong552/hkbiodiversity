@@ -65,9 +65,10 @@ const MiniSpeciesCard = ({ species }: { species: Species }) => {
       <div className="relative w-16 h-16 shrink-0 rounded-xl overflow-hidden bg-white shadow-inner flex items-center justify-center">
         {/* Actual Image */}
         {(() => {
-          const globalProfilePic = profilePictureMap[species.taxa_id];
+          const taxaId = species.taxa_id || '';
+          const globalProfilePic = taxaId ? profilePictureMap[taxaId] : undefined;
           const effectiveSpecies = globalProfilePic !== undefined ? { ...species, profile_picture: globalProfilePic } : species;
-          const displayImage = getSpeciesImageUrl(effectiveSpecies, 'square');
+          const displayImage = getSpeciesImageUrl(effectiveSpecies as any, 'square');
           const finalImage = displayImage || imageUrl || (isInatLoading ? '' : placeholderImage);
           
           if (!finalImage) return null;
