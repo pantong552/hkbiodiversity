@@ -198,7 +198,7 @@ export default function SpeciesTable({
                   {/* Family (Both) */}
                   <td className="px-3 py-2.5 md:px-6 md:py-4 hidden md:table-cell w-[120px]">
                     <span className="text-[12px] md:text-[13px] font-medium text-slate-500 line-clamp-1">
-                      {language === 'zh' ? (faunaItem.family_chi || floraItem.family_zh) : (faunaItem.family_eng || floraItem.family_en)}
+                      {language === 'zh' ? (faunaItem.family_chi || floraItem.family_chi) : (faunaItem.family_eng || floraItem.family_eng)}
                     </span>
                   </td>
 
@@ -206,7 +206,7 @@ export default function SpeciesTable({
                   {isPlant && (
                     <td className="px-3 py-2.5 md:px-6 md:py-4 hidden md:table-cell w-[120px]">
                       <span className="text-[12px] md:text-[13px] font-medium text-slate-400 line-clamp-1">
-                        {language === 'zh' ? floraItem.genus_zh : floraItem.genus_en}
+                        {language === 'zh' ? floraItem.genus_chi : floraItem.genus_eng}
                       </span>
                     </td>
                   )}
@@ -221,7 +221,7 @@ export default function SpeciesTable({
                   {/* Common Name */}
                   <td className="px-3 py-2.5 md:px-6 md:py-4 max-w-[140px] md:max-w-none">
                     <span className="text-[13px] md:text-[14px] font-black text-slate-900 line-clamp-2 md:whitespace-nowrap">
-                      {language === 'zh' ? (faunaItem.common_name_chi || floraItem.common_name_zh) : (faunaItem.common_name_eng || floraItem.common_name_en)}
+                      {language === 'zh' ? (faunaItem.common_name_chi || floraItem.common_name_chi) : (faunaItem.common_name_eng || floraItem.common_name_eng)}
                     </span>
                   </td>
 

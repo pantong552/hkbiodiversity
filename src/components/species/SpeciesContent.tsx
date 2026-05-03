@@ -63,6 +63,16 @@ const SpeciesHeroBackground = ({ photos, defaultImage, isLoading }: { photos: In
     return () => clearInterval(timer);
   }, [displayPhotos.length]);
 
+  const [isMobile, setIsMobile] = React.useState(false);
+  React.useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
+
   return (
     <div className="absolute inset-0 z-0 bg-slate-950 overflow-hidden">
       {/* Background Image Layer */}
@@ -78,12 +88,12 @@ const SpeciesHeroBackground = ({ photos, defaultImage, isLoading }: { photos: In
           {/* Background Image */}
           {(hasPhotos || (!isLoading && !hasPhotos)) && (
             <Image 
-              src={hasPhotos ? (displayPhotos[index].large_url || displayPhotos[index].url) : defaultImage} 
+              src={hasPhotos ? (isMobile ? (displayPhotos[index].medium_url || displayPhotos[index].url) : (displayPhotos[index].large_url || displayPhotos[index].url)) : defaultImage} 
               alt="Species background"
               fill
               sizes="100vw"
               onLoadingComplete={() => index === 0 && setImgLoaded(true)}
-              unoptimized={hasPhotos ? (displayPhotos[index].large_url || displayPhotos[index].url).includes('/api/image/transform') : defaultImage.includes('/api/image/transform')}
+              unoptimized={hasPhotos ? (isMobile ? (displayPhotos[index].medium_url || displayPhotos[index].url) : (displayPhotos[index].large_url || displayPhotos[index].url)).includes('/api/image/transform') : defaultImage.includes('/api/image/transform')}
               className="object-cover opacity-70"
               priority={index === 0}
             />

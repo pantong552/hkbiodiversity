@@ -37,7 +37,7 @@ const PlantCard = ({ plant }: { plant: PlantSpecies }) => {
       {/* Category Tag */}
       <div className="px-6 pt-6 flex justify-between items-start gap-2">
         <span className="px-3 py-1 bg-slate-100 text-slate-500 rounded-full text-[10px] font-black uppercase tracking-widest">
-          {language === 'zh' ? plant.category_zh : plant.category_en}
+          {language === 'zh' ? plant.category_chi : plant.category_eng}
         </span>
         <div className="flex gap-1">
           {plant.is_cap96 === 'Y' && (
@@ -52,7 +52,7 @@ const PlantCard = ({ plant }: { plant: PlantSpecies }) => {
       <div className="p-6 space-y-4 flex-grow">
         <div>
           <h3 className="text-xl font-black text-slate-800 leading-tight group-hover:text-emerald-600 transition-colors">
-            {plant.common_name_zh || plant.scientific_name}
+            {plant.common_name_chi || plant.scientific_name}
           </h3>
           <p className="text-sm font-serif italic text-slate-400 mt-1">
             {plant.scientific_name}
@@ -62,7 +62,7 @@ const PlantCard = ({ plant }: { plant: PlantSpecies }) => {
         <div className="flex flex-wrap gap-y-2 gap-x-4 text-xs font-bold text-slate-500">
           <div className="flex items-center gap-1.5">
             <Leaf className="w-3.5 h-3.5 text-emerald-500" />
-            {plant.family_zh} ({plant.family_en})
+            {plant.family_chi} ({plant.family_eng})
           </div>
           <div className="flex items-center gap-1.5">
             <MapPin className="w-3.5 h-3.5 text-slate-400" />
@@ -114,7 +114,7 @@ export default function PlantSearchPage() {
   // Fetch unique metadata once
   useEffect(() => {
     const fetchMeta = async () => {
-      const { data } = await supabase.from('plant_species').select('category_zh, category_en, family_zh, family_en, genus_zh, genus_en').not('category_zh', 'is', null);
+      const { data } = await supabase.from('plant_species').select('category_chi, category_eng, family_chi, family_eng, genus_chi, genus_eng').not('category_chi', 'is', null);
       if (data) {
         const uniqueKeys = new Set();
         const cats: any[] = [];
@@ -122,34 +122,34 @@ export default function PlantSearchPage() {
         const genCounts = new Map<string, { display: string; count: number }>();
 
         data.forEach((item: any) => {
-          if (item.category_zh && !uniqueKeys.has(item.category_zh)) {
-            uniqueKeys.add(item.category_zh);
+          if (item.category_chi && !uniqueKeys.has(item.category_chi)) {
+            uniqueKeys.add(item.category_chi);
             cats.push({
-              zh: item.category_zh,
-              en: item.category_en,
-              display: language === 'zh' ? item.category_zh : (item.category_en || item.category_zh)
+              zh: item.category_chi,
+              en: item.category_eng,
+              display: language === 'zh' ? item.category_chi : (item.category_eng || item.category_chi)
             });
           }
 
-          if (item.family_zh) {
-            const fKey = item.family_zh;
+          if (item.family_chi) {
+            const fKey = item.family_chi;
             if (famCounts.has(fKey)) {
               famCounts.get(fKey)!.count += 1;
             } else {
               famCounts.set(fKey, { 
-                display: language === 'zh' ? item.family_zh : (item.family_en || item.family_zh), 
+                display: language === 'zh' ? item.family_chi : (item.family_eng || item.family_chi), 
                 count: 1 
               });
             }
           }
 
-          if (item.genus_zh) {
-            const gKey = item.genus_zh;
+          if (item.genus_chi) {
+            const gKey = item.genus_chi;
             if (genCounts.has(gKey)) {
               genCounts.get(gKey)!.count += 1;
             } else {
               genCounts.set(gKey, { 
-                display: language === 'zh' ? item.genus_zh : (item.genus_en || item.genus_zh), 
+                display: language === 'zh' ? item.genus_chi : (item.genus_eng || item.genus_chi), 
                 count: 1 
               });
             }
@@ -170,12 +170,12 @@ export default function PlantSearchPage() {
       let query = supabase.from('plant_species').select('*');
 
       if (filters.searchQuery) {
-        query = query.or(`scientific_name.ilike.%${filters.searchQuery}%,common_name_zh.ilike.%${filters.searchQuery}%,common_name_en.ilike.%${filters.searchQuery}%`);
+        query = query.or(`scientific_name.ilike.%${filters.searchQuery}%,common_name_chi.ilike.%${filters.searchQuery}%,common_name_eng.ilike.%${filters.searchQuery}%`);
       }
 
-      if (filters.categories.length > 0) query = query.in('category_zh', filters.categories);
-      if (filters.families.length > 0) query = query.in('family_zh', filters.families);
-      if (filters.genuses.length > 0) query = query.in('genus_zh', filters.genuses);
+      if (filters.categories.length > 0) query = query.in('category_chi', filters.categories);
+      if (filters.families.length > 0) query = query.in('family_chi', filters.families);
+      if (filters.genuses.length > 0) query = query.in('genus_chi', filters.genuses);
       if (filters.isCap96) query = query.eq('is_cap96', 'Y');
       if (filters.isCap586) query = query.eq('is_cap586', 'Y');
       if (filters.isRare) query = query.neq('hk_rare_precious_note', 'No');

@@ -44,17 +44,18 @@ export default function SpeciesCard({
       return {
         id: p.id,
         inat_id: p.inat_id,
-        common_name_chi: p.common_name_zh,
-        common_name_eng: p.common_name_en,
+        common_name_chi: p.common_name_chi,
+        common_name_eng: p.common_name_eng,
         scientific_name: p.scientific_name,
         author: p.author,
-        taxa_group: p.category_zh,
+        taxa_group: p.category_chi,
         order: null, // Plants don't typically display order in this UI
-        family: p.family_zh,
+        family: p.family_chi,
         iucn: null, 
         origin: p.origin,
         months: p.flowering_months?.length > 0 ? p.flowering_months : p.fruiting_months
       };
+
     } else {
       const s = species as Species;
       return {

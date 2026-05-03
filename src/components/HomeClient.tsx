@@ -191,7 +191,7 @@ export default function HomeClient() {
             if (taxaType === 'fauna') {
                 query = query.or(`common_name_chi.ilike.%${currentSearch}%,common_name_eng.ilike.%${currentSearch}%,scientific_name.ilike.%${currentSearch}%,alias_common_name_chi.ilike.%${currentSearch}%,alias_common_name_eng.ilike.%${currentSearch}%,alias_scientific_name.ilike.%${currentSearch}%`);
             } else {
-                query = query.or(`scientific_name.ilike.%${currentSearch}%,common_name_zh.ilike.%${currentSearch}%,common_name_en.ilike.%${currentSearch}%`);
+                query = query.or(`scientific_name.ilike.%${currentSearch}%,common_name_chi.ilike.%${currentSearch}%,common_name_eng.ilike.%${currentSearch}%`);
             }
         }
 
@@ -211,11 +211,11 @@ export default function HomeClient() {
             // Flora Filters
             if (plantFilters.searchQuery.trim()) {
                 const ps = plantFilters.searchQuery.trim();
-                query = query.or(`scientific_name.ilike.%${ps}%,common_name_zh.ilike.%${ps}%,common_name_en.ilike.%${ps}%`);
+                query = query.or(`scientific_name.ilike.%${ps}%,common_name_chi.ilike.%${ps}%,common_name_eng.ilike.%${ps}%`);
             }
-            if (plantFilters.categories.length > 0) query = query.in('category_zh', plantFilters.categories);
-            if (plantFilters.families.length > 0) query = query.in('family_zh', plantFilters.families);
-            if (plantFilters.genuses.length > 0) query = query.in('genus_zh', plantFilters.genuses);
+            if (plantFilters.categories.length > 0) query = query.in('category_chi', plantFilters.categories);
+            if (plantFilters.families.length > 0) query = query.in('family_chi', plantFilters.families);
+            if (plantFilters.genuses.length > 0) query = query.in('genus_chi', plantFilters.genuses);
             if (plantFilters.origins.length > 0) {
                 const expandedOrigins = plantFilters.origins.flatMap(o => 
                     o === 'Native' ? ['Native', '原生'] : o === 'Exotic' ? ['Exotic', '外來'] : [o]
@@ -242,11 +242,11 @@ export default function HomeClient() {
 
           // Map table keys to actual DB columns
           const dbKey = key === 'common_name' 
-            ? (taxaType === 'fauna' ? 'common_name_chi' : 'common_name_zh')
+            ? (taxaType === 'fauna' ? 'common_name_chi' : 'common_name_chi')
             : key === 'scientific_name' ? 'scientific_name'
-            : key === 'order' ? (taxaType === 'fauna' ? (language === 'zh' ? 'order_chi' : 'order_eng') : 'order_zh')
-            : key === 'family' ? (taxaType === 'fauna' ? (language === 'zh' ? 'family_chi' : 'family_eng') : 'family_zh')
-            : key === 'genus' ? (taxaType === 'fauna' ? 'genus_eng' : 'genus_zh')
+            : key === 'order' ? (taxaType === 'fauna' ? (language === 'zh' ? 'order_chi' : 'order_eng') : 'family_chi')
+            : key === 'family' ? (taxaType === 'fauna' ? (language === 'zh' ? 'family_chi' : 'family_eng') : 'family_chi')
+            : key === 'genus' ? (taxaType === 'fauna' ? 'genus_eng' : 'genus_chi')
             : key === 'iucn' ? (taxaType === 'fauna' ? 'iucn' : 'hk_rare_precious_note')
             : key;
 
@@ -270,7 +270,7 @@ export default function HomeClient() {
           'scientific_name': 'scientific_name',
           'rarity': 'iucn',
         } : {
-          'common_name': language === 'zh' ? 'common_name_zh' : 'common_name_en',
+          'common_name': language === 'zh' ? 'common_name_chi' : 'common_name_eng',
           'scientific_name': 'scientific_name',
           'rarity': 'hk_rare_precious_note',
         };

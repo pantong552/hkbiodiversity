@@ -142,12 +142,11 @@ export default function CongenericExplorer({ species, isMobile = false }: Congen
       setIsLoading(true);
       try {
         const isFlora = species.taxa_group === 'FLORA';
-        // 植物表使用 _en，動物表使用 _eng
-        const genusField = isFlora ? 'genus_en' : 'genus_eng';
-        const familyField = isFlora ? 'family_en' : 'family_eng';
+        const genusField = 'genus_eng';
+        const familyField = 'family_eng';
         
-        const genusValue = isFlora ? (species as any).genus_en : species.genus_eng;
-        const familyValue = isFlora ? (species as any).family_en : species.family_eng;
+        const genusValue = species.genus_eng;
+        const familyValue = species.family_eng;
 
         // Step 1: Try Genus
         if (genusValue) {
@@ -162,13 +161,13 @@ export default function CongenericExplorer({ species, isMobile = false }: Congen
             const mappedData = isFlora ? data.map((p: any) => ({
               ...p,
               id: p.inat_id,
-              common_name_chi: p.common_name_zh,
-              common_name_eng: p.common_name_en,
+              common_name_chi: p.common_name_chi,
+              common_name_eng: p.common_name_eng,
               taxa_group: 'FLORA',
-              family_chi: p.family_zh,
-              family_eng: p.family_en,
-              genus_chi: p.genus_zh,
-              genus_eng: p.genus_en,
+              family_chi: p.family_chi,
+              family_eng: p.family_eng,
+              genus_chi: p.genus_chi,
+              genus_eng: p.genus_eng,
             })) : data;
 
             setCongenericSpecies([...mappedData].sort(() => Math.random() - 0.5));
@@ -191,14 +190,15 @@ export default function CongenericExplorer({ species, isMobile = false }: Congen
             const mappedData = isFlora ? data.map((p: any) => ({
               ...p,
               id: p.inat_id,
-              common_name_chi: p.common_name_zh,
-              common_name_eng: p.common_name_en,
+              common_name_chi: p.common_name_chi,
+              common_name_eng: p.common_name_eng,
               taxa_group: 'FLORA',
-              family_chi: p.family_zh,
-              family_eng: p.family_en,
-              genus_chi: p.genus_zh,
-              genus_eng: p.genus_en,
+              family_chi: p.family_chi,
+              family_eng: p.family_eng,
+              genus_chi: p.genus_chi,
+              genus_eng: p.genus_eng,
             })) : data;
+
 
             setCongenericSpecies([...mappedData].sort(() => Math.random() - 0.5));
             setDiscoveryLevel('family');

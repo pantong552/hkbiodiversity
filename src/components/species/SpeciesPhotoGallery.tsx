@@ -60,6 +60,16 @@ export default function SpeciesPhotoGallery({
     }
   }, [fetchedPhotos, isLoading]);
 
+  const [isMobile, setIsMobile] = useState(false);
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 768); // 使用 md breakpoint 作為界線
+    };
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
+
   const [isDragging, setIsDragging] = useState(false);
   const [startX, setStartX] = useState(0);
   const [scrollLeft, setScrollLeft] = useState(0);
@@ -279,12 +289,12 @@ export default function SpeciesPhotoGallery({
                 className="absolute inset-0 cursor-grab active:cursor-grabbing"
               >
                 <Image
-                  src={currentPhoto?.large_url}
+                  src={isMobile ? currentPhoto?.medium_url : currentPhoto?.large_url}
                   alt={commonName || 'Species observation'}
                   fill
                   className="object-contain sm:object-cover"
-                  unoptimized={currentPhoto?.large_url?.includes('/api/image/transform')}
-                  sizes="(max-width: 640px) 100vw, (max-width: 1024px) 80vw, 1200px"
+                  unoptimized={(isMobile ? currentPhoto?.medium_url : currentPhoto?.large_url)?.includes('/api/image/transform')}
+                  sizes="(max-width: 768px) 100vw, (max-width: 1024px) 80vw, 1200px"
                 />
               </motion.div>
             </AnimatePresence>

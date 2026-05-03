@@ -42,16 +42,25 @@ function mapPlantToSpecies(plantData: any): Species {
   return {
     ...plantData,
     taxa_group: 'FLORA',
-    common_name_chi: plantData.common_name_zh,
-    common_name_eng: plantData.common_name_en,
+    common_name_chi: plantData.common_name_chi,
+    common_name_eng: plantData.common_name_eng,
     scientific_name: plantData.scientific_name,
-    class_eng: plantData.category_en,
-    order_eng: plantData.family_en,
-    family_eng: plantData.family_en,
+    family_chi: plantData.family_chi,
+    family_eng: plantData.family_eng,
+    genus_chi: plantData.genus_chi,
+    genus_eng: plantData.genus_eng,
+    class_chi: plantData.category_chi,
+    class_eng: plantData.category_eng,
+    order_eng: plantData.family_eng,
     habitat_chi: plantData.habitat_chi,
-    habitat_eng: plantData.habitat,
+    habitat_eng: plantData.habitat_eng,
+    description_chi: plantData.description_chi,
+    description_eng: plantData.description_eng,
+    remarks_chi: plantData.remark_chi,
+    remarks_eng: plantData.remark_eng,
   } as unknown as Species;
 }
+
 
 /**
  * Fetch iNaturalist photo URL for a given taxon ID

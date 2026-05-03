@@ -171,14 +171,15 @@ export default function BookmarksSection() {
                       id: p.id,
                       taxa_id: p.taxa_id,
                       inat_id: p.inat_id,
-                      common_name_chi: p.common_name_zh,
-                      common_name_eng: p.common_name_en,
+                      common_name_chi: p.common_name_chi,
+                      common_name_eng: p.common_name_eng,
                       scientific_name: p.scientific_name,
                       iucn: '',
-                      informal_group_eng: p.category_en,
-                      informal_group_chi: p.category_zh,
+                      informal_group_eng: p.category_eng,
+                      informal_group_chi: p.category_chi,
                       favorite_id: fav.id,
                       bookmarked_at: fav.created_at,
+
                   };
               }
           }

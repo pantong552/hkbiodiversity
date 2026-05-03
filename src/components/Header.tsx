@@ -321,7 +321,7 @@ export default function Header() {
                       setIsMobileMenuOpen(false);
                       setIsAccountOpen(true);
                     }}
-                    className="flex items-center gap-3 px-4 py-3 bg-slate-50 rounded-2xl border border-slate-100 hover:border-emerald-200 hover:bg-emerald-50/50 transition-all duration-300 cursor-pointer"
+                    className="flex items-center gap-3 px-4 py-3 w-full bg-slate-50 rounded-2xl border border-slate-100 hover:border-emerald-200 hover:bg-emerald-50/50 transition-all duration-300 cursor-pointer"
                   >
                     {user.user_metadata.avatar_url ? (
                       <img
