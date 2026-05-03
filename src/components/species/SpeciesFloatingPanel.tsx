@@ -78,7 +78,8 @@ function SpeciesTabPreview({
             <div className="relative h-32 w-full bg-slate-100 overflow-hidden">
               {(() => {
                 // 優先序：全局即時狀態 > 資料庫原始資料 > iNaturalist
-                const globalProfilePic = species ? profilePictureMap[species.taxa_id] : undefined;
+                const taxaId = species?.taxa_id;
+                const globalProfilePic = taxaId ? profilePictureMap[taxaId] : undefined;
                 const effectiveSpecies = globalProfilePic !== undefined ? { ...species, profile_picture: globalProfilePic } : species;
                 
                 // 提升尺寸至 medium 以解決模糊問題
