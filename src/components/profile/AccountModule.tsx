@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { User, Heart, Calendar, Clock, Mail, X, Settings, ArrowLeft } from 'lucide-react';
+import { User, Heart, Calendar, Clock, Mail, X, Settings, ArrowLeft, ShieldCheck } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '@/context/AuthContext';
 import { useLanguage } from '@/context/LanguageContext';
@@ -173,6 +173,21 @@ export default function AccountModule() {
                             {t('account.profile_info')}
                           </h4>
                           <div className="space-y-4">
+                             <div className="flex items-center gap-4 p-4 bg-slate-50/50 rounded-2xl border border-slate-100">
+                              <ShieldCheck className={`w-4 h-4 ${
+                                profile?.role === 'admin' ? 'text-red-500' : 
+                                profile?.role === 'curator' ? 'text-amber-500' : 'text-slate-400'
+                              }`} />
+                              <div className="flex-1 min-w-0">
+                                <p className="text-[9px] font-bold text-slate-400 uppercase tracking-tighter">{t('account.role')}</p>
+                                <p className={`text-sm font-black ${
+                                  profile?.role === 'admin' ? 'text-red-600' : 
+                                  profile?.role === 'curator' ? 'text-amber-600' : 'text-slate-700'
+                                }`}>
+                                  {t(`account.role_${profile?.role || 'guest'}`)}
+                                </p>
+                              </div>
+                            </div>
                             <div className="flex items-center gap-4 p-4 bg-slate-50/50 rounded-2xl border border-slate-100">
                               <Calendar className="w-4 h-4 text-emerald-600" />
                               <div className="flex-1 min-w-0">

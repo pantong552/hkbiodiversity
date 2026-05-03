@@ -39,6 +39,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             id: currentUser.id,
             username: currentUser.user_metadata?.full_name || currentUser.email?.split('@')[0],
             avatar_url: currentUser.user_metadata?.avatar_url || null,
+            role: 'guest',
             updated_at: new Date().toISOString(),
             last_online_at: new Date().toISOString()
           })

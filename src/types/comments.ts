@@ -1,7 +1,10 @@
+export type UserRole = 'admin' | 'curator' | 'guest';
+
 export interface Profile {
   id: string;
   username: string | null;
   avatar_url: string | null;
+  role: UserRole;
   updated_at: string;
   last_online_at?: string | null;
   inaturalist_username?: string | null;
