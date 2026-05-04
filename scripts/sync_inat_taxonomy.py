@@ -152,13 +152,12 @@ def process_single_file(input_path, output_path, filter_mode, mode, workers, is_
     except Exception:
         df = pd.read_csv(input_path, encoding='utf-8', errors='replace')
 
-    target_ranks = {"phylum": "phylum", "class": "class", "subclass": "sub_class", "order": "order", "suborder": "sub_order", "superfamily": "superfamily", "family": "family", "subfamily": "sub_family", "genus": "genus", "species": "species", "subspecies": "sub_species"}
+    target_ranks = {"phylum": "phylum", "class": "class", "order": "order", "family": "family", "genus": "genus", "species": "species", "subspecies": "sub_species"}
     
     # 初始化欄位
     if mode in [1, 2]:
         for cp in target_ranks.values():
             for sf in ["_eng", "_chi"]:
-                if sf == "_chi" and cp in ["species", "sub_species"]: continue
                 cn = f"{cp}{sf}"
                 if cn not in df.columns: df[cn] = None
                 df[cn] = df[cn].astype(object)
