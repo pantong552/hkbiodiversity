@@ -22,8 +22,8 @@ export interface SelectedFilters {
   iucn: string[];
 }
 
-export default function SidebarFilter({ 
-  isOpen, 
+export default function SidebarFilter({
+  isOpen,
   onClose,
   onFilterChange,
   onSearchSubmit,
@@ -38,7 +38,7 @@ export default function SidebarFilter({
     order_eng: language === 'zh' ? '目 (Order)' : 'Order',
     family_eng: language === 'zh' ? '科 (Family)' : 'Family',
     genus_eng: language === 'zh' ? '屬 (Genus)' : 'Genus',
-    informal_group_eng: language === 'zh' ? '非正式類群' : 'Informal Group',
+    informal_group_eng: language === 'zh' ? '分類群 (Taxa Group)' : 'Taxa Group',
   };
 
   const IUCN_STATUSES = Object.keys(IUCN_CONFIG);
@@ -47,6 +47,7 @@ export default function SidebarFilter({
   const [expanded, setExpanded] = useState<Record<string, boolean>>({
     taxonomy: true,
     iucn: true,
+    taxaGroup: true,
     phylum_eng: false,
     class_eng: false,
     order_eng: false,
@@ -71,7 +72,7 @@ export default function SidebarFilter({
   useEffect(() => {
     if (selectedFilters) {
       setSelected(selectedFilters);
-      
+
       // Auto-expand levels that have selected items
       const newExpanded = { ...expanded };
       let hasChange = false;
@@ -92,8 +93,8 @@ export default function SidebarFilter({
 
   useEffect(() => {
     async function fetchStats() {
-      const levels: TaxonomyLevel[] = ['phylum_eng', 'class_eng', 'order_eng', 'family_eng', 'genus_eng'];
-      
+      const levels: TaxonomyLevel[] = ['phylum_eng', 'class_eng', 'order_eng', 'family_eng', 'genus_eng', 'informal_group_eng'];
+
       try {
         // 為每個層級獨立獲取統計，排除該層級自身的選取值
         const levelPromises = levels.map(async (level) => {
@@ -103,6 +104,7 @@ export default function SidebarFilter({
             p_order_eng: level === 'order_eng' ? [] : selected.taxonomy.order_eng,
             p_family_eng: level === 'family_eng' ? [] : selected.taxonomy.family_eng,
             p_genus_eng: level === 'genus_eng' ? [] : selected.taxonomy.genus_eng,
+            p_informal_group_eng: level === 'informal_group_eng' ? [] : selected.taxonomy.informal_group_eng,
             p_iucn: selected.iucn,
             p_search: searchQuery
           };
@@ -117,6 +119,7 @@ export default function SidebarFilter({
           p_order_eng: selected.taxonomy.order_eng,
           p_family_eng: selected.taxonomy.family_eng,
           p_genus_eng: selected.taxonomy.genus_eng,
+          p_informal_group_eng: selected.taxonomy.informal_group_eng,
           p_iucn: selected.iucn,
           p_search: searchQuery
         });
@@ -127,17 +130,17 @@ export default function SidebarFilter({
         ]);
 
         const newOptions = { ...taxonomyOptions };
-        
+
         levelResults.forEach(({ level, data, error }) => {
           if (!error && data) {
             const rawData = data[level] || [];
             const uniqueItems = new Map<string, { name: string; display: string; count: number }>();
-            
+
             rawData.forEach((item: any) => {
               const name = item.name || 'Unknown';
               const count = parseInt(item.count) || 0;
               const chiName = item.chi || name;
-              
+
               const existing = uniqueItems.get(name);
               if (existing) {
                 existing.count += count;
@@ -164,7 +167,7 @@ export default function SidebarFilter({
         });
 
         setTaxonomyOptions(newOptions);
-        
+
         if (!iucnResult.error && iucnResult.data) {
           setIucnCounts(iucnResult.data.iucn || {});
         }
@@ -226,7 +229,7 @@ export default function SidebarFilter({
   return (
     <>
       {isOpen && (
-        <div 
+        <div
           className="fixed top-0 left-0 right-0 h-[100dvh] bg-slate-900/40 backdrop-blur-md z-[100] min-[1101px]:hidden"
           onClick={onClose}
         />
@@ -247,7 +250,7 @@ export default function SidebarFilter({
               {t('filter.title')}
             </h2>
             {activeCount > 0 && (
-              <button 
+              <button
                 onClick={clearFilters}
                 className="text-xs font-bold text-emerald-600 hover:text-emerald-700 bg-emerald-50 px-2 py-1 rounded-lg transition-colors"
               >
@@ -259,7 +262,7 @@ export default function SidebarFilter({
             </button>
           </div>
 
-          <QuickFilterSearch 
+          <QuickFilterSearch
             initialValue={searchQuery}
             onSubmit={onSearchSubmit}
             className="mb-6"
@@ -267,39 +270,63 @@ export default function SidebarFilter({
 
           <div className="space-y-6">
             <div className="space-y-4">
-              <button 
+              <button
+                onClick={() => toggleExpand('taxaGroup')}
+                className="w-full flex items-center justify-between text-sm font-black uppercase tracking-widest text-slate-400 hover:text-emerald-700 transition-colors"
+              >
+                {language === 'zh' ? '生物分類群' : 'Biota Group'}
+                {expanded.taxaGroup ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+              </button>
+
+              {expanded.taxaGroup && (
+                <div className="pt-2">
+                  <MultiSelectDropdown
+                    label={TAXONOMY_LABELS.informal_group_eng}
+                    options={taxonomyOptions.informal_group_eng}
+                    selectedValues={selected.taxonomy.informal_group_eng}
+                    onChange={(values) => handleTaxonomyChange('informal_group_eng', values)}
+                    placeholder={TAXONOMY_LABELS.informal_group_eng}
+                  />
+                </div>
+              )}
+            </div>
+
+            <div className="space-y-4">
+              <button
                 onClick={() => toggleExpand('taxonomy')}
                 className="w-full flex items-center justify-between text-sm font-black uppercase tracking-widest text-slate-400 hover:text-emerald-700 transition-colors"
               >
                 {t('filter.taxonomy')}
                 {expanded.taxonomy ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
               </button>
-              
+
               {expanded.taxonomy && (
                 <div className="space-y-3 pt-2">
-                  {(Object.keys(TAXONOMY_LABELS) as TaxonomyLevel[]).map((level) => (
-                    <MultiSelectDropdown
-                      key={level}
-                      label={TAXONOMY_LABELS[level]}
-                      options={taxonomyOptions[level]}
-                      selectedValues={selected.taxonomy[level]}
-                      onChange={(values) => handleTaxonomyChange(level, values)}
-                      placeholder={TAXONOMY_LABELS[level]}
-                    />
-                  ))}
+                  {(Object.keys(TAXONOMY_LABELS) as TaxonomyLevel[])
+                    .filter(level => level !== 'informal_group_eng')
+                    .map((level) => (
+                      <MultiSelectDropdown
+                        key={level}
+                        label={TAXONOMY_LABELS[level]}
+                        options={taxonomyOptions[level]}
+                        selectedValues={selected.taxonomy[level]}
+                        onChange={(values) => handleTaxonomyChange(level, values)}
+                        placeholder={TAXONOMY_LABELS[level]}
+                      />
+                    ))}
                 </div>
               )}
             </div>
 
             <div className="space-y-4 pt-4 border-t border-emerald-50">
-              <button 
+              <button
                 onClick={() => toggleExpand('iucn')}
                 className="w-full flex items-center justify-between text-sm font-black uppercase tracking-widest text-slate-400 hover:text-emerald-700 transition-colors"
               >
                 {language === 'zh' ? 'IUCN 狀態' : 'IUCN Status'}
                 {expanded.iucn ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
               </button>
-              
+
               {expanded.iucn && (
                 <div className="flex flex-wrap gap-2 pt-2">
                   {IUCN_STATUSES.map((status) => {
@@ -307,7 +334,7 @@ export default function SidebarFilter({
                     const isSelected = selected.iucn.includes(status);
                     const config = getIUCNConfig(status);
                     const label = language === 'zh' ? config.label.zh : config.label.en;
-                    
+
                     // Always show for complete filter list, but dim if count is 0 and not selected
                     const isEmpty = count === 0 && !isSelected;
 
@@ -319,7 +346,7 @@ export default function SidebarFilter({
                           px-3 py-1.5 rounded-xl text-[11px] font-black transition-all border shadow-sm flex items-center gap-1.5 uppercase tracking-wider
                           ${isSelected
                             ? `${config.styles} shadow-md scale-105 ring-2 ring-emerald-500/20`
-                            : isEmpty 
+                            : isEmpty
                               ? 'bg-slate-50 border-slate-100 text-slate-300 opacity-50 grayscale hover:grayscale-0 hover:opacity-100'
                               : 'bg-white border-slate-200 text-slate-600 hover:border-emerald-200 hover:bg-slate-50'}
                         `}
