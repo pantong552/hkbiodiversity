@@ -171,7 +171,7 @@ export default function HomeHero() {
                 />
               </div>
 
-              {/* Search Trigger (Icon Button) */}
+              {/* Search Trigger*/}
               <button 
                 type="submit"
                 className="w-10 h-10 md:w-14 md:h-14 shrink-0 flex items-center justify-center bg-emerald-600 hover:bg-emerald-500 text-white rounded-full shadow-lg shadow-emerald-200/40 hover:scale-105 active:scale-95 transition-all duration-300 mr-0.5 md:mr-1"
