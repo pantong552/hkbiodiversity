@@ -1,100 +1,83 @@
 import { Metadata } from 'next';
-import { Suspense } from 'react';
-import HomeClient from '@/components/HomeClient';
-import { getSpeciesById, getSpeciesImageUrl } from '@/lib/species';
+import HomeHero from '@/components/home/HomeHero';
+import Header from '@/components/Header';
+import SpeciesStats from '@/components/home/SpeciesStats';
+import NewsSection from '@/components/home/NewsSection';
+import Leaderboard from '@/components/home/Leaderboard';
+import LatestComments from '@/components/home/LatestComments';
+import { getHomeStats, getLeaderboard, getLatestComments, getLatestSpecies } from '@/lib/home';
 
 export const dynamic = 'force-dynamic';
-export const revalidate = 0;
+export const revalidate = 3600; // 每小時重新驗證一次
 
-export async function generateMetadata(props: { 
-  searchParams: Promise<{ [key: string]: string | string[] | undefined }> | { [key: string]: string | string[] | undefined }
-}): Promise<Metadata> {
-  // 適配不同版本的 Next.js searchParams 處理
-  const searchParams = 'then' in props.searchParams ? await props.searchParams : props.searchParams;
-  const speciesId = typeof searchParams.species === 'string' ? searchParams.species : undefined;
-  
-  const baseUrl = 'https://hkbiodiversity.org';
-  const defaultTitle = 'Hong Kong Biodiversity Collective | 香港自然生態匯誌';
-  const defaultDescription = 'A collaborative biodiversity encyclopedia of Hong Kong, covering approximately 10,000 species.';
-
-  if (!speciesId) {
-    return {
-      title: defaultTitle,
-      description: defaultDescription,
-      alternates: {
-        canonical: baseUrl,
-      },
-      openGraph: {
-        title: defaultTitle,
-        description: defaultDescription,
-        type: 'website',
-        url: baseUrl,
-        images: [
-          {
-            url: `${baseUrl}/api/og`,
-            width: 1200,
-            height: 630,
-            alt: defaultTitle,
-          }
-        ]
-      },
-      twitter: {
-        card: 'summary_large_image',
-        title: defaultTitle,
-        description: defaultDescription,
-        images: [`${baseUrl}/api/og`],
+export const metadata: Metadata = {
+  title: 'Hong Kong Biodiversity Collective | 香港自然生態匯誌',
+  description: 'A collaborative biodiversity encyclopedia of Hong Kong, covering approximately 10,000 species.',
+  openGraph: {
+    title: 'Hong Kong Biodiversity Collective | 香港自然生態匯誌',
+    description: 'A collaborative biodiversity encyclopedia of Hong Kong, covering approximately 10,000 species.',
+    type: 'website',
+    url: 'https://hkbiodiversity.org',
+    images: [
+      {
+        url: 'https://hkbiodiversity.org/api/og',
+        width: 1200,
+        height: 630,
+        alt: 'HKBC',
       }
-    };
-  }
+    ]
+  },
+};
 
-  // Fetch species data for dynamic metadata if ID is present
-  const species = await getSpeciesById(speciesId);
-  if (!species) return { title: defaultTitle };
+export default async function HomePage() {
+  // 並行獲取所有數據
+  const [stats, leaderboard, comments, latestSpecies] = await Promise.all([
+    getHomeStats(),
+    getLeaderboard(),
+    getLatestComments(),
+    getLatestSpecies()
+  ]);
 
-  const commonName = species.common_name_chi || species.common_name_eng || species.scientific_name;
-  const scientificName = species.scientific_name;
-  const imageUrl = await getSpeciesImageUrl(species);
-  const canonicalUrl = `${baseUrl}/?species=${speciesId}`;
-
-  const dynamicTitle = `${commonName} (${scientificName}) | HK Biodiversity Collective`;
-  const dynamicDescription = `在香港自然生態匯誌查看 ${commonName} 的詳細資料。分類：${species.class_eng || ''} ${species.order_eng || ''} ${species.family_eng || ''}`;
-  
-  // Default social image fallback
-  const finalImageUrl = imageUrl || `${baseUrl}/api/og`;
-
-  return {
-    title: dynamicTitle,
-    description: dynamicDescription,
-    alternates: {
-      canonical: canonicalUrl,
-    },
-    openGraph: {
-      title: dynamicTitle,
-      description: dynamicDescription,
-      images: [
-        {
-          url: finalImageUrl,
-          width: 1200,
-          height: 630,
-          alt: commonName,
-        }
-      ],
-      type: 'article',
-      url: canonicalUrl,
-    },
-    twitter: {
-      card: 'summary_large_image',
-      title: dynamicTitle,
-      description: dynamicDescription,
-      images: [finalImageUrl],
-    }
-  };
-}
-
-export default function Home() {
   return (
-    <Suspense fallback={<div className="flex items-center justify-center min-h-screen text-slate-400 font-bold uppercase tracking-widest text-xs">LOADING...</div>}>
-      <HomeClient />
-    </Suspense>
+    <>
+      <Header />
+      <main className="min-h-screen bg-white">
+        {/* 1. Hero Section */}
+        <HomeHero />
+
+      {/* 2. Stats Section */}
+      <SpeciesStats stats={stats} />
+
+      {/* 3. News & New Species Section */}
+      <NewsSection latestSpecies={latestSpecies} />
+
+      {/* 4. Leaderboard & Latest Comments Section */}
+      <section className="py-24 bg-white">
+        <div className="container mx-auto px-6">
+          <div className="grid lg:grid-cols-5 gap-10">
+            <div className="lg:col-span-3">
+              <LatestComments comments={comments} />
+            </div>
+            <div className="lg:col-span-2">
+              <Leaderboard users={leaderboard} />
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Footer Branding */}
+      <section className="py-20 border-t border-slate-100 bg-slate-50">
+        <div className="container mx-auto px-6 text-center">
+          <div className="flex items-center justify-center gap-4 mb-6">
+            <img src="/logo.svg" alt="Logo" className="w-12 h-12" />
+            <h2 className="text-2xl font-black text-slate-900 tracking-tighter">HKBC</h2>
+          </div>
+          <p className="text-slate-400 font-bold uppercase tracking-[0.3em] text-xs">
+            Hong Kong Biodiversity Collective
+          </p>
+        </div>
+      </section>
+      </main>
+    </>
   );
 }

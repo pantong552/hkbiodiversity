@@ -257,7 +257,8 @@ export default function SpeciesFloatingPanel() {
   useEffect(() => {
     // Only go back if we are still on the same page where the panel was opened
     // and if the panel was manually closed via UI (not via browser back button)
-    if (!isExpanded && pathname === '/' && typeof window !== 'undefined' && window.history.state?.panelOpen === true) {
+    const isMainRoute = pathname === '/' || pathname === '/database';
+    if (!isExpanded && isMainRoute && typeof window !== 'undefined' && window.history.state?.panelOpen === true) {
       // Small delay to ensure any pending navigations are settled
       const timer = setTimeout(() => {
         // Double check: if we've already navigated away, don't go back
@@ -269,9 +270,10 @@ export default function SpeciesFloatingPanel() {
     }
   }, [isExpanded, pathname]);
 
-  // Auto-collapse panel when navigating away from home
+  // Auto-collapse panel when navigating away from home or database
   useEffect(() => {
-    if (isExpanded && pathname !== '/') {
+    const isMainRoute = pathname === '/' || pathname === '/database';
+    if (isExpanded && !isMainRoute) {
       toggleExpand(false);
     }
   }, [pathname, isExpanded, toggleExpand]);
@@ -301,9 +303,9 @@ export default function SpeciesFloatingPanel() {
     const species = speciesData[activeSpeciesId];
     const commonName = language === 'zh' ? species.common_name_chi : species.common_name_eng;
     
-    // 生成物種首頁代參數連結，確保開啟完整環境
+    // 生成資料庫頁面代參數連結，確保開啟完整環境
     const baseUrl = typeof window !== 'undefined' ? window.location.origin : '';
-    const shareUrl = `${baseUrl}/?species=${activeSpeciesId}`;
+    const shareUrl = `${baseUrl}/database?species=${activeSpeciesId}`;
     
     share({
       title: `${commonName} | HK Biodiversity`,

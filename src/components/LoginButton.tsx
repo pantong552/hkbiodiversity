@@ -3,7 +3,11 @@
 import { createClient } from '@/utils/supabase/client'
 import { useState } from 'react'
 
-export default function LoginButton() {
+interface LoginButtonProps {
+  isTransparent?: boolean;
+}
+
+export default function LoginButton({ isTransparent = false }: LoginButtonProps) {
   const [isLoading, setIsLoading] = useState(false)
   const supabase = createClient()
 
@@ -28,7 +32,13 @@ export default function LoginButton() {
     <button
       onClick={handleGoogleLogin}
       disabled={isLoading}
-      className="group relative flex items-center gap-2 overflow-hidden rounded-full bg-slate-900 px-6 py-2.5 text-sm font-medium text-white transition-all hover:bg-slate-800 active:scale-95 disabled:pointer-events-none disabled:opacity-50 shadow-lg shadow-slate-200"
+      className={`
+        group relative flex items-center gap-3 overflow-hidden rounded-full px-6 py-2.5 text-sm font-bold transition-all duration-500 active:scale-95 disabled:pointer-events-none disabled:opacity-50
+        ${isTransparent 
+          ? 'bg-white/10 backdrop-blur-md text-white border border-white/20 hover:bg-white/20 hover:border-white/40 shadow-xl shadow-black/5' 
+          : 'bg-slate-900 text-white shadow-lg shadow-slate-200 hover:bg-emerald-600'
+        }
+      `}
     >
       {/* 炫光效果背景 */}
       <div className="absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/10 to-transparent transition-transform duration-500 group-hover:translate-x-full" />

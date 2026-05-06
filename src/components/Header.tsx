@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { Leaf, Menu, X, User, LogOut, Settings, Globe } from 'lucide-react';
 import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 import { motion } from 'framer-motion';
 import LoginButton from './LoginButton';
 import { useLanguage } from '@/context/LanguageContext';
@@ -12,9 +13,13 @@ import { useSpeciesPanel } from '@/context/SpeciesPanelContext';
 export default function Header() {
   const { language, setLanguage, t } = useLanguage();
   const { user, signOut } = useAuth();
+  const pathname = usePathname();
   const [isScrolled, setIsScrolled] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isVisible, setIsVisible] = useState(true);
+
+  const isHomePage = pathname === '/';
+  const isHeaderTransparent = isHomePage && !isScrolled;
 
   const { isExpanded, isGalleryOpen, isUploadModalOpen, isFilterOpen, toggleExpand, setIsAccountOpen, isAccountOpen } = useSpeciesPanel();
   const lastScrollYRef = useRef(0);
@@ -108,6 +113,7 @@ export default function Header() {
 
   const navLinks = [
     { name: t('nav.home'), href: '/' },
+    { name: t('nav.database'), href: '/database' },
     // 以下頁面尚未建立，暫時停用以避免 404 prefetch 錯誤
     { name: t('nav.about'), href: '#', disabled: true },
     { name: t('nav.blog'), href: '#', disabled: true },
@@ -122,10 +128,11 @@ export default function Header() {
       ${(isVisible && !isGalleryOpen && !isUploadModalOpen && !isAccountOpen) ? 'translate-y-0 opacity-100' : '-translate-y-40 opacity-0'}
     `}>
       <nav className={`
-        glass-header max-w-[1920px] mx-auto
-        ${isScrolled ? 'py-2 lg:py-3 shadow-2xl shadow-slate-200/50' : 'py-3 lg:py-5 shadow-none'}
+        max-w-[1920px] mx-auto rounded-[2rem]
+        ${isHeaderTransparent ? 'bg-transparent border-transparent shadow-none' : 'glass-header bg-white/90 backdrop-blur-xl border-slate-100 shadow-2xl shadow-slate-200/50'}
+        ${isScrolled ? 'py-2 lg:py-3' : 'py-3 lg:py-5'}
         px-6 md:px-8 flex items-center justify-between
-        bg-white border-slate-100
+        transition-all duration-500
       `}>
         {/* Logo & Branding */}
         <Link 
@@ -149,31 +156,31 @@ export default function Header() {
           </motion.div>
 
           {/* Vertical Separator Line */}
-          <div className="h-10 w-px bg-slate-200/60 hidden md:block" />
-
+          <div className={`h-10 w-px hidden md:block transition-colors duration-500 ${isHeaderTransparent ? 'bg-white/20' : 'bg-slate-200/60'}`} />
+  
           {/* Text Identity */}
           <div className="flex flex-col justify-center gap-0.5">
             <div className="flex items-baseline gap-1.5">
-              <span className="text-2xl font-black tracking-tighter text-slate-900 group-hover:text-emerald-700 transition-colors duration-500">
+              <span className={`text-2xl font-black tracking-tighter transition-colors duration-500 ${isHeaderTransparent ? 'text-white drop-shadow-md' : 'text-slate-900'} group-hover:text-emerald-500`}>
                 HK
               </span>
               <motion.span
                 initial={{ letterSpacing: "0.2em" }}
                 whileHover={{ letterSpacing: "0.4em" }}
-                className="text-xs font-light uppercase text-emerald-600 transition-all duration-700"
+                className={`text-xs font-light uppercase transition-colors duration-500 ${isHeaderTransparent ? 'text-emerald-300 drop-shadow-sm' : 'text-emerald-600'}`}
               >
                 Biodiversity
               </motion.span>
             </div>
-
+  
             <div className="flex items-center gap-3">
-              <span className="text-[12px] font-bold uppercase tracking-[0.25em] text-slate-500">
+              <span className={`text-[12px] font-bold uppercase tracking-[0.25em] transition-colors duration-500 ${isHeaderTransparent ? 'text-white drop-shadow-sm' : 'text-slate-500'}`}>
                 Collective
               </span>
               {/* Chinese Title Integration - Hidden on Mobile */}
               <div className="hidden md:flex items-center gap-1.5 opacity-80 group-hover:opacity-100 transition-opacity duration-700">
-                <div className="w-1 h-1 bg-emerald-500 rounded-full" />
-                <span className="text-[12px] font-medium tracking-widest text-slate-400 whitespace-nowrap">
+                <div className={`w-1 h-1 rounded-full ${isHeaderTransparent ? 'bg-emerald-400' : 'bg-emerald-500'}`} />
+                <span className={`text-[12px] font-medium tracking-widest transition-colors duration-500 ${isHeaderTransparent ? 'text-white/80 drop-shadow-sm' : 'text-slate-400'} whitespace-nowrap`}>
                   香港自然生態匯誌
                 </span>
               </div>
@@ -197,7 +204,7 @@ export default function Header() {
                 <Link
                   key={link.name}
                   href={link.href}
-                  className="text-sm font-bold text-slate-500 hover:text-emerald-600 transition-colors"
+                  className={`text-sm font-bold transition-colors duration-500 ${isHeaderTransparent ? 'text-white drop-shadow-sm hover:text-emerald-300' : 'text-slate-500 hover:text-emerald-600'}`}
                 >
                   {link.name}
                 </Link>
@@ -206,16 +213,16 @@ export default function Header() {
           </div>
 
           {/* Language Switcher - Desktop */}
-          <div className="flex items-center p-1 bg-slate-100/50 rounded-full border border-slate-200/50 backdrop-blur-sm">
+          <div className={`flex items-center p-1 rounded-full border transition-all duration-500 backdrop-blur-sm ${isHeaderTransparent ? 'bg-white/10 border-white/20' : 'bg-slate-100/50 border-slate-200/50'}`}>
             <button
               onClick={() => setLanguage('zh')}
-              className={`px-3 py-1 text-[10px] font-black rounded-full transition-all ${language === 'zh' ? 'bg-white text-emerald-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
+              className={`px-3 py-1 text-[10px] font-black rounded-full transition-all ${language === 'zh' ? 'bg-white text-emerald-600 shadow-sm' : (isHeaderTransparent ? 'text-white/60 hover:text-white' : 'text-slate-400 hover:text-slate-600')}`}
             >
               繁中
             </button>
             <button
               onClick={() => setLanguage('en')}
-              className={`px-3 py-1 text-[10px] font-black rounded-full transition-all ${language === 'en' ? 'bg-white text-emerald-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
+              className={`px-3 py-1 text-[10px] font-black rounded-full transition-all ${language === 'en' ? 'bg-white text-emerald-600 shadow-sm' : (isHeaderTransparent ? 'text-white/60 hover:text-white' : 'text-slate-400 hover:text-slate-600')}`}
             >
               EN
             </button>
@@ -225,7 +232,7 @@ export default function Header() {
             <div className="flex items-center gap-2 lg:gap-3">
               <button 
                 onClick={() => setIsAccountOpen(true)}
-                className="flex items-center gap-2 px-4 py-2 bg-slate-50 rounded-2xl border border-slate-100 hover:border-emerald-200 hover:bg-emerald-50/50 transition-all duration-300 cursor-pointer group"
+                className={`flex items-center gap-2 px-4 py-2 rounded-2xl border transition-all duration-500 cursor-pointer group ${isHeaderTransparent ? 'bg-white/10 border-white/20 hover:bg-white/20' : 'bg-slate-50 border-slate-100 hover:border-emerald-200 hover:bg-emerald-50/50'}`}
               >
                 {user.user_metadata.avatar_url ? (
                   <img
@@ -234,9 +241,9 @@ export default function Header() {
                     className="w-6 h-6 rounded-full"
                   />
                 ) : (
-                  <User className="w-4 h-4 text-slate-500" />
+                  <User className={`w-4 h-4 ${isHeaderTransparent ? 'text-white/60' : 'text-slate-500'}`} />
                 )}
-                <span className="text-sm font-bold text-slate-700 group-hover:text-emerald-700 transition-colors">
+                <span className={`text-sm font-bold transition-colors ${isHeaderTransparent ? 'text-white group-hover:text-white' : 'text-slate-700 group-hover:text-emerald-700'}`}>
                   {user.user_metadata.full_name || user.email}
                 </span>
               </button>
@@ -249,14 +256,14 @@ export default function Header() {
               </button>
             </div>
           ) : (
-            <LoginButton />
+            <LoginButton isTransparent={isHeaderTransparent} />
           )}
         </div>
 
         {/* Mobile/Tablet Menu Toggle - Visible below 1101px */}
         <button
           ref={menuToggleRef}
-          className="min-[1101px]:hidden p-2 text-slate-600 hover:bg-slate-100 rounded-xl"
+          className={`min-[1101px]:hidden p-2 rounded-xl transition-colors duration-500 ${isHeaderTransparent ? 'text-white hover:bg-white/10' : 'text-slate-600 hover:bg-slate-100'}`}
           onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
         >
           {isMobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
@@ -350,7 +357,7 @@ export default function Header() {
                 </div>
               ) : (
                 <div className="flex justify-center">
-                  <LoginButton />
+                  <LoginButton isTransparent={false} />
                 </div>
               )}
             </div>

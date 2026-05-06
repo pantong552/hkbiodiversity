@@ -445,11 +445,49 @@ export default function HomeClient() {
     }
   }, [pendingTaxonomyFilter, setPendingTaxonomyFilter, setIsFilterOpen]);
 
-  // Handle species and taxonomy parameters in URL on initial load and param change (Fallback)
+  // 1. 僅在初次掛載時處理 sessionStorage 搜尋負載
+  useEffect(() => {
+    try {
+      const internalSearch = sessionStorage.getItem('hkbc_quick_search');
+      if (internalSearch) {
+        const payload = JSON.parse(internalSearch);
+        if (payload.q) {
+          setSearchQuery(payload.q);
+          if (payload.type === 'flora') {
+            setPlantFilters(prev => ({ ...prev, searchQuery: payload.q }));
+          }
+        }
+        if (payload.type) {
+          setTaxaType(payload.type);
+        }
+        // 處理完畢後立即清除，避免重新整理時重複觸發
+        sessionStorage.removeItem('hkbc_quick_search');
+      }
+    } catch (err) {
+      console.error('Failed to parse internal search payload', err);
+    }
+  }, []); // 嚴格僅執行一次
+
+  // 2. 持續監聽 URL 參數 (species, taxonomy, type, q)
   useEffect(() => {
     const speciesId = searchParams.get('species');
     if (speciesId) {
       addSpecies(speciesId);
+    }
+
+    // 處理類型切換參數 (URL Override)
+    const typeFromUrl = searchParams.get('type') as TaxaType | null;
+    if (typeFromUrl && (typeFromUrl === 'fauna' || typeFromUrl === 'flora')) {
+      setTaxaType(typeFromUrl);
+    }
+
+    // 處理搜尋關鍵字參數 (URL Fallback)
+    const queryFromUrl = searchParams.get('q');
+    if (queryFromUrl) {
+      setSearchQuery(queryFromUrl);
+      if (typeFromUrl === 'flora' || (typeFromUrl === null && taxaType === 'flora')) {
+        setPlantFilters(prev => ({ ...prev, searchQuery: queryFromUrl }));
+      }
     }
 
     // 處理分類搜尋參數
@@ -471,14 +509,14 @@ export default function HomeClient() {
           taxonomy: cleanTaxonomy,
           iucn: []
         });
-        setSearchQuery('');
+        setSearchQuery(''); 
         setIsFilterOpen(true);
         hasTaxonomyParam = true;
         break;
       }
     }
     
-    // 檢查植物分類 (如果還沒被動物參數佔用)
+    // 檢查植物分類
     if (!hasTaxonomyParam) {
       for (const level of floraTaxaLevels) {
         const val = searchParams.get(level);
@@ -497,13 +535,18 @@ export default function HomeClient() {
       }
     }
 
-    // 清理 URL 參數：僅清理 species 參數，保留分類參數以增強穩定性與支援重新整理
-    if (speciesId) {
-      const params = new URLSearchParams(window.location.search);
-      params.delete('species');
-      const newQuery = params.toString();
-      router.replace(newQuery ? `/?${newQuery}` : '/', { scroll: false });
-    }
+    // 3. 清理 URL 參數 (僅針對 species 參數，且只在初始化或特定情境下執行)
+    // 注意：為了避免 router.replace 與面板開啟衝突，我們只有在真正需要清理時才呼叫
+    const timer = setTimeout(() => {
+      if (speciesId && window.location.search.includes('species=')) {
+        const params = new URLSearchParams(window.location.search);
+        params.delete('species');
+        const newQuery = params.toString();
+        router.replace(newQuery ? `/database?${newQuery}` : '/database', { scroll: false });
+      }
+    }, 1000); // 延遲清理，確保面板已穩定開啟
+
+    return () => clearTimeout(timer);
   }, [searchParams, addSpecies, setIsFilterOpen, router]);
 
   // Reset page when triggers change

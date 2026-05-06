@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { ChevronDown, ChevronRight, Search, Filter, X, CheckCircle2, RotateCcw } from 'lucide-react';
 import { Species, TaxonomyLevel } from '../types/species';
 import { useLanguage } from '../context/LanguageContext';
@@ -90,9 +90,11 @@ export default function SidebarFilter({
     phylum_eng: [], class_eng: [], order_eng: [], family_eng: [], genus_eng: [], informal_group_eng: []
   });
   const [iucnCounts, setIucnCounts] = useState<Record<string, number>>({});
+  const fetchIdRef = useRef(0);
 
   useEffect(() => {
     async function fetchStats() {
+      const currentFetchId = ++fetchIdRef.current;
       const levels: TaxonomyLevel[] = ['phylum_eng', 'class_eng', 'order_eng', 'family_eng', 'genus_eng', 'informal_group_eng'];
 
       try {
@@ -129,7 +131,10 @@ export default function SidebarFilter({
           iucnPromise
         ]);
 
-        const newOptions = { ...taxonomyOptions };
+        // 檢查請求是否過時 (Prevent race condition)
+        if (currentFetchId !== fetchIdRef.current) return;
+
+        const newOptions: any = {};
 
         levelResults.forEach(({ level, data, error }) => {
           if (!error && data) {
@@ -177,7 +182,7 @@ export default function SidebarFilter({
     }
 
     fetchStats();
-  }, [selected, language, searchQuery]); // 重新加入 searchQuery，確保側邊欄統計與搜尋結果同步
+  }, [selected, language, searchQuery]);
 
   const filterOptions = taxonomyOptions;
 
