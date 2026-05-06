@@ -55,34 +55,53 @@ export default function HomeHero() {
           transition={{ duration: 0.8 }}
           className="max-w-4xl mx-auto"
         >
-          <h1 className="flex flex-col gap-6 md:gap-8 drop-shadow-2xl">
+          <h1 className="flex flex-col gap-6 md:gap-10 drop-shadow-2xl">
             {language === 'zh' ? (
-              <div className="flex flex-col items-center gap-4">
-                <div className="flex flex-col md:flex-row items-center gap-x-6 gap-y-2">
-                  <span className="text-2xl md:text-3xl font-light tracking-[0.3em] text-emerald-100/70 uppercase">走入</span>
-                  <span className="text-6xl md:text-8xl lg:text-[7rem] font-black tracking-tighter text-white leading-none">
+              <div className="flex flex-col items-center gap-2 md:gap-4">
+                <motion.div 
+                  initial={{ opacity: 0, x: -20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ delay: 0.2, duration: 0.8 }}
+                  className="flex flex-col md:flex-row items-center gap-x-6 gap-y-1"
+                >
+                  <span className="text-xl md:text-3xl font-light tracking-[0.4em] text-emerald-100/60 uppercase">探尋</span>
+                  <span className="text-6xl md:text-8xl lg:text-[7.5rem] font-black tracking-tighter text-white leading-none">
                     山林<span className="text-emerald-400">海影</span>
                   </span>
-                </div>
-                <div className="flex flex-col md:flex-row items-center gap-x-6 gap-y-2">
-                  <span className="text-2xl md:text-3xl font-light tracking-[0.3em] text-emerald-100/70 uppercase">留下</span>
-                  <span className="text-6xl md:text-8xl lg:text-[7rem] font-black tracking-tighter text-white leading-none">
-                    共筆<span className="text-emerald-400">足跡</span>
+                </motion.div>
+                <motion.div 
+                  initial={{ opacity: 0, x: 20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ delay: 0.4, duration: 0.8 }}
+                  className="flex flex-col md:flex-row items-center gap-x-6 gap-y-1"
+                >
+                  <span className="text-xl md:text-3xl font-light tracking-[0.4em] text-emerald-100/60 uppercase">共譜</span>
+                  <span className="text-6xl md:text-8xl lg:text-[7.5rem] font-black tracking-tighter text-white leading-none">
+                    自然<span className="text-emerald-400">誌銘</span>
                   </span>
-                </div>
+                </motion.div>
               </div>
             ) : (
-              <div className="flex flex-col items-center gap-2">
-                <span className="text-7xl md:text-9xl lg:text-[8rem] font-black tracking-tighter text-white leading-[0.9]">
-                  Into the <span className="text-emerald-400">Wild</span>
-                </span>
-                <span className="text-4xl md:text-6xl lg:text-[4rem] font-medium tracking-tight text-emerald-100/80 -mt-2 md:-mt-4">
-                  onto the <span className="italic font-light">Cloud</span>
-                </span>
-                <div className="h-px w-24 bg-emerald-500/30 mt-8 mb-4" />
-                <span className="text-xs md:text-sm font-bold uppercase tracking-[0.6em] text-emerald-400/80">
-                  Documenting Nature Together
-                </span>
+              <div className="flex flex-col items-center text-center px-4">
+                <motion.span 
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.2, duration: 0.8 }}
+                  className="text-5xl md:text-8xl lg:text-[8.5rem] font-black tracking-tighter text-white leading-[0.85] mb-2"
+                >
+                  Tracing the <span className="text-emerald-400">wilds</span>
+                </motion.span>
+                <motion.div 
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.4, duration: 0.8 }}
+                  className="flex flex-col items-center"
+                >
+                  <span className="text-2xl md:text-5xl lg:text-[3.8rem] font-medium tracking-tight text-emerald-100/90 leading-tight">
+                    scripting the <span className="italic font-light text-white">life</span> of our lands.
+                  </span>
+                  <div className="h-1 w-20 md:w-32 bg-gradient-to-r from-transparent via-emerald-500/50 to-transparent mt-8 md:mt-12" />
+                </motion.div>
               </div>
             )}
           </h1>
