@@ -143,8 +143,10 @@ export async function getLatestSpecies() {
     .order('id', { ascending: false })
     .limit(3);
 
-  return [
-    ...(fauna || []).map(s => ({ ...s, type: 'fauna' })),
-    ...(flora || []).map(s => ({ ...s, type: 'flora' }))
-  ].sort((a, b) => (b.id - a.id)).slice(0, 5);
+  const combined = [
+    ...(fauna || []).map((s: any) => ({ ...s, type: 'fauna' })),
+    ...(flora || []).map((s: any) => ({ ...s, type: 'flora' }))
+  ];
+
+  return combined.sort((a, b) => (Number(b.id) - Number(a.id))).slice(0, 5);
 }
