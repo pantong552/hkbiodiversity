@@ -1,6 +1,7 @@
 'use client';
 
 import { Trophy, MessageSquare, Camera, User, Star } from 'lucide-react';
+import { motion } from 'framer-motion';
 import { LeaderboardUser } from '@/lib/home';
 import { useLanguage } from '@/context/LanguageContext';
 
