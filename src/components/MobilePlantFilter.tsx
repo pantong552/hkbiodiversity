@@ -15,6 +15,7 @@ interface MobilePlantFilterProps {
   availableFamilies: any[];
   availableGenuses: any[];
   onReset: () => void;
+  onSearchSubmit?: (val: string) => void;
 }
 
 export default function MobilePlantFilter({
@@ -25,7 +26,8 @@ export default function MobilePlantFilter({
   availableCategories,
   availableFamilies,
   availableGenuses,
-  onReset
+  onReset,
+  onSearchSubmit
 }: MobilePlantFilterProps) {
   const { language } = useLanguage();
 
@@ -82,6 +84,7 @@ export default function MobilePlantFilter({
             availableFamilies={availableFamilies}
             availableGenuses={availableGenuses}
             onReset={onReset}
+            onSearchSubmit={onSearchSubmit}
             hideTitle={true}
           />
         </div>

@@ -239,9 +239,10 @@ export default function SidebarFilter({
     };
     setSelected(reset);
     onFilterChange(reset);
+    onSearchSubmit('');
   };
 
-  const activeCount = Object.values(selected.taxonomy).flat().length + selected.iucn.length;
+  const activeCount = Object.values(selected.taxonomy).flat().length + selected.iucn.length + (searchQuery.length > 0 ? 1 : 0);
 
   return (
     <>

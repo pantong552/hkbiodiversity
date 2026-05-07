@@ -20,6 +20,7 @@ interface PlantFilterPanelProps {
   availableFamilies: Option[];
   availableGenuses: Option[];
   onReset: () => void;
+  onSearchSubmit?: (val: string) => void;
   hideTitle?: boolean;
 }
 
@@ -32,6 +33,7 @@ export default function PlantFilterPanel({
   availableFamilies,
   availableGenuses,
   onReset,
+  onSearchSubmit,
   hideTitle = false
 }: PlantFilterPanelProps) {
   const { language } = useLanguage();
@@ -51,6 +53,7 @@ export default function PlantFilterPanel({
 
   const handleSearchSubmit = (val: string) => {
     setFilters(prev => ({ ...prev, searchQuery: val }));
+    if (onSearchSubmit) onSearchSubmit(val);
   };
 
   const toggleMonth = (month: number, type: 'flowering' | 'fruiting') => {
@@ -89,7 +92,8 @@ export default function PlantFilterPanel({
                     (filters.isCap96 ? 1 : 0) + 
                     (filters.isCap586 ? 1 : 0) + 
                     (filters.isRare ? 1 : 0) + 
-                    (filters.isInChinaRedBook ? 1 : 0);
+                    (filters.isInChinaRedBook ? 1 : 0) +
+                    (filters.searchQuery.length > 0 ? 1 : 0);
 
   return (
     <div className="w-full space-y-6 animate-in fade-in slide-in-from-left-4 duration-500">

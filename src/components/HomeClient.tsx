@@ -646,7 +646,11 @@ export default function HomeClient() {
                             availableCategories={availablePlantMeta.categories}
                             availableFamilies={availablePlantMeta.families}
                             availableGenuses={availablePlantMeta.genuses}
-                            onReset={() => setPlantFilters(INITIAL_PLANT_FILTERS)}
+                            onReset={() => {
+                                setPlantFilters(INITIAL_PLANT_FILTERS);
+                                setSearchQuery('');
+                            }}
+                            onSearchSubmit={setSearchQuery}
                         />
                     </div>
                 </div>
@@ -901,7 +905,11 @@ export default function HomeClient() {
           availableCategories={availablePlantMeta.categories}
           availableFamilies={availablePlantMeta.families}
           availableGenuses={availablePlantMeta.genuses}
-          onReset={() => setPlantFilters(INITIAL_PLANT_FILTERS)}
+          onReset={() => {
+            setPlantFilters(INITIAL_PLANT_FILTERS);
+            setSearchQuery('');
+          }}
+          onSearchSubmit={setSearchQuery}
         />
       )}
     </div>
