@@ -69,7 +69,7 @@ export default function NewsSection({ latestSpecies, news }: NewsSectionProps) {
         <div className="grid lg:grid-cols-2 gap-12 lg:gap-20">
           
           {/* Announcements */}
-          <div className="flex flex-col">
+          <div className="flex flex-col min-w-0">
             <div className="flex items-center justify-between mb-8 pb-4 border-b border-slate-100">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 bg-slate-900 rounded-xl flex items-center justify-center text-white shadow-lg shadow-slate-900/10">
@@ -113,7 +113,7 @@ export default function NewsSection({ latestSpecies, news }: NewsSectionProps) {
                         {item.date}
                       </span>
                     </div>
-                    <h3 className="text-sm md:text-base font-black text-slate-800 group-hover:text-slate-900 transition-colors truncate">
+                    <h3 className={`${language === 'en' ? 'text-xs md:text-sm' : 'text-sm md:text-base'} font-black text-slate-800 group-hover:text-slate-900 transition-colors truncate`}>
                       {item.title}
                     </h3>
                   </div>
@@ -127,7 +127,7 @@ export default function NewsSection({ latestSpecies, news }: NewsSectionProps) {
           </div>
 
           {/* New Species */}
-          <div className="flex flex-col">
+          <div className="flex flex-col min-w-0">
             <div className="flex items-center justify-between mb-8 pb-4 border-b border-slate-100">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 bg-emerald-600 rounded-xl flex items-center justify-center text-white shadow-lg shadow-emerald-600/10">
@@ -173,7 +173,7 @@ export default function NewsSection({ latestSpecies, news }: NewsSectionProps) {
                     </div>
                     <div className="flex flex-col">
                       <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider leading-none mb-1">{t('home.added_species')}</span>
-                      <h3 className="text-sm md:text-base font-black text-slate-800 group-hover:text-emerald-700 transition-colors truncate">
+                      <h3 className={`${language === 'en' ? 'text-xs md:text-sm' : 'text-sm md:text-base'} font-black text-slate-800 group-hover:text-emerald-700 transition-colors truncate`}>
                         {item.title}
                       </h3>
                     </div>

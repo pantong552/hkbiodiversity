@@ -166,7 +166,7 @@ export default function Header() {
               </span>
               <motion.span
                 initial={{ letterSpacing: "0.2em" }}
-                whileHover={{ letterSpacing: "0.4em" }}
+                whileHover={{ letterSpacing: language === 'zh' ? "0.4em" : "0.3em" }}
                 className={`text-xs font-light uppercase transition-colors duration-500 ${isHeaderTransparent ? 'text-emerald-300 drop-shadow-sm' : 'text-emerald-600'}`}
               >
                 Biodiversity
@@ -189,7 +189,7 @@ export default function Header() {
         </Link>
 
         {/* Desktop Nav - Now only visible above 1100px */}
-        <div className="hidden min-[1101px]:flex items-center gap-6 xl:gap-10">
+        <div className={`hidden min-[1101px]:flex items-center ${language === 'en' ? 'gap-4 xl:gap-6' : 'gap-6 xl:gap-10'}`}>
           <div className="flex items-center gap-4 xl:gap-8">
             {navLinks.map((link) => (
               link.disabled ? (
@@ -204,7 +204,7 @@ export default function Header() {
                 <Link
                   key={link.name}
                   href={link.href}
-                  className={`text-sm font-bold transition-colors duration-500 ${isHeaderTransparent ? 'text-white drop-shadow-sm hover:text-emerald-300' : 'text-slate-500 hover:text-emerald-600'}`}
+                  className={`${language === 'en' ? 'text-xs xl:text-sm' : 'text-sm'} font-bold transition-colors duration-500 ${isHeaderTransparent ? 'text-white drop-shadow-sm hover:text-emerald-300' : 'text-slate-500 hover:text-emerald-600'}`}
                 >
                   {link.name}
                 </Link>

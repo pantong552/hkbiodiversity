@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { Search, ChevronRight, ChevronDown } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -13,6 +13,17 @@ export default function HomeHero() {
   const [searchType, setSearchType] = useState<'fauna' | 'flora'>('fauna');
   const [showTypeDropdown, setShowTypeDropdown] = useState(false);
   const [mounted, setMounted] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (showTypeDropdown && dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setShowTypeDropdown(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [showTypeDropdown]);
 
   useEffect(() => {
     setMounted(true);
@@ -115,7 +126,7 @@ export default function HomeHero() {
             <div className="relative flex items-center bg-white/95 backdrop-blur-2xl rounded-[2.5rem] p-1 md:p-1.5 shadow-2xl shadow-slate-900/20 border border-white">
               
               {/* Type Dropdown */}
-              <div className="relative shrink-0">
+              <div className="relative shrink-0" ref={dropdownRef}>
                 <button
                   type="button"
                   onClick={() => setShowTypeDropdown(!showTypeDropdown)}
