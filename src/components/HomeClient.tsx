@@ -302,7 +302,7 @@ export default function HomeClient() {
             }
 
             if (f_origins.length > 0) {
-                const expandedOrigins = f_origins.flatMap(o => 
+                const expandedOrigins = f_origins.flatMap((o: string) => 
                     o === 'Native' ? ['Native', '原生'] : o === 'Exotic' ? ['Exotic', '外來'] : [o]
                 );
                 query = query.in('origin', expandedOrigins);
