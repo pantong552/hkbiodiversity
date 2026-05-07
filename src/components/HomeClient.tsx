@@ -404,11 +404,11 @@ export default function HomeClient() {
       } : {
         p_search: currentSearch,
         p_categories: (tableFilters.category?.length > 0) ? tableFilters.category : (plantFilters.categories || []),
-        p_family: (tableFilters.family?.length > 0) ? tableFilters.family : (plantFilters.family_eng || []),
-        p_genus: (tableFilters.genus?.length > 0) ? tableFilters.genus : (plantFilters.genus_eng || []),
+        p_family: (tableFilters.family?.length > 0) ? tableFilters.family : (plantFilters.families || []),
+        p_genus: (tableFilters.genus?.length > 0) ? tableFilters.genus : (plantFilters.genuses || []),
         p_scientific_name: tableFilters.scientific_name || [],
         p_common_name: tableFilters.common_name || [],
-        p_native_status: (tableFilters.native_status?.length > 0) ? tableFilters.native_status : (plantFilters.origin || [])
+        p_native_status: (tableFilters.native_status?.length > 0) ? tableFilters.native_status : (plantFilters.origins || [])
       };
 
       try {
