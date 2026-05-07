@@ -7,8 +7,13 @@ import Header from '@/components/Header';
 import { Calendar, ArrowLeft, Megaphone, ChevronRight, Clock, ChevronDown, ChevronUp, Filter, X, ChevronLeft } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import rehypeRaw from 'rehype-raw';
+import remarkBreaks from 'remark-breaks';
+import rehypeExternalLinks from 'rehype-external-links';
 import { supabase } from '@/lib/supabase';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useAuth } from '@/context/AuthContext';
+import NewsEditor from '@/components/news/NewsEditor';
+import { Plus, Settings, Edit2 } from 'lucide-react';
 
 const ITEMS_PER_PAGE = 10;
 
@@ -31,9 +36,25 @@ function NewsContent() {
   const [filterCategory, setFilterCategory] = useState<string | null>(null);
   const [isNavOpen, setIsNavOpen] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
+  const [isEditing, setIsEditing] = useState(false);
+  const [editingNews, setEditingNews] = useState<NewsItem | null>(null);
+  const { profile } = useAuth();
+  const isAdmin = profile?.role === 'admin';
+
+  const fetchData = async () => {
+    setLoading(true);
+    const { data } = await supabase
+      .from('site_news')
+      .select('*')
+      .order('published_at', { ascending: false });
+    
+    const newsList: NewsItem[] = (data as NewsItem[]) || [];
+    setAllNews(newsList);
+    setLoading(false);
+  };
 
   useEffect(() => {
-    async function fetchData() {
+    async function initialFetch() {
       const { data } = await supabase
         .from('site_news')
         .select('*')
@@ -52,7 +73,7 @@ function NewsContent() {
       }
       setLoading(false);
     }
-    fetchData();
+    initialFetch();
   }, [searchParams]);
 
   useEffect(() => {
@@ -107,9 +128,30 @@ function NewsContent() {
   }
 
   return (
-    <div className="max-w-6xl mx-auto px-4 w-full box-border overflow-x-hidden">
+    <div className={`${isEditing ? 'max-w-7xl' : 'max-w-6xl'} mx-auto px-4 w-full box-border transition-all duration-500 overflow-x-hidden`}>
       <AnimatePresence mode="wait">
-        {selectedNews ? (
+        {isEditing ? (
+          <motion.div
+            key="editor"
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.95 }}
+            className="py-8"
+          >
+            <NewsEditor 
+              news={editingNews} 
+              onClose={() => {
+                setIsEditing(false);
+                setEditingNews(null);
+              }}
+              onSave={() => {
+                setIsEditing(false);
+                setEditingNews(null);
+                fetchData();
+              }}
+            />
+          </motion.div>
+        ) : selectedNews ? (
           <motion.div 
             key="detail"
             initial={{ opacity: 0, y: 10 }}
@@ -151,7 +193,13 @@ function NewsContent() {
             {/* Detail Content - Single Language */}
             <div className="p-6 md:p-10">
               <div className="news-content prose prose-slate max-w-none">
-                <ReactMarkdown rehypePlugins={[rehypeRaw]}>
+                <ReactMarkdown 
+                  rehypePlugins={[
+                    rehypeRaw,
+                    [rehypeExternalLinks, { target: '_blank', rel: ['noopener', 'noreferrer'] }]
+                  ]}
+                  remarkPlugins={[remarkBreaks]}
+                >
                   {(language === 'zh' ? selectedNews.content_chi : selectedNews.content_eng).replace(/\\n/g, '\n')}
                 </ReactMarkdown>
               </div>
@@ -168,6 +216,24 @@ function NewsContent() {
                   {language === 'zh' ? '網站更新與消息' : 'Latest Updates'}
                 </p>
               </div>
+
+              {/* Admin Actions */}
+              {isAdmin && (
+                <div className="p-1 bg-white rounded-3xl border border-emerald-100 shadow-sm overflow-hidden">
+                  <button 
+                    onClick={() => {
+                      setEditingNews(null);
+                      setIsEditing(true);
+                    }}
+                    className="w-full flex items-center gap-3 p-4 bg-emerald-50 text-emerald-700 hover:bg-emerald-600 hover:text-white rounded-2xl transition-all group"
+                  >
+                    <div className="w-8 h-8 bg-white/80 rounded-lg flex items-center justify-center group-hover:bg-white/20 transition-colors">
+                      <Plus className="w-5 h-5" />
+                    </div>
+                    <span className="text-sm font-black tracking-tight">{language === 'zh' ? '新增公告' : 'New Announcement'}</span>
+                  </button>
+                </div>
+              )}
 
               {/* Category Navigation - Collapsible on Mobile/Tablet */}
               <div className="bg-white rounded-3xl border border-slate-200/60 shadow-sm overflow-hidden">
@@ -241,13 +307,13 @@ function NewsContent() {
               {paginatedNews.length > 0 ? (
                 <div className="space-y-2">
                   {paginatedNews.map((item, idx) => (
-                    <motion.button
+                    <motion.div
                       key={item.id}
                       initial={{ opacity: 0, x: -10 }}
                       animate={{ opacity: 1, x: 0 }}
                       transition={{ delay: idx * 0.03 }}
                       onClick={() => setSelectedNews(item)}
-                      className="w-full flex items-center gap-3 md:gap-4 p-2.5 md:p-3.5 bg-white rounded-xl border border-slate-200/60 hover:border-emerald-500/50 hover:shadow-md hover:shadow-emerald-500/5 transition-all duration-300 group text-left relative overflow-hidden box-border"
+                      className="w-full flex items-center gap-3 md:gap-4 p-2.5 md:p-3.5 bg-white rounded-xl border border-slate-200/60 hover:border-emerald-500/50 hover:shadow-md hover:shadow-emerald-500/5 transition-all duration-300 group text-left relative overflow-hidden box-border cursor-pointer"
                     >
                       <div className="hidden md:flex flex-col items-center justify-center w-12 h-12 bg-slate-50 rounded-lg border border-slate-100 group-hover:bg-emerald-50 group-hover:border-emerald-100 transition-colors">
                         <span className="text-[9px] font-black text-slate-400 group-hover:text-emerald-400 uppercase tracking-tighter leading-none">
@@ -272,10 +338,24 @@ function NewsContent() {
                         </h3>
                       </div>
 
-                      <div className="shrink-0 w-7 h-7 rounded-full bg-slate-50 flex items-center justify-center text-slate-300 group-hover:bg-emerald-500 group-hover:text-white transition-all transform group-hover:translate-x-1">
-                        <ChevronRight className="w-4 h-4" />
+                      <div className="shrink-0 flex items-center gap-2">
+                        {isAdmin && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setEditingNews(item);
+                              setIsEditing(true);
+                            }}
+                            className="w-8 h-8 rounded-full bg-slate-50 flex items-center justify-center text-slate-400 hover:bg-amber-50 hover:text-amber-600 transition-all"
+                          >
+                            <Edit2 className="w-4 h-4" />
+                          </button>
+                        )}
+                        <div className="shrink-0 w-7 h-7 rounded-full bg-slate-50 flex items-center justify-center text-slate-300 group-hover:bg-emerald-500 group-hover:text-white transition-all transform group-hover:translate-x-1">
+                          <ChevronRight className="w-4 h-4" />
+                        </div>
                       </div>
-                    </motion.button>
+                    </motion.div>
                   ))}
                 </div>
               ) : (

@@ -5,6 +5,8 @@ import { Calendar, Tag, ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
 import ReactMarkdown from 'react-markdown';
 import rehypeRaw from 'rehype-raw';
+import remarkBreaks from 'remark-breaks';
+import rehypeExternalLinks from 'rehype-external-links';
 import { notFound } from 'next/navigation';
 
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }) {
@@ -73,7 +75,13 @@ function NewsDetailClient({ news }: { news: any }) {
                 中文內容
               </div>
               <div className="news-content">
-                <ReactMarkdown rehypePlugins={[rehypeRaw]}>
+                <ReactMarkdown 
+                  rehypePlugins={[
+                    rehypeRaw,
+                    [rehypeExternalLinks, { target: '_blank', rel: ['noopener', 'noreferrer'] }]
+                  ]}
+                  remarkPlugins={[remarkBreaks]}
+                >
                   {news.content_chi.replace(/\\n/g, '\n')}
                 </ReactMarkdown>
               </div>
@@ -85,7 +93,13 @@ function NewsDetailClient({ news }: { news: any }) {
                 English Content
               </div>
               <div className="news-content">
-                <ReactMarkdown rehypePlugins={[rehypeRaw]}>
+                <ReactMarkdown 
+                  rehypePlugins={[
+                    rehypeRaw,
+                    [rehypeExternalLinks, { target: '_blank', rel: ['noopener', 'noreferrer'] }]
+                  ]}
+                  remarkPlugins={[remarkBreaks]}
+                >
                   {news.content_eng.replace(/\\n/g, '\n')}
                 </ReactMarkdown>
               </div>
@@ -144,6 +158,21 @@ function NewsDetailClient({ news }: { news: any }) {
               border: 0;
               border-top: 1px solid #e2e8f0;
               margin: 2.5rem 0;
+            }
+            .news-content a {
+              color: #059669;
+              font-weight: 800;
+              text-decoration: underline;
+              text-decoration-color: rgba(16, 185, 129, 0.3);
+              text-decoration-thickness: 3px;
+              text-underline-offset: 3px;
+              transition: all 0.2s;
+            }
+            .news-content a:hover {
+              color: #047857;
+              text-decoration-color: #059669;
+              background-color: rgba(236, 253, 245, 0.5);
+              border-radius: 2px;
             }
           `}</style>
         </div>

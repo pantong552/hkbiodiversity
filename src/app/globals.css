@@ -125,3 +125,11 @@ body {
   -ms-overflow-style: none !important;
   scrollbar-width: none !important;
 }
+/* News Content Link Styles */
+.news-content a {
+  @apply text-emerald-600 font-bold underline decoration-emerald-500/30 decoration-[3px] underline-offset-[3px] transition-all duration-200;
+}
+
+.news-content a:hover {
+  @apply text-emerald-700 decoration-emerald-600 bg-emerald-50/50 rounded-sm -mx-0.5 px-0.5;
+}
