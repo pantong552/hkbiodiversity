@@ -16,7 +16,7 @@ interface Option {
 interface PlantFilterPanelProps {
   filters: PlantFilterState;
   setFilters: React.Dispatch<React.SetStateAction<PlantFilterState>>;
-  availableCategories: { zh: string; en: string; display: string }[];
+  availableCategories: Option[];
   availableFamilies: Option[];
   availableGenuses: Option[];
   onReset: () => void;
