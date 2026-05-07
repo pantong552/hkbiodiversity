@@ -13,21 +13,21 @@ export interface Species {
   alias_common_name_eng?: string;
   author: string;
   
-  // Taxonomy (Eng / Chi)
+  // Taxonomy (Eng / Chi) - _chi 欄位已從資料庫移除，請使用 TaxonomyContext 獲取中文名稱
   phylum_eng: string;
-  phylum_chi: string;
+  phylum_chi?: string;
   class_eng: string;
-  class_chi: string;
+  class_chi?: string;
   order_eng: string;
-  order_chi: string;
+  order_chi?: string;
   family_eng: string;
-  family_chi: string;
+  family_chi?: string;
   genus_eng: string;
-  genus_chi: string;
+  genus_chi?: string;
   species_eng: string;
   sub_species_eng?: string;
   informal_group_eng: string;
-  informal_group_chi: string;
+  informal_group_chi?: string;
 
   // Status & Conservation
   afcd?: string;

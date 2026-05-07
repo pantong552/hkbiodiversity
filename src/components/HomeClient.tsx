@@ -15,6 +15,7 @@ import { Species } from '@/types/species';
 import { PlantSpecies, PlantFilterState } from '@/types/plants';
 import { useLanguage } from '@/context/LanguageContext';
 import { supabase as supabaseSingleton } from '@/lib/supabase';
+import { useTaxonomy } from '@/context/TaxonomyContext';
 import { Loader2 } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import MobileToolbar from '@/components/search/MobileToolbar';
@@ -44,6 +45,7 @@ const INITIAL_PLANT_FILTERS: PlantFilterState = {
 
 export default function HomeClient() {
   const { language, t } = useLanguage();
+  const { getTaxonomyChi } = useTaxonomy();
   const { isLoading: isAuthLoading } = useAuth();
   const { addSpecies, openSpeciesIds, isExpanded, isFilterOpen, setIsFilterOpen, pendingTaxonomyFilter, setPendingTaxonomyFilter } = useSpeciesPanel();
   const searchParams = useSearchParams();
@@ -140,15 +142,16 @@ export default function HomeClient() {
                     if (data && !error) {
                         if (level === 'categories') {
                             newMeta.categories = (data.categories || []).map((i: any) => ({
-                                zh: i.name,
-                                en: i.en,
-                                display: language === 'zh' ? i.name : (i.en || i.name)
+                                zh: getTaxonomyChi('class', 'flora', i.en || i.name),
+                                en: i.en || i.name,
+                                display: language === 'zh' ? getTaxonomyChi('class', 'flora', i.en || i.name) : (i.en || i.name)
                             }));
                         } else {
                             const items = level === 'families' ? data.families : data.genuses;
+                            const rank = level === 'families' ? 'family' : 'genus';
                             newMeta[level] = (items || []).map((i: any) => ({
                                 name: i.name,
-                                display: language === 'zh' ? (i.name || i.en) : (i.en || i.name),
+                                display: language === 'zh' ? getTaxonomyChi(rank, 'flora', i.name) : i.name,
                                 count: i.count
                             })).sort((a: any, b: any) => b.count - a.count);
                         }
@@ -162,7 +165,7 @@ export default function HomeClient() {
         };
         fetchMeta();
     }
-  }, [taxaType, plantFilters, searchQuery, language]);
+  }, [taxaType, plantFilters, searchQuery, language, getTaxonomyChi]);
 
   // Handle Taxa Switch
   const handleTaxaChange = (type: TaxaType) => {
@@ -256,9 +259,9 @@ export default function HomeClient() {
                 const ps = plantFilters.searchQuery.trim();
                 query = query.or(`scientific_name.ilike.%${ps}%,common_name_chi.ilike.%${ps}%,common_name_eng.ilike.%${ps}%`);
             }
-            if (plantFilters.categories.length > 0) query = query.in('category_chi', plantFilters.categories);
-            if (plantFilters.families.length > 0) query = query.in('family_chi', plantFilters.families);
-            if (plantFilters.genuses.length > 0) query = query.in('genus_chi', plantFilters.genuses);
+            if (plantFilters.categories.length > 0) query = query.in('category_eng', plantFilters.categories);
+            if (plantFilters.families.length > 0) query = query.in('family_eng', plantFilters.families);
+            if (plantFilters.genuses.length > 0) query = query.in('genus_eng', plantFilters.genuses);
             if (plantFilters.origins.length > 0) {
                 const expandedOrigins = plantFilters.origins.flatMap(o => 
                     o === 'Native' ? ['Native', '原生'] : o === 'Exotic' ? ['Exotic', '外來'] : [o]
@@ -283,13 +286,13 @@ export default function HomeClient() {
             return;
           }
 
-          // Map table keys to actual DB columns
+          // Map table keys to actual DB columns - 統一使用英文欄位作為 Filter Key
           const dbKey = key === 'common_name' 
-            ? (taxaType === 'fauna' ? 'common_name_chi' : 'common_name_chi')
+            ? 'common_name_chi'
             : key === 'scientific_name' ? 'scientific_name'
-            : key === 'order' ? (taxaType === 'fauna' ? (language === 'zh' ? 'order_chi' : 'order_eng') : 'family_chi')
-            : key === 'family' ? (taxaType === 'fauna' ? (language === 'zh' ? 'family_chi' : 'family_eng') : 'family_chi')
-            : key === 'genus' ? (taxaType === 'fauna' ? 'genus_eng' : 'genus_chi')
+            : key === 'order' ? (taxaType === 'fauna' ? 'order_eng' : 'family_eng')
+            : key === 'family' ? (taxaType === 'fauna' ? 'family_eng' : 'family_eng')
+            : key === 'genus' ? (taxaType === 'fauna' ? 'genus_eng' : 'genus_eng')
             : key === 'iucn' ? (taxaType === 'fauna' ? 'iucn' : 'hk_rare_precious_note')
             : key;
 

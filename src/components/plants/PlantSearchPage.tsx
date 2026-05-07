@@ -9,6 +9,8 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Leaf, Calendar, MapPin, Loader2, Info } from 'lucide-react';
 import Image from 'next/image';
 
+import { useTaxonomy } from '@/context/TaxonomyContext';
+
 const INITIAL_FILTERS: PlantFilterState = {
   searchQuery: '',
   categories: [],
@@ -25,6 +27,7 @@ const INITIAL_FILTERS: PlantFilterState = {
 
 const PlantCard = ({ plant }: { plant: PlantSpecies }) => {
   const { language } = useLanguage();
+  const { getTaxonomyChi } = useTaxonomy();
   
   return (
     <motion.div
@@ -37,7 +40,7 @@ const PlantCard = ({ plant }: { plant: PlantSpecies }) => {
       {/* Category Tag */}
       <div className="px-6 pt-6 flex justify-between items-start gap-2">
         <span className="px-3 py-1 bg-slate-100 text-slate-500 rounded-full text-[10px] font-black uppercase tracking-widest">
-          {language === 'zh' ? plant.category_chi : plant.category_eng}
+          {language === 'zh' ? getTaxonomyChi('class', 'flora', plant.category_eng) : plant.category_eng}
         </span>
         <div className="flex gap-1">
           {plant.is_cap96 === 'Y' && (
@@ -62,7 +65,7 @@ const PlantCard = ({ plant }: { plant: PlantSpecies }) => {
         <div className="flex flex-wrap gap-y-2 gap-x-4 text-xs font-bold text-slate-500">
           <div className="flex items-center gap-1.5">
             <Leaf className="w-3.5 h-3.5 text-emerald-500" />
-            {plant.family_chi} ({plant.family_eng})
+            {language === 'zh' ? getTaxonomyChi('family', 'flora', plant.family_eng) : plant.family_eng} ({plant.family_eng})
           </div>
           <div className="flex items-center gap-1.5">
             <MapPin className="w-3.5 h-3.5 text-slate-400" />
@@ -103,6 +106,7 @@ const PlantCard = ({ plant }: { plant: PlantSpecies }) => {
 
 export default function PlantSearchPage() {
   const { language } = useLanguage();
+  const { getTaxonomyChi } = useTaxonomy();
   const supabase = createClient();
   const [plants, setPlants] = useState<PlantSpecies[]>([]);
   const [loading, setLoading] = useState(true);
@@ -114,7 +118,8 @@ export default function PlantSearchPage() {
   // Fetch unique metadata once
   useEffect(() => {
     const fetchMeta = async () => {
-      const { data } = await supabase.from('plant_species').select('category_chi, category_eng, family_chi, family_eng, genus_chi, genus_eng').not('category_chi', 'is', null);
+      // 僅選取英文名稱作為 Key，中文名稱由 TaxonomyContext 提供
+      const { data } = await supabase.from('plant_species').select('category_eng, family_eng, genus_eng').not('category_eng', 'is', null);
       if (data) {
         const uniqueKeys = new Set();
         const cats: any[] = [];
@@ -122,34 +127,34 @@ export default function PlantSearchPage() {
         const genCounts = new Map<string, { display: string; count: number }>();
 
         data.forEach((item: any) => {
-          if (item.category_chi && !uniqueKeys.has(item.category_chi)) {
-            uniqueKeys.add(item.category_chi);
+          if (item.category_eng && !uniqueKeys.has(item.category_eng)) {
+            uniqueKeys.add(item.category_eng);
             cats.push({
-              zh: item.category_chi,
+              zh: getTaxonomyChi('class', 'flora', item.category_eng), // 將 category 映射為 class 或使用自定義
               en: item.category_eng,
-              display: language === 'zh' ? item.category_chi : (item.category_eng || item.category_chi)
+              display: language === 'zh' ? getTaxonomyChi('class', 'flora', item.category_eng) : item.category_eng
             });
           }
 
-          if (item.family_chi) {
-            const fKey = item.family_chi;
+          if (item.family_eng) {
+            const fKey = item.family_eng;
             if (famCounts.has(fKey)) {
               famCounts.get(fKey)!.count += 1;
             } else {
               famCounts.set(fKey, { 
-                display: language === 'zh' ? item.family_chi : (item.family_eng || item.family_chi), 
+                display: language === 'zh' ? getTaxonomyChi('family', 'flora', item.family_eng) : item.family_eng, 
                 count: 1 
               });
             }
           }
 
-          if (item.genus_chi) {
-            const gKey = item.genus_chi;
+          if (item.genus_eng) {
+            const gKey = item.genus_eng;
             if (genCounts.has(gKey)) {
               genCounts.get(gKey)!.count += 1;
             } else {
               genCounts.set(gKey, { 
-                display: language === 'zh' ? item.genus_chi : (item.genus_eng || item.genus_chi), 
+                display: language === 'zh' ? getTaxonomyChi('genus', 'flora', item.genus_eng) : item.genus_eng, 
                 count: 1 
               });
             }
@@ -162,7 +167,7 @@ export default function PlantSearchPage() {
       }
     };
     fetchMeta();
-  }, [language]); // Removed supabase to prevent re-fetching on render
+  }, [language, getTaxonomyChi]); // 加入 getTaxonomyChi 作為依賴項
 
   useEffect(() => {
     const fetchPlants = async () => {
@@ -173,9 +178,9 @@ export default function PlantSearchPage() {
         query = query.or(`scientific_name.ilike.%${filters.searchQuery}%,common_name_chi.ilike.%${filters.searchQuery}%,common_name_eng.ilike.%${filters.searchQuery}%`);
       }
 
-      if (filters.categories.length > 0) query = query.in('category_chi', filters.categories);
-      if (filters.families.length > 0) query = query.in('family_chi', filters.families);
-      if (filters.genuses.length > 0) query = query.in('genus_chi', filters.genuses);
+      if (filters.categories.length > 0) query = query.in('category_eng', filters.categories);
+      if (filters.families.length > 0) query = query.in('family_eng', filters.families);
+      if (filters.genuses.length > 0) query = query.in('genus_eng', filters.genuses);
       if (filters.isCap96) query = query.eq('is_cap96', 'Y');
       if (filters.isCap586) query = query.eq('is_cap586', 'Y');
       if (filters.isRare) query = query.neq('hk_rare_precious_note', 'No');

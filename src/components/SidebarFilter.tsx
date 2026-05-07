@@ -2,6 +2,7 @@ import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { ChevronDown, ChevronRight, Search, Filter, X, CheckCircle2, RotateCcw } from 'lucide-react';
 import { Species, TaxonomyLevel } from '../types/species';
 import { useLanguage } from '../context/LanguageContext';
+import { useTaxonomy } from '../context/TaxonomyContext';
 import { supabase } from '@/lib/supabase';
 import QuickFilterSearch from './ui/QuickFilterSearch';
 import { getIUCNConfig, IUCN_CONFIG } from '../constants/statusStyles';
@@ -31,6 +32,7 @@ export default function SidebarFilter({
   selectedFilters
 }: SidebarFilterProps) {
   const { language, t } = useLanguage();
+  const { getTaxonomyChi } = useTaxonomy();
 
   const TAXONOMY_LABELS: Record<TaxonomyLevel, string> = {
     phylum_eng: language === 'zh' ? '門 (Phylum)' : 'Phylum',
@@ -144,11 +146,21 @@ export default function SidebarFilter({
             rawData.forEach((item: any) => {
               const name = item.name || 'Unknown';
               const count = parseInt(item.count) || 0;
-              const chiName = item.chi || name;
+              
+              // 優先從 TaxonomyContext 獲取中文名稱
+              let chiName = item.chi || name;
+              if (language === 'zh') {
+                const rank = level.replace('_eng', '') as any;
+                const mappedChi = getTaxonomyChi(rank, 'fauna', name);
+                if (mappedChi !== name) {
+                  chiName = mappedChi;
+                }
+              }
 
               const existing = uniqueItems.get(name);
               if (existing) {
                 existing.count += count;
+                // 如果目前的顯示名稱有亂碼，或者新名稱權重較高，則更新
                 const isCurrentGlitchy = existing.display.includes('\ufffd');
                 const isNewGlitchy = chiName.includes('\ufffd');
                 if ((isCurrentGlitchy && !isNewGlitchy) || (count > (existing.count - count) && !isNewGlitchy)) {
@@ -182,7 +194,7 @@ export default function SidebarFilter({
     }
 
     fetchStats();
-  }, [selected, language, searchQuery]);
+  }, [selected, language, searchQuery, getTaxonomyChi]);
 
   const filterOptions = taxonomyOptions;
 

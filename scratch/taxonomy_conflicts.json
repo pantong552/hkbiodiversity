@@ -1,0 +1,42 @@
+[
+  {
+    "type": "fauna",
+    "rank": "informal_group",
+    "eng": "Beetles",
+    "chosen": "甲蟲",
+    "options": {
+      "甲蟲": 574,
+      "甲���": 1
+    }
+  },
+  {
+    "type": "fauna",
+    "rank": "informal_group",
+    "eng": "Blues",
+    "chosen": "灰蝶",
+    "options": {
+      "灰蝶": 65,
+      "��蝶": 1
+    }
+  },
+  {
+    "type": "fauna",
+    "rank": "informal_group",
+    "eng": "Marine Snails",
+    "chosen": "海螺",
+    "options": {
+      "海螺": 74,
+      "���螺": 1
+    }
+  },
+  {
+    "type": "flora",
+    "rank": "genus",
+    "eng": "Cyrtanthus",
+    "chosen": "曲管花屬",
+    "options": {
+      "曲管花屬": 1,
+      "曲管花属": 1
+    }
+  }
+]

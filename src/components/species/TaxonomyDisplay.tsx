@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import { useSpeciesPanel } from '@/context/SpeciesPanelContext';
 import { formatScientificName } from '@/utils/formatters';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useTaxonomy } from '@/context/TaxonomyContext';
 
 interface TaxonomyDisplayProps {
   species: Species;
@@ -20,6 +21,7 @@ interface FullTaxonomyData {
 
 export default function TaxonomyDisplay({ species }: TaxonomyDisplayProps) {
   const { language } = useLanguage();
+  const { getTaxonomyChi } = useTaxonomy();
   const router = useRouter();
   const { toggleExpand, setPendingTaxonomyFilter } = useSpeciesPanel();
   
@@ -30,6 +32,7 @@ export default function TaxonomyDisplay({ species }: TaxonomyDisplayProps) {
 
   // 判斷是否為植物 - 使用更明確的類群標記
   const isPlant = species.taxa_group === 'FLORA' || (!species.phylum_eng && !!(species as any).family_chi);
+  const taxaType = isPlant ? 'flora' : 'fauna';
 
   const levels = isPlant ? [
     { 
@@ -38,11 +41,11 @@ export default function TaxonomyDisplay({ species }: TaxonomyDisplayProps) {
     },
     { 
       id: 'families', labelChi: '科', labelEng: 'Family',
-      chi: (species as any).family_chi, eng: (species as any).family_eng 
+      chi: getTaxonomyChi('family', taxaType, (species as any).family_eng), eng: (species as any).family_eng 
     },
     { 
       id: 'genuses', labelChi: '屬', labelEng: 'Genus',
-      chi: (species as any).genus_chi, eng: (species as any).genus_eng,
+      chi: getTaxonomyChi('genus', taxaType, (species as any).genus_eng), eng: (species as any).genus_eng,
       isScientific: true
     },
     { 
@@ -54,23 +57,23 @@ export default function TaxonomyDisplay({ species }: TaxonomyDisplayProps) {
   ] : [
     { 
       id: 'phylum_eng', labelChi: '門', labelEng: 'Phylum',
-      chi: species.phylum_chi, eng: species.phylum_eng 
+      chi: getTaxonomyChi('phylum', taxaType, species.phylum_eng), eng: species.phylum_eng 
     },
     { 
       id: 'class_eng', labelChi: '綱', labelEng: 'Class',
-      chi: species.class_chi, eng: species.class_eng 
+      chi: getTaxonomyChi('class', taxaType, species.class_eng), eng: species.class_eng 
     },
     { 
       id: 'order_eng', labelChi: '目', labelEng: 'Order',
-      chi: species.order_chi, eng: species.order_eng 
+      chi: getTaxonomyChi('order', taxaType, species.order_eng), eng: species.order_eng 
     },
     { 
       id: 'family_eng', labelChi: '科', labelEng: 'Family',
-      chi: species.family_chi, eng: species.family_eng 
+      chi: getTaxonomyChi('family', taxaType, species.family_eng), eng: species.family_eng 
     },
     { 
       id: 'genus_eng', labelChi: '屬', labelEng: 'Genus',
-      chi: species.genus_chi, eng: species.genus_eng,
+      chi: getTaxonomyChi('genus', taxaType, species.genus_eng), eng: species.genus_eng,
       isScientific: true
     },
     { 

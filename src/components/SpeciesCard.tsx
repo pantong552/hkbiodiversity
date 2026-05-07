@@ -13,6 +13,7 @@ import { getIUCNConfig } from '../constants/statusStyles';
 import { supabase as supabaseSingleton } from '@/lib/supabase';
 import { createPortal } from 'react-dom';
 import { formatScientificName, formatNativeStatus, getSpeciesImageUrl } from '../utils/formatters';
+import { useTaxonomy } from '@/context/TaxonomyContext';
 
 interface SpeciesCardProps {
   species: any; // Species | PlantSpecies
@@ -30,6 +31,7 @@ export default function SpeciesCard({
   onTaxonomyClick
 }: SpeciesCardProps) {
   const { language } = useLanguage();
+  const { getTaxonomyChi } = useTaxonomy();
   const { addSpecies, profilePictureMap } = useSpeciesPanel();
   const { user } = useAuth();
   
@@ -41,6 +43,8 @@ export default function SpeciesCard({
 
   // Normalize data for consistent rendering
   const normalized = useMemo(() => {
+    const taxaType = isPlant ? 'flora' : 'fauna';
+    
     if (isPlant) {
       const p = species as PlantSpecies;
       return {
@@ -51,8 +55,12 @@ export default function SpeciesCard({
         scientific_name: p.scientific_name,
         author: p.author,
         taxa_group: p.category_chi ? { label: p.category_chi, value: p.category_chi, level: 'categories' } : null,
-        order: null, // Plants don't typically display order in this UI
-        family: p.family_chi ? { label: p.family_chi, value: p.family_chi, level: 'families' } : null,
+        order: null, 
+        family: p.family_eng ? { 
+          label: language === 'zh' ? getTaxonomyChi('family', taxaType, p.family_eng) : p.family_eng, 
+          value: p.family_eng, 
+          level: 'families' 
+        } : null,
         iucn: null, 
         origin: p.origin,
         months: p.flowering_months?.length > 0 ? p.flowering_months : p.fruiting_months
@@ -72,14 +80,14 @@ export default function SpeciesCard({
           value: s.informal_group_eng || s.informal_group_chi,
           level: 'informal_group_eng'
         } : null,
-        order: (s.order_eng || s.order_chi) ? { 
-          label: language === 'zh' ? (s.order_chi || s.order_eng) : (s.order_eng || s.order_chi),
-          value: s.order_eng || s.order_chi,
+        order: s.order_eng ? { 
+          label: language === 'zh' ? getTaxonomyChi('order', taxaType, s.order_eng) : s.order_eng,
+          value: s.order_eng,
           level: 'order_eng'
         } : null,
-        family: (s.family_eng || s.family_chi) ? { 
-          label: language === 'zh' ? (s.family_chi || s.family_eng) : (s.family_eng || s.family_chi),
-          value: s.family_eng || s.family_chi,
+        family: s.family_eng ? { 
+          label: language === 'zh' ? getTaxonomyChi('family', taxaType, s.family_eng) : s.family_eng,
+          value: s.family_eng,
           level: 'family_eng'
         } : null,
         iucn: s.iucn,
@@ -87,7 +95,7 @@ export default function SpeciesCard({
         months: null
       };
     }
-  }, [species, isPlant, language]);
+  }, [species, isPlant, language, getTaxonomyChi]);
 
   useEffect(() => {
     setMounted(true);

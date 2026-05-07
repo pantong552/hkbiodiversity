@@ -15,7 +15,7 @@ import { useRef } from 'react';
 import SpeciesMap from './SpeciesMap';
 import { formatScientificName } from '@/utils/formatters';
 import CongenericExplorer from './CongenericExplorer';
-
+import { useTaxonomy } from '@/context/TaxonomyContext';
 
 interface SpeciesContentProps {
   species: Species;
@@ -162,6 +162,7 @@ const SpeciesHeroBackground = ({ photos, defaultImage, isLoading }: { photos: In
 
 export default function SpeciesContent({ species, showBreadcrumb = true }: SpeciesContentProps) {
   const { language } = useLanguage();
+  const { getTaxonomyChi } = useTaxonomy();
   const { photos, isLoading } = useInaturalistSpeciesPhotos(species.inat_id);
   const [currentProfilePic, setCurrentProfilePic] = React.useState(species.profile_picture);
 
@@ -169,6 +170,9 @@ export default function SpeciesContent({ species, showBreadcrumb = true }: Speci
   React.useEffect(() => {
     setCurrentProfilePic(species.profile_picture);
   }, [species.taxa_id, species.profile_picture]);
+
+  const isPlant = species.taxa_group === 'FLORA' || (!species.phylum_eng && !!(species as any).family_chi);
+  const taxaType = isPlant ? 'flora' : 'fauna';
 
   const commonName = language === 'zh' ? species.common_name_chi : species.common_name_eng;
   const description = language === 'zh' ? species.description_chi : species.description_eng;
@@ -185,13 +189,23 @@ export default function SpeciesContent({ species, showBreadcrumb = true }: Speci
       {showBreadcrumb && (
         <div className="bg-white/60 backdrop-blur-sm border-b border-slate-100 px-8 py-3">
           <div className="max-w-7xl mx-auto flex items-center gap-2 text-[10px] font-bold text-slate-400 uppercase tracking-widest">
-            <span>{language === 'zh' ? species.phylum_chi : species.phylum_eng}</span>
-            <span>/</span>
-            <span>{language === 'zh' ? species.class_chi : species.class_eng}</span>
-            <span>/</span>
-            <span>{language === 'zh' ? species.order_chi : species.order_eng}</span>
-            <span>/</span>
-            <span className="text-emerald-600">{language === 'zh' ? species.family_chi : species.family_eng}</span>
+            {isPlant ? (
+              <>
+                <span className="text-emerald-600">{language === 'zh' ? getTaxonomyChi('family', taxaType, (species as any).family_eng) : (species as any).family_eng}</span>
+                <span>/</span>
+                <span>{language === 'zh' ? getTaxonomyChi('genus', taxaType, (species as any).genus_eng) : (species as any).genus_eng}</span>
+              </>
+            ) : (
+              <>
+                <span>{language === 'zh' ? getTaxonomyChi('phylum', taxaType, species.phylum_eng) : species.phylum_eng}</span>
+                <span>/</span>
+                <span>{language === 'zh' ? getTaxonomyChi('class', taxaType, species.class_eng) : species.class_eng}</span>
+                <span>/</span>
+                <span>{language === 'zh' ? getTaxonomyChi('order', taxaType, species.order_eng) : species.order_eng}</span>
+                <span>/</span>
+                <span className="text-emerald-600">{language === 'zh' ? getTaxonomyChi('family', taxaType, species.family_eng) : species.family_eng}</span>
+              </>
+            )}
           </div>
         </div>
       )}

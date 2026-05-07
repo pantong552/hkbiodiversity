@@ -10,6 +10,7 @@ import { getIUCNConfig } from '@/constants/statusStyles';
 import MultiSelectDropdown from '@/components/ui/MultiSelectDropdown';
 import { formatScientificName, formatNativeStatus } from '@/utils/formatters';
 import { TaxaType } from '@/components/search/TaxaGroupSwitcher';
+import { useTaxonomy } from '@/context/TaxonomyContext';
 
 interface SpeciesTableProps {
   taxaType: TaxaType;
@@ -33,6 +34,7 @@ export default function SpeciesTable({
   onSort 
 }: SpeciesTableProps) {
   const { language, t } = useLanguage();
+  const { getTaxonomyChi } = useTaxonomy();
   const { addSpecies } = useSpeciesPanel();
   const [isChanging, setIsChanging] = useState(false);
   const isPlant = taxaType === 'flora';
@@ -179,6 +181,7 @@ export default function SpeciesTable({
               const floraItem = item as PlantSpecies;
               const itemIUCN = !isPlant ? (faunaItem.iucn || 'NE') : null;
               const iucnConfig = !isPlant ? getIUCNConfig(itemIUCN!) : null;
+              const taxaTypeVal = isPlant ? 'flora' : 'fauna';
               
               return (
                 <tr 
@@ -190,7 +193,7 @@ export default function SpeciesTable({
                   {!isPlant && (
                     <td className="px-3 py-2.5 md:px-6 md:py-4 hidden md:table-cell w-[120px]">
                       <span className="text-[12px] md:text-[13px] font-bold text-slate-600 line-clamp-1">
-                        {language === 'zh' ? faunaItem.order_chi : faunaItem.order_eng}
+                        {language === 'zh' ? getTaxonomyChi('order', taxaTypeVal, faunaItem.order_eng) : faunaItem.order_eng}
                       </span>
                     </td>
                   )}
@@ -198,7 +201,9 @@ export default function SpeciesTable({
                   {/* Family (Both) */}
                   <td className="px-3 py-2.5 md:px-6 md:py-4 hidden md:table-cell w-[120px]">
                     <span className="text-[12px] md:text-[13px] font-medium text-slate-500 line-clamp-1">
-                      {language === 'zh' ? (faunaItem.family_chi || floraItem.family_chi) : (faunaItem.family_eng || floraItem.family_eng)}
+                      {language === 'zh' 
+                        ? getTaxonomyChi('family', taxaTypeVal, faunaItem.family_eng || floraItem.family_eng) 
+                        : (faunaItem.family_eng || floraItem.family_eng)}
                     </span>
                   </td>
 
@@ -206,7 +211,7 @@ export default function SpeciesTable({
                   {isPlant && (
                     <td className="px-3 py-2.5 md:px-6 md:py-4 hidden md:table-cell w-[120px]">
                       <span className="text-[12px] md:text-[13px] font-medium text-slate-400 line-clamp-1">
-                        {language === 'zh' ? floraItem.genus_chi : floraItem.genus_eng}
+                        {language === 'zh' ? getTaxonomyChi('genus', taxaTypeVal, floraItem.genus_eng) : floraItem.genus_eng}
                       </span>
                     </td>
                   )}

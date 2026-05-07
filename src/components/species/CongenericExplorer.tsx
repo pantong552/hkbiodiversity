@@ -172,9 +172,7 @@ export default function CongenericExplorer({ species, isMobile = false }: Congen
               common_name_chi: p.common_name_chi,
               common_name_eng: p.common_name_eng,
               taxa_group: 'FLORA',
-              family_chi: p.family_chi,
               family_eng: p.family_eng,
-              genus_chi: p.genus_chi,
               genus_eng: p.genus_eng,
             })) : data;
 

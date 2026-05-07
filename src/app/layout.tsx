@@ -52,6 +52,7 @@ export const metadata: Metadata = {
 import { LanguageProvider } from '@/context/LanguageContext';
 import { SpeciesPanelProvider } from '@/context/SpeciesPanelContext';
 import { AuthProvider } from '@/context/AuthContext';
+import { TaxonomyProvider } from '@/context/TaxonomyContext';
 import SpeciesFloatingPanel from '@/components/species/SpeciesFloatingPanel';
 import AccountModule from '@/components/profile/AccountModule';
 
@@ -65,11 +66,13 @@ export default function RootLayout({
       <body className={`${workSans.variable} ${outfit.variable} font-sans antialiased text-cyan-900`}>
         <AuthProvider>
           <LanguageProvider>
-            <SpeciesPanelProvider>
-              {children}
-              <SpeciesFloatingPanel />
-              <AccountModule />
-            </SpeciesPanelProvider>
+            <TaxonomyProvider>
+              <SpeciesPanelProvider>
+                {children}
+                <SpeciesFloatingPanel />
+                <AccountModule />
+              </SpeciesPanelProvider>
+            </TaxonomyProvider>
           </LanguageProvider>
         </AuthProvider>
       </body>

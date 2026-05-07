@@ -35,12 +35,12 @@ BEGIN
       )
   )
   SELECT json_build_object(
-    'phylum_eng', (SELECT json_agg(t) FROM (SELECT phylum_eng as name, phylum_chi as chi, count(*) FROM filtered_species GROUP BY phylum_eng, phylum_chi) t),
-    'class_eng', (SELECT json_agg(t) FROM (SELECT class_eng as name, class_chi as chi, count(*) FROM filtered_species GROUP BY class_eng, class_chi) t),
-    'order_eng', (SELECT json_agg(t) FROM (SELECT order_eng as name, order_chi as chi, count(*) FROM filtered_species GROUP BY order_eng, order_chi) t),
-    'family_eng', (SELECT json_agg(t) FROM (SELECT family_eng as name, family_chi as chi, count(*) FROM filtered_species GROUP BY family_eng, family_chi) t),
-    'genus_eng', (SELECT json_agg(t) FROM (SELECT genus_eng as name, genus_chi as chi, count(*) FROM filtered_species GROUP BY genus_eng, genus_chi) t),
-    'informal_group_eng', (SELECT json_agg(t) FROM (SELECT informal_group_eng as name, informal_group_chi as chi, count(*) FROM filtered_species GROUP BY informal_group_eng, informal_group_chi) t),
+    'phylum_eng', (SELECT json_agg(t) FROM (SELECT phylum_eng as name, count(*) FROM filtered_species GROUP BY phylum_eng) t),
+    'class_eng', (SELECT json_agg(t) FROM (SELECT class_eng as name, count(*) FROM filtered_species GROUP BY class_eng) t),
+    'order_eng', (SELECT json_agg(t) FROM (SELECT order_eng as name, count(*) FROM filtered_species GROUP BY order_eng) t),
+    'family_eng', (SELECT json_agg(t) FROM (SELECT family_eng as name, count(*) FROM filtered_species GROUP BY family_eng) t),
+    'genus_eng', (SELECT json_agg(t) FROM (SELECT genus_eng as name, count(*) FROM filtered_species GROUP BY genus_eng) t),
+    'informal_group_eng', (SELECT json_agg(t) FROM (SELECT informal_group_eng as name, count(*) FROM filtered_species GROUP BY informal_group_eng) t),
     'iucn', (SELECT json_object_agg(iucn, count) FROM (SELECT iucn, count(*) as count FROM filtered_species GROUP BY iucn) t)
   ) INTO result;
 

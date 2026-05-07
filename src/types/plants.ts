@@ -3,11 +3,12 @@ export interface PlantSpecies {
   taxa_id?: string;
   inat_id: number;
   oid: number;
-  category_chi: string;
+  // Taxonomy (Eng / Chi) - _chi 欄位已從資料庫移除，請使用 TaxonomyContext 獲取中文名稱
+  category_chi?: string;
   category_eng: string;
-  family_chi: string;
+  family_chi?: string;
   family_eng: string;
-  genus_chi: string;
+  genus_chi?: string;
   genus_eng: string;
   scientific_name: string;
   author: string;

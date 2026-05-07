@@ -12,6 +12,7 @@ import { useShare } from '@/hooks/useShare';
 import { useInaturalistPhoto } from '@/hooks/useInaturalistPhoto';
 import { usePathname } from 'next/navigation';
 import { getSpeciesImageUrl } from '@/utils/formatters';
+import { useTaxonomy } from '@/context/TaxonomyContext';
 
 // --- Subcomponent: Species Tab Preview (Tooltip) ---
 function SpeciesTabPreview({ 
@@ -27,6 +28,7 @@ function SpeciesTabPreview({
   visible: boolean,
   xOffset?: number
 }) {
+  const { getTaxonomyChi } = useTaxonomy();
   const { imageUrl, isLoading } = useInaturalistPhoto(species?.inat_id || undefined);
   const { profilePictureMap } = useSpeciesPanel();
   const containerRef = useRef<HTMLDivElement>(null);
@@ -133,11 +135,11 @@ function SpeciesTabPreview({
                   {species.scientific_name}
                 </p>
               )}
-              {species && (
+               {species && (
                 <div className="mt-2 flex items-center gap-1.5 opacity-60">
                    <div className="w-1 h-1 rounded-full bg-slate-400" />
                    <span className="text-[8px] font-bold uppercase tracking-widest">
-                     {language === 'zh' ? species.family_chi : species.family_eng}
+                     {language === 'zh' ? getTaxonomyChi('family', species.taxa_group === 'FLORA' ? 'flora' : 'fauna', species.family_eng) : species.family_eng}
                    </span>
                 </div>
               )}
@@ -166,6 +168,7 @@ export default function SpeciesFloatingPanel() {
   } = useSpeciesPanel();
   
   const { language, t } = useLanguage();
+  const { getTaxonomyChi } = useTaxonomy();
   const pathname = usePathname();
   const [speciesData, setSpeciesData] = useState<Record<string, Species>>({});
   const [isLoading, setIsLoading] = useState<Record<string, boolean>>({});
@@ -362,15 +365,10 @@ export default function SpeciesFloatingPanel() {
                     common_name_chi: plantData.common_name_chi,
                     common_name_eng: plantData.common_name_eng,
                     taxa_group: 'FLORA', 
-                    family_chi: plantData.family_chi,
                     family_eng: plantData.family_eng,
-                    genus_chi: plantData.genus_chi,
                     genus_eng: plantData.genus_eng,
-                    phylum_chi: '維管植物', 
                     phylum_eng: 'Tracheophyta',
-                    class_chi: plantData.category_chi,
                     class_eng: plantData.category_eng,
-                    order_chi: plantData.family_chi, 
                     order_eng: plantData.family_eng,
                     description_chi: plantData.description_chi,
                     description_eng: plantData.description_eng,
