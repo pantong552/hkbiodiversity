@@ -155,11 +155,20 @@ export default function SpeciesTable({
                       <MultiSelectDropdown
                         label={col.label}
                         options={(metadata[col.key] || []).map(item => {
-                          const isEnMode = language === 'en';
-                          const isLocalizable = col.key === 'common_name' || col.key === 'family' || col.key === 'order' || col.key === 'genus';
+                          const isZh = language === 'zh';
+                          const isLocalizable = col.key === 'family' || col.key === 'order' || col.key === 'genus';
+                          
+                          let display = item.display || item.name;
+                          if (isZh && isLocalizable) {
+                            const mapped = getTaxonomyChi(col.key, taxaType === 'flora' ? 'flora' : 'fauna', item.en || item.name);
+                            if (mapped) display = mapped;
+                          } else if (language === 'en' && item.en) {
+                            display = item.en;
+                          }
+
                           return {
                             ...item,
-                            display: (isEnMode && isLocalizable && item.en) ? item.en : item.display
+                            display
                           };
                         })}
                         selectedValues={filters[col.key] || []}

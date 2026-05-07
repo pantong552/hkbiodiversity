@@ -112,10 +112,12 @@ export default function MultiSelectDropdown({
   }, [isOpen, isMobileView]);
 
   const filteredOptions = useMemo(() => {
-    return options.filter(opt => 
-      opt.display.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      opt.name.toLowerCase().includes(searchTerm.toLowerCase())
-    );
+    const search = searchTerm.toLowerCase();
+    return options.filter(opt => {
+      const display = (opt.display || '').toLowerCase();
+      const name = (opt.name || '').toLowerCase();
+      return display.includes(search) || name.includes(search);
+    });
   }, [options, searchTerm]);
 
   const handleApply = () => {

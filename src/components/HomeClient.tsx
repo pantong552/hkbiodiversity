@@ -242,16 +242,40 @@ export default function HomeClient() {
         }
 
         if (taxaType === 'fauna') {
-            // Taxonomy Filters (Phylum, Class, Order, Family, Genus)
-            Object.entries(selectedFilters.taxonomy).forEach(([level, values]) => {
+            // 合併側邊欄與表格過濾器
+            const finalTaxonomy = {
+                phylum_eng: (tableFilters.phylum?.length > 0) ? tableFilters.phylum : selectedFilters.taxonomy.phylum_eng,
+                class_eng: (tableFilters.class?.length > 0) ? tableFilters.class : selectedFilters.taxonomy.class_eng,
+                order_eng: (tableFilters.order?.length > 0) ? tableFilters.order : selectedFilters.taxonomy.order_eng,
+                family_eng: (tableFilters.family?.length > 0) ? tableFilters.family : selectedFilters.taxonomy.family_eng,
+                genus_eng: (tableFilters.genus?.length > 0) ? tableFilters.genus : selectedFilters.taxonomy.genus_eng,
+                informal_group_eng: (tableFilters.informal_group?.length > 0) ? tableFilters.informal_group : selectedFilters.taxonomy.informal_group_eng
+            };
+
+            Object.entries(finalTaxonomy).forEach(([level, values]) => {
                 if (values && values.length > 0) {
                     query = query.in(level, values);
                 }
             });
 
             // IUCN Filters
-            if (selectedFilters.iucn && selectedFilters.iucn.length > 0) {
-                query = query.in('iucn', selectedFilters.iucn);
+            const finalIucn = (tableFilters.iucn?.length > 0) ? tableFilters.iucn : selectedFilters.iucn;
+            if (finalIucn && finalIucn.length > 0) {
+                query = query.in('iucn', finalIucn);
+            }
+            
+            // Native Status
+            const finalNative = (tableFilters.native_status?.length > 0) ? tableFilters.native_status : ((selectedFilters as any).status?.native_status || []);
+            if (finalNative && finalNative.length > 0) {
+                query = query.in('native_status', finalNative);
+            }
+
+            // Scientific & Common Name Table Filters
+            if (tableFilters.scientific_name?.length > 0) {
+                query = query.in('scientific_name', tableFilters.scientific_name);
+            }
+            if (tableFilters.common_name?.length > 0) {
+                query = query.in('common_name_chi', tableFilters.common_name);
             }
         } else {
             // Flora Filters
@@ -259,15 +283,31 @@ export default function HomeClient() {
                 const ps = plantFilters.searchQuery.trim();
                 query = query.or(`scientific_name.ilike.%${ps}%,common_name_chi.ilike.%${ps}%,common_name_eng.ilike.%${ps}%`);
             }
-            if (plantFilters.categories.length > 0) query = query.in('category_eng', plantFilters.categories);
-            if (plantFilters.families.length > 0) query = query.in('family_eng', plantFilters.families);
-            if (plantFilters.genuses.length > 0) query = query.in('genus_eng', plantFilters.genuses);
-            if (plantFilters.origins.length > 0) {
-                const expandedOrigins = plantFilters.origins.flatMap(o => 
+            
+            const f_categories = (tableFilters.category?.length > 0) ? tableFilters.category : plantFilters.categories;
+            const f_families = (tableFilters.family?.length > 0) ? tableFilters.family : plantFilters.families;
+            const f_genuses = (tableFilters.genus?.length > 0) ? tableFilters.genus : plantFilters.genuses;
+            const f_origins = (tableFilters.native_status?.length > 0) ? tableFilters.native_status : plantFilters.origins;
+
+            if (f_categories.length > 0) query = query.in('category_eng', f_categories);
+            if (f_families.length > 0) query = query.in('family_eng', f_families);
+            if (f_genuses.length > 0) query = query.in('genus_eng', f_genuses);
+            
+            // Scientific & Common Name Table Filters
+            if (tableFilters.scientific_name?.length > 0) {
+                query = query.in('scientific_name', tableFilters.scientific_name);
+            }
+            if (tableFilters.common_name?.length > 0) {
+                query = query.in('common_name_chi', tableFilters.common_name);
+            }
+
+            if (f_origins.length > 0) {
+                const expandedOrigins = f_origins.flatMap(o => 
                     o === 'Native' ? ['Native', '原生'] : o === 'Exotic' ? ['Exotic', '外來'] : [o]
                 );
                 query = query.in('origin', expandedOrigins);
             }
+            
             if (plantFilters.isCap96) query = query.eq('is_cap96', 'Y');
             if (plantFilters.isCap586) query = query.eq('is_cap586', 'Y');
             if (plantFilters.floweringMonths.length > 0) query = query.overlaps('flowering_months', plantFilters.floweringMonths);
@@ -353,11 +393,22 @@ export default function HomeClient() {
       
       const params = taxaType === 'fauna' ? {
         p_search: currentSearch,
-        p_phylum: selectedFilters.taxonomy.phylum_eng,
-        p_class: selectedFilters.taxonomy.class_eng
+        p_phylum: (tableFilters.phylum?.length > 0) ? tableFilters.phylum : (selectedFilters.taxonomy?.phylum_eng || []),
+        p_class: (tableFilters.class?.length > 0) ? tableFilters.class : (selectedFilters.taxonomy?.class_eng || []),
+        p_order: (tableFilters.order?.length > 0) ? tableFilters.order : (selectedFilters.taxonomy?.order_eng || []),
+        p_family: (tableFilters.family?.length > 0) ? tableFilters.family : (selectedFilters.taxonomy?.family_eng || []),
+        p_scientific_name: tableFilters.scientific_name || [],
+        p_common_name: tableFilters.common_name || [],
+        p_iucn: (tableFilters.iucn?.length > 0) ? tableFilters.iucn : (selectedFilters.iucn || []),
+        p_native_status: (tableFilters.native_status?.length > 0) ? tableFilters.native_status : ((selectedFilters as any).status?.native_status || [])
       } : {
         p_search: currentSearch,
-        p_categories: plantFilters.categories
+        p_categories: (tableFilters.category?.length > 0) ? tableFilters.category : (plantFilters.categories || []),
+        p_family: (tableFilters.family?.length > 0) ? tableFilters.family : (plantFilters.family_eng || []),
+        p_genus: (tableFilters.genus?.length > 0) ? tableFilters.genus : (plantFilters.genus_eng || []),
+        p_scientific_name: tableFilters.scientific_name || [],
+        p_common_name: tableFilters.common_name || [],
+        p_native_status: (tableFilters.native_status?.length > 0) ? tableFilters.native_status : (plantFilters.origin || [])
       };
 
       try {
@@ -385,7 +436,7 @@ export default function HomeClient() {
     };
 
     fetchTableMetadata();
-  }, [taxaType, searchQuery, selectedFilters, plantFilters, isAuthLoading]);
+  }, [taxaType, searchQuery, selectedFilters, plantFilters, tableFilters, isAuthLoading]);
   // Handle Sort Change
   const handleSort = (field: string) => {
     if (sortBy === field) {
