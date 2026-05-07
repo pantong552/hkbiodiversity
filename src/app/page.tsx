@@ -5,7 +5,7 @@ import SpeciesStats from '@/components/home/SpeciesStats';
 import NewsSection from '@/components/home/NewsSection';
 import Leaderboard from '@/components/home/Leaderboard';
 import LatestComments from '@/components/home/LatestComments';
-import { getHomeStats, getLeaderboard, getLatestComments, getLatestSpecies } from '@/lib/home';
+import { getHomeStats, getLeaderboard, getLatestComments, getLatestSpecies, getLatestNews } from '@/lib/home';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 3600; // 每小時重新驗證一次
@@ -31,11 +31,12 @@ export const metadata: Metadata = {
 
 export default async function HomePage() {
   // 並行獲取所有數據
-  const [stats, leaderboard, comments, latestSpecies] = await Promise.all([
+  const [stats, leaderboard, comments, latestSpecies, news] = await Promise.all([
     getHomeStats(),
     getLeaderboard(),
     getLatestComments(),
-    getLatestSpecies()
+    getLatestSpecies(),
+    getLatestNews()
   ]);
 
   return (
@@ -49,7 +50,7 @@ export default async function HomePage() {
       <SpeciesStats stats={stats} />
 
       {/* 3. News & New Species Section */}
-      <NewsSection latestSpecies={latestSpecies} />
+      <NewsSection latestSpecies={latestSpecies} news={news} />
 
       {/* 4. Leaderboard & Latest Comments Section */}
       <section className="py-24 bg-white">

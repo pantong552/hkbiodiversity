@@ -16,30 +16,26 @@ interface NewsItem {
 
 interface NewsSectionProps {
   latestSpecies: any[];
+  news: any[];
 }
 
-export default function NewsSection({ latestSpecies }: NewsSectionProps) {
+export default function NewsSection({ latestSpecies, news }: NewsSectionProps) {
   const { language, t } = useLanguage();
 
-  // Mock Announcements
-  const announcements: NewsItem[] = [
-    {
-      id: 1,
-      title: language === 'zh' ? 'HKBC 網站 2.0 正式上線，全面優化搜尋體驗與社群功能' : 'HKBC 2.0 Launched: Enhanced search and community features',
-      date: '2026-05-06',
-      type: 'announcement',
-      link: '#',
-      category: language === 'zh' ? '系統更新' : 'System'
-    },
-    {
-      id: 2,
-      title: language === 'zh' ? '徵求生態攝影貢獻者：加入我們的圖庫擴展計畫' : 'Call for Contributors: Join our biodiversity photo expansion project',
-      date: '2026-04-20',
-      type: 'announcement',
-      link: '#',
-      category: language === 'zh' ? '社群消息' : 'Community'
-    }
-  ];
+  const announcements: NewsItem[] = news.map(n => ({
+    id: n.id,
+    title: language === 'zh' ? n.title_chi : n.title_eng,
+    date: new Date(n.published_at).toISOString().split('T')[0],
+    type: 'announcement',
+    link: `/news?id=${n.id}`,
+    category: language === 'zh' ? (
+      n.category === 'System' ? '系統維護' :
+      n.category === 'Community' ? '社群消息' :
+      n.category === 'Taxonomy' ? '物種更新' :
+      n.category === 'Notice' ? '公告' :
+      n.category === 'Sales' ? '商品消息' : n.category
+    ) : n.category
+  }));
 
   const speciesNews: NewsItem[] = latestSpecies.map(s => ({
     id: s.taxa_id,
@@ -64,9 +60,12 @@ export default function NewsSection({ latestSpecies }: NewsSectionProps) {
                 </div>
                 <h2 className="text-3xl font-black text-slate-900 tracking-tight">{t('home.news_announcement')}</h2>
               </div>
-              <button className="text-sm font-bold text-slate-400 hover:text-blue-600 transition-colors flex items-center gap-1 group">
+              <Link 
+                href="/news"
+                className="text-sm font-bold text-slate-400 hover:text-blue-600 transition-colors flex items-center gap-1 group"
+              >
                 {t('home.view_more')} <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
-              </button>
+              </Link>
             </div>
 
             <div className="space-y-4">

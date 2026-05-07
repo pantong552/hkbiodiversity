@@ -150,3 +150,58 @@ export async function getLatestSpecies() {
 
   return combined.sort((a, b) => (Number(b.id) - Number(a.id))).slice(0, 5);
 }
+
+/**
+ * 獲取最新公告
+ */
+export async function getLatestNews() {
+  const { data } = await supabase
+    .from('site_news')
+    .select('*')
+    .order('published_at', { ascending: false })
+    .limit(5);
+
+  return data || [];
+}
+
+/**
+ * 獲取所有公告
+ */
+export async function getAllNews() {
+  const { data } = await supabase
+    .from('site_news')
+    .select('*')
+    .order('published_at', { ascending: false });
+
+  return data || [];
+}
+
+/**
+ * 根據 ID 獲取公告詳情
+ */
+export async function getNewsById(id: string) {
+  // 檢查是否為有效的 UUID 格式 (8-4-4-4-12)
+  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+  if (!uuidRegex.test(id)) {
+    console.warn(`Invalid UUID format for news id: ${id}`);
+    return null;
+  }
+
+  const { data, error } = await supabase
+    .from('site_news')
+    .select('*')
+    .eq('id', id)
+    .single();
+
+  if (error) {
+    // 如果是 406 (Not Acceptable) 或 PGRST116 (No rows found)，這是正常的 "未找到"
+    if (error.code === 'PGRST116') {
+      return null;
+    }
+    console.error('Supabase error in getNewsById:', error.message, error.details, error.hint);
+    return null;
+  }
+
+  return data;
+}
+
