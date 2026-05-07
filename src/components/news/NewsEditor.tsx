@@ -22,10 +22,17 @@ import { marked } from 'marked';
 import TurndownService from 'turndown';
 import { useRef } from 'react';
 
-const ReactQuill = dynamic(() => import('react-quill-new'), { 
-  ssr: false,
-  loading: () => <div className="w-full h-full bg-slate-50 animate-pulse" />
-});
+const ReactQuill = dynamic(
+  async () => {
+    const { default: RQ } = await import('react-quill-new');
+    // eslint-disable-next-line react/display-name
+    return ({ forwardedRef, ...props }: any) => <RQ ref={forwardedRef} {...props} />;
+  },
+  { 
+    ssr: false,
+    loading: () => <div className="w-full h-full bg-slate-50 animate-pulse" />
+  }
+);
 
 const turndownService = new TurndownService({
   headingStyle: 'atx',
@@ -501,7 +508,7 @@ export default function NewsEditor({ news, onClose, onSave }: NewsEditorProps) {
           {/* Content Area */}
           <div className="flex-1 relative bg-white overflow-hidden flex flex-col quill-editor-wrapper">
             <ReactQuill
-              ref={activeTab === 'chi' ? quillRefChi : quillRefEng}
+              forwardedRef={activeTab === 'chi' ? quillRefChi : quillRefEng}
               value={activeTab === 'chi' ? formData.content_chi : formData.content_eng}
               onChange={handleQuillChange}
               placeholder={activeTab === 'chi' ? '開始輸入中文公告內容...' : 'Start typing English content...'}
