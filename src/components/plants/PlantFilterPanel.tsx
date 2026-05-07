@@ -130,7 +130,7 @@ export default function PlantFilterPanel({
         {expanded.category && (
           <MultiSelectDropdown 
             label={t.category}
-            options={availableCategories.map(cat => ({ name: cat.zh, display: cat.display }))}
+            options={availableCategories.map(cat => ({ name: cat.name, display: cat.display }))}
             selectedValues={filters.categories}
             onChange={(values) => setFilters(prev => ({ ...prev, categories: values }))}
             placeholder={t.category}

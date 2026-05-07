@@ -142,16 +142,20 @@ export default function HomeClient() {
                     if (data && !error) {
                         if (level === 'categories') {
                             newMeta.categories = (data.categories || []).map((i: any) => ({
-                                zh: getTaxonomyChi('class', 'flora', i.en || i.name),
-                                en: i.en || i.name,
-                                display: language === 'zh' ? getTaxonomyChi('class', 'flora', i.en || i.name) : (i.en || i.name)
+                                // 使用英文 (en) 作為過濾用的 name
+                                name: i.en || i.name,
+                                // 顯示用中文或英文
+                                display: language === 'zh' ? (i.name || i.en) : (i.en || i.name),
+                                count: i.count
                             }));
                         } else {
                             const items = level === 'families' ? data.families : data.genuses;
                             const rank = level === 'families' ? 'family' : 'genus';
                             newMeta[level] = (items || []).map((i: any) => ({
-                                name: i.name,
-                                display: language === 'zh' ? getTaxonomyChi(rank, 'flora', i.name) : i.name,
+                                // 使用英文 (en) 作為過濾用的 name
+                                name: i.en || i.name,
+                                // 顯示用中文或英文
+                                display: language === 'zh' ? (i.name || i.en) : (i.en || i.name),
                                 count: i.count
                             })).sort((a: any, b: any) => b.count - a.count);
                         }
@@ -233,12 +237,8 @@ export default function HomeClient() {
 
         // Apply Global & Quick Search
         const currentSearch = searchQuery.trim();
-        if (currentSearch) {
-            if (taxaType === 'fauna') {
-                query = query.or(`common_name_chi.ilike.%${currentSearch}%,common_name_eng.ilike.%${currentSearch}%,scientific_name.ilike.%${currentSearch}%,alias_common_name_chi.ilike.%${currentSearch}%,alias_common_name_eng.ilike.%${currentSearch}%,alias_scientific_name.ilike.%${currentSearch}%`);
-            } else {
-                query = query.or(`scientific_name.ilike.%${currentSearch}%,common_name_chi.ilike.%${currentSearch}%,common_name_eng.ilike.%${currentSearch}%`);
-            }
+        if (currentSearch && taxaType === 'fauna') {
+            query = query.or(`common_name_chi.ilike.%${currentSearch}%,common_name_eng.ilike.%${currentSearch}%,scientific_name.ilike.%${currentSearch}%,alias_common_name_chi.ilike.%${currentSearch}%,alias_common_name_eng.ilike.%${currentSearch}%,alias_scientific_name.ilike.%${currentSearch}%`);
         }
 
         if (taxaType === 'fauna') {
@@ -279,29 +279,36 @@ export default function HomeClient() {
             }
         } else {
             // Flora Filters
-            if (plantFilters.searchQuery.trim()) {
-                const ps = plantFilters.searchQuery.trim();
+            // 1. Search Logic
+            const ps = (plantFilters.searchQuery || searchQuery || '').trim();
+            if (ps) {
                 query = query.or(`scientific_name.ilike.%${ps}%,common_name_chi.ilike.%${ps}%,common_name_eng.ilike.%${ps}%`);
             }
             
-            const f_categories = (tableFilters.category?.length > 0) ? tableFilters.category : plantFilters.categories;
-            const f_families = (tableFilters.family?.length > 0) ? tableFilters.family : plantFilters.families;
-            const f_genuses = (tableFilters.genus?.length > 0) ? tableFilters.genus : plantFilters.genuses;
-            const f_origins = (tableFilters.native_status?.length > 0) ? tableFilters.native_status : plantFilters.origins;
-
-            if (f_categories.length > 0) query = query.in('category_eng', f_categories);
-            if (f_families.length > 0) query = query.in('family_eng', f_families);
-            if (f_genuses.length > 0) query = query.in('genus_eng', f_genuses);
+            // 2. Taxonomy Filters (Sidebar Priority)
+            // 確保只有在陣列真正有值時才加入過濾條件
+            if (plantFilters.categories && plantFilters.categories.length > 0) {
+                query = query.in('category_eng', plantFilters.categories);
+            }
+            if (plantFilters.families && plantFilters.families.length > 0) {
+                query = query.in('family_eng', plantFilters.families);
+            }
+            if (plantFilters.genuses && plantFilters.genuses.length > 0) {
+                query = query.in('genus_eng', plantFilters.genuses);
+            }
             
-            // Scientific & Common Name Table Filters
-            if (tableFilters.scientific_name?.length > 0) {
-                query = query.in('scientific_name', tableFilters.scientific_name);
-            }
-            if (tableFilters.common_name?.length > 0) {
-                query = query.in('common_name_chi', tableFilters.common_name);
+            // 3. Table Mode Overrides (Only if active in table mode)
+            if (displayMode === 'table') {
+                if (tableFilters.scientific_name?.length > 0) query = query.in('scientific_name', tableFilters.scientific_name);
+                if (tableFilters.common_name?.length > 0) query = query.in('common_name_chi', tableFilters.common_name);
             }
 
-            if (f_origins.length > 0) {
+            // 4. Native Status Filter
+            const f_origins = (displayMode === 'table' && tableFilters.native_status?.length > 0) 
+                ? tableFilters.native_status 
+                : plantFilters.origins;
+
+            if (f_origins && f_origins.length > 0) {
                 const expandedOrigins = f_origins.flatMap((o: string) => 
                     o === 'Native' ? ['Native', '原生'] : o === 'Exotic' ? ['Exotic', '外來'] : [o]
                 );
@@ -317,39 +324,41 @@ export default function HomeClient() {
         }
 
         // Apply Table Filters (for list mode)
-        Object.entries(tableFilters).forEach(([key, value]) => {
-          if (!value || (Array.isArray(value) && value.length === 0)) return;
-          
-          // 如果該欄位是「全選」，則不加入 .in 過濾器以提升效能
-          const availableOptions = tableMetadata[key] || [];
-          if (Array.isArray(value) && availableOptions.length > 0 && value.length >= availableOptions.length) {
-            return;
-          }
-
-          // Map table keys to actual DB columns - 統一使用英文欄位作為 Filter Key
-          const dbKey = key === 'common_name' 
-            ? 'common_name_chi'
-            : key === 'scientific_name' ? 'scientific_name'
-            : key === 'order' ? (taxaType === 'fauna' ? 'order_eng' : 'family_eng')
-            : key === 'family' ? (taxaType === 'fauna' ? 'family_eng' : 'family_eng')
-            : key === 'genus' ? (taxaType === 'fauna' ? 'genus_eng' : 'genus_eng')
-            : key === 'iucn' ? (taxaType === 'fauna' ? 'iucn' : 'hk_rare_precious_note')
-            : key;
-
-          if (Array.isArray(value)) {
-            if (dbKey === 'iucn' && value.includes('NE')) {
-              // 處理 NE: 包含簡寫 'NE'、NULL 或空字串
-              const otherValues = value.filter(v => v !== 'NE');
-              const filterParts = [`iucn.is.null`, `iucn.eq.""` , `iucn.eq.NE` ];
-              if (otherValues.length > 0) {
-                filterParts.push(`iucn.in.(${otherValues.map(v => `"${v}"`).join(',')})`);
-              }
-              query = query.or(filterParts.join(','));
-            } else {
-              query = query.in(dbKey, value);
+        if (displayMode === 'table') {
+          Object.entries(tableFilters).forEach(([key, value]) => {
+            if (!value || (Array.isArray(value) && value.length === 0)) return;
+            
+            // 如果該欄位是「全選」，則不加入 .in 過濾器以提升效能
+            const availableOptions = tableMetadata[key] || [];
+            if (Array.isArray(value) && availableOptions.length > 0 && value.length >= availableOptions.length) {
+              return;
             }
-          }
-        });
+
+            // Map table keys to actual DB columns - 統一使用英文欄位作為 Filter Key
+            const dbKey = key === 'common_name' 
+              ? 'common_name_chi'
+              : key === 'scientific_name' ? 'scientific_name'
+              : key === 'order' ? (taxaType === 'fauna' ? 'order_eng' : 'family_eng')
+              : key === 'family' ? (taxaType === 'fauna' ? 'family_eng' : 'family_eng')
+              : key === 'genus' ? (taxaType === 'fauna' ? 'genus_eng' : 'genus_eng')
+              : key === 'iucn' ? (taxaType === 'fauna' ? 'iucn' : 'hk_rare_precious_note')
+              : key;
+
+            if (Array.isArray(value)) {
+              if (dbKey === 'iucn' && value.includes('NE')) {
+                // 處理 NE: 包含簡寫 'NE'、NULL 或空字串
+                const otherValues = value.filter(v => v !== 'NE');
+                const filterParts = [`iucn.is.null`, `iucn.eq.""` , `iucn.eq.NE` ];
+                if (otherValues.length > 0) {
+                  filterParts.push(`iucn.in.(${otherValues.map(v => `"${v}"`).join(',')})`);
+                }
+                query = query.or(filterParts.join(','));
+              } else {
+                query = query.in(dbKey, value);
+              }
+            }
+          });
+        }
 
         const fieldMap: Record<string, string> = taxaType === 'fauna' ? {
           'common_name': language === 'zh' ? 'common_name_chi' : 'common_name_eng',
