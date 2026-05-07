@@ -12,11 +12,21 @@ import { motion, AnimatePresence } from 'framer-motion';
 
 const ITEMS_PER_PAGE = 10;
 
+interface NewsItem {
+  id: string;
+  category: string;
+  published_at: string;
+  title_chi: string;
+  title_eng: string;
+  content_chi: string;
+  content_eng: string;
+}
+
 function NewsContent() {
   const { language, t } = useLanguage();
   const searchParams = useSearchParams();
-  const [allNews, setAllNews] = useState<any[]>([]);
-  const [selectedNews, setSelectedNews] = useState<any | null>(null);
+  const [allNews, setAllNews] = useState<NewsItem[]>([]);
+  const [selectedNews, setSelectedNews] = useState<NewsItem | null>(null);
   const [loading, setLoading] = useState(true);
   const [filterCategory, setFilterCategory] = useState<string | null>(null);
   const [isNavOpen, setIsNavOpen] = useState(false);
@@ -29,12 +39,12 @@ function NewsContent() {
         .select('*')
         .order('published_at', { ascending: false });
       
-      const newsList = data || [];
+      const newsList: NewsItem[] = (data as NewsItem[]) || [];
       setAllNews(newsList);
 
       const id = searchParams.get('id');
       if (id) {
-        const found = newsList.find(n => n.id === id);
+        const found = newsList.find((n: NewsItem) => n.id === id);
         if (found) {
           setSelectedNews(found);
           window.history.replaceState(null, '', '/news');
