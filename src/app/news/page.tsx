@@ -115,8 +115,9 @@ function NewsContent() {
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -10 }}
-            className="bg-white rounded-3xl border border-slate-200/60 shadow-sm overflow-hidden"
+            className="bg-white rounded-3xl border border-slate-200/60 shadow-sm overflow-hidden max-w-4xl mx-auto"
           >
+            {/* Detail Header */}
             <div className="p-6 md:p-10 border-b border-slate-100 bg-slate-50/50">
               <button 
                 onClick={() => setSelectedNews(null)}
@@ -142,44 +143,23 @@ function NewsContent() {
                 </div>
               </div>
 
-              <h1 className="text-3xl md:text-4xl font-black text-slate-900 leading-tight mb-4 tracking-tight">
+              <h1 className="text-3xl md:text-4xl font-black text-slate-900 leading-tight tracking-tight">
                 {language === 'zh' ? selectedNews.title_chi : selectedNews.title_eng}
               </h1>
-              {language === 'zh' && (
-                <p className="text-xl font-bold text-slate-400 leading-snug tracking-tight opacity-70">
-                  {selectedNews.title_eng}
-                </p>
-              )}
             </div>
 
-            <div className="p-6 md:p-10 grid lg:grid-cols-2 gap-12 lg:gap-16">
-              <section>
-                <div className="flex items-center gap-2 mb-6">
-                   <div className="w-1.5 h-6 bg-emerald-500 rounded-full"></div>
-                   <h2 className="text-sm font-black text-slate-900 uppercase tracking-wider">{language === 'zh' ? '中文內容' : 'Chinese Content'}</h2>
-                </div>
-                <div className="news-content prose prose-slate max-w-none">
-                  <ReactMarkdown rehypePlugins={[rehypeRaw]}>
-                    {selectedNews.content_chi.replace(/\\n/g, '\n')}
-                  </ReactMarkdown>
-                </div>
-              </section>
-
-              <section className="lg:border-l lg:border-slate-100 lg:pl-16">
-                <div className="flex items-center gap-2 mb-6">
-                   <div className="w-1.5 h-6 bg-slate-300 rounded-full"></div>
-                   <h2 className="text-sm font-black text-slate-400 uppercase tracking-wider font-mono">{language === 'zh' ? '英文內容' : 'English Content'}</h2>
-                </div>
-                <div className="news-content prose prose-slate max-w-none opacity-80">
-                  <ReactMarkdown rehypePlugins={[rehypeRaw]}>
-                    {selectedNews.content_eng.replace(/\\n/g, '\n')}
-                  </ReactMarkdown>
-                </div>
-              </section>
+            {/* Detail Content - Single Language */}
+            <div className="p-6 md:p-10">
+              <div className="news-content prose prose-slate max-w-none">
+                <ReactMarkdown rehypePlugins={[rehypeRaw]}>
+                  {(language === 'zh' ? selectedNews.content_chi : selectedNews.content_eng).replace(/\\n/g, '\n')}
+                </ReactMarkdown>
+              </div>
             </div>
           </motion.div>
         ) : (
           <div className="grid lg:grid-cols-4 gap-8">
+            {/* Sidebar / Nav */}
             <aside className="lg:col-span-1 space-y-4">
               <div className="p-6 bg-emerald-600 rounded-3xl text-white shadow-xl shadow-emerald-600/20 relative overflow-hidden group">
                 <Megaphone className="w-20 h-20 absolute -right-4 -bottom-4 text-white/10 rotate-12 group-hover:scale-110 transition-transform duration-500" />
@@ -189,6 +169,7 @@ function NewsContent() {
                 </p>
               </div>
 
+              {/* Category Navigation - Collapsible on Mobile/Tablet */}
               <div className="bg-white rounded-3xl border border-slate-200/60 shadow-sm overflow-hidden">
                 <button 
                   onClick={() => setIsNavOpen(!isNavOpen)}
@@ -204,6 +185,7 @@ function NewsContent() {
                 </button>
 
                 <div className={`px-4 pb-6 space-y-1 ${isNavOpen ? 'block' : 'hidden lg:block'}`}>
+                  {/* All News Toggle */}
                   <button
                     onClick={() => {
                       setFilterCategory(null);
@@ -236,7 +218,9 @@ function NewsContent() {
               </div>
             </aside>
 
+            {/* List */}
             <div className="lg:col-span-3 space-y-3 w-full max-w-full overflow-hidden flex flex-col">
+              {/* Active Filter Badge */}
               {filterCategory && (
                 <div className="flex items-center justify-between bg-emerald-50/50 border border-emerald-100 rounded-2xl p-4 mb-1">
                   <div className="flex items-center gap-2">
@@ -303,6 +287,7 @@ function NewsContent() {
                 </div>
               )}
 
+              {/* Pagination UI */}
               {totalPages > 1 && (
                 <div className="mt-8 flex items-center justify-center gap-2">
                   <button
