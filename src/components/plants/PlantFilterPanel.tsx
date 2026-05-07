@@ -10,7 +10,7 @@ import QuickFilterSearch from '@/components/ui/QuickFilterSearch';
 interface Option {
   name: string;
   display: string;
-  count: number;
+  count?: number;
 }
 
 interface PlantFilterPanelProps {

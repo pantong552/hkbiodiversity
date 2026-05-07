@@ -11,7 +11,7 @@ interface MobilePlantFilterProps {
   onClose: () => void;
   filters: PlantFilterState;
   setFilters: React.Dispatch<React.SetStateAction<PlantFilterState>>;
-  availableCategories: { zh: string; en: string; display: string }[];
+  availableCategories: any[];
   availableFamilies: any[];
   availableGenuses: any[];
   onReset: () => void;

@@ -111,7 +111,7 @@ export default function PlantSearchPage() {
   const [plants, setPlants] = useState<PlantSpecies[]>([]);
   const [loading, setLoading] = useState(true);
   const [filters, setFilters] = useState<PlantFilterState>(INITIAL_FILTERS);
-  const [categories, setCategories] = useState<{ zh: string; en: string; display: string }[]>([]);
+  const [categories, setCategories] = useState<{ name: string; display: string; count?: number }[]>([]);
   const [families, setFamilies] = useState<{ name: string; display: string; count: number }[]>([]);
   const [genuses, setGenuses] = useState<{ name: string; display: string; count: number }[]>([]);
 
@@ -130,9 +130,9 @@ export default function PlantSearchPage() {
           if (item.category_eng && !uniqueKeys.has(item.category_eng)) {
             uniqueKeys.add(item.category_eng);
             cats.push({
-              zh: getTaxonomyChi('class', 'flora', item.category_eng), // 將 category 映射為 class 或使用自定義
-              en: item.category_eng,
-              display: language === 'zh' ? getTaxonomyChi('class', 'flora', item.category_eng) : item.category_eng
+              name: item.category_eng,
+              display: language === 'zh' ? getTaxonomyChi('class', 'flora', item.category_eng) : item.category_eng,
+              count: 0 // 這裡目前未統計數量
             });
           }
 
