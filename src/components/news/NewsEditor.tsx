@@ -7,7 +7,7 @@ import {
   X, Save, Bold, Italic, List, Link as LinkIcon, 
   Heading1, Heading2, Quote, Code, Eye, Edit3, 
   Globe, Languages, ChevronDown, CheckCircle2, AlertCircle,
-  Palette, Type, Undo, Redo 
+  Palette, Type, Undo, Redo, ListOrdered, ArrowLeft, Calendar, EyeOff 
 } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import rehypeRaw from 'rehype-raw';
@@ -16,6 +16,21 @@ import rehypeExternalLinks from 'rehype-external-links';
 import { motion, AnimatePresence } from 'framer-motion';
 import { HexColorPicker } from "react-colorful";
 import CustomDropdown from '@/components/ui/CustomDropdown';
+import dynamic from 'next/dynamic';
+import 'react-quill-new/dist/quill.snow.css';
+import { marked } from 'marked';
+import TurndownService from 'turndown';
+import { useRef } from 'react';
+
+const ReactQuill = dynamic(() => import('react-quill-new'), { 
+  ssr: false,
+  loading: () => <div className="w-full h-full bg-slate-50 animate-pulse" />
+});
+
+const turndownService = new TurndownService({
+  headingStyle: 'atx',
+  codeBlockStyle: 'fenced'
+});
 
 interface NewsItem {
   id?: string;
@@ -48,13 +63,25 @@ export default function NewsEditor({ news, onClose, onSave }: NewsEditorProps) {
   const [isSaving, setIsSaving] = useState(false);
   const [openDropdown, setOpenDropdown] = useState<'size' | 'color' | null>(null);
   const [pickerColor, setPickerColor] = useState("#679758");
-  const [formData, setFormData] = useState<NewsItem>({
-    category: 'Notice',
-    title_chi: '',
-    title_eng: '',
-    content_chi: '',
-    content_eng: '',
-    ...news
+  const [confirmAction, setConfirmAction] = useState<'cancel' | 'save' | null>(null);
+  const quillRefChi = useRef<any>(null);
+  const quillRefEng = useRef<any>(null);
+
+  // 初始化時將 Markdown 轉為 HTML
+  const [formData, setFormData] = useState<NewsItem>(() => {
+    const initial = {
+      category: 'Notice',
+      title_chi: '',
+      title_eng: '',
+      content_chi: '',
+      content_eng: '',
+      ...news
+    };
+    return {
+      ...initial,
+      content_chi: news?.content_chi ? marked.parse(news.content_chi) as string : '',
+      content_eng: news?.content_eng ? marked.parse(news.content_eng) as string : ''
+    };
   });
 
   // History management
@@ -125,6 +152,59 @@ export default function NewsEditor({ news, onClose, onSave }: NewsEditorProps) {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [historyIndex, history]);
 
+  const handleTextareaKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      const textarea = e.currentTarget;
+      const start = textarea.selectionStart;
+      const text = textarea.value;
+      
+      // Get current line
+      const lines = text.substring(0, start).split('\n');
+      const currentLine = lines[lines.length - 1];
+      
+      // Check for unordered list
+      const ulMatch = currentLine.match(/^(\s*)-\s+(.*)/);
+      if (ulMatch) {
+        if (ulMatch[2].trim() === '') {
+          // Empty list item, remove it (backspace behavior)
+          e.preventDefault();
+          const newText = text.substring(0, start - ulMatch[0].length) + text.substring(start);
+          handleInputChange(activeTab === 'chi' ? 'content_chi' : 'content_eng', newText);
+          return;
+        }
+        e.preventDefault();
+        const insertion = `\n${ulMatch[1]}- `;
+        const newText = text.substring(0, start) + insertion + text.substring(start);
+        handleInputChange(activeTab === 'chi' ? 'content_chi' : 'content_eng', newText);
+        setTimeout(() => {
+          textarea.setSelectionRange(start + insertion.length, start + insertion.length);
+        }, 0);
+        return;
+      }
+
+      // Check for ordered list
+      const olMatch = currentLine.match(/^(\s*)(\d+)\.\s+(.*)/);
+      if (olMatch) {
+        if (olMatch[3].trim() === '') {
+          // Empty list item, remove it
+          e.preventDefault();
+          const newText = text.substring(0, start - olMatch[0].length) + text.substring(start);
+          handleInputChange(activeTab === 'chi' ? 'content_chi' : 'content_eng', newText);
+          return;
+        }
+        e.preventDefault();
+        const nextNum = parseInt(olMatch[2]) + 1;
+        const insertion = `\n${olMatch[1]}${nextNum}. `;
+        const newText = text.substring(0, start) + insertion + text.substring(start);
+        handleInputChange(activeTab === 'chi' ? 'content_chi' : 'content_eng', newText);
+        setTimeout(() => {
+          textarea.setSelectionRange(start + insertion.length, start + insertion.length);
+        }, 0);
+        return;
+      }
+    }
+  };
+
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       const target = event.target as HTMLElement;
@@ -142,39 +222,36 @@ export default function NewsEditor({ news, onClose, onSave }: NewsEditorProps) {
   }, [openDropdown]);
 
   const insertMarkdown = (type: string) => {
-    const textarea = document.getElementById(activeTab === 'chi' ? 'content_chi' : 'content_eng') as HTMLTextAreaElement;
-    if (!textarea) return;
-
-    const start = textarea.selectionStart;
-    const end = textarea.selectionEnd;
-    const text = textarea.value;
-    const selectedText = text.substring(start, end);
-    let insertion = '';
+    const quill = activeTab === 'chi' ? quillRefChi.current?.getEditor() : quillRefEng.current?.getEditor();
+    if (!quill) return;
 
     const [action, value] = type.split(':');
-    switch (action) {
-      case 'bold': insertion = `**${selectedText || '粗體文字'}**`; break;
-      case 'italic': insertion = `*${selectedText || '斜體文字'}*`; break;
-      case 'h1': insertion = `# ${selectedText || '標題 1'}\n`; break;
-      case 'h2': insertion = `## ${selectedText || '標題 2'}\n`; break;
-      case 'list': insertion = `- ${selectedText || '清單項目'}\n`; break;
-      case 'quote': insertion = `\n> ${selectedText || '引用文字'}\n`; break;
-      case 'code': insertion = `\n\`\`\`\n${selectedText || '程式碼'}\n\`\`\`\n`; break;
-      case 'link': insertion = `[${selectedText || '連結文字'}](https://)`; break;
-      case 'color': insertion = `<span style="color: ${value || '#679758'}">${selectedText || '有色文字'}</span>`; break;
-      case 'size': insertion = `<span style="font-size: ${value || '1.25rem'}">${selectedText || '大號文字'}</span>`; break;
-    }
-
-    const newValue = text.substring(0, start) + insertion + text.substring(end);
-    const newData = { ...formData, [activeTab === 'chi' ? 'content_chi' : 'content_eng']: newValue };
-    setFormData(newData);
-    addToHistory(newData);
+    const range = quill.getSelection();
     
-    // Reset focus and selection
-    setTimeout(() => {
-      textarea.focus();
-      textarea.setSelectionRange(start + insertion.length, start + insertion.length);
-    }, 0);
+    if (range) {
+      switch (action) {
+        case 'bold': quill.format('bold', !quill.getFormat(range).bold); break;
+        case 'italic': quill.format('italic', !quill.getFormat(range).italic); break;
+        case 'h1': quill.format('header', quill.getFormat(range).header === 1 ? false : 1); break;
+        case 'h2': quill.format('header', quill.getFormat(range).header === 2 ? false : 2); break;
+        case 'list': quill.format('list', quill.getFormat(range).list === 'bullet' ? false : 'bullet'); break;
+        case 'ol': quill.format('list', quill.getFormat(range).list === 'ordered' ? false : 'ordered'); break;
+        case 'quote': quill.format('blockquote', !quill.getFormat(range).blockquote); break;
+        case 'code': quill.format('code-block', !quill.getFormat(range)['code-block']); break;
+        case 'link': {
+          const url = prompt('Enter URL:', 'https://');
+          if (url) quill.format('link', url);
+          break;
+        }
+        case 'color': quill.format('color', value || '#679758'); break;
+        case 'size': quill.format('size', value === '1.25rem' ? 'large' : value === '1.5rem' ? 'huge' : value === '0.875rem' ? 'small' : value); break;
+      }
+    }
+  };
+
+  const handleQuillChange = (content: string) => {
+    const field = activeTab === 'chi' ? 'content_chi' : 'content_eng';
+    handleInputChange(field, content);
   };
 
   const handleSave = async () => {
@@ -183,10 +260,21 @@ export default function NewsEditor({ news, onClose, onSave }: NewsEditorProps) {
       return;
     }
 
+    if (confirmAction !== 'save') {
+      setConfirmAction('save');
+      return;
+    }
+
+    setConfirmAction(null);
     setIsSaving(true);
     try {
-      // 移除 undefined 的欄位 (特別是 id)
-      const payload: any = { ...formData };
+      // 儲存前將 HTML 轉回 Markdown 以保持資料格式一致性
+      const payload: any = { 
+        ...formData,
+        content_chi: turndownService.turndown(formData.content_chi),
+        content_eng: turndownService.turndown(formData.content_eng)
+      };
+      
       if (!payload.id) delete payload.id;
       
       const { error } = await supabase
@@ -294,6 +382,7 @@ export default function NewsEditor({ news, onClose, onSave }: NewsEditorProps) {
             <ToolbarButton icon={<Heading2 size={16} />} onClick={() => insertMarkdown('h2')} title="H2" />
             <div className="w-px h-4 bg-slate-200 mx-1" />
             <ToolbarButton icon={<List size={16} />} onClick={() => insertMarkdown('list')} title="List" />
+            <ToolbarButton icon={<ListOrdered size={16} />} onClick={() => insertMarkdown('ol')} title="Numbered List" />
             <div className="w-px h-4 bg-slate-200 mx-1" />
             
             {/* Font Size Dropdown */}
@@ -407,59 +496,68 @@ export default function NewsEditor({ news, onClose, onSave }: NewsEditorProps) {
             <ToolbarButton icon={<Code size={16} />} onClick={() => insertMarkdown('code')} title="Code" />
             <ToolbarButton icon={<LinkIcon size={16} />} onClick={() => insertMarkdown('link')} title="Link" />
             <div className="flex-1" />
-            <button 
-              onClick={() => setShowPreview(!showPreview)}
-              className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${showPreview ? 'bg-emerald-500 text-white' : 'bg-white border border-slate-200 text-slate-500 hover:bg-slate-50'}`}
-            >
-              <Eye size={14} />
-              {language === 'zh' ? '預覽' : 'Preview'}
-            </button>
           </div>
 
           {/* Content Area */}
-          <div className="flex-1 relative bg-white">
-            <textarea
-              id={activeTab === 'chi' ? 'content_chi' : 'content_eng'}
+          <div className="flex-1 relative bg-white overflow-hidden flex flex-col quill-editor-wrapper">
+            <ReactQuill
+              ref={activeTab === 'chi' ? quillRefChi : quillRefEng}
               value={activeTab === 'chi' ? formData.content_chi : formData.content_eng}
-              onChange={(e) => handleInputChange(activeTab === 'chi' ? 'content_chi' : 'content_eng', e.target.value)}
-              placeholder={activeTab === 'chi' ? '開始輸入中文公告內容 (Markdown 格式)...' : 'Start typing English content (Markdown format)...'}
-              className="w-full h-full p-6 text-slate-700 font-medium resize-none border-none focus:ring-0 leading-relaxed text-base"
+              onChange={handleQuillChange}
+              placeholder={activeTab === 'chi' ? '開始輸入中文公告內容...' : 'Start typing English content...'}
+              theme="snow"
+              modules={{
+                toolbar: false // 使用我們自定義的工具列
+              }}
+              className="h-full flex flex-col"
             />
           </div>
         </div>
 
-        {/* Preview Area (Desktop side-by-side or overlay) */}
+        {/* Preview Area (Full UI Simulation) */}
         <AnimatePresence>
           {showPreview && (
             <motion.div 
-              initial={{ opacity: 0, x: 20 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: 20 }}
-              className="flex-1 bg-slate-50/80 overflow-y-auto p-8 news-preview border-l border-emerald-100/50"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 20 }}
+              className="flex-1 bg-white overflow-y-auto p-4 md:p-12 news-preview border-l border-slate-100"
             >
-              <div className="max-w-2xl mx-auto">
-                <div className="flex items-center gap-2 mb-6">
-                  <span className="px-2 py-0.5 bg-emerald-100 text-emerald-700 text-[10px] font-black rounded uppercase tracking-widest">
-                    {language === 'zh' ? '即時預覽' : 'Live Preview'}
-                  </span>
-                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
-                    {activeTab === 'chi' ? '繁體中文' : 'English'}
-                  </span>
+              <div className="max-w-4xl mx-auto">
+                {/* Simulated detail page layout */}
+                <div className="mb-8 flex items-center gap-2 text-slate-400 font-bold text-xs">
+                  <ArrowLeft className="w-3 h-3" /> BACK TO HOME / 返回首頁
                 </div>
-                <h1 className="text-3xl font-black text-slate-900 mb-8">
-                  {activeTab === 'chi' ? formData.title_chi : formData.title_eng}
-                </h1>
-                <div className="prose prose-slate max-w-none news-content">
-                  <ReactMarkdown 
-                    rehypePlugins={[
-                      rehypeRaw,
-                      [rehypeExternalLinks, { target: '_blank', rel: ['noopener', 'noreferrer'] }]
-                    ]}
-                    remarkPlugins={[remarkBreaks]}
-                  >
-                    {(activeTab === 'chi' ? formData.content_chi : formData.content_eng).replace(/\\n/g, '\n')}
-                  </ReactMarkdown>
-                </div>
+
+                <header className="mb-10">
+                  <div className="flex items-center gap-3 mb-6">
+                    <span className="px-3 py-1 bg-emerald-50 text-[10px] font-black text-emerald-600 uppercase tracking-widest rounded-full">
+                      {CATEGORIES.find(c => c.id === formData.category)?.name || formData.category}
+                    </span>
+                    <span className="text-[11px] font-bold text-slate-400 flex items-center gap-1.5">
+                      <Calendar className="w-3.5 h-3.5" /> 
+                      {new Date().toLocaleDateString('zh-HK', { year: 'numeric', month: 'long', day: 'numeric' })}
+                    </span>
+                  </div>
+                  
+                  <h1 className="text-3xl md:text-4xl font-black text-slate-900 tracking-tight leading-tight mb-4">
+                    {activeTab === 'chi' ? (formData.title_chi || '中文標題預覽') : (formData.title_eng || 'English Title Preview')}
+                  </h1>
+                </header>
+
+                <article className="border-t border-slate-100 pt-10">
+                  <div className="news-content prose prose-slate max-w-none">
+                    <ReactMarkdown 
+                      rehypePlugins={[
+                        rehypeRaw,
+                        [rehypeExternalLinks, { target: '_blank', rel: ['noopener', 'noreferrer'] }]
+                      ]}
+                      remarkPlugins={[remarkBreaks]}
+                    >
+                      {turndownService.turndown(activeTab === 'chi' ? formData.content_chi : formData.content_eng)}
+                    </ReactMarkdown>
+                  </div>
+                </article>
               </div>
             </motion.div>
           )}
@@ -473,7 +571,19 @@ export default function NewsEditor({ news, onClose, onSave }: NewsEditorProps) {
         </p>
         <div className="flex items-center gap-3">
           <button 
-            onClick={onClose}
+            onClick={() => setShowPreview(!showPreview)}
+            className={`flex items-center gap-2 px-6 py-2.5 rounded-xl text-sm font-black transition-all ${
+              showPreview 
+                ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-600/20' 
+                : 'bg-white text-slate-600 border border-slate-200 hover:border-emerald-500/30 hover:text-emerald-600 shadow-sm'
+            }`}
+          >
+            {showPreview ? <EyeOff size={18} /> : <Eye size={18} />}
+            {showPreview ? (language === 'zh' ? '退出預覽' : 'Exit Preview') : (language === 'zh' ? '預覽公告' : 'Preview News')}
+          </button>
+
+          <button 
+            onClick={() => setConfirmAction('cancel')}
             className="px-6 py-2.5 rounded-xl text-sm font-black text-slate-500 hover:bg-slate-100 transition-all"
           >
             {language === 'zh' ? '取消' : 'Cancel'}
@@ -504,10 +614,67 @@ export default function NewsEditor({ news, onClose, onSave }: NewsEditorProps) {
         .news-preview .news-content h1, .news-preview .news-content h2, .news-preview .news-content h3 {
           font-weight: 900; color: #0f172a; margin-top: 2rem; margin-bottom: 1rem;
         }
+        .news-preview .news-content h1 { font-size: 1.5rem !important; }
+        .news-preview .news-content h2 { font-size: 1.25rem !important; }
         .news-preview .news-content blockquote {
           border-left: 4px solid #10b981; padding: 0.75rem 1.25rem; background: #f8fafc; border-radius: 0 0.75rem 0.75rem 0; margin: 1.5rem 0;
         }
-        .news-preview .news-content ul { list-style-type: disc; padding-left: 1.25rem; margin-bottom: 1.25rem; }
+        .news-preview .news-content ul, .news-preview .news-content ol { 
+          padding-left: 2rem !important; margin-bottom: 1.25rem; 
+        }
+        .news-preview .news-content ul { list-style-type: disc; }
+        .news-preview .news-content ol { list-style-type: decimal; }
+        .news-preview .news-content li { margin-bottom: 0.5rem; }
+        
+        .quill-editor-wrapper .ql-container {
+          border: none !important;
+          font-family: inherit;
+          flex: 1;
+          display: flex;
+          flex-direction: column;
+          overflow: hidden;
+        }
+        .quill-editor-wrapper .ql-editor {
+          padding: 1.5rem 3rem;
+          font-size: 1rem;
+          line-height: 1.75;
+          color: #334155;
+          flex: 1;
+          overflow-y: auto;
+        }
+        .quill-editor-wrapper .ql-editor h1 {
+          font-size: 1.5rem !important;
+          font-weight: 900 !important;
+          margin-top: 2rem !important;
+          margin-bottom: 1.25rem !important;
+          color: #0f172a !important;
+          padding-bottom: 0.5rem;
+        }
+        .quill-editor-wrapper .ql-editor h2 {
+          font-size: 1.25rem !important;
+          font-weight: 900 !important;
+          margin-top: 1.5rem !important;
+          margin-bottom: 1rem !important;
+          color: #0f172a !important;
+        }
+        .quill-editor-wrapper .ql-editor ul, 
+        .quill-editor-wrapper .ql-editor ol {
+          padding-left: 0.75rem !important;
+          margin-bottom: 1.25rem !important;
+        }
+        .quill-editor-wrapper .ql-editor li {
+          margin-bottom: 0.5rem !important;
+          padding-left: 0.5rem !important;
+        }
+        .quill-editor-wrapper .ql-editor.ql-blank::before {
+          left: 3rem;
+          color: #cbd5e1;
+          font-style: normal;
+        }
+        /* 字體大小對應 */
+        .ql-size-small { font-size: 0.875rem !important; }
+        .ql-size-large { font-size: 1.25rem !important; }
+        .ql-size-huge { font-size: 1.5rem !important; }
         
         .custom-color-picker .react-colorful {
           width: 200px;
@@ -526,6 +693,62 @@ export default function NewsEditor({ news, onClose, onSave }: NewsEditorProps) {
           height: 16px;
         }
       `}</style>
+
+      {/* Confirmation Modal Overlay */}
+      <AnimatePresence>
+        {confirmAction && (
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[100] bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-6"
+          >
+            <motion.div 
+              initial={{ scale: 0.9, opacity: 0, y: 20 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.9, opacity: 0, y: 20 }}
+              className="bg-white rounded-3xl shadow-2xl max-w-sm w-full p-8 text-center"
+            >
+              <div className={`w-16 h-16 rounded-2xl mx-auto mb-6 flex items-center justify-center ${confirmAction === 'save' ? 'bg-emerald-100 text-emerald-600' : 'bg-red-100 text-red-600'}`}>
+                {confirmAction === 'save' ? <Save size={32} /> : <AlertCircle size={32} />}
+              </div>
+              
+              <h3 className="text-xl font-black text-slate-900 mb-2">
+                {confirmAction === 'save' 
+                  ? (language === 'zh' ? '確定要發佈嗎？' : 'Ready to Publish?') 
+                  : (language === 'zh' ? '放棄編輯？' : 'Discard Changes?')}
+              </h3>
+              
+              <p className="text-sm text-slate-500 font-bold mb-8 leading-relaxed">
+                {confirmAction === 'save'
+                  ? (language === 'zh' ? '此操作將會立即更新首頁與公告列表，所有使用者皆可看見內容。' : 'This will immediately update the homepage and news list for everyone.')
+                  : (language === 'zh' ? '您尚未儲存的內容將會遺失，確定要關閉編輯器嗎？' : 'All unsaved changes will be lost. Are you sure you want to close?')}
+              </p>
+              
+              <div className="flex flex-col gap-3">
+                <button
+                  onClick={() => confirmAction === 'save' ? handleSave() : onClose()}
+                  className={`w-full py-3 rounded-2xl text-sm font-black text-white shadow-lg transition-all ${
+                    confirmAction === 'save' 
+                      ? 'bg-emerald-600 shadow-emerald-600/20 hover:bg-emerald-500' 
+                      : 'bg-red-600 shadow-red-600/20 hover:bg-red-500'
+                  }`}
+                >
+                  {confirmAction === 'save' 
+                    ? (language === 'zh' ? '確定發佈' : 'Confirm Publish') 
+                    : (language === 'zh' ? '確定放棄' : 'Confirm Discard')}
+                </button>
+                <button
+                  onClick={() => setConfirmAction(null)}
+                  className="w-full py-3 rounded-2xl text-sm font-black text-slate-400 hover:bg-slate-50 hover:text-slate-600 transition-all"
+                >
+                  {language === 'zh' ? '返回' : 'Back'}
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

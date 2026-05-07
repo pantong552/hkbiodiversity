@@ -137,8 +137,9 @@ function NewsDetailClient({ news }: { news: any }) {
             .news-content h2 { font-size: 1.5rem; }
             .news-content h3 { font-size: 1.25rem; }
             .news-content ul, .news-content ol {
-              margin-bottom: 1.5rem;
-              padding-left: 1.5rem;
+              margin-bottom: 1.5rem !important;
+              padding-left: 2rem !important;
+              list-style-position: outside !important;
             }
             .news-content ul { list-style-type: disc; }
             .news-content ol { list-style-type: decimal; }

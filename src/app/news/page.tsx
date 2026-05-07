@@ -441,13 +441,15 @@ function NewsContent() {
           margin: 1.5rem 0;
           color: #475569;
         }
-        .news-content ul {
-          list-style-type: disc;
-          padding-left: 1.25rem;
-          margin-bottom: 1.25rem;
+        .news-content ul, .news-content ol {
+          margin-bottom: 1.5rem !important;
+          padding-left: 2rem !important;
+          list-style-position: outside !important;
         }
+        .news-content ul { list-style-type: disc !important; }
+        .news-content ol { list-style-type: decimal !important; }
         .news-content li {
-          margin-bottom: 0.5rem;
+          margin-bottom: 0.5rem !important;
         }
       `}</style>
     </div>

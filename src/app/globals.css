@@ -133,3 +133,17 @@ body {
 .news-content a:hover {
   @apply text-emerald-700 decoration-emerald-600 bg-emerald-50/50 rounded-sm -mx-0.5 px-0.5;
 }
+/* News Content List Styles */
+.news-content ul {
+  list-style-type: disc !important;
+  list-style-position: outside !important;
+  @apply pl-8 mb-4;
+}
+.news-content ol {
+  list-style-type: decimal !important;
+  list-style-position: outside !important;
+  @apply pl-8 mb-4;
+}
+.news-content li {
+  @apply mb-2 leading-relaxed;
+}
