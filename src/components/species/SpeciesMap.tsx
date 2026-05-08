@@ -56,56 +56,56 @@ const createRasterStyle = (sources: { id: string, tiles: string[], attribution?:
 });
 
 const BASEMAPS = [
-  { 
-    id: 'carto-light', 
-    name: { zh: 'Carto 亮色', en: 'Carto Light' }, 
+  {
+    id: 'carto-light',
+    name: { zh: 'Carto 亮色', en: 'Carto Light' },
     preview: 'https://a.basemaps.cartocdn.com/light_all/13/6694/3574.png',
-    style: createRasterStyle([{ id: 'carto-light', tiles: [MAP_SOURCES.cartoLight], attribution: '&copy; CARTO' }]) 
-  },
-  { 
-    id: 'carto-dark', 
-    name: { zh: 'Carto 深色', en: 'Carto Dark' }, 
-    preview: 'https://a.basemaps.cartocdn.com/dark_all/13/6694/3574.png',
-    style: createRasterStyle([{ id: 'carto-dark', tiles: [MAP_SOURCES.cartoDark], attribution: '&copy; CARTO' }]) 
-  },
-  { 
-    id: 'osm', 
-    name: { zh: 'OpenStreetMap', en: 'OpenStreetMap' }, 
-    preview: 'https://tile.openstreetmap.org/13/6694/3574.png',
-    style: createRasterStyle([{ id: 'osm', tiles: [MAP_SOURCES.osm], attribution: '&copy; OSM' }]) 
-  },
-  { 
-    id: 'esri-sat', 
-    name: { zh: 'Esri 衛星圖', en: 'Esri Satellite' }, 
-    preview: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/13/3574/6694', 
-    style: createRasterStyle([{ id: 'esri-sat', tiles: [MAP_SOURCES.esri], attribution: '&copy; Esri' }]) 
-  },
-  { 
-    id: 'google-streets', 
-    name: { zh: 'Google 街道', en: 'Google Streets' }, 
-    preview: 'https://mt1.google.com/vt/lyrs=m&x=6694&y=3574&z=13',
-    style: createRasterStyle([{ id: 'google-streets', tiles: [MAP_SOURCES.googleStreets], attribution: '&copy; Google' }]) 
-  },
-  { 
-    id: 'google-sat', 
-    name: { zh: 'Google 衛星', en: 'Google Satellite' }, 
-    preview: 'https://mt1.google.com/vt/lyrs=s&x=6694&y=3574&z=13',
-    style: createRasterStyle([{ id: 'google-sat', tiles: [MAP_SOURCES.googleSatellite], attribution: '&copy; Google' }]) 
-  },
-  { 
-    id: 'google-hybrid', 
-    name: { zh: 'Google 混合', en: 'Google Hybrid' }, 
-    preview: 'https://mt1.google.com/vt/lyrs=y&x=6694&y=3574&z=13',
-    style: createRasterStyle([{ id: 'google-hybrid', tiles: [MAP_SOURCES.googleHybrid], attribution: '&copy; Google' }]) 
-  },
-  { 
-    id: 'google-terrain', 
-    name: { zh: 'Google 地形', en: 'Google Terrain' }, 
-    preview: 'https://mt1.google.com/vt/lyrs=p&x=6694&y=3574&z=13',
-    style: createRasterStyle([{ id: 'google-terrain', tiles: [MAP_SOURCES.googleTerrain], attribution: '&copy; Google' }]) 
+    style: createRasterStyle([{ id: 'carto-light', tiles: [MAP_SOURCES.cartoLight], attribution: '&copy; CARTO' }])
   },
   {
-    id: 'hk-vector', name: { zh: '香港政府向量', en: 'HK Vector' }, 
+    id: 'carto-dark',
+    name: { zh: 'Carto 深色', en: 'Carto Dark' },
+    preview: 'https://a.basemaps.cartocdn.com/dark_all/13/6694/3574.png',
+    style: createRasterStyle([{ id: 'carto-dark', tiles: [MAP_SOURCES.cartoDark], attribution: '&copy; CARTO' }])
+  },
+  {
+    id: 'osm',
+    name: { zh: 'OpenStreetMap', en: 'OpenStreetMap' },
+    preview: 'https://tile.openstreetmap.org/13/6694/3574.png',
+    style: createRasterStyle([{ id: 'osm', tiles: [MAP_SOURCES.osm], attribution: '&copy; OSM' }])
+  },
+  {
+    id: 'esri-sat',
+    name: { zh: 'Esri 衛星圖', en: 'Esri Satellite' },
+    preview: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/13/3574/6694',
+    style: createRasterStyle([{ id: 'esri-sat', tiles: [MAP_SOURCES.esri], attribution: '&copy; Esri' }])
+  },
+  {
+    id: 'google-streets',
+    name: { zh: 'Google 街道', en: 'Google Streets' },
+    preview: 'https://mt1.google.com/vt/lyrs=m&x=6694&y=3574&z=13',
+    style: createRasterStyle([{ id: 'google-streets', tiles: [MAP_SOURCES.googleStreets], attribution: '&copy; Google' }])
+  },
+  {
+    id: 'google-sat',
+    name: { zh: 'Google 衛星', en: 'Google Satellite' },
+    preview: 'https://mt1.google.com/vt/lyrs=s&x=6694&y=3574&z=13',
+    style: createRasterStyle([{ id: 'google-sat', tiles: [MAP_SOURCES.googleSatellite], attribution: '&copy; Google' }])
+  },
+  {
+    id: 'google-hybrid',
+    name: { zh: 'Google 混合', en: 'Google Hybrid' },
+    preview: 'https://mt1.google.com/vt/lyrs=y&x=6694&y=3574&z=13',
+    style: createRasterStyle([{ id: 'google-hybrid', tiles: [MAP_SOURCES.googleHybrid], attribution: '&copy; Google' }])
+  },
+  {
+    id: 'google-terrain',
+    name: { zh: 'Google 地形', en: 'Google Terrain' },
+    preview: 'https://mt1.google.com/vt/lyrs=p&x=6694&y=3574&z=13',
+    style: createRasterStyle([{ id: 'google-terrain', tiles: [MAP_SOURCES.googleTerrain], attribution: '&copy; Google' }])
+  },
+  {
+    id: 'hk-vector', name: { zh: '香港政府向量', en: 'HK Vector' },
     preview: 'https://a.basemaps.cartocdn.com/light_all/13/6694/3574.png',
     style: createRasterStyle([
       { id: 'hk-vector-base', tiles: [MAP_SOURCES.hkVector], attribution: '&copy; HKSAR' },
@@ -175,6 +175,32 @@ export default function SpeciesMap({ taxonId }: SpeciesMapProps) {
   const [cursorStyle, setCursorStyle] = useState<string>('auto');
   const [currentStyleId, setCurrentStyleId] = useState('carto-light');
   const [isBasemapPanelOpen, setIsBasemapPanelOpen] = useState(false);
+  const [showAttribution, setShowAttribution] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
+  const attributionRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const checkMobile = () => setIsMobile(window.innerWidth < 1024); // 使用 1024 作為平板/桌面分界線
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
+
+  // 點擊外部隱藏版權資訊 (僅限行動/平板端)
+  useEffect(() => {
+    if (!isMobile) return;
+    
+    const handleClickOutside = (event: MouseEvent) => {
+      if (attributionRef.current && !attributionRef.current.contains(event.target as Node)) {
+        setShowAttribution(false);
+      }
+    };
+
+    if (showAttribution) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [showAttribution, isMobile]);
 
   const currentStyle = BASEMAPS.find(m => m.id === currentStyleId)?.style || BASEMAPS[0].style;
 
@@ -350,9 +376,20 @@ export default function SpeciesMap({ taxonId }: SpeciesMapProps) {
         onMouseLeave={onMouseLeave}
         cursor={cursorStyle}
         interactiveLayerIds={['grid-layer']}
-        onLoad={() => setMapLoaded(true)}
+        attributionControl={false}
+        onLoad={(e) => {
+          setMapLoaded(true);
+          const map = e.target;
+          // 行動端偵測並自動縮放至香港範圍
+          if (isMobile) {
+            map.fitBounds(
+              [[113.8, 22.15], [114.4, 22.58]], // 香港經緯度範圍 [西南, 東北]
+              { padding: 20, duration: 1000 }
+            );
+          }
+        }}
       >
-        <MapNavControl position="top-right" showCompass={false} />
+        {!isMobile && <MapNavControl position="top-right" showCompass={false} />}
         <FullscreenControl containerId="map-container" position="top-right" />
 
         {gridData && (
@@ -390,7 +427,7 @@ export default function SpeciesMap({ taxonId }: SpeciesMapProps) {
       </AnimatePresence>
 
       {/* Basemap Switcher Panel */}
-      <div className="absolute top-[130px] right-[22px] z-40">
+      <div className={`absolute ${isMobile ? 'top-[54px]' : 'top-[130px]'} right-[22px] z-40`}>
         <div className="relative">
           <button
             onClick={() => setIsBasemapPanelOpen(!isBasemapPanelOpen)}
@@ -555,11 +592,40 @@ export default function SpeciesMap({ taxonId }: SpeciesMapProps) {
       </AnimatePresence>
 
       {/* Legend Overlay */}
-      <div className="absolute bottom-6 left-6 z-20 bg-white/80 backdrop-blur-md px-4 py-3 rounded-2xl border border-slate-200 shadow-lg pointer-events-none">
-        <h5 className="text-[10px] font-black text-slate-800 uppercase tracking-widest mb-2">{t.densityTitle}</h5>
+      <div className={`absolute ${isMobile ? 'bottom-4 left-4 p-2' : 'bottom-6 left-6 p-4'} z-20 bg-white/80 backdrop-blur-md rounded-2xl border border-slate-200 shadow-lg pointer-events-none`}>
+        {!isMobile && <h5 className="text-[10px] font-black text-slate-800 uppercase tracking-widest mb-2">{t.densityTitle}</h5>}
         <div className="flex items-center gap-2">
-          <div className="w-24 h-2 bg-gradient-to-r from-[#d1fae5] via-[#10b981] to-[#064e3b] rounded-full" />
-          <span className="text-[9px] font-bold text-slate-500">1 — 20+</span>
+          <div className={`${isMobile ? 'w-16 h-1.5' : 'w-24 h-2'} bg-gradient-to-r from-[#d1fae5] via-[#10b981] to-[#064e3b] rounded-full`} />
+          <span className={`${isMobile ? 'text-[8px]' : 'text-[9px]'} font-bold text-slate-500`}>1 — 20+</span>
+        </div>
+      </div>
+
+      {/* Attribution info icon for all devices */}
+      <div 
+        ref={attributionRef}
+        className={`absolute ${isMobile ? 'bottom-4 right-4' : 'bottom-6 right-6'} z-40`}
+        onMouseEnter={() => !isMobile && setShowAttribution(true)}
+        onMouseLeave={() => !isMobile && setShowAttribution(false)}
+      >
+        <div className="relative flex flex-col items-end">
+          <AnimatePresence>
+            {showAttribution && (
+              <motion.div
+                initial={{ opacity: 0, y: 10, scale: 0.9 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: 10, scale: 0.9 }}
+                className="mb-2 p-2 bg-black/80 backdrop-blur-md text-white text-[9px] rounded-lg shadow-xl whitespace-nowrap"
+              >
+                &copy; CARTO | MapLibre | HKSAR | OSM
+              </motion.div>
+            )}
+          </AnimatePresence>
+          <button
+            onClick={() => isMobile && setShowAttribution(!showAttribution)}
+            className={`${isMobile ? 'w-7 h-7' : 'w-8 h-8'} bg-white/90 backdrop-blur-md border border-slate-200 rounded-full flex items-center justify-center text-slate-500 shadow-lg hover:bg-white transition-colors active:scale-95`}
+          >
+            <Info className={`${isMobile ? 'w-4 h-4' : 'w-5 h-5'}`} />
+          </button>
         </div>
       </div>
 
