@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { createClient } from '@/utils/supabase/client';
 import { useLanguage } from '@/context/LanguageContext';
-import { Profile, UserRole } from '@/types/comments';
+import { Profile, UserRole, UserStatus } from '@/types/comments';
 import { 
   User, 
   Search, 
@@ -14,7 +14,9 @@ import {
   ExternalLink,
   CheckCircle2,
   XCircle,
-  Loader2
+  Loader2,
+  UserX,
+  UserCheck
 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { format } from 'date-fns';
@@ -73,19 +75,21 @@ export default function UsersManager({ onRequestConfirm }: UsersManagerProps) {
     }
   };
 
-  const handleRemoveUser = (userId: string) => {
+  const handleStatusToggle = (userId: string, currentStatus: UserStatus) => {
+    const nextStatus: UserStatus = currentStatus === 'active' ? 'blocked' : 'active';
+    
     onRequestConfirm(async () => {
       setActionLoading(userId);
       try {
         const { error } = await supabase
           .from('profiles')
-          .delete()
+          .update({ status: nextStatus })
           .eq('id', userId);
 
         if (error) throw error;
-        setProfiles(profiles.filter(p => p.id !== userId));
+        setProfiles(profiles.map(p => p.id === userId ? { ...p, status: nextStatus } : p));
       } catch (err) {
-        console.error('Error removing user:', err);
+        console.error('Error toggling status:', err);
         alert(t('account.save_error'));
       } finally {
         setActionLoading(null);
@@ -119,6 +123,13 @@ export default function UsersManager({ onRequestConfirm }: UsersManagerProps) {
       default:
         return <span className="flex items-center gap-1 px-2 py-1 bg-slate-50 text-slate-500 rounded-lg text-[10px] font-black uppercase ring-1 ring-slate-100"><UserCircle className="w-3 h-3" /> {t('account.role_guest')}</span>;
     }
+  };
+
+  const getStatusBadge = (status: UserStatus) => {
+    if (status === 'blocked') {
+      return <span className="px-2 py-1 bg-slate-900 text-white rounded-lg text-[10px] font-black uppercase ring-1 ring-slate-800">{t('admin.status_blocked')}</span>;
+    }
+    return <span className="px-2 py-1 bg-emerald-50 text-emerald-600 rounded-lg text-[10px] font-black uppercase ring-1 ring-emerald-100">{t('admin.status_active')}</span>;
   };
 
   return (
@@ -157,9 +168,9 @@ export default function UsersManager({ onRequestConfirm }: UsersManagerProps) {
                   <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">{t('account.username')}</th>
                   <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">{t('account.email')}</th>
                   <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">{t('admin.last_online')}</th>
-                  <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">{t('admin.inat_username')}</th>
                   <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">{t('admin.consent')}</th>
                   <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">{t('admin.role')}</th>
+                  <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Status</th>
                   <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">{t('admin.actions')}</th>
                 </tr>
               </thead>
@@ -168,7 +179,7 @@ export default function UsersManager({ onRequestConfirm }: UsersManagerProps) {
                   <motion.tr 
                     key={profile.id}
                     layout
-                    className="hover:bg-emerald-50/30 transition-colors group"
+                    className={`hover:bg-emerald-50/30 transition-colors group ${profile.status === 'blocked' ? 'opacity-60 grayscale' : ''}`}
                   >
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-3">
@@ -194,21 +205,6 @@ export default function UsersManager({ onRequestConfirm }: UsersManagerProps) {
                     <td className="px-6 py-4 text-xs font-medium text-slate-500 whitespace-nowrap">
                       {formatDate(profile.last_online_at)}
                     </td>
-                    <td className="px-6 py-4">
-                      {profile.inaturalist_username ? (
-                        <div className="flex items-center gap-1.5 text-xs font-bold text-emerald-600">
-                          {profile.inaturalist_username}
-                          <a 
-                            href={`https://www.inaturalist.org/people/${profile.inaturalist_username}`} 
-                            target="_blank" 
-                            rel="noopener noreferrer"
-                            className="p-1 hover:bg-emerald-100 rounded-md transition-colors"
-                          >
-                            <ExternalLink className="w-3 h-3" />
-                          </a>
-                        </div>
-                      ) : <span className="text-slate-300">-</span>}
-                    </td>
                     <td className="px-6 py-4 text-center">
                       {profile.allow_all_rights_reserved_usage ? (
                         <CheckCircle2 className="w-5 h-5 text-emerald-500 mx-auto" />
@@ -221,7 +217,7 @@ export default function UsersManager({ onRequestConfirm }: UsersManagerProps) {
                         <select 
                           value={profile.role}
                           onChange={(e) => handleRoleChange(profile.id, e.target.value as UserRole)}
-                          disabled={actionLoading === profile.id}
+                          disabled={actionLoading === profile.id || profile.status === 'blocked'}
                           className="absolute inset-0 opacity-0 cursor-pointer disabled:cursor-not-allowed"
                         >
                           <option value="guest">{t('account.role_guest')}</option>
@@ -231,16 +227,26 @@ export default function UsersManager({ onRequestConfirm }: UsersManagerProps) {
                         {getRoleBadge(profile.role)}
                       </div>
                     </td>
+                    <td className="px-6 py-4 text-center">
+                      {getStatusBadge(profile.status)}
+                    </td>
                     <td className="px-6 py-4 text-right">
                       <button 
-                        onClick={() => handleRemoveUser(profile.id)}
+                        onClick={() => handleStatusToggle(profile.id, profile.status)}
                         disabled={actionLoading === profile.id}
-                        className="p-2 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all"
+                        title={profile.status === 'active' ? 'Block User' : 'Unblock User'}
+                        className={`p-2 rounded-xl transition-all ${
+                          profile.status === 'active' 
+                            ? 'text-slate-300 hover:text-red-500 hover:bg-red-50' 
+                            : 'text-emerald-500 bg-emerald-50 hover:bg-emerald-100'
+                        }`}
                       >
                         {actionLoading === profile.id ? (
                           <Loader2 className="w-4 h-4 animate-spin" />
+                        ) : profile.status === 'active' ? (
+                          <UserX className="w-4 h-4" />
                         ) : (
-                          <Trash2 className="w-4 h-4" />
+                          <UserCheck className="w-4 h-4" />
                         )}
                       </button>
                     </td>
@@ -256,7 +262,7 @@ export default function UsersManager({ onRequestConfirm }: UsersManagerProps) {
               <motion.div 
                 key={profile.id}
                 layout
-                className="p-5 bg-white rounded-3xl border border-slate-200/60 shadow-sm space-y-4"
+                className={`p-5 bg-white rounded-3xl border border-slate-200/60 shadow-sm space-y-4 ${profile.status === 'blocked' ? 'opacity-70 grayscale' : ''}`}
               >
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
@@ -276,56 +282,31 @@ export default function UsersManager({ onRequestConfirm }: UsersManagerProps) {
                     <div>
                       <h4 className="font-bold text-slate-900 leading-tight">{profile.username || 'Anonymous'}</h4>
                       <p className="text-xs text-slate-500 truncate mt-0.5">{profile.email}</p>
-                      <p className="text-[10px] font-medium text-slate-400 uppercase tracking-widest mt-1">
-                        {t('admin.last_online')}: {formatDate(profile.last_online_at)}
-                      </p>
                     </div>
                   </div>
-                  <button 
-                    onClick={() => handleRemoveUser(profile.id)}
-                    className="p-3 text-red-500 bg-red-50 rounded-2xl"
-                  >
-                    <Trash2 className="w-5 h-5" />
-                  </button>
+                  <div className="flex items-center gap-2">
+                    {getStatusBadge(profile.status)}
+                    <button 
+                      onClick={() => handleStatusToggle(profile.id, profile.status)}
+                      className={`p-3 rounded-2xl ${
+                        profile.status === 'active' ? 'text-red-500 bg-red-50' : 'text-emerald-500 bg-emerald-50'
+                      }`}
+                    >
+                      {profile.status === 'active' ? <UserX className="w-5 h-5" /> : <UserCheck className="w-5 h-5" />}
+                    </button>
+                  </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4 pt-2">
+                <div className="grid grid-cols-2 gap-4 pt-2 border-t border-slate-50">
                   <div className="space-y-1">
-                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{t('admin.inat_username')}</p>
-                    <p className="text-sm font-bold text-slate-700 truncate">
-                      {profile.inaturalist_username || '-'}
+                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{t('admin.last_online')}</p>
+                    <p className="text-xs font-bold text-slate-700">
+                      {formatDate(profile.last_online_at)}
                     </p>
                   </div>
                   <div className="space-y-1">
-                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{t('admin.consent')}</p>
-                    <div className="flex items-center gap-1.5">
-                      {profile.allow_all_rights_reserved_usage ? (
-                        <CheckCircle2 className="w-4 h-4 text-emerald-500" />
-                      ) : (
-                        <XCircle className="w-4 h-4 text-slate-200" />
-                      )}
-                      <span className="text-xs font-bold text-slate-600">{profile.allow_all_rights_reserved_usage ? 'YES' : 'NO'}</span>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="pt-2 border-top border-slate-100">
-                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">{t('admin.role')}</p>
-                  <div className="flex flex-wrap gap-2">
-                    {(['guest', 'curator', 'admin'] as UserRole[]).map((r) => (
-                      <button
-                        key={r}
-                        onClick={() => handleRoleChange(profile.id, r)}
-                        disabled={actionLoading === profile.id}
-                        className={`px-4 py-2 rounded-xl text-xs font-black transition-all ${
-                          profile.role === r 
-                            ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-200' 
-                            : 'bg-slate-50 text-slate-500 border border-slate-100'
-                        }`}
-                      >
-                        {t(`account.role_${r}`)}
-                      </button>
-                    ))}
+                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{t('admin.role')}</p>
+                    {getRoleBadge(profile.role)}
                   </div>
                 </div>
               </motion.div>

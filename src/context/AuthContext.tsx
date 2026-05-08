@@ -4,6 +4,8 @@ import React, { createContext, useContext, useEffect, useState } from 'react';
 import { createClient } from '@/utils/supabase/client';
 import { User } from '@supabase/supabase-js';
 import { Profile } from '@/types/comments';
+import { motion, AnimatePresence } from 'framer-motion';
+import { ShieldAlert, X } from 'lucide-react';
 
 interface AuthContextType {
   user: User | null;
@@ -19,6 +21,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [showBlockedModal, setShowBlockedModal] = useState(false);
   const supabase = createClient();
 
   const fetchProfile = async (userId: string, currentUser?: User | null) => {
@@ -32,7 +35,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (error) throw error;
 
       if (!data && currentUser) {
-        // 如果沒有 Profile，嘗試建立一個
         const { data: newProfile, error: upsertError } = await supabase
           .from('profiles')
           .upsert({
@@ -40,6 +42,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             username: currentUser.user_metadata?.full_name || currentUser.email?.split('@')[0],
             avatar_url: currentUser.user_metadata?.avatar_url || null,
             role: 'guest',
+            status: 'active',
             updated_at: new Date().toISOString(),
             last_online_at: new Date().toISOString()
           })
@@ -66,20 +69,23 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  const signOut = async () => {
+    await supabase.auth.signOut();
+    setUser(null);
+    setProfile(null);
+    setShowBlockedModal(false);
+  };
+
   useEffect(() => {
     let mounted = true;
     let authEventTriggered = false;
 
-    // 安全超時：如果在 3.5 秒內沒有收到任何 Auth 事件，強制取消 Loading 狀態
-    // 解決某些行動裝置瀏覽器不觸發 initial event 的問題
     const safetyTimeout = setTimeout(() => {
       if (mounted && !authEventTriggered) {
-        console.warn('Auth initialization timed out, forcing loading to false (Safety Fallback)');
         setIsLoading(false);
       }
     }, 3500);
 
-    // 處理 Session 恢復
     const handleSession = async (session: any) => {
       if (!mounted) return;
       authEventTriggered = true;
@@ -90,9 +96,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       if (currentUser) {
         const profileData = await fetchProfile(currentUser.id, currentUser);
-        if (mounted) setProfile(profileData);
         
-        // 自動更新最後上線時間 (心跳)
+        if (profileData?.status === 'blocked') {
+          await supabase.auth.signOut();
+          if (mounted) {
+            setUser(null);
+            setProfile(null);
+            setIsLoading(false);
+            setShowBlockedModal(true);
+          }
+          return;
+        }
+
+        if (mounted) setProfile(profileData);
         updateLastOnline(currentUser.id);
       } else {
         if (mounted) setProfile(null);
@@ -101,38 +117,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (mounted) setIsLoading(false);
     };
 
-    // 1. 主要偵測：onAuthStateChange (Supabase v2 應立即觸發 INITIAL_SESSION)
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event: string, session: any) => {
-      console.log('Auth Event:', event);
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       handleSession(session);
     });
 
-    // 2. 次要偵測 (行動裝置補丁)：有些瀏覽器在跳轉後不會觸發初始事件
-    // 我們在 500ms 後主動檢查一次
     const secondaryCheck = setTimeout(async () => {
       if (mounted && !authEventTriggered) {
-        try {
-          const { data: { session } } = await supabase.auth.getSession();
-          if (session) {
-            console.log('Handled session via secondary check');
-            handleSession(session);
-          }
-        } catch (e) {
-          console.error('Secondary check failed:', e);
-        }
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session) handleSession(session);
       }
     }, 500);
 
-    // 3. 頁面恢復偵測：當使用者從 OAuth 視窗跳回原 Tab 時刷新
     const handleFocus = async () => {
       if (mounted && !user) {
-        // 如果還沒登入，嘗試刷新一下 session
-        try {
-          const { data: sessionData } = await supabase.auth.getSession();
-          if (sessionData?.session) handleSession(sessionData.session);
-        } catch (e) {
-          console.error('Focus session check failed:', e);
-        }
+        const { data: sessionData } = await supabase.auth.getSession();
+        if (sessionData?.session) handleSession(sessionData.session);
       }
     };
     window.addEventListener('focus', handleFocus);
@@ -146,11 +145,33 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
   }, []);
 
-  const signOut = async () => {
-    await supabase.auth.signOut();
-    setUser(null);
-    setProfile(null);
-  };
+  // Realtime 封鎖監聽
+  useEffect(() => {
+    if (!user) return;
+
+    const channel = supabase
+      .channel(`profile-status-${user.id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'profiles',
+          filter: `id=eq.${user.id}`
+        },
+        (payload) => {
+          if (payload.new.status === 'blocked') {
+            signOut();
+            setShowBlockedModal(true);
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [user?.id]);
 
   const refreshProfile = async () => {
     if (user) {
@@ -162,6 +183,48 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   return (
     <AuthContext.Provider value={{ user, profile, isLoading, signOut, refreshProfile }}>
       {children}
+      
+      {/* 全局封鎖提示 Modal */}
+      <AnimatePresence>
+        {showBlockedModal && (
+          <div className="fixed inset-0 z-[10000] flex items-center justify-center p-4">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="absolute inset-0 bg-slate-900/60 backdrop-blur-xl"
+              onClick={() => setShowBlockedModal(false)}
+            />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 10 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 10 }}
+              className="relative w-full max-w-[300px] bg-white/90 backdrop-blur-2xl rounded-[2rem] shadow-2xl border border-white overflow-hidden"
+            >
+              <div className="p-6 text-center">
+                <div className="w-12 h-12 bg-red-50 rounded-2xl flex items-center justify-center mb-4 mx-auto">
+                  <ShieldAlert className="w-6 h-6 text-red-500" />
+                </div>
+                <h3 className="text-base font-black text-slate-900 tracking-tight mb-2">
+                  帳號已被封鎖
+                </h3>
+                <p className="text-[11px] text-slate-500 font-medium leading-relaxed px-2">
+                  您的帳號已被系統封鎖，無法登入或存取數據。如有疑問請聯絡管理員。
+                </p>
+                <p className="text-[9px] text-slate-400 font-bold uppercase tracking-wider mt-4">
+                  Account Blocked
+                </p>
+              </div>
+              <button
+                onClick={() => setShowBlockedModal(false)}
+                className="w-full py-4 text-xs font-black text-slate-400 hover:text-slate-600 hover:bg-slate-50 transition-all border-t border-slate-100"
+              >
+                我知道了
+              </button>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </AuthContext.Provider>
   );
 };

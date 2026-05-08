@@ -218,7 +218,7 @@ export default function MaintainPage() {
         }}
         title={t('admin.confirm_remove_title')}
         message={t('admin.confirm_remove')}
-        confirmText={t('common.delete')}
+        confirmText={t('common.confirm')}
         cancelText={t('common.cancel')}
       />
 

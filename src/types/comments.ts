@@ -1,4 +1,5 @@
 export type UserRole = 'admin' | 'curator' | 'guest';
+export type UserStatus = 'active' | 'blocked';
 
 export interface Profile {
   id: string;
@@ -6,6 +7,7 @@ export interface Profile {
   email: string | null;
   avatar_url: string | null;
   role: UserRole;
+  status: UserStatus;
   updated_at: string;
   last_online_at?: string | null;
   inaturalist_username?: string | null;
