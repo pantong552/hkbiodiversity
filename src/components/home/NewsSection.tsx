@@ -95,7 +95,7 @@ export default function NewsSection({ latestSpecies, news }: NewsSectionProps) {
                   href={item.link}
                   className="flex items-center gap-4 p-3.5 bg-white rounded-2xl border border-slate-200/60 hover:border-slate-900/20 hover:shadow-xl hover:shadow-slate-900/5 transition-all duration-300 group overflow-hidden box-border"
                 >
-                   <div className="hidden md:flex flex-col items-center justify-center w-12 h-12 bg-slate-50 rounded-xl border border-slate-100 group-hover:bg-slate-900 group-hover:border-slate-900 transition-colors shrink-0">
+                   <div className="hidden md:flex flex-col items-center justify-center w-12 h-12 bg-slate-50 rounded-xl border border-slate-100 group-hover:bg-slate-900 group-hover:border-slate-900 transition-colors shrink-0" suppressHydrationWarning>
                     <span className="text-[9px] font-black text-slate-400 group-hover:text-slate-300 uppercase tracking-tighter leading-none">
                       {new Date(item.date).toLocaleString('en-US', { month: 'short' })}
                     </span>
@@ -109,7 +109,7 @@ export default function NewsSection({ latestSpecies, news }: NewsSectionProps) {
                       <span className={`px-2 py-0.5 rounded-md text-[8px] font-black uppercase tracking-widest border ${getCategoryStyles(item.category, 'announcement')}`}>
                         {item.category}
                       </span>
-                      <span className="md:hidden text-[10px] font-bold text-slate-400">
+                      <span className="md:hidden text-[10px] font-bold text-slate-400" suppressHydrationWarning>
                         {item.date}
                       </span>
                     </div>
@@ -153,7 +153,7 @@ export default function NewsSection({ latestSpecies, news }: NewsSectionProps) {
                   href={item.link}
                   className="flex items-center gap-4 p-3.5 bg-white rounded-2xl border border-slate-200/60 hover:border-emerald-500/30 hover:shadow-xl hover:shadow-emerald-500/5 transition-all duration-300 group overflow-hidden box-border"
                 >
-                  <div className="hidden md:flex flex-col items-center justify-center w-12 h-12 bg-emerald-50 rounded-xl border border-emerald-100 group-hover:bg-emerald-600 group-hover:border-emerald-600 transition-colors shrink-0">
+                  <div className="hidden md:flex flex-col items-center justify-center w-12 h-12 bg-emerald-50 rounded-xl border border-emerald-100 group-hover:bg-emerald-600 group-hover:border-emerald-600 transition-colors shrink-0" suppressHydrationWarning>
                     <span className="text-[9px] font-black text-emerald-400 group-hover:text-emerald-100 uppercase tracking-tighter leading-none">
                       {new Date(item.date).toLocaleString('en-US', { month: 'short' })}
                     </span>
@@ -167,7 +167,7 @@ export default function NewsSection({ latestSpecies, news }: NewsSectionProps) {
                       <span className={`px-2 py-0.5 rounded-md text-[8px] font-black uppercase tracking-widest border ${getCategoryStyles(item.category, 'new_species')}`}>
                         {item.category}
                       </span>
-                      <span className="md:hidden text-[10px] font-bold text-slate-400">
+                      <span className="md:hidden text-[10px] font-bold text-slate-400" suppressHydrationWarning>
                         {item.date}
                       </span>
                     </div>

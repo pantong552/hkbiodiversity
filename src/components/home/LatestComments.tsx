@@ -52,7 +52,7 @@ export default function LatestComments({ comments }: LatestCommentsProps) {
                   {comment.profiles?.username || 'Member'}
                 </span>
               </div>
-              <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1">
+              <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1" suppressHydrationWarning>
                 <Clock className="w-3 h-3" /> {new Date(comment.created_at).toLocaleDateString()}
               </span>
             </div>
