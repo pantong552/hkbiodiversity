@@ -8,6 +8,7 @@ export interface Profile {
   avatar_url: string | null;
   role: UserRole;
   status: UserStatus;
+  created_at: string;
   updated_at: string;
   last_online_at?: string | null;
   inaturalist_username?: string | null;

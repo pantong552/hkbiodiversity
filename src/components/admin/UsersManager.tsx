@@ -7,7 +7,6 @@ import { Profile, UserRole, UserStatus } from '@/types/comments';
 import { 
   User, 
   Search, 
-  Trash2, 
   ShieldCheck, 
   Shield, 
   UserCircle,
@@ -16,7 +15,8 @@ import {
   XCircle,
   Loader2,
   UserX,
-  UserCheck
+  UserCheck,
+  Calendar
 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { format } from 'date-fns';
@@ -45,7 +45,7 @@ export default function UsersManager({ onRequestConfirm }: UsersManagerProps) {
       const { data, error } = await supabase
         .from('profiles')
         .select('*')
-        .order('updated_at', { ascending: false });
+        .order('created_at', { ascending: false });
 
       if (error) throw error;
       setProfiles(data || []);
@@ -167,8 +167,8 @@ export default function UsersManager({ onRequestConfirm }: UsersManagerProps) {
                 <tr className="bg-slate-50/80 border-bottom border-slate-100">
                   <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">{t('account.username')}</th>
                   <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">{t('account.email')}</th>
+                  <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">{t('admin.joined_at')}</th>
                   <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">{t('admin.last_online')}</th>
-                  <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">{t('admin.consent')}</th>
                   <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">{t('admin.role')}</th>
                   <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Status</th>
                   <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">{t('admin.actions')}</th>
@@ -203,14 +203,10 @@ export default function UsersManager({ onRequestConfirm }: UsersManagerProps) {
                       <span className="text-xs font-medium text-slate-500 truncate block max-w-[200px]">{profile.email || '-'}</span>
                     </td>
                     <td className="px-6 py-4 text-xs font-medium text-slate-500 whitespace-nowrap">
-                      {formatDate(profile.last_online_at)}
+                      {formatDate(profile.created_at)}
                     </td>
-                    <td className="px-6 py-4 text-center">
-                      {profile.allow_all_rights_reserved_usage ? (
-                        <CheckCircle2 className="w-5 h-5 text-emerald-500 mx-auto" />
-                      ) : (
-                        <XCircle className="w-5 h-5 text-slate-200 mx-auto" />
-                      )}
+                    <td className="px-6 py-4 text-xs font-medium text-slate-500 whitespace-nowrap">
+                      {formatDate(profile.last_online_at)}
                     </td>
                     <td className="px-6 py-4">
                       <div className="relative inline-block">
@@ -299,14 +295,20 @@ export default function UsersManager({ onRequestConfirm }: UsersManagerProps) {
 
                 <div className="grid grid-cols-2 gap-4 pt-2 border-t border-slate-50">
                   <div className="space-y-1">
-                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{t('admin.last_online')}</p>
+                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{t('admin.joined_at')}</p>
                     <p className="text-xs font-bold text-slate-700">
-                      {formatDate(profile.last_online_at)}
+                      {formatDate(profile.created_at)}
                     </p>
                   </div>
                   <div className="space-y-1">
                     <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{t('admin.role')}</p>
                     {getRoleBadge(profile.role)}
+                  </div>
+                  <div className="space-y-1 col-span-2">
+                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{t('admin.last_online')}</p>
+                    <p className="text-xs font-bold text-slate-700">
+                      {formatDate(profile.last_online_at)}
+                    </p>
                   </div>
                 </div>
               </motion.div>
