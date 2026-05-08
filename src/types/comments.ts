@@ -3,6 +3,7 @@ export type UserRole = 'admin' | 'curator' | 'guest';
 export interface Profile {
   id: string;
   username: string | null;
+  email: string | null;
   avatar_url: string | null;
   role: UserRole;
   updated_at: string;

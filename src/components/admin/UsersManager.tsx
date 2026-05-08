@@ -1,0 +1,338 @@
+'use client';
+
+import { useState, useEffect } from 'react';
+import { createClient } from '@/utils/supabase/client';
+import { useLanguage } from '@/context/LanguageContext';
+import { Profile, UserRole } from '@/types/comments';
+import { 
+  User, 
+  Search, 
+  Trash2, 
+  ShieldCheck, 
+  Shield, 
+  UserCircle,
+  ExternalLink,
+  CheckCircle2,
+  XCircle,
+  Loader2
+} from 'lucide-react';
+import { motion } from 'framer-motion';
+import { format } from 'date-fns';
+import { zhTW, enUS } from 'date-fns/locale';
+
+interface UsersManagerProps {
+  onRequestConfirm: (onConfirm: () => void) => void;
+}
+
+export default function UsersManager({ onRequestConfirm }: UsersManagerProps) {
+  const { language, t } = useLanguage();
+  const supabase = createClient();
+  const [profiles, setProfiles] = useState<Profile[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [actionLoading, setActionLoading] = useState<string | null>(null);
+  const [imageErrors, setImageErrors] = useState<Record<string, boolean>>({});
+
+  useEffect(() => {
+    fetchProfiles();
+  }, []);
+
+  const fetchProfiles = async () => {
+    setLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .order('updated_at', { ascending: false });
+
+      if (error) throw error;
+      setProfiles(data || []);
+    } catch (err) {
+      console.error('Error fetching profiles:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleRoleChange = async (userId: string, newRole: UserRole) => {
+    setActionLoading(userId);
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .update({ role: newRole })
+        .eq('id', userId);
+
+      if (error) throw error;
+      
+      setProfiles(profiles.map(p => p.id === userId ? { ...p, role: newRole } : p));
+    } catch (err) {
+      console.error('Error updating role:', err);
+      alert(t('account.save_error'));
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handleRemoveUser = (userId: string) => {
+    onRequestConfirm(async () => {
+      setActionLoading(userId);
+      try {
+        const { error } = await supabase
+          .from('profiles')
+          .delete()
+          .eq('id', userId);
+
+        if (error) throw error;
+        setProfiles(profiles.filter(p => p.id !== userId));
+      } catch (err) {
+        console.error('Error removing user:', err);
+        alert(t('account.save_error'));
+      } finally {
+        setActionLoading(null);
+      }
+    });
+  };
+
+  const filteredProfiles = profiles.filter(p => 
+    (p.username?.toLowerCase() || '').includes(searchQuery.toLowerCase()) ||
+    (p.email?.toLowerCase() || '').includes(searchQuery.toLowerCase()) ||
+    (p.inaturalist_username?.toLowerCase() || '').includes(searchQuery.toLowerCase())
+  );
+
+  const formatDate = (dateStr: string | null | undefined) => {
+    if (!dateStr) return '-';
+    try {
+      return format(new Date(dateStr), 'yyyy-MM-dd HH:mm', { 
+        locale: language === 'zh' ? zhTW : enUS 
+      });
+    } catch {
+      return dateStr;
+    }
+  };
+
+  const getRoleBadge = (role: UserRole) => {
+    switch (role) {
+      case 'admin':
+        return <span className="flex items-center gap-1 px-2 py-1 bg-red-50 text-red-600 rounded-lg text-[10px] font-black uppercase ring-1 ring-red-100"><ShieldCheck className="w-3 h-3" /> {t('account.role_admin')}</span>;
+      case 'curator':
+        return <span className="flex items-center gap-1 px-2 py-1 bg-amber-50 text-amber-600 rounded-lg text-[10px] font-black uppercase ring-1 ring-amber-100"><Shield className="w-3 h-3" /> {t('account.role_curator')}</span>;
+      default:
+        return <span className="flex items-center gap-1 px-2 py-1 bg-slate-50 text-slate-500 rounded-lg text-[10px] font-black uppercase ring-1 ring-slate-100"><UserCircle className="w-3 h-3" /> {t('account.role_guest')}</span>;
+    }
+  };
+
+  return (
+    <div className="space-y-6">
+      {/* Search and Filters */}
+      <div className="relative group max-w-md">
+        <div className="absolute inset-0 bg-emerald-500/5 blur-xl rounded-2xl transition-all group-focus-within:bg-emerald-500/10" />
+        <div className="relative flex items-center bg-white/80 backdrop-blur-md border border-slate-200/60 rounded-2xl px-4 py-2.5 transition-all focus-within:border-emerald-400 focus-within:shadow-lg focus-within:shadow-emerald-500/5">
+          <Search className="w-5 h-5 text-slate-400 mr-3" />
+          <input 
+            type="text" 
+            placeholder={t('admin.search_placeholder')}
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-full bg-transparent border-none outline-none text-slate-700 text-sm font-medium placeholder:text-slate-400"
+          />
+        </div>
+      </div>
+
+      {loading ? (
+        <div className="flex flex-col items-center justify-center py-20">
+          <Loader2 className="w-10 h-10 text-emerald-500 animate-spin mb-4" />
+          <p className="text-slate-500 font-medium">{t('loading.message')}</p>
+        </div>
+      ) : filteredProfiles.length === 0 ? (
+        <div className="text-center py-20 bg-slate-50/50 rounded-3xl border border-dashed border-slate-200">
+          <p className="text-slate-400 font-medium">{t('admin.no_users')}</p>
+        </div>
+      ) : (
+        <>
+          {/* Desktop Table View */}
+          <div className="hidden lg:block overflow-x-auto rounded-3xl border border-slate-200/60 bg-white/50 backdrop-blur-md shadow-sm">
+            <table className="w-full text-left border-collapse">
+              <thead>
+                <tr className="bg-slate-50/80 border-bottom border-slate-100">
+                  <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">{t('account.username')}</th>
+                  <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">{t('account.email')}</th>
+                  <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">{t('admin.last_online')}</th>
+                  <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">{t('admin.inat_username')}</th>
+                  <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">{t('admin.consent')}</th>
+                  <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">{t('admin.role')}</th>
+                  <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">{t('admin.actions')}</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {filteredProfiles.map((profile) => (
+                  <motion.tr 
+                    key={profile.id}
+                    layout
+                    className="hover:bg-emerald-50/30 transition-colors group"
+                  >
+                    <td className="px-6 py-4">
+                      <div className="flex items-center gap-3">
+                        <div className="relative w-10 h-10 rounded-full overflow-hidden border border-slate-200 bg-slate-100 flex-shrink-0">
+                          {profile.avatar_url && !imageErrors[profile.id] ? (
+                            <img 
+                              src={profile.avatar_url} 
+                              alt="" 
+                              className="w-full h-full object-cover" 
+                              referrerPolicy="no-referrer"
+                              onError={() => setImageErrors(prev => ({ ...prev, [profile.id]: true }))}
+                            />
+                          ) : (
+                            <User className="w-full h-full p-2 text-slate-400" />
+                          )}
+                        </div>
+                        <span className="font-bold text-slate-700 truncate max-w-[150px]">{profile.username || 'Anonymous'}</span>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4">
+                      <span className="text-xs font-medium text-slate-500 truncate block max-w-[200px]">{profile.email || '-'}</span>
+                    </td>
+                    <td className="px-6 py-4 text-xs font-medium text-slate-500 whitespace-nowrap">
+                      {formatDate(profile.last_online_at)}
+                    </td>
+                    <td className="px-6 py-4">
+                      {profile.inaturalist_username ? (
+                        <div className="flex items-center gap-1.5 text-xs font-bold text-emerald-600">
+                          {profile.inaturalist_username}
+                          <a 
+                            href={`https://www.inaturalist.org/people/${profile.inaturalist_username}`} 
+                            target="_blank" 
+                            rel="noopener noreferrer"
+                            className="p-1 hover:bg-emerald-100 rounded-md transition-colors"
+                          >
+                            <ExternalLink className="w-3 h-3" />
+                          </a>
+                        </div>
+                      ) : <span className="text-slate-300">-</span>}
+                    </td>
+                    <td className="px-6 py-4 text-center">
+                      {profile.allow_all_rights_reserved_usage ? (
+                        <CheckCircle2 className="w-5 h-5 text-emerald-500 mx-auto" />
+                      ) : (
+                        <XCircle className="w-5 h-5 text-slate-200 mx-auto" />
+                      )}
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="relative inline-block">
+                        <select 
+                          value={profile.role}
+                          onChange={(e) => handleRoleChange(profile.id, e.target.value as UserRole)}
+                          disabled={actionLoading === profile.id}
+                          className="absolute inset-0 opacity-0 cursor-pointer disabled:cursor-not-allowed"
+                        >
+                          <option value="guest">{t('account.role_guest')}</option>
+                          <option value="curator">{t('account.role_curator')}</option>
+                          <option value="admin">{t('account.role_admin')}</option>
+                        </select>
+                        {getRoleBadge(profile.role)}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 text-right">
+                      <button 
+                        onClick={() => handleRemoveUser(profile.id)}
+                        disabled={actionLoading === profile.id}
+                        className="p-2 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all"
+                      >
+                        {actionLoading === profile.id ? (
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                        ) : (
+                          <Trash2 className="w-4 h-4" />
+                        )}
+                      </button>
+                    </td>
+                  </motion.tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Mobile Card View */}
+          <div className="lg:hidden space-y-4">
+            {filteredProfiles.map((profile) => (
+              <motion.div 
+                key={profile.id}
+                layout
+                className="p-5 bg-white rounded-3xl border border-slate-200/60 shadow-sm space-y-4"
+              >
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="w-12 h-12 rounded-full overflow-hidden border border-slate-200 bg-slate-100">
+                      {profile.avatar_url && !imageErrors[profile.id] ? (
+                        <img 
+                          src={profile.avatar_url} 
+                          alt="" 
+                          className="w-full h-full object-cover" 
+                          referrerPolicy="no-referrer"
+                          onError={() => setImageErrors(prev => ({ ...prev, [profile.id]: true }))}
+                        />
+                      ) : (
+                        <User className="w-full h-full p-2 text-slate-400" />
+                      )}
+                    </div>
+                    <div>
+                      <h4 className="font-bold text-slate-900 leading-tight">{profile.username || 'Anonymous'}</h4>
+                      <p className="text-xs text-slate-500 truncate mt-0.5">{profile.email}</p>
+                      <p className="text-[10px] font-medium text-slate-400 uppercase tracking-widest mt-1">
+                        {t('admin.last_online')}: {formatDate(profile.last_online_at)}
+                      </p>
+                    </div>
+                  </div>
+                  <button 
+                    onClick={() => handleRemoveUser(profile.id)}
+                    className="p-3 text-red-500 bg-red-50 rounded-2xl"
+                  >
+                    <Trash2 className="w-5 h-5" />
+                  </button>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4 pt-2">
+                  <div className="space-y-1">
+                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{t('admin.inat_username')}</p>
+                    <p className="text-sm font-bold text-slate-700 truncate">
+                      {profile.inaturalist_username || '-'}
+                    </p>
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{t('admin.consent')}</p>
+                    <div className="flex items-center gap-1.5">
+                      {profile.allow_all_rights_reserved_usage ? (
+                        <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+                      ) : (
+                        <XCircle className="w-4 h-4 text-slate-200" />
+                      )}
+                      <span className="text-xs font-bold text-slate-600">{profile.allow_all_rights_reserved_usage ? 'YES' : 'NO'}</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="pt-2 border-top border-slate-100">
+                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">{t('admin.role')}</p>
+                  <div className="flex flex-wrap gap-2">
+                    {(['guest', 'curator', 'admin'] as UserRole[]).map((r) => (
+                      <button
+                        key={r}
+                        onClick={() => handleRoleChange(profile.id, r)}
+                        disabled={actionLoading === profile.id}
+                        className={`px-4 py-2 rounded-xl text-xs font-black transition-all ${
+                          profile.role === r 
+                            ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-200' 
+                            : 'bg-slate-50 text-slate-500 border border-slate-100'
+                        }`}
+                      >
+                        {t(`account.role_${r}`)}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </motion.div>
+            ))}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}

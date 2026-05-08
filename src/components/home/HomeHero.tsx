@@ -91,6 +91,13 @@ export default function HomeHero() {
                     自然<span className="text-emerald-400">誌銘</span>
                   </span>
                 </motion.div>
+                <motion.div 
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.6, duration: 0.8 }}
+                >
+                  <div className="h-1 w-20 md:w-32 bg-gradient-to-r from-transparent via-emerald-500/50 to-transparent mt-8 md:mt-12" />
+                </motion.div>
               </div>
             ) : (
               <div className="flex flex-col items-center text-center px-4">
