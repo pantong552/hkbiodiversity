@@ -102,7 +102,9 @@ const translations: Record<Language, Record<string, string>> = {
     'dropdown.no_results': '找不到符合的分類',
     'dropdown.clear_search': '清除搜尋',
     'gallery.set_profile_error': '封面照片更新失敗',
-    'gallery.current_profile': '目前封面',
+    'gallery.set_profile_success': '設定成功',
+    'gallery.current_profile': '封面圖片',
+    'gallery.set_profile_picture': '設為封面圖片',
     // 首頁
     'home.slogan': '走入山林海影，留下共筆足跡。',
     'home.discover_hk': '探索香港自然',
@@ -234,7 +236,9 @@ const translations: Record<Language, Record<string, string>> = {
     'dropdown.no_results': 'No matching categories found',
     'dropdown.clear_search': 'Clear Search',
     'gallery.set_profile_error': 'Update failed',
-    'gallery.current_profile': 'Current Cover',
+    'gallery.set_profile_success': 'Set Success',
+    'gallery.current_profile': 'Cover Photo',
+    'gallery.set_profile_picture': 'Set as Cover',
     // Home
     'home.slogan': 'Into the Wild, onto the Cloud: Documenting Nature Together.',
     'home.discover_hk': 'Discover Hong Kong\'s Nature',

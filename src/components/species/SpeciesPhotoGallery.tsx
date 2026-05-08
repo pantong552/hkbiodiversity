@@ -461,10 +461,10 @@ export default function SpeciesPhotoGallery({
                 <button 
                   onClick={handleSetProfilePicture}
                   disabled={isUpdatingProfile}
-                  className={`flex items-center gap-2 px-3 py-1.5 backdrop-blur-md border rounded-xl transition-all group/star shadow-lg ${
+                  className={`flex items-center gap-2.5 px-4 py-2 backdrop-blur-md border rounded-xl transition-all group/star shadow-lg ${
                     updateStatus === 'success' ? 'bg-emerald-500 border-emerald-400 text-white' : 
                     updateStatus === 'error' ? 'bg-red-500 border-red-400 text-white' :
-                    isCurrentPhotoProfile ? 'bg-amber-400/20 border-amber-400/30 text-amber-400' : 'bg-black/40 border-white/10 text-white/70 hover:bg-black/60 hover:text-white'
+                    isCurrentPhotoProfile ? 'bg-amber-400 border-amber-500 text-slate-900 font-bold shadow-amber-500/20' : 'bg-black/40 border-white/10 text-white/70 hover:bg-black/60 hover:text-white'
                   }`}
                 >
                   {isUpdatingProfile ? (
@@ -476,7 +476,7 @@ export default function SpeciesPhotoGallery({
                   ) : (
                     <Star className={`w-3.5 h-3.5 ${isCurrentPhotoProfile ? 'fill-current' : ''}`} />
                   )}
-                  <span className="text-[9px] font-black uppercase tracking-widest hidden sm:inline">
+                  <span className="text-[11px] font-black uppercase tracking-wider hidden sm:inline">
                     {updateStatus === 'success' ? t('gallery.set_profile_success') : 
                      isCurrentPhotoProfile ? t('gallery.current_profile') : t('gallery.set_profile_picture')}
                   </span>
@@ -587,8 +587,7 @@ export default function SpeciesPhotoGallery({
         taxaId={taxaId}
         currentProfilePicture={profilePicture}
         onProfilePictureUpdate={(newUrl) => {
-          // 這裡可以透過重新獲取物種數據或本地狀態更新來同步
-          // 目前我們先依賴重新整理，但 UI 已有成功提示
+          onProfilePictureUpdate?.(newUrl);
         }}
       />
 

@@ -238,7 +238,6 @@ export default function EnrichedLightbox({
       }
 
       // 如果點擊的照片已經是封面圖，則取消設定（設為 null）
-      // 注意：判斷時需要考慮資料庫存的是 medium URL
       let isAlreadyProfile = false;
       if (imageUrl.includes('inaturalist') || (currentProfilePicture && currentProfilePicture.includes('inaturalist'))) {
           const currentId = getInatIdFromUrl(imageUrl);
@@ -395,9 +394,9 @@ export default function EnrichedLightbox({
                 className={`p-2.5 rounded-full transition-all relative group/star ${
                   updateStatus === 'success' ? 'bg-emerald-500 text-white' : 
                   updateStatus === 'error' ? 'bg-red-500 text-white' :
-                  isCurrentPhotoProfile ? 'text-amber-400 bg-amber-400/10' : 'text-white/70 hover:bg-white/10 hover:text-white'
+                  isCurrentPhotoProfile ? 'bg-amber-400 text-slate-900 border border-amber-500' : 'text-white/70 hover:bg-white/10 hover:text-white'
                 }`}
-                title={t('gallery.set_profile_picture')}
+                title={isCurrentPhotoProfile ? t('gallery.current_profile') : t('gallery.set_profile_picture')}
               >
                 {isUpdatingProfile ? (
                   <Loader2 className="w-4 h-4 animate-spin" />
@@ -407,13 +406,6 @@ export default function EnrichedLightbox({
                   <AlertCircle className="w-4 h-4" />
                 ) : (
                   <Star className={`w-4 h-4 ${isCurrentPhotoProfile ? 'fill-current' : ''}`} />
-                )}
-
-                {/* 封面標記 Tooltip */}
-                {isCurrentPhotoProfile && updateStatus === 'idle' && (
-                  <span className="absolute top-full mt-2 right-0 bg-amber-500 text-[8px] font-black uppercase px-1.5 py-0.5 rounded shadow-lg whitespace-nowrap">
-                    {t('gallery.current_profile')}
-                  </span>
                 )}
               </button>
             )}
