@@ -159,7 +159,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           table: 'profiles',
           filter: `id=eq.${user.id}`
         },
-        (payload) => {
+        (payload: any) => {
           if (payload.new.status === 'blocked') {
             signOut();
             setShowBlockedModal(true);
