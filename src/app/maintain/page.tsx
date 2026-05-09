@@ -18,6 +18,7 @@ import Link from 'next/link';
 import UsersManager from '@/components/admin/UsersManager';
 import TaxaManager from '@/components/admin/TaxaManager';
 import TaxonomyMappingsManager from '@/components/admin/TaxonomyMappingsManager';
+import LanguageSwitcher from '@/components/admin/LanguageSwitcher';
 import { motion, AnimatePresence } from 'framer-motion';
 
 type AdminTab = 'users' | 'taxonomy-fauna' | 'taxonomy-flora' | 'taxa';
@@ -273,8 +274,12 @@ export default function MaintainPage() {
               </div>
               <ChevronRight className={`w-3.5 h-3.5 transition-transform ${activeTab === 'taxa' ? 'opacity-100' : 'opacity-0 -translate-x-2'}`} />
             </button>
-            
           </nav>
+
+          {/* Language Switcher at Bottom */}
+          <div className="mt-auto pt-6 border-t border-slate-200/60 lg:pb-4">
+            <LanguageSwitcher />
+          </div>
         </aside>
 
           {/* Main Content Area */}
