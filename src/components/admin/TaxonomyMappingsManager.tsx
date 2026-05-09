@@ -18,6 +18,7 @@ import {
   ChevronDown
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useTaxonomy } from '@/context/TaxonomyContext';
 
 interface TaxonomyMappingsManagerProps {
   mode: 'fauna' | 'flora';
@@ -54,6 +55,7 @@ const RANK_FIELD_MAP = {
 
 export default function TaxonomyMappingsManager({ mode, onRequestConfirm }: TaxonomyMappingsManagerProps) {
   const { language, t } = useLanguage();
+  const { getTaxonomyChi } = useTaxonomy();
   const supabase = createClient();
   const [data, setData] = useState<TaxonomyMapping[]>([]);
   const [loading, setLoading] = useState(true);
@@ -75,7 +77,7 @@ export default function TaxonomyMappingsManager({ mode, onRequestConfirm }: Taxo
   });
   const [rankFilters, setRankFilters] = useState<string[]>([]);
   const [showRankFilter, setShowRankFilter] = useState(false);
-  const [groupFilters, setGroupFilters] = useState<string[]>(['Amphibian']);
+  const [groupFilters, setGroupFilters] = useState<string[]>([]);
   const [showGroupFilter, setShowGroupFilter] = useState(false);
   const [showMissingOnly, setShowMissingOnly] = useState(false);
 
@@ -133,6 +135,14 @@ export default function TaxonomyMappingsManager({ mode, onRequestConfirm }: Taxo
   }, [data]);
 
   useEffect(() => {
+    if (mode === 'fauna') {
+      setGroupFilters(['Amphibian']);
+    } else {
+      setGroupFilters(['Angiosperms (Dicotyledons)']);
+    }
+  }, [mode]);
+
+  useEffect(() => {
     fetchData();
   }, [mode]);
 
@@ -145,7 +155,7 @@ export default function TaxonomyMappingsManager({ mode, onRequestConfirm }: Taxo
 
       // 1. Fetch ALL taxonomy names from species/plant_species table (with pagination)
       const distinctPromises = Object.entries(rankFields).map(async ([rank, field]) => {
-        const selectFields = mode === 'fauna' ? `${field}, taxa_group` : field;
+        const selectFields = mode === 'fauna' ? `${field}, taxa_group` : `${field}, category_eng`;
         const uniqueMap = new Map<string, string>();
         let offset = 0;
         const limit = 1000;
@@ -163,7 +173,7 @@ export default function TaxonomyMappingsManager({ mode, onRequestConfirm }: Taxo
           batchData.forEach((item: any) => {
             const name = (item[field] as string || '').trim();
             if (name) {
-              const group = (item as any).taxa_group || (mode === 'flora' ? 'FLORA' : '');
+              const group = (item as any).taxa_group || (mode === 'flora' ? (item as any).category_eng : '');
               const key = `${name}||${group}`;
               uniqueMap.set(key, group);
             }
@@ -431,7 +441,10 @@ export default function TaxonomyMappingsManager({ mode, onRequestConfirm }: Taxo
                           onClick={() => toggleFilter(groupFilters, setGroupFilters, group)}
                           className={`w-full flex items-center justify-between px-3 py-2 text-xs font-bold rounded-xl transition-all ${groupFilters.includes(group) ? 'bg-emerald-50 text-emerald-600' : 'text-slate-500 hover:bg-slate-50'}`}
                         >
-                          {group}
+                          {language === 'zh' 
+                            ? getTaxonomyChi(mode === 'flora' ? 'category' : 'taxa_group', mode, group) 
+                            : group
+                          }
                           {groupFilters.includes(group) && <Check className="w-3.5 h-3.5" />}
                         </button>
                       ))}
