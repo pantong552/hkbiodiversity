@@ -32,7 +32,7 @@ interface UsersManagerProps {
   onRequestConfirm: (onConfirm: () => void) => void;
 }
 
-type SortKey = 'username' | 'created_at' | 'last_online_at';
+type SortKey = 'username' | 'created_at' | 'last_online_at' | 'status';
 type SortDirection = 'asc' | 'desc';
 
 export default function UsersManager({ onRequestConfirm }: UsersManagerProps) {
