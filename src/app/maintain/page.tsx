@@ -149,10 +149,10 @@ export default function MaintainPage() {
           <nav className="flex flex-col gap-1.5">
             <button
               onClick={() => setActiveTab('users')}
-              className={`w-full flex items-center justify-between p-3 rounded-2xl transition-all group ${
+              className={`w-full flex items-center justify-between p-3 rounded-2xl transition-all duration-200 group outline-none select-none active:scale-[0.98] ${
                 activeTab === 'users' 
                   ? 'bg-white shadow-lg shadow-slate-200/40 border border-slate-100 text-slate-900' 
-                  : 'text-slate-500 hover:bg-white/50'
+                  : 'text-slate-500 hover:bg-white/50 border border-transparent'
               }`}
             >
               <div className="flex items-center gap-2.5">
@@ -166,10 +166,10 @@ export default function MaintainPage() {
 
             <button
               onClick={() => setActiveTab('taxa')}
-              className={`w-full flex items-center justify-between p-3 rounded-2xl transition-all group ${
+              className={`w-full flex items-center justify-between p-3 rounded-2xl transition-all duration-200 group outline-none select-none active:scale-[0.98] ${
                 activeTab === 'taxa' 
                   ? 'bg-white shadow-lg shadow-slate-200/40 border border-slate-100 text-slate-900' 
-                  : 'text-slate-500 hover:bg-white/50'
+                  : 'text-slate-500 hover:bg-white/50 border border-transparent'
               }`}
             >
               <div className="flex items-center gap-2.5">
