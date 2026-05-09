@@ -160,10 +160,10 @@ export default function TaxonomyMappingsManager({ mode, onRequestConfirm }: Taxo
           if (error) throw error;
           if (!batchData || batchData.length === 0) break;
 
-          batchData.forEach(item => {
+          batchData.forEach((item: any) => {
             const name = (item[field] as string || '').trim();
             if (name) {
-              const group = item.taxa_group || (mode === 'flora' ? 'FLORA' : '');
+              const group = (item as any).taxa_group || (mode === 'flora' ? 'FLORA' : '');
               const key = `${name}||${group}`;
               uniqueMap.set(key, group);
             }
