@@ -119,66 +119,66 @@ export default function MaintainPage() {
         <div className="absolute bottom-[-10%] left-[-10%] w-[30%] h-[30%] bg-slate-200/30 blur-[100px] rounded-full" />
       </div>
 
-      <div className="flex-1 flex flex-col lg:flex-row relative z-10 pt-4 lg:pt-6">
-        {/* Left Sidebar - Fixed on Desktop */}
-        <aside className="w-full lg:w-72 xl:w-80 lg:h-[calc(100vh-60px)] lg:sticky lg:top-6 px-6 lg:pl-8 lg:pr-4 mb-8 lg:mb-0 flex flex-col gap-6">
-          <div className="space-y-6">
+      <div className="flex-1 flex flex-col lg:flex-row relative z-10 pt-4 lg:pt-4">
+        {/* Left Sidebar - Fixed on Desktop - Compact Version */}
+        <aside className="w-full lg:w-64 xl:w-72 lg:h-[calc(100vh-60px)] lg:sticky lg:top-4 px-4 lg:pl-6 lg:pr-3 mb-6 lg:mb-0 flex flex-col gap-5">
+          <div className="space-y-4">
             <Link 
               href="/"
-              className="inline-flex items-center gap-2 text-xs font-black text-emerald-600 uppercase tracking-widest hover:gap-3 transition-all group"
+              className="inline-flex items-center gap-2 text-[10px] font-black text-emerald-600 uppercase tracking-widest hover:gap-3 transition-all group"
             >
-              <ArrowLeft className="w-4 h-4" />
+              <ArrowLeft className="w-3.5 h-3.5" />
               {t('account.back')}
             </Link>
             
-            <div className="flex items-center gap-4">
-              <div className="p-3 bg-white rounded-2xl shadow-xl shadow-emerald-200/40 border border-emerald-100">
-                <ShieldCheck className="w-8 h-8 text-emerald-600" />
+            <div className="flex items-center gap-3">
+              <div className="p-2.5 bg-white rounded-xl shadow-lg shadow-emerald-200/30 border border-emerald-50">
+                <ShieldCheck className="w-6 h-6 text-emerald-600" />
               </div>
               <div>
-                <h1 className="text-2xl xl:text-3xl font-black text-slate-900 tracking-tighter leading-none">
+                <h1 className="text-xl xl:text-2xl font-black text-slate-900 tracking-tighter leading-none">
                   {t('admin.title')}
                 </h1>
-                <p className="text-[10px] text-slate-500 font-bold uppercase tracking-wider mt-1.5">
-                  Management Console
+                <p className="text-[9px] text-slate-500 font-bold uppercase tracking-wider mt-1">
+                  Management
                 </p>
               </div>
             </div>
           </div>
 
-          <nav className="flex flex-col gap-2">
+          <nav className="flex flex-col gap-1.5">
             <button
               onClick={() => setActiveTab('users')}
-              className={`w-full flex items-center justify-between p-4 rounded-3xl transition-all group ${
+              className={`w-full flex items-center justify-between p-3 rounded-2xl transition-all group ${
                 activeTab === 'users' 
-                  ? 'bg-white shadow-xl shadow-slate-200/50 border border-slate-100 text-slate-900' 
+                  ? 'bg-white shadow-lg shadow-slate-200/40 border border-slate-100 text-slate-900' 
                   : 'text-slate-500 hover:bg-white/50'
               }`}
             >
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2.5">
                 <div className={`p-2 rounded-xl transition-colors ${activeTab === 'users' ? 'bg-emerald-600 text-white' : 'bg-slate-100 text-slate-400 group-hover:bg-emerald-100 group-hover:text-emerald-600'}`}>
-                  <Users className="w-5 h-5" />
+                  <Users className="w-4 h-4" />
                 </div>
-                <span className="font-bold">{t('admin.users_manager')}</span>
+                <span className="font-bold text-sm">{t('admin.users_manager')}</span>
               </div>
-              <ChevronRight className={`w-4 h-4 transition-transform ${activeTab === 'users' ? 'opacity-100' : 'opacity-0 -translate-x-2'}`} />
+              <ChevronRight className={`w-3.5 h-3.5 transition-transform ${activeTab === 'users' ? 'opacity-100' : 'opacity-0 -translate-x-2'}`} />
             </button>
 
             <button
               onClick={() => setActiveTab('taxa')}
-              className={`w-full flex items-center justify-between p-4 rounded-3xl transition-all group ${
+              className={`w-full flex items-center justify-between p-3 rounded-2xl transition-all group ${
                 activeTab === 'taxa' 
-                  ? 'bg-white shadow-xl shadow-slate-200/50 border border-slate-100 text-slate-900' 
+                  ? 'bg-white shadow-lg shadow-slate-200/40 border border-slate-100 text-slate-900' 
                   : 'text-slate-500 hover:bg-white/50'
               }`}
             >
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2.5">
                 <div className={`p-2 rounded-xl transition-colors ${activeTab === 'taxa' ? 'bg-emerald-600 text-white' : 'bg-slate-100 text-slate-400 group-hover:bg-emerald-100 group-hover:text-emerald-600'}`}>
-                  <Package className="w-5 h-5" />
+                  <Package className="w-4 h-4" />
                 </div>
-                <span className="font-bold">{t('admin.taxa_manager')}</span>
+                <span className="font-bold text-sm">{t('admin.taxa_manager')}</span>
               </div>
-              <ChevronRight className={`w-4 h-4 transition-transform ${activeTab === 'taxa' ? 'opacity-100' : 'opacity-0 -translate-x-2'}`} />
+              <ChevronRight className={`w-3.5 h-3.5 transition-transform ${activeTab === 'taxa' ? 'opacity-100' : 'opacity-0 -translate-x-2'}`} />
             </button>
             
             {/* Help box removed */}
