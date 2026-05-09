@@ -46,7 +46,7 @@ const RANK_FIELD_MAP = {
     genus: 'genus_eng'
   } as Record<string, string>,
   flora: {
-    class: 'category_eng',
+    category: 'category_eng',
     family: 'family_eng',
     genus: 'genus_eng'
   } as Record<string, string>
@@ -122,7 +122,7 @@ export default function TaxonomyMappingsManager({ mode, onRequestConfirm }: Taxo
   const uniqueRanks = useMemo(() => {
     const ranks = Array.from(new Set(data.map(d => d.rank)));
     return ranks.sort((a, b) => {
-      const order = ['class', 'order', 'family', 'genus'];
+      const order = ['category', 'class', 'order', 'family', 'genus'];
       return order.indexOf(a) - order.indexOf(b);
     });
   }, [data]);

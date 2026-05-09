@@ -140,25 +140,19 @@ export default function HomeClient() {
                 
                 results.forEach(({ level, data, error }) => {
                     if (data && !error) {
-                        if (level === 'categories') {
-                            newMeta.categories = (data.categories || []).map((i: any) => ({
-                                // 使用英文 (en) 作為過濾用的 name
-                                name: i.en || i.name,
-                                // 顯示用中文或英文
-                                display: language === 'zh' ? (i.name || i.en) : (i.en || i.name),
+                        const items = level === 'categories' ? (data.categories || []) : (level === 'families' ? (data.families || []) : (data.genuses || []));
+                        const rankKey = level === 'categories' ? 'category' : (level === 'families' ? 'family' : 'genus');
+
+                        newMeta[level] = items.map((i: any) => {
+                            const nameEng = i.en || i.name;
+                            return {
+                                name: nameEng,
+                                display: language === 'zh' 
+                                    ? getTaxonomyChi(rankKey, 'flora', nameEng)
+                                    : nameEng,
                                 count: i.count
-                            }));
-                        } else {
-                            const items = level === 'families' ? data.families : data.genuses;
-                            const rank = level === 'families' ? 'family' : 'genus';
-                            newMeta[level] = (items || []).map((i: any) => ({
-                                // 使用英文 (en) 作為過濾用的 name
-                                name: i.en || i.name,
-                                // 顯示用中文或英文
-                                display: language === 'zh' ? (i.name || i.en) : (i.en || i.name),
-                                count: i.count
-                            })).sort((a: any, b: any) => b.count - a.count);
-                        }
+                            };
+                        }).sort((a: any, b: any) => b.count - a.count);
                     }
                 });
                 
@@ -328,12 +322,6 @@ export default function HomeClient() {
           Object.entries(tableFilters).forEach(([key, value]) => {
             if (!value || (Array.isArray(value) && value.length === 0)) return;
             
-            // 如果該欄位是「全選」，則不加入 .in 過濾器以提升效能
-            const availableOptions = tableMetadata[key] || [];
-            if (Array.isArray(value) && availableOptions.length > 0 && value.length >= availableOptions.length) {
-              return;
-            }
-
             // Map table keys to actual DB columns - 統一使用英文欄位作為 Filter Key
             const dbKey = key === 'common_name' 
               ? 'common_name_chi'

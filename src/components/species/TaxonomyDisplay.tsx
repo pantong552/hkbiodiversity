@@ -37,7 +37,7 @@ export default function TaxonomyDisplay({ species }: TaxonomyDisplayProps) {
   const levels = isPlant ? [
     { 
       id: 'categories', labelChi: '類別', labelEng: 'Category',
-      chi: (species as any).category_chi, eng: (species as any).category_eng 
+      chi: getTaxonomyChi('category', taxaType, (species as any).category_eng), eng: (species as any).category_eng 
     },
     { 
       id: 'families', labelChi: '科', labelEng: 'Family',
