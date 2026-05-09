@@ -148,7 +148,7 @@ export default function MaintainPage() {
 
       <div className="flex-1 flex flex-col lg:flex-row relative z-10 pt-4 lg:pt-4">
         {/* Left Sidebar - Fixed on Desktop - Compact Version */}
-        <aside className="w-full lg:w-64 xl:w-72 lg:h-[calc(100vh-60px)] lg:sticky lg:top-4 px-4 lg:pl-6 lg:pr-3 mb-6 lg:mb-0 flex flex-col gap-5">
+        <aside className="w-full lg:w-64 xl:w-72 lg:h-[calc(100vh-60px)] lg:sticky lg:top-4 px-4 lg:pl-6 lg:pr-3 mb-6 lg:mb-0 flex flex-col gap-5 flex-shrink-0">
           <div className="space-y-4">
             <Link 
               href="/"
@@ -278,7 +278,7 @@ export default function MaintainPage() {
         </aside>
 
           {/* Main Content Area */}
-          <main className="flex-1 px-4 lg:pr-8 lg:pl-4 pb-20">
+          <main className="flex-1 px-4 lg:pr-8 lg:pl-4 pb-20 min-w-0">
             <motion.div
               key={activeTab}
               initial={{ opacity: 0, x: 20 }}

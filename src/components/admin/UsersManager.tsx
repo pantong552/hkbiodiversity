@@ -366,7 +366,7 @@ export default function UsersManager({ onRequestConfirm }: UsersManagerProps) {
                 {filteredAndSortedProfiles.map((profile) => (
                   <tr 
                     key={profile.id} 
-                    className={`hover:bg-white/40 transition-all duration-200 group ${profile.status === 'blocked' ? 'opacity-50 grayscale' : ''}`}
+                    className={`hover:bg-emerald-50/60 hover:shadow-lg hover:shadow-slate-200/40 transition-all duration-300 group cursor-pointer ${profile.status === 'blocked' ? 'opacity-50 grayscale' : ''}`}
                   >
                     <td className="px-4 py-2 border-b border-white/10">
                       <div className="flex items-center gap-2.5">

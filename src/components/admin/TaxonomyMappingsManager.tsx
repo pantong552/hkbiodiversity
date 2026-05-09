@@ -83,6 +83,42 @@ export default function TaxonomyMappingsManager({ mode, onRequestConfirm }: Taxo
   const rankFilterRef = useClickOutside(() => setShowRankFilter(false));
   const groupFilterRef = useClickOutside(() => setShowGroupFilter(false));
 
+  // Column Resizing State
+  const [columnWidths, setColumnWidths] = useState<Record<string, number>>({
+    rank: 100,
+    name_eng: 220,
+    name_chi: 250
+  });
+  const resizingRef = useRef<{ key: string; startX: number; startWidth: number } | null>(null);
+
+  const handleMouseDown = (key: string, e: React.MouseEvent) => {
+    resizingRef.current = {
+      key,
+      startX: e.pageX,
+      startWidth: columnWidths[key]
+    };
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
+  };
+
+  const handleMouseMove = (e: MouseEvent) => {
+    if (!resizingRef.current) return;
+    const { key, startX, startWidth } = resizingRef.current;
+    const deltaX = e.pageX - startX;
+    const newWidth = Math.max(80, startWidth + deltaX);
+    setColumnWidths(prev => ({ ...prev, [key]: newWidth }));
+  };
+
+  const handleMouseUp = () => {
+    resizingRef.current = null;
+    document.removeEventListener('mousemove', handleMouseMove);
+    document.removeEventListener('mouseup', handleMouseUp);
+    document.body.style.cursor = '';
+    document.body.style.userSelect = '';
+  };
+
   const uniqueRanks = useMemo(() => {
     const ranks = Array.from(new Set(data.map(d => d.rank)));
     return ranks.sort((a, b) => {
@@ -469,10 +505,14 @@ export default function TaxonomyMappingsManager({ mode, onRequestConfirm }: Taxo
         </div>
       ) : (
         <div className="overflow-visible rounded-[1.5rem] border border-white bg-white/30 backdrop-blur-xl shadow-sm overflow-x-auto">
-          <table className="w-full text-left border-collapse min-w-[700px]">
+          <table className="w-max text-left border-collapse table-fixed">
             <thead>
               <tr className="bg-slate-50/50 border-b border-slate-100">
-                <th ref={rankFilterRef as any} className="px-4 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest relative">
+                <th 
+                  ref={rankFilterRef as any} 
+                  style={{ width: columnWidths.rank }}
+                  className="px-4 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest relative group/header"
+                >
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2 cursor-pointer group" onClick={() => requestSort('rank')}>
                       {t('admin.rank')}
@@ -482,6 +522,13 @@ export default function TaxonomyMappingsManager({ mode, onRequestConfirm }: Taxo
                       <Filter className={`w-3 h-3 ${rankFilters.length > 0 ? 'text-emerald-500' : 'text-slate-300'}`} />
                     </button>
                   </div>
+                  
+                  {/* Resizer Handle */}
+                  <div 
+                    onMouseDown={(e) => handleMouseDown('rank', e)}
+                    className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize group-hover/header:bg-emerald-500/20 active:bg-emerald-500 transition-colors z-30"
+                  />
+
                   <AnimatePresence>
                     {showRankFilter && (
                       <motion.div 
@@ -505,18 +552,36 @@ export default function TaxonomyMappingsManager({ mode, onRequestConfirm }: Taxo
                   </AnimatePresence>
                 </th>
 
-                <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest cursor-pointer group" onClick={() => requestSort('name_eng')}>
-                  <div className="flex items-center gap-2">
+                <th 
+                  style={{ width: columnWidths.name_eng }}
+                  className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest cursor-pointer group/header relative" 
+                >
+                  <div className="flex items-center gap-2" onClick={() => requestSort('name_eng')}>
                     {t('admin.name_eng')}
                     <SortIcon column="name_eng" />
                   </div>
+                  
+                  {/* Resizer Handle */}
+                  <div 
+                    onMouseDown={(e) => handleMouseDown('name_eng', e)}
+                    className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize group-hover/header:bg-emerald-500/20 active:bg-emerald-500 transition-colors z-30"
+                  />
                 </th>
 
-                <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest cursor-pointer group" onClick={() => requestSort('name_chi')}>
-                  <div className="flex items-center gap-2">
+                <th 
+                  style={{ width: columnWidths.name_chi }}
+                  className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest cursor-pointer group/header relative" 
+                >
+                  <div className="flex items-center gap-2" onClick={() => requestSort('name_chi')}>
                     {t('admin.name_chi')}
                     <SortIcon column="name_chi" />
                   </div>
+
+                  {/* Resizer Handle */}
+                  <div 
+                    onMouseDown={(e) => handleMouseDown('name_chi', e)}
+                    className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize group-hover/header:bg-emerald-500/20 active:bg-emerald-500 transition-colors z-30"
+                  />
                 </th>
               </tr>
             </thead>
@@ -532,7 +597,7 @@ export default function TaxonomyMappingsManager({ mode, onRequestConfirm }: Taxo
                 const isActionLoading = actionLoading === loadingKey;
 
                 return (
-                  <tr key={rowId} className="hover:bg-white/40 transition-all duration-200 group border-b border-white/10">
+                  <tr key={rowId} className="hover:bg-emerald-50/60 hover:shadow-lg hover:shadow-slate-200/40 transition-all duration-300 group border-b border-white/10 cursor-pointer">
                     <td className="px-4 py-2 text-[11px] font-black text-slate-400 uppercase">{item.rank}</td>
                     
                     {/* Editable Eng Name */}
