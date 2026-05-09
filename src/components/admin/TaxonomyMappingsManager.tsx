@@ -158,7 +158,7 @@ export default function TaxonomyMappingsManager({ mode, onRequestConfirm }: Taxo
       // 1. Fetch ALL taxonomy names from species/plant_species table (with pagination)
       const distinctPromises = Object.entries(rankFields).map(async ([rank, field]) => {
         const selectFields = mode === 'fauna' ? `${field}, taxa_group` : `${field}, category_eng`;
-        const uniqueMap = new Map<string, string>();
+        const uniqueMap = new Map<string, { group: string; count: number }>();
         let offset = 0;
         const limit = 1000;
 
@@ -189,7 +189,7 @@ export default function TaxonomyMappingsManager({ mode, onRequestConfirm }: Taxo
 
         return Array.from(uniqueMap.entries()).map(([key, info]) => {
           const [name] = key.split('||');
-          return { rank, name_eng: name, taxa_group: (info as any).group, species_count: (info as any).count };
+          return { rank, name_eng: name, taxa_group: info.group, species_count: info.count };
         });
       });
 
