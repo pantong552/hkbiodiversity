@@ -32,10 +32,11 @@ interface TaxonomyMapping {
   taxa_group?: string;
   name_eng: string;
   name_chi: string;
+  species_count?: number;
   is_from_mappings?: boolean;
 }
 
-type SortKey = 'rank' | 'name_eng' | 'name_chi' | 'taxa_group';
+type SortKey = 'rank' | 'name_eng' | 'name_chi' | 'taxa_group' | 'species_count';
 type SortDirection = 'asc' | 'desc';
 
 // Define the mapping between internal ranks and database columns
@@ -89,7 +90,8 @@ export default function TaxonomyMappingsManager({ mode, onRequestConfirm }: Taxo
   const [columnWidths, setColumnWidths] = useState<Record<string, number>>({
     rank: 100,
     name_eng: 220,
-    name_chi: 250
+    name_chi: 250,
+    species_count: 100
   });
   const resizingRef = useRef<{ key: string; startX: number; startWidth: number } | null>(null);
 
@@ -175,7 +177,9 @@ export default function TaxonomyMappingsManager({ mode, onRequestConfirm }: Taxo
             if (name) {
               const group = (item as any).taxa_group || (mode === 'flora' ? (item as any).category_eng : '');
               const key = `${name}||${group}`;
-              uniqueMap.set(key, group);
+              
+              const current = uniqueMap.get(key) || { group, count: 0 };
+              uniqueMap.set(key, { ...current, count: current.count + 1 });
             }
           });
 
@@ -183,9 +187,9 @@ export default function TaxonomyMappingsManager({ mode, onRequestConfirm }: Taxo
           offset += limit;
         }
 
-        return Array.from(uniqueMap.entries()).map(([key, group]) => {
+        return Array.from(uniqueMap.entries()).map(([key, info]) => {
           const [name] = key.split('||');
-          return { rank, name_eng: name, taxa_group: group };
+          return { rank, name_eng: name, taxa_group: (info as any).group, species_count: (info as any).count };
         });
       });
 
@@ -220,6 +224,7 @@ export default function TaxonomyMappingsManager({ mode, onRequestConfirm }: Taxo
           taxa_group: st.taxa_group,
           name_eng: st.name_eng,
           name_chi: mapping?.name_chi || '',
+          species_count: st.species_count,
           is_from_mappings: !!mapping
         };
       });
@@ -380,10 +385,17 @@ export default function TaxonomyMappingsManager({ mode, onRequestConfirm }: Taxo
     }
 
     result.sort((a, b) => {
-      const aVal = String(a[sortConfig.key] || '').toLowerCase();
-      const bVal = String(b[sortConfig.key] || '').toLowerCase();
-      if (aVal < bVal) return sortConfig.direction === 'asc' ? -1 : 1;
-      if (aVal > bVal) return sortConfig.direction === 'asc' ? 1 : -1;
+      const aVal = a[sortConfig.key];
+      const bVal = b[sortConfig.key];
+
+      if (typeof aVal === 'number' && typeof bVal === 'number') {
+        return sortConfig.direction === 'asc' ? aVal - bVal : bVal - aVal;
+      }
+
+      const sA = String(aVal || '').toLowerCase();
+      const sB = String(bVal || '').toLowerCase();
+      if (sA < sB) return sortConfig.direction === 'asc' ? -1 : 1;
+      if (sA > sB) return sortConfig.direction === 'asc' ? 1 : -1;
       return 0;
     });
 
@@ -399,7 +411,7 @@ export default function TaxonomyMappingsManager({ mode, onRequestConfirm }: Taxo
   };
 
   const SortIcon = ({ column }: { column: SortKey }) => {
-    if (sortConfig.key !== column) return <ArrowUpDown className="w-3 h-3 text-slate-300 opacity-0 group-hover:opacity-100 transition-opacity" />;
+    if (sortConfig.key !== column) return <ArrowUpDown className="w-3 h-3 text-slate-200 transition-colors" />;
     return sortConfig.direction === 'asc' ? <ArrowUp className="w-3 h-3 text-emerald-500" /> : <ArrowDown className="w-3 h-3 text-emerald-500" />;
   };
 
@@ -596,6 +608,22 @@ export default function TaxonomyMappingsManager({ mode, onRequestConfirm }: Taxo
                     className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize group-hover/header:bg-emerald-500/20 active:bg-emerald-500 transition-colors z-30"
                   />
                 </th>
+
+                <th 
+                  style={{ width: columnWidths.species_count }}
+                  className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest cursor-pointer group/header relative" 
+                >
+                  <div className="flex items-center gap-2" onClick={() => requestSort('species_count')}>
+                    {language === 'zh' ? '數量' : 'Count'}
+                    <SortIcon column="species_count" />
+                  </div>
+
+                  {/* Resizer Handle */}
+                  <div 
+                    onMouseDown={(e) => handleMouseDown('species_count', e)}
+                    className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize group-hover/header:bg-emerald-500/20 active:bg-emerald-500 transition-colors z-30"
+                  />
+                </th>
               </tr>
             </thead>
             <tbody className="bg-white/20">
@@ -687,6 +715,16 @@ export default function TaxonomyMappingsManager({ mode, onRequestConfirm }: Taxo
                           <Edit2 className="w-2.5 h-2.5 text-emerald-500 opacity-0 group-hover/cell:opacity-100 transition-opacity ml-2" />
                         </div>
                       )}
+                    </td>
+
+                    {/* Species Count */}
+                    <td className="px-6 py-2">
+                      <div className="flex items-center gap-2">
+                        <span className="px-2 py-0.5 bg-slate-100 text-slate-600 rounded-lg text-[10px] font-black min-w-[32px] text-center shadow-sm border border-slate-200/50">
+                          {item.species_count || 0}
+                        </span>
+                        <span className="text-[9px] text-slate-400 font-bold uppercase tracking-tighter">Species</span>
+                      </div>
                     </td>
                   </tr>
                 );
