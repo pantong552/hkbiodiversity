@@ -40,6 +40,22 @@ function CustomConfirmModal({
   confirmText: string;
   cancelText: string;
 }) {
+  useEffect(() => {
+    if (!isOpen) return;
+    
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        onConfirm();
+      } else if (e.key === 'Escape') {
+        onClose();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, onConfirm, onClose]);
+
   return (
     <AnimatePresence>
       {isOpen && (
@@ -92,20 +108,28 @@ export default function MaintainPage() {
   const { t } = useLanguage();
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<AdminTab>('users');
-  const [confirmModal, setConfirmModal] = useState<{ isOpen: boolean; onConfirm: (() => void) | null }>({
+  const [confirmModal, setConfirmModal] = useState<{ 
+    isOpen: boolean; 
+    onConfirm: (() => void) | null;
+    title?: string;
+    message?: string;
+  }>({
     isOpen: false,
     onConfirm: null
   });
 
   useEffect(() => {
-    if (!isLoading && (!profile || profile.role !== 'admin')) {
+    if (!isLoading && !profile) {
+      router.push('/account');
+    }
+    if (!isLoading && profile && profile.role !== 'admin') {
       router.push('/');
     }
   }, [profile, isLoading, router]);
 
   if (isLoading || !profile || profile.role !== 'admin') {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-50">
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
         <div className="flex flex-col items-center gap-4">
           <div className="w-12 h-12 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin" />
           <p className="text-slate-500 font-bold animate-pulse">Verifying Permissions...</p>
@@ -167,7 +191,8 @@ export default function MaintainPage() {
               <ChevronRight className={`w-3.5 h-3.5 transition-transform ${activeTab === 'users' ? 'opacity-100' : 'opacity-0 -translate-x-2'}`} />
             </button>
 
-            <div className="space-y-1">
+            {/* Taxonomy Management with Sub-options */}
+            <div className="flex flex-col">
               <div 
                 className={`flex items-center justify-between p-3 rounded-2xl cursor-pointer transition-all duration-200 group outline-none select-none ${
                   activeTab.startsWith('taxonomy') 
@@ -188,21 +213,43 @@ export default function MaintainPage() {
               <AnimatePresence>
                 {activeTab.startsWith('taxonomy') && (
                   <motion.div 
-                    initial={{ opacity: 0, height: 0 }}
-                    animate={{ opacity: 1, height: 'auto' }}
-                    exit={{ opacity: 0, height: 0 }}
-                    className="ml-6 border-l-2 border-emerald-100/50 flex flex-col gap-1 py-1"
+                    initial={{ height: 0, opacity: 0 }}
+                    animate={{ height: 'auto', opacity: 1 }}
+                    exit={{ height: 0, opacity: 0 }}
+                    className="overflow-hidden flex flex-col ml-12 border-l border-slate-100 gap-1 mt-1 mb-2"
                   >
                     <button 
                       onClick={() => setActiveTab('taxonomy-fauna')}
-                      className={`text-left px-4 py-2 rounded-xl text-xs font-bold transition-all ${activeTab === 'taxonomy-fauna' ? 'text-emerald-600 bg-emerald-50' : 'text-slate-400 hover:text-emerald-500'}`}
+                      className={`relative text-left pl-6 pr-4 py-2.5 rounded-xl text-[11px] font-black uppercase tracking-wider transition-all duration-300 flex items-center ${
+                        activeTab === 'taxonomy-fauna' 
+                          ? 'text-emerald-700 bg-gradient-to-r from-emerald-50 to-transparent' 
+                          : 'text-slate-400 hover:text-emerald-600 hover:bg-emerald-50/30 hover:translate-x-1'
+                      }`}
                     >
+                      {activeTab === 'taxonomy-fauna' && (
+                        <motion.div 
+                          layoutId="submenu-active-indicator"
+                          className="absolute left-[-1px] top-2 bottom-2 w-0.5 bg-emerald-500 rounded-full"
+                          transition={{ type: "spring", stiffness: 300, damping: 30 }}
+                        />
+                      )}
                       {t('admin.taxa_fauna')}
                     </button>
                     <button 
                       onClick={() => setActiveTab('taxonomy-flora')}
-                      className={`text-left px-4 py-2 rounded-xl text-xs font-bold transition-all ${activeTab === 'taxonomy-flora' ? 'text-emerald-600 bg-emerald-50' : 'text-slate-400 hover:text-emerald-500'}`}
+                      className={`relative text-left pl-6 pr-4 py-2.5 rounded-xl text-[11px] font-black uppercase tracking-wider transition-all duration-300 flex items-center ${
+                        activeTab === 'taxonomy-flora' 
+                          ? 'text-emerald-700 bg-gradient-to-r from-emerald-50 to-transparent' 
+                          : 'text-slate-400 hover:text-emerald-600 hover:bg-emerald-50/30 hover:translate-x-1'
+                      }`}
                     >
+                      {activeTab === 'taxonomy-flora' && (
+                        <motion.div 
+                          layoutId="submenu-active-indicator"
+                          className="absolute left-[-1px] top-2 bottom-2 w-0.5 bg-emerald-500 rounded-full"
+                          transition={{ type: "spring", stiffness: 300, damping: 30 }}
+                        />
+                      )}
                       {t('admin.taxa_flora')}
                     </button>
                   </motion.div>
@@ -227,7 +274,6 @@ export default function MaintainPage() {
               <ChevronRight className={`w-3.5 h-3.5 transition-transform ${activeTab === 'taxa' ? 'opacity-100' : 'opacity-0 -translate-x-2'}`} />
             </button>
             
-            {/* Help box removed */}
           </nav>
         </aside>
 
@@ -248,12 +294,33 @@ export default function MaintainPage() {
               </div>
               {activeTab === 'users' ? (
                 <UsersManager 
-                  onRequestConfirm={(onConfirm) => setConfirmModal({ isOpen: true, onConfirm })} 
+                  onRequestConfirm={(onConfirm) => setConfirmModal({ 
+                    isOpen: true, 
+                    onConfirm,
+                    title: t('admin.confirm_remove_title'),
+                    message: t('admin.confirm_remove')
+                  })} 
                 />
               ) : activeTab === 'taxonomy-fauna' ? (
-                <TaxonomyMappingsManager mode="fauna" />
+                <TaxonomyMappingsManager 
+                  mode="fauna" 
+                  onRequestConfirm={(onConfirm, title, message) => setConfirmModal({ 
+                    isOpen: true, 
+                    onConfirm,
+                    title: title || t('admin.confirm_remove_title'),
+                    message: message || t('admin.confirm_remove')
+                  })} 
+                />
               ) : activeTab === 'taxonomy-flora' ? (
-                <TaxonomyMappingsManager mode="flora" />
+                <TaxonomyMappingsManager 
+                  mode="flora" 
+                  onRequestConfirm={(onConfirm, title, message) => setConfirmModal({ 
+                    isOpen: true, 
+                    onConfirm,
+                    title: title || t('admin.confirm_remove_title'),
+                    message: message || t('admin.confirm_remove')
+                  })} 
+                />
               ) : <TaxaManager />}
             </motion.div>
           </main>
@@ -261,13 +328,13 @@ export default function MaintainPage() {
 
       <CustomConfirmModal 
         isOpen={confirmModal.isOpen}
-        onClose={() => setConfirmModal({ isOpen: false, onConfirm: null })}
+        onClose={() => setConfirmModal({ ...confirmModal, isOpen: false, onConfirm: null })}
         onConfirm={() => {
           if (confirmModal.onConfirm) confirmModal.onConfirm();
-          setConfirmModal({ isOpen: false, onConfirm: null });
+          setConfirmModal({ ...confirmModal, isOpen: false, onConfirm: null });
         }}
-        title={t('admin.confirm_remove_title')}
-        message={t('admin.confirm_remove')}
+        title={confirmModal.title || t('admin.confirm_remove_title')}
+        message={confirmModal.message || t('admin.confirm_remove')}
         confirmText={t('common.confirm')}
         cancelText={t('common.cancel')}
       />

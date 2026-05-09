@@ -14,24 +14,27 @@ import {
   Check,
   Edit2,
   X,
-  AlertCircle
+  AlertCircle,
+  ChevronDown
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 interface TaxonomyMappingsManagerProps {
   mode: 'fauna' | 'flora';
+  onRequestConfirm: (action: () => Promise<void>, title?: string, message?: string) => void;
 }
 
 interface TaxonomyMapping {
   id?: number | string;
   rank: string;
   taxa_type: string;
+  taxa_group?: string;
   name_eng: string;
   name_chi: string;
   is_from_mappings?: boolean;
 }
 
-type SortKey = 'rank' | 'name_eng' | 'name_chi';
+type SortKey = 'rank' | 'name_eng' | 'name_chi' | 'taxa_group';
 type SortDirection = 'asc' | 'desc';
 
 // Define the mapping between internal ranks and database columns
@@ -49,7 +52,7 @@ const RANK_FIELD_MAP = {
   } as Record<string, string>
 };
 
-export default function TaxonomyMappingsManager({ mode }: TaxonomyMappingsManagerProps) {
+export default function TaxonomyMappingsManager({ mode, onRequestConfirm }: TaxonomyMappingsManagerProps) {
   const { language, t } = useLanguage();
   const supabase = createClient();
   const [data, setData] = useState<TaxonomyMapping[]>([]);
@@ -72,10 +75,26 @@ export default function TaxonomyMappingsManager({ mode }: TaxonomyMappingsManage
   });
   const [rankFilters, setRankFilters] = useState<string[]>([]);
   const [showRankFilter, setShowRankFilter] = useState(false);
+  const [groupFilters, setGroupFilters] = useState<string[]>(['Amphibian']);
+  const [showGroupFilter, setShowGroupFilter] = useState(false);
   const [showMissingOnly, setShowMissingOnly] = useState(false);
 
   // Click Outside Refs
   const rankFilterRef = useClickOutside(() => setShowRankFilter(false));
+  const groupFilterRef = useClickOutside(() => setShowGroupFilter(false));
+
+  const uniqueRanks = useMemo(() => {
+    const ranks = Array.from(new Set(data.map(d => d.rank)));
+    return ranks.sort((a, b) => {
+      const order = ['class', 'order', 'family', 'genus'];
+      return order.indexOf(a) - order.indexOf(b);
+    });
+  }, [data]);
+
+  const uniqueGroups = useMemo(() => {
+    const groups = Array.from(new Set(data.map(d => d.taxa_group).filter(Boolean))) as string[];
+    return groups.sort();
+  }, [data]);
 
   useEffect(() => {
     fetchData();
@@ -88,17 +107,40 @@ export default function TaxonomyMappingsManager({ mode }: TaxonomyMappingsManage
       const targetTable = mode === 'fauna' ? 'species' : 'plant_species';
       const rankFields = RANK_FIELD_MAP[mode];
 
-      // 1. Fetch DISTINCT taxonomy names from species/plant_species table
-      // Note: We perform multiple queries because DISTINCT on multiple columns is not directly supported via Supabase JS select
+      // 1. Fetch ALL taxonomy names from species/plant_species table (with pagination)
       const distinctPromises = Object.entries(rankFields).map(async ([rank, field]) => {
-        const { data: distinctData, error } = await supabase
-          .from(targetTable)
-          .select(field)
-          .not(field, 'is', null);
-        
-        if (error) throw error;
-        const uniqueValues = Array.from(new Set(distinctData.map(item => item[field] as string)));
-        return uniqueValues.map(name => ({ rank, name_eng: name }));
+        const selectFields = mode === 'fauna' ? `${field}, taxa_group` : field;
+        const uniqueMap = new Map<string, string>();
+        let offset = 0;
+        const limit = 1000;
+
+        while (true) {
+          const { data: batchData, error } = await supabase
+            .from(targetTable)
+            .select(selectFields)
+            .not(field, 'is', null)
+            .range(offset, offset + limit - 1);
+          
+          if (error) throw error;
+          if (!batchData || batchData.length === 0) break;
+
+          batchData.forEach(item => {
+            const name = (item[field] as string || '').trim();
+            if (name) {
+              const group = item.taxa_group || (mode === 'flora' ? 'FLORA' : '');
+              const key = `${name}||${group}`;
+              uniqueMap.set(key, group);
+            }
+          });
+
+          if (batchData.length < limit) break;
+          offset += limit;
+        }
+
+        return Array.from(uniqueMap.entries()).map(([key, group]) => {
+          const [name] = key.split('||');
+          return { rank, name_eng: name, taxa_group: group };
+        });
       });
 
       const rawResults = await Promise.all(distinctPromises);
@@ -129,6 +171,7 @@ export default function TaxonomyMappingsManager({ mode }: TaxonomyMappingsManage
           id: mapping?.id,
           rank: st.rank,
           taxa_type: taxaType,
+          taxa_group: st.taxa_group,
           name_eng: st.name_eng,
           name_chi: mapping?.name_chi || '',
           is_from_mappings: !!mapping
@@ -150,8 +193,7 @@ export default function TaxonomyMappingsManager({ mode }: TaxonomyMappingsManage
       return;
     }
 
-    const itemId = item.id || `${item.rank}-${item.taxa_type}-${item.name_eng}`;
-    setActionLoading(itemId);
+    const loadingKey = item.id || `${item.rank}-${item.taxa_type}-${item.taxa_group || ''}-${item.name_eng}`;
     
     try {
       const taxaType = mode === 'fauna' ? 'fauna' : 'flora';
@@ -159,23 +201,65 @@ export default function TaxonomyMappingsManager({ mode }: TaxonomyMappingsManage
       const dbField = RANK_FIELD_MAP[mode][item.rank];
 
       if (field === 'name_eng') {
-        // --- MODIFYING ENGLISH NAME (Heavy Sync Operation) ---
+        // --- MODIFYING ENGLISH NAME (Merge / Sync Logic) ---
+        const normalizedNewValue = newValue.trim();
         
-        // 1. Update Taxonomy Mappings table
-        if (item.is_from_mappings && item.id) {
-          const { error } = await supabase.from('taxonomy_mappings').update({ name_eng: newValue }).eq('id', item.id);
-          if (error) throw error;
+        // 1. Check if the target name already exists in OUR LOCAL DATA (which includes species table results)
+        const targetExists = data.some(d => 
+          d.rank === item.rank && 
+          d.name_eng.trim().toLowerCase() === normalizedNewValue.toLowerCase() &&
+          d.name_eng.trim() !== oldValue.trim() // Ensure it's not the current item itself
+        );
+
+        if (targetExists) {
+          // TARGET EXISTS: This is a MERGE operation
+          setEditingCell({ id: null, field: null });
+          
+          const title = language === 'zh' ? '分類合併確認' : 'Taxonomy Merge Confirmation';
+          const message = language === 'zh' 
+            ? `警告：目標名稱 "${normalizedNewValue}" 已存在。\n\n所有原本屬於 "${oldValue}" 的物種將會被合併到 "${normalizedNewValue}" 之下。此操作無法復原，您確定要繼續嗎？`
+            : `Warning: Target name "${normalizedNewValue}" already exists.\n\nAll species currently under "${oldValue}" will be merged into "${normalizedNewValue}". This action cannot be undone. Do you want to proceed?`;
+
+          onRequestConfirm(async () => {
+            setActionLoading(loadingKey);
+            try {
+              // A. Update all species/plants to the NEW (existing) name
+              const { error: syncError } = await supabase.from(targetTable).update({ [dbField]: normalizedNewValue }).eq(dbField, oldValue);
+              if (syncError) throw syncError;
+
+              // B. Delete the old mapping record if it existed
+              if (item.is_from_mappings && item.id) {
+                const { error: delError } = await supabase.from('taxonomy_mappings').delete().eq('id', item.id);
+                if (delError) throw delError;
+              }
+
+              // C. Update local state
+              await fetchData();
+            } finally {
+              setActionLoading(null);
+            }
+          }, title, message);
+          return;
+        } else {
+          // TARGET DOES NOT EXIST: Standard Rename
+          setActionLoading(loadingKey);
+          // A. Update Taxonomy Mappings table
+          if (item.is_from_mappings && item.id) {
+            const { error } = await supabase.from('taxonomy_mappings').update({ name_eng: normalizedNewValue }).eq('id', item.id);
+            if (error) throw error;
+          }
+
+          // B. Update all occurrences in Species/Plant_Species table
+          const { error: syncError } = await supabase.from(targetTable).update({ [dbField]: normalizedNewValue }).eq(dbField, oldValue);
+          if (syncError) throw syncError;
+
+          // C. Refresh data to reflect the name change across all lists
+          await fetchData();
         }
-
-        // 2. Update all occurrences in Species/Plant_Species table
-        const { error: syncError } = await supabase.from(targetTable).update({ [dbField]: newValue }).eq(dbField, oldValue);
-        if (syncError) throw syncError;
-
-        // Update local state
-        setData(data.map(d => (d.rank === item.rank && d.name_eng === oldValue) ? { ...d, name_eng: newValue } : d));
 
       } else if (field === 'name_chi') {
         // --- MODIFYING CHINESE NAME ---
+        setActionLoading(loadingKey);
 
         if (item.is_from_mappings && item.id) {
           // Update existing
@@ -226,10 +310,12 @@ export default function TaxonomyMappingsManager({ mode }: TaxonomyMappingsManage
     setSortConfig({ key, direction });
   };
 
-  const uniqueRanks = useMemo(() => Array.from(new Set(data.map(m => m.rank))).sort(), [data]);
-
   const filteredAndSortedData = useMemo(() => {
     let result = [...data];
+
+    if (groupFilters.length > 0) {
+      result = result.filter(item => item.taxa_group && groupFilters.includes(item.taxa_group));
+    }
 
     if (showMissingOnly) {
       result = result.filter(m => !m.name_chi || m.name_chi.trim() === '');
@@ -256,7 +342,7 @@ export default function TaxonomyMappingsManager({ mode }: TaxonomyMappingsManage
     });
 
     return result;
-  }, [data, searchQuery, rankFilters, sortConfig, showMissingOnly]);
+  }, [data, searchQuery, rankFilters, groupFilters, sortConfig, showMissingOnly]);
 
   const toggleFilter = (list: string[], setList: (l: string[]) => void, value: string) => {
     if (list.includes(value)) {
@@ -275,20 +361,65 @@ export default function TaxonomyMappingsManager({ mode }: TaxonomyMappingsManage
     <div className="space-y-4">
       {/* Search Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div className="flex flex-col gap-1">
-          <div className="relative group w-full max-w-md">
-            <div className="absolute inset-0 bg-emerald-500/5 blur-xl rounded-2xl transition-all group-focus-within:bg-emerald-500/10" />
-            <div className="relative flex items-center bg-white/60 backdrop-blur-xl border border-white/80 rounded-2xl px-4 py-2 transition-all focus-within:border-emerald-400">
-              <Search className="w-4 h-4 text-slate-400 mr-2.5" />
-              <input 
-                type="text" 
-                placeholder={t('admin.search_taxonomy')}
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full bg-transparent border-none outline-none text-slate-700 text-sm font-medium placeholder:text-slate-400"
-              />
+        <div className="flex flex-col gap-1 w-full max-w-xl">
+          <div className="flex items-center gap-3">
+            {/* Taxa Group Filter Dropdown */}
+            <div className="relative" ref={groupFilterRef}>
+              <button 
+                onClick={() => setShowGroupFilter(!showGroupFilter)}
+                className={`flex items-center gap-2 px-4 py-2 bg-white/60 backdrop-blur-xl border border-white/80 rounded-2xl text-xs font-bold transition-all hover:bg-white/80 ${groupFilters.length > 0 ? 'text-emerald-600 border-emerald-200' : 'text-slate-500'}`}
+              >
+                <Filter className="w-3.5 h-3.5" />
+                <span>{groupFilters.length === 0 ? t('admin.taxa_group') : `${t('admin.taxa_group')} (${groupFilters.length})`}</span>
+                <ChevronDown className={`w-3.5 h-3.5 transition-transform ${showGroupFilter ? 'rotate-180' : ''}`} />
+              </button>
+
+              <AnimatePresence>
+                {showGroupFilter && (
+                  <motion.div 
+                    initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    exit={{ opacity: 0, y: 10, scale: 0.95 }}
+                    className="absolute top-full left-0 mt-2 w-56 bg-white rounded-2xl shadow-2xl shadow-slate-200/50 border border-slate-100 p-2 z-[60]"
+                  >
+                    <div className="px-2 py-1.5 mb-1 border-b border-slate-50 flex items-center justify-between">
+                      <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{t('admin.taxa_group')}</span>
+                      {groupFilters.length > 0 && (
+                        <button onClick={() => setGroupFilters([])} className="text-[9px] font-bold text-red-500 hover:underline">Reset</button>
+                      )}
+                    </div>
+                    <div className="max-h-64 overflow-y-auto space-y-0.5 custom-scrollbar">
+                      {uniqueGroups.map(group => (
+                        <button 
+                          key={group}
+                          onClick={() => toggleFilter(groupFilters, setGroupFilters, group)}
+                          className={`w-full flex items-center justify-between px-3 py-2 text-xs font-bold rounded-xl transition-all ${groupFilters.includes(group) ? 'bg-emerald-50 text-emerald-600' : 'text-slate-500 hover:bg-slate-50'}`}
+                        >
+                          {group}
+                          {groupFilters.includes(group) && <Check className="w-3.5 h-3.5" />}
+                        </button>
+                      ))}
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+
+            <div className="relative group flex-1">
+              <div className="absolute inset-0 bg-emerald-500/5 blur-xl rounded-2xl transition-all group-focus-within:bg-emerald-500/10" />
+              <div className="relative flex items-center bg-white/60 backdrop-blur-xl border border-white/80 rounded-2xl px-4 py-2 transition-all focus-within:border-emerald-400">
+                <Search className="w-4 h-4 text-slate-400 mr-2.5" />
+                <input 
+                  type="text" 
+                  placeholder={t('admin.search_taxonomy')}
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full bg-transparent border-none outline-none text-slate-700 text-sm font-medium placeholder:text-slate-400"
+                />
+              </div>
             </div>
           </div>
+          
           <div className="flex items-center gap-2 mt-1 ml-4">
             <p className="text-[9px] text-slate-400 font-medium flex items-center gap-1">
               <Edit2 className="w-2.5 h-2.5" /> {t('admin.edit_hint')}
@@ -315,10 +446,11 @@ export default function TaxonomyMappingsManager({ mode }: TaxonomyMappingsManage
           <div className="px-3 py-1 bg-white/40 border border-white rounded-full text-[10px] font-bold text-slate-500">
             Total: <span className="text-emerald-600 font-black ml-1">{filteredAndSortedData.length}</span>
           </div>
-          {(rankFilters.length > 0 || searchQuery || showMissingOnly) && (
+          {(rankFilters.length > 0 || groupFilters.length > 0 || searchQuery || showMissingOnly) && (
             <button 
               onClick={() => {
                 setRankFilters([]);
+                setGroupFilters([]);
                 setSearchQuery('');
                 setShowMissingOnly(false);
               }}
@@ -389,17 +521,23 @@ export default function TaxonomyMappingsManager({ mode }: TaxonomyMappingsManage
               </tr>
             </thead>
             <tbody className="bg-white/20">
-              {filteredAndSortedData.map((item) => {
-                const itemId = item.id || `${item.rank}-${item.taxa_type}-${item.name_eng}`;
-                const isActionLoading = actionLoading === itemId;
+              {filteredAndSortedData.map((item, index) => {
+                // Generate a unique ID for this row. 
+                // We use index + taxa_group + rank + name to guarantee uniqueness, 
+                // as a single mapping record might be referenced by multiple taxa groups.
+                const rowId = `row-${index}-${item.rank}-${item.taxa_group || ''}-${item.name_eng.trim()}`;
+                
+                // For action loading, we use the specific mapping ID if available, otherwise the composite name
+                const loadingKey = item.id || `${item.rank}-${item.taxa_type}-${item.taxa_group || ''}-${item.name_eng}`;
+                const isActionLoading = actionLoading === loadingKey;
 
                 return (
-                  <tr key={itemId} className="hover:bg-white/40 transition-all duration-200 group border-b border-white/10">
+                  <tr key={rowId} className="hover:bg-white/40 transition-all duration-200 group border-b border-white/10">
                     <td className="px-4 py-2 text-[11px] font-black text-slate-400 uppercase">{item.rank}</td>
                     
                     {/* Editable Eng Name */}
                     <td className="px-6 py-2">
-                      {editingCell.id === itemId && editingCell.field === 'name_eng' ? (
+                      {editingCell.id === rowId && editingCell.field === 'name_eng' ? (
                         <div className="flex items-center gap-2">
                           <input
                             ref={inputRef}
@@ -415,7 +553,14 @@ export default function TaxonomyMappingsManager({ mode }: TaxonomyMappingsManage
                           />
                         </div>
                       ) : (
-                        <div onClick={() => startEditing(item, 'name_eng')} className="flex items-center justify-between group/cell cursor-pointer py-0.5">
+                        <div 
+                          onClick={() => {
+                            setEditingCell({ id: rowId, field: 'name_eng' });
+                            setEditValue(item.name_eng);
+                            setTimeout(() => inputRef.current?.focus(), 50);
+                          }} 
+                          className="flex items-center justify-between group/cell cursor-pointer py-0.5"
+                        >
                           <div className="flex items-center gap-2">
                             {isActionLoading && editingCell.field === 'name_eng' && <Loader2 className="w-2.5 h-2.5 text-emerald-500 animate-spin" />}
                             <span className="font-bold text-slate-700 text-xs italic">{item.name_eng}</span>
@@ -427,7 +572,7 @@ export default function TaxonomyMappingsManager({ mode }: TaxonomyMappingsManage
 
                     {/* Editable Chi Name */}
                     <td className="px-6 py-2">
-                      {editingCell.id === itemId && editingCell.field === 'name_chi' ? (
+                      {editingCell.id === rowId && editingCell.field === 'name_chi' ? (
                         <div className="flex items-center gap-2">
                           <input
                             ref={inputRef}
@@ -443,7 +588,14 @@ export default function TaxonomyMappingsManager({ mode }: TaxonomyMappingsManage
                           />
                         </div>
                       ) : (
-                        <div onClick={() => startEditing(item, 'name_chi')} className="flex items-center justify-between group/cell cursor-pointer py-0.5">
+                        <div 
+                          onClick={() => {
+                            setEditingCell({ id: rowId, field: 'name_chi' });
+                            setEditValue(item.name_chi || '');
+                            setTimeout(() => inputRef.current?.focus(), 50);
+                          }} 
+                          className="flex items-center justify-between group/cell cursor-pointer py-0.5"
+                        >
                           <div className="flex items-center gap-2">
                             {isActionLoading && editingCell.field === 'name_chi' && <Loader2 className="w-2.5 h-2.5 text-emerald-500 animate-spin" />}
                             {item.name_chi ? (
