@@ -10,14 +10,17 @@ import {
   LayoutDashboard, 
   ChevronRight,
   ShieldCheck,
-  ArrowLeft
+  ArrowLeft,
+  ListTree,
+  ChevronDown
 } from 'lucide-react';
 import Link from 'next/link';
 import UsersManager from '@/components/admin/UsersManager';
 import TaxaManager from '@/components/admin/TaxaManager';
+import TaxonomyMappingsManager from '@/components/admin/TaxonomyMappingsManager';
 import { motion, AnimatePresence } from 'framer-motion';
 
-type AdminTab = 'users' | 'taxa';
+type AdminTab = 'users' | 'taxonomy-fauna' | 'taxonomy-flora' | 'taxa';
 
 // --- Custom Confirmation Modal ---
 function CustomConfirmModal({ 
@@ -164,6 +167,49 @@ export default function MaintainPage() {
               <ChevronRight className={`w-3.5 h-3.5 transition-transform ${activeTab === 'users' ? 'opacity-100' : 'opacity-0 -translate-x-2'}`} />
             </button>
 
+            <div className="space-y-1">
+              <div 
+                className={`flex items-center justify-between p-3 rounded-2xl cursor-pointer transition-all duration-200 group outline-none select-none ${
+                  activeTab.startsWith('taxonomy') 
+                    ? 'bg-white shadow-lg shadow-slate-200/40 border border-slate-100 text-slate-900' 
+                    : 'text-slate-500 hover:bg-white/50 border border-transparent'
+                }`}
+                onClick={() => setActiveTab(activeTab === 'taxonomy-fauna' ? 'users' : 'taxonomy-fauna')}
+              >
+                <div className="flex items-center gap-2.5">
+                  <div className={`p-2 rounded-xl transition-colors ${activeTab.startsWith('taxonomy') ? 'bg-emerald-600 text-white' : 'bg-slate-100 text-slate-400 group-hover:bg-emerald-100 group-hover:text-emerald-600'}`}>
+                    <ListTree className="w-4 h-4" />
+                  </div>
+                  <span className="font-bold text-sm">{t('admin.taxonomy_manager')}</span>
+                </div>
+                <ChevronDown className={`w-3.5 h-3.5 transition-transform ${activeTab.startsWith('taxonomy') ? 'rotate-180' : ''}`} />
+              </div>
+              
+              <AnimatePresence>
+                {activeTab.startsWith('taxonomy') && (
+                  <motion.div 
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: 'auto' }}
+                    exit={{ opacity: 0, height: 0 }}
+                    className="ml-6 border-l-2 border-emerald-100/50 flex flex-col gap-1 py-1"
+                  >
+                    <button 
+                      onClick={() => setActiveTab('taxonomy-fauna')}
+                      className={`text-left px-4 py-2 rounded-xl text-xs font-bold transition-all ${activeTab === 'taxonomy-fauna' ? 'text-emerald-600 bg-emerald-50' : 'text-slate-400 hover:text-emerald-500'}`}
+                    >
+                      {t('admin.taxa_fauna')}
+                    </button>
+                    <button 
+                      onClick={() => setActiveTab('taxonomy-flora')}
+                      className={`text-left px-4 py-2 rounded-xl text-xs font-bold transition-all ${activeTab === 'taxonomy-flora' ? 'text-emerald-600 bg-emerald-50' : 'text-slate-400 hover:text-emerald-500'}`}
+                    >
+                      {t('admin.taxa_flora')}
+                    </button>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+
             <button
               onClick={() => setActiveTab('taxa')}
               className={`w-full flex items-center justify-between p-3 rounded-2xl transition-all duration-200 group outline-none select-none active:scale-[0.98] ${
@@ -197,13 +243,17 @@ export default function MaintainPage() {
               <div className="flex items-center justify-between mb-8">
                 <h2 className="text-xl font-black text-slate-800 tracking-tight flex items-center gap-2">
                   <div className="w-2 h-6 bg-emerald-500 rounded-full" />
-                  {activeTab === 'users' ? t('admin.users_manager') : t('admin.taxa_manager')}
+                  {activeTab === 'users' ? t('admin.users_manager') : activeTab === 'taxonomy-fauna' ? t('admin.taxa_fauna') : activeTab === 'taxonomy-flora' ? t('admin.taxa_flora') : t('admin.taxa_manager')}
                 </h2>
               </div>
               {activeTab === 'users' ? (
                 <UsersManager 
                   onRequestConfirm={(onConfirm) => setConfirmModal({ isOpen: true, onConfirm })} 
                 />
+              ) : activeTab === 'taxonomy-fauna' ? (
+                <TaxonomyMappingsManager mode="fauna" />
+              ) : activeTab === 'taxonomy-flora' ? (
+                <TaxonomyMappingsManager mode="flora" />
               ) : <TaxaManager />}
             </motion.div>
           </main>
