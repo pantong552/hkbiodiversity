@@ -16,12 +16,12 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 import UsersManager from '@/components/admin/UsersManager';
-import TaxaManager from '@/components/admin/TaxaManager';
 import TaxonomyMappingsManager from '@/components/admin/TaxonomyMappingsManager';
+import SpeciesManager from '@/components/admin/SpeciesManager';
 import LanguageSwitcher from '@/components/admin/LanguageSwitcher';
 import { motion, AnimatePresence } from 'framer-motion';
 
-type AdminTab = 'users' | 'taxonomy-fauna' | 'taxonomy-flora' | 'taxa';
+type AdminTab = 'users' | 'taxonomy-fauna' | 'taxonomy-flora' | 'species-fauna';
 
 // --- Custom Confirmation Modal ---
 function CustomConfirmModal({ 
@@ -106,7 +106,7 @@ function CustomConfirmModal({
 
 export default function MaintainPage() {
   const { profile, isLoading } = useAuth();
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<AdminTab>('users');
   const [confirmModal, setConfirmModal] = useState<{ 
@@ -258,22 +258,54 @@ export default function MaintainPage() {
               </AnimatePresence>
             </div>
 
-            <button
-              onClick={() => setActiveTab('taxa')}
-              className={`w-full flex items-center justify-between p-3 rounded-2xl transition-all duration-200 group outline-none select-none active:scale-[0.98] ${
-                activeTab === 'taxa' 
-                  ? 'bg-white shadow-lg shadow-slate-200/40 border border-slate-100 text-slate-900' 
-                  : 'text-slate-500 hover:bg-white/50 border border-transparent'
-              }`}
-            >
-              <div className="flex items-center gap-2.5">
-                <div className={`p-2 rounded-xl transition-colors ${activeTab === 'taxa' ? 'bg-emerald-600 text-white' : 'bg-slate-100 text-slate-400 group-hover:bg-emerald-100 group-hover:text-emerald-600'}`}>
-                  <Package className="w-4 h-4" />
+            {/* Species Bank Management with Sub-options */}
+            <div className="flex flex-col">
+              <div 
+                className={`flex items-center justify-between p-3 rounded-2xl cursor-pointer transition-all duration-200 group outline-none select-none ${
+                  activeTab.startsWith('species')
+                    ? 'bg-white shadow-lg shadow-slate-200/40 border border-slate-100 text-slate-900' 
+                    : 'text-slate-500 hover:bg-white/50 border border-transparent'
+                }`}
+                onClick={() => setActiveTab('species-fauna')}
+              >
+                <div className="flex items-center gap-2.5">
+                  <div className={`p-2 rounded-xl transition-colors ${activeTab.startsWith('species') ? 'bg-emerald-600 text-white' : 'bg-slate-100 text-slate-400 group-hover:bg-emerald-100 group-hover:text-emerald-600'}`}>
+                    <Package className="w-4 h-4" />
+                  </div>
+                  <span className="font-bold text-sm">{t('admin.taxa_manager')}</span>
                 </div>
-                <span className="font-bold text-sm">{t('admin.taxa_manager')}</span>
+                <ChevronDown className={`w-3.5 h-3.5 transition-transform ${activeTab.startsWith('species') ? 'rotate-180' : ''}`} />
               </div>
-              <ChevronRight className={`w-3.5 h-3.5 transition-transform ${activeTab === 'taxa' ? 'opacity-100' : 'opacity-0 -translate-x-2'}`} />
-            </button>
+              
+              <AnimatePresence>
+                {activeTab.startsWith('species') && (
+                  <motion.div 
+                    initial={{ height: 0, opacity: 0 }}
+                    animate={{ height: 'auto', opacity: 1 }}
+                    exit={{ height: 0, opacity: 0 }}
+                    className="overflow-hidden flex flex-col ml-12 border-l border-slate-100 gap-1 mt-1 mb-2"
+                  >
+                    <button 
+                      onClick={() => setActiveTab('species-fauna')}
+                      className={`relative text-left pl-6 pr-4 py-2.5 rounded-xl text-[11px] font-black uppercase tracking-wider transition-all duration-300 flex items-center ${
+                        activeTab === 'species-fauna' 
+                          ? 'text-emerald-700 bg-gradient-to-r from-emerald-50 to-transparent' 
+                          : 'text-slate-400 hover:text-emerald-600 hover:bg-emerald-50/30 hover:translate-x-1'
+                      }`}
+                    >
+                      {activeTab === 'species-fauna' && (
+                        <motion.div 
+                          layoutId="submenu-active-indicator-species"
+                          className="absolute left-[-1px] top-2 bottom-2 w-0.5 bg-emerald-500 rounded-full"
+                          transition={{ type: "spring", stiffness: 300, damping: 30 }}
+                        />
+                      )}
+                      {t('admin.species_fauna')}
+                    </button>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
           </nav>
 
           {/* Language Switcher at Bottom */}
@@ -283,50 +315,54 @@ export default function MaintainPage() {
         </aside>
 
           {/* Main Content Area */}
-          <main className="flex-1 px-4 lg:pr-8 lg:pl-4 pb-20 min-w-0">
+          <main className="flex-1 px-2 lg:pr-6 lg:pl-2 pb-6 min-w-0">
             <motion.div
               key={activeTab}
               initial={{ opacity: 0, x: 20 }}
               animate={{ opacity: 1, x: 0 }}
               transition={{ duration: 0.4 }}
-              className="bg-white/40 backdrop-blur-2xl rounded-[2.5rem] border border-white p-4 md:p-8 shadow-2xl shadow-slate-200/40 min-h-[calc(100vh-120px)]"
+              className="bg-white/40 backdrop-blur-2xl rounded-[2.5rem] border border-white p-4 md:p-6 shadow-2xl shadow-slate-200/40 flex flex-col h-[calc(100vh-80px)]"
             >
-              <div className="flex items-center justify-between mb-8">
+              <div className="flex items-center justify-between mb-4 flex-shrink-0">
                 <h2 className="text-xl font-black text-slate-800 tracking-tight flex items-center gap-2">
                   <div className="w-2 h-6 bg-emerald-500 rounded-full" />
-                  {activeTab === 'users' ? t('admin.users_manager') : activeTab === 'taxonomy-fauna' ? t('admin.taxa_fauna') : activeTab === 'taxonomy-flora' ? t('admin.taxa_flora') : t('admin.taxa_manager')}
+                  {activeTab === 'users' ? t('admin.users_manager') : activeTab === 'taxonomy-fauna' ? t('admin.taxa_fauna') : activeTab === 'taxonomy-flora' ? t('admin.taxa_flora') : activeTab === 'species-fauna' ? t('admin.species_fauna') : t('admin.taxa_manager')}
                 </h2>
               </div>
-              {activeTab === 'users' ? (
-                <UsersManager 
-                  onRequestConfirm={(onConfirm) => setConfirmModal({ 
-                    isOpen: true, 
-                    onConfirm,
-                    title: t('admin.confirm_remove_title'),
-                    message: t('admin.confirm_remove')
-                  })} 
-                />
-              ) : activeTab === 'taxonomy-fauna' ? (
-                <TaxonomyMappingsManager 
-                  mode="fauna" 
-                  onRequestConfirm={(onConfirm, title, message) => setConfirmModal({ 
-                    isOpen: true, 
-                    onConfirm,
-                    title: title || t('admin.confirm_remove_title'),
-                    message: message || t('admin.confirm_remove')
-                  })} 
-                />
-              ) : activeTab === 'taxonomy-flora' ? (
-                <TaxonomyMappingsManager 
-                  mode="flora" 
-                  onRequestConfirm={(onConfirm, title, message) => setConfirmModal({ 
-                    isOpen: true, 
-                    onConfirm,
-                    title: title || t('admin.confirm_remove_title'),
-                    message: message || t('admin.confirm_remove')
-                  })} 
-                />
-              ) : <TaxaManager />}
+              <div className="flex-1 min-h-0">
+                {activeTab === 'users' ? (
+                  <UsersManager 
+                    onRequestConfirm={(onConfirm) => setConfirmModal({ 
+                      isOpen: true, 
+                      onConfirm,
+                      title: t('admin.confirm_remove_title'),
+                      message: t('admin.confirm_remove')
+                    })} 
+                  />
+                ) : activeTab === 'taxonomy-fauna' ? (
+                  <TaxonomyMappingsManager 
+                    mode="fauna" 
+                    onRequestConfirm={(onConfirm, title, message) => setConfirmModal({ 
+                      isOpen: true, 
+                      onConfirm,
+                      title: title || t('admin.confirm_remove_title'),
+                      message: message || t('admin.confirm_remove')
+                    })} 
+                  />
+                ) : activeTab === 'taxonomy-flora' ? (
+                  <TaxonomyMappingsManager 
+                    mode="flora" 
+                    onRequestConfirm={(onConfirm, title, message) => setConfirmModal({ 
+                      isOpen: true, 
+                      onConfirm,
+                      title: title || t('admin.confirm_remove_title'),
+                      message: message || t('admin.confirm_remove')
+                    })} 
+                  />
+                ) : (
+                  <SpeciesManager />
+                )}
+              </div>
             </motion.div>
           </main>
         </div>
