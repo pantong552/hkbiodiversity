@@ -12,7 +12,9 @@ import {
   ShieldCheck,
   ArrowLeft,
   ListTree,
-  ChevronDown
+  ChevronDown,
+  PanelLeftClose,
+  PanelLeftOpen
 } from 'lucide-react';
 import Link from 'next/link';
 import UsersManager from '@/components/admin/UsersManager';
@@ -109,6 +111,7 @@ export default function MaintainPage() {
   const { t, language } = useLanguage();
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<AdminTab>('users');
+  const [isCollapsed, setIsCollapsed] = useState(false);
   const [confirmModal, setConfirmModal] = useState<{ 
     isOpen: boolean; 
     onConfirm: (() => void) | null;
@@ -148,33 +151,48 @@ export default function MaintainPage() {
       </div>
 
       <div className="flex-1 flex flex-col lg:flex-row relative z-10 pt-4 lg:pt-4">
-        {/* Left Sidebar - Fixed on Desktop - Compact Version */}
-        <aside className="w-full lg:w-64 xl:w-72 lg:h-[calc(100vh-60px)] lg:sticky lg:top-4 px-4 lg:pl-6 lg:pr-3 mb-6 lg:mb-0 flex flex-col gap-5 flex-shrink-0">
+        {/* Left Sidebar - Fixed on Desktop - Collapsible */}
+        <aside 
+          className={`w-full lg:h-[calc(100vh-60px)] lg:sticky lg:top-4 px-4 lg:pl-6 lg:pr-3 mb-6 lg:mb-0 flex flex-col gap-5 flex-shrink-0 transition-all duration-300 ease-in-out ${
+            isCollapsed ? 'lg:w-20' : 'lg:w-64 xl:w-72'
+          }`}
+        >
           <div className="space-y-4">
-            <Link 
-              href="/"
-              className="inline-flex items-center gap-2 text-[10px] font-black text-emerald-600 uppercase tracking-widest hover:gap-3 transition-all group"
-            >
-              <ArrowLeft className="w-3.5 h-3.5" />
-              {t('account.back')}
-            </Link>
+            <div className="flex items-center justify-between">
+              <Link 
+                href="/"
+                className={`inline-flex items-center gap-2 text-[10px] font-black text-emerald-600 uppercase tracking-widest hover:gap-3 transition-all group ${
+                  isCollapsed ? 'opacity-0 w-0 overflow-hidden' : 'opacity-100'
+                }`}
+              >
+                <ArrowLeft className="w-3.5 h-3.5" />
+                {t('account.back')}
+              </Link>
+              <button
+                onClick={() => setIsCollapsed(!isCollapsed)}
+                className="hidden lg:flex p-2 rounded-xl text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 transition-all active:scale-95"
+                title={isCollapsed ? "Expand Sidebar" : "Collapse Sidebar"}
+              >
+                {isCollapsed ? <PanelLeftOpen className="w-4 h-4" /> : <PanelLeftClose className="w-4 h-4" />}
+              </button>
+            </div>
             
-            <div className="flex items-center gap-3">
-              <div className="p-2.5 bg-white rounded-xl shadow-lg shadow-emerald-200/30 border border-emerald-50">
+            <div className={`flex items-center gap-3 ${isCollapsed ? 'justify-center' : ''}`}>
+              <div className="p-2.5 bg-white rounded-xl shadow-lg shadow-emerald-200/30 border border-emerald-50 flex-shrink-0">
                 <ShieldCheck className="w-6 h-6 text-emerald-600" />
               </div>
-              <div>
+              <div className={`transition-all duration-300 origin-left ${isCollapsed ? 'opacity-0 scale-0 w-0 overflow-hidden' : 'opacity-100 scale-100'}`}>
                 {language === 'zh' ? (
                   <>
-                    <h1 className="text-xl xl:text-2xl font-black text-slate-900 tracking-tighter leading-none">
+                    <h1 className="text-xl xl:text-2xl font-black text-slate-900 tracking-tighter leading-none whitespace-nowrap">
                       系統管理
                     </h1>
-                    <p className="text-[9px] text-slate-400 font-bold uppercase tracking-wider mt-1">
+                    <p className="text-[9px] text-slate-400 font-bold uppercase tracking-wider mt-1 whitespace-nowrap">
                       System Management
                     </p>
                   </>
                 ) : (
-                  <h1 className="text-xl xl:text-2xl font-black text-slate-900 tracking-tighter leading-none uppercase">
+                  <h1 className="text-xl xl:text-2xl font-black text-slate-900 tracking-tighter leading-none uppercase whitespace-nowrap">
                     System Management
                   </h1>
                 )}
@@ -185,42 +203,45 @@ export default function MaintainPage() {
           <nav className="flex flex-col gap-1.5">
             <button
               onClick={() => setActiveTab('users')}
-              className={`w-full flex items-center justify-between p-3 rounded-2xl transition-all duration-200 group outline-none select-none active:scale-[0.98] ${
+              className={`w-full flex items-center p-3 rounded-2xl transition-all duration-200 group outline-none select-none active:scale-[0.98] ${
                 activeTab === 'users' 
                   ? 'bg-white shadow-lg shadow-slate-200/40 border border-slate-100 text-slate-900' 
                   : 'text-slate-500 hover:bg-white/50 border border-transparent'
-              }`}
+              } ${isCollapsed ? 'justify-center' : 'justify-between'}`}
             >
               <div className="flex items-center gap-2.5">
-                <div className={`p-2 rounded-xl transition-colors ${activeTab === 'users' ? 'bg-emerald-600 text-white' : 'bg-slate-100 text-slate-400 group-hover:bg-emerald-100 group-hover:text-emerald-600'}`}>
+                <div className={`p-2 rounded-xl transition-colors flex-shrink-0 ${activeTab === 'users' ? 'bg-emerald-600 text-white' : 'bg-slate-100 text-slate-400 group-hover:bg-emerald-100 group-hover:text-emerald-600'}`}>
                   <Users className="w-4 h-4" />
                 </div>
-                <span className="font-bold text-sm">{t('admin.users_manager')}</span>
+                {!isCollapsed && <span className="font-bold text-sm whitespace-nowrap">{t('admin.users_manager')}</span>}
               </div>
-              <ChevronRight className={`w-3.5 h-3.5 transition-transform ${activeTab === 'users' ? 'opacity-100' : 'opacity-0 -translate-x-2'}`} />
+              {!isCollapsed && <ChevronRight className={`w-3.5 h-3.5 transition-transform ${activeTab === 'users' ? 'opacity-100' : 'opacity-0 -translate-x-2'}`} />}
             </button>
 
             {/* Taxonomy Management with Sub-options */}
             <div className="flex flex-col">
               <div 
-                className={`flex items-center justify-between p-3 rounded-2xl cursor-pointer transition-all duration-200 group outline-none select-none ${
+                className={`flex items-center p-3 rounded-2xl cursor-pointer transition-all duration-200 group outline-none select-none ${
                   activeTab.startsWith('taxonomy') 
                     ? 'bg-white shadow-lg shadow-slate-200/40 border border-slate-100 text-slate-900' 
                     : 'text-slate-500 hover:bg-white/50 border border-transparent'
-                }`}
-                onClick={() => setActiveTab(activeTab === 'taxonomy-fauna' ? 'users' : 'taxonomy-fauna')}
+                } ${isCollapsed ? 'justify-center' : 'justify-between'}`}
+                onClick={() => {
+                  if (isCollapsed) setIsCollapsed(false);
+                  setActiveTab(activeTab === 'taxonomy-fauna' ? 'users' : 'taxonomy-fauna');
+                }}
               >
                 <div className="flex items-center gap-2.5">
-                  <div className={`p-2 rounded-xl transition-colors ${activeTab.startsWith('taxonomy') ? 'bg-emerald-600 text-white' : 'bg-slate-100 text-slate-400 group-hover:bg-emerald-100 group-hover:text-emerald-600'}`}>
+                  <div className={`p-2 rounded-xl transition-colors flex-shrink-0 ${activeTab.startsWith('taxonomy') ? 'bg-emerald-600 text-white' : 'bg-slate-100 text-slate-400 group-hover:bg-emerald-100 group-hover:text-emerald-600'}`}>
                     <ListTree className="w-4 h-4" />
                   </div>
-                  <span className="font-bold text-sm">{t('admin.taxonomy_manager')}</span>
+                  {!isCollapsed && <span className="font-bold text-sm whitespace-nowrap">{t('admin.taxonomy_manager')}</span>}
                 </div>
-                <ChevronDown className={`w-3.5 h-3.5 transition-transform ${activeTab.startsWith('taxonomy') ? 'rotate-180' : ''}`} />
+                {!isCollapsed && <ChevronDown className={`w-3.5 h-3.5 transition-transform ${activeTab.startsWith('taxonomy') ? 'rotate-180' : ''}`} />}
               </div>
               
               <AnimatePresence>
-                {activeTab.startsWith('taxonomy') && (
+                {!isCollapsed && activeTab.startsWith('taxonomy') && (
                   <motion.div 
                     initial={{ height: 0, opacity: 0 }}
                     animate={{ height: 'auto', opacity: 1 }}
@@ -269,24 +290,27 @@ export default function MaintainPage() {
             {/* Species Bank Management with Sub-options */}
             <div className="flex flex-col">
               <div 
-                className={`flex items-center justify-between p-3 rounded-2xl cursor-pointer transition-all duration-200 group outline-none select-none ${
+                className={`flex items-center p-3 rounded-2xl cursor-pointer transition-all duration-200 group outline-none select-none ${
                   activeTab.startsWith('species')
                     ? 'bg-white shadow-lg shadow-slate-200/40 border border-slate-100 text-slate-900' 
                     : 'text-slate-500 hover:bg-white/50 border border-transparent'
-                }`}
-                onClick={() => setActiveTab('species-fauna')}
+                } ${isCollapsed ? 'justify-center' : 'justify-between'}`}
+                onClick={() => {
+                  if (isCollapsed) setIsCollapsed(false);
+                  setActiveTab('species-fauna');
+                }}
               >
                 <div className="flex items-center gap-2.5">
-                  <div className={`p-2 rounded-xl transition-colors ${activeTab.startsWith('species') ? 'bg-emerald-600 text-white' : 'bg-slate-100 text-slate-400 group-hover:bg-emerald-100 group-hover:text-emerald-600'}`}>
+                  <div className={`p-2 rounded-xl transition-colors flex-shrink-0 ${activeTab.startsWith('species') ? 'bg-emerald-600 text-white' : 'bg-slate-100 text-slate-400 group-hover:bg-emerald-100 group-hover:text-emerald-600'}`}>
                     <Package className="w-4 h-4" />
                   </div>
-                  <span className="font-bold text-sm">{t('admin.taxa_manager')}</span>
+                  {!isCollapsed && <span className="font-bold text-sm whitespace-nowrap">{t('admin.taxa_manager')}</span>}
                 </div>
-                <ChevronDown className={`w-3.5 h-3.5 transition-transform ${activeTab.startsWith('species') ? 'rotate-180' : ''}`} />
+                {!isCollapsed && <ChevronDown className={`w-3.5 h-3.5 transition-transform ${activeTab.startsWith('species') ? 'rotate-180' : ''}`} />}
               </div>
               
               <AnimatePresence>
-                {activeTab.startsWith('species') && (
+                {!isCollapsed && activeTab.startsWith('species') && (
                   <motion.div 
                     initial={{ height: 0, opacity: 0 }}
                     animate={{ height: 'auto', opacity: 1 }}
@@ -317,10 +341,14 @@ export default function MaintainPage() {
           </nav>
 
           {/* Language Switcher at Bottom */}
-          <div className="mt-auto pt-4 border-t border-slate-100 lg:pb-0">
-            <div className="px-2">
+          <div className={`mt-auto pt-4 border-t border-slate-100 lg:pb-0 transition-all duration-300 ${isCollapsed ? 'px-0 flex justify-center' : 'px-2'}`}>
+            {isCollapsed ? (
+              <div className="w-10 h-10 bg-white rounded-xl shadow-sm border border-slate-100 flex items-center justify-center text-[10px] font-bold text-emerald-600">
+                {language === 'zh' ? '繁' : 'EN'}
+              </div>
+            ) : (
               <LanguageSwitcher />
-            </div>
+            )}
           </div>
         </aside>
 

@@ -321,6 +321,14 @@ export default function TaxonomyMappingsManager({ mode, onRequestConfirm }: Taxo
     }
   };
 
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Escape') {
+      cancelEditing();
+    } else if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+      saveEdit();
+    }
+  };
+
   const requestSort = (key: SortKey) => {
     let direction: SortDirection = 'asc';
     if (sortConfig.key === key && sortConfig.direction === 'asc') {
@@ -503,7 +511,7 @@ export default function TaxonomyMappingsManager({ mode, onRequestConfirm }: Taxo
       ) : (
         <div className="flex-1 min-h-0 overflow-auto rounded-[1.5rem] border border-white bg-white/30 backdrop-blur-xl shadow-sm custom-scrollbar">
           <table className="w-max text-left border-collapse table-fixed">
-            <thead className="sticky top-0 z-40 bg-slate-50/90 backdrop-blur-md shadow-sm">
+            <thead className="sticky top-0 z-40 bg-slate-50 shadow-sm">
               <tr className="border-b border-slate-100">
                 <th 
                   ref={rankFilterRef as any} 
@@ -623,6 +631,7 @@ export default function TaxonomyMappingsManager({ mode, onRequestConfirm }: Taxo
                           value={editValues.name_eng || ''}
                           onChange={(e) => handleEditChange('name_eng', e.target.value)}
                           className="bg-white border border-emerald-300 rounded-lg px-2 py-1 text-xs font-bold text-emerald-700 italic outline-none shadow-inner w-full focus:ring-1 focus:ring-emerald-500"
+                          onKeyDown={handleKeyDown}
                           autoFocus
                           onClick={(e) => e.stopPropagation()}
                         />
@@ -639,6 +648,7 @@ export default function TaxonomyMappingsManager({ mode, onRequestConfirm }: Taxo
                           value={editValues.name_chi || ''}
                           onChange={(e) => handleEditChange('name_chi', e.target.value)}
                           className="bg-white border border-emerald-300 rounded-lg px-2 py-1 text-xs font-black text-slate-800 outline-none shadow-inner w-full focus:ring-1 focus:ring-emerald-500"
+                          onKeyDown={handleKeyDown}
                           onClick={(e) => e.stopPropagation()}
                         />
                       ) : (

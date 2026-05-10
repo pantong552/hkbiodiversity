@@ -287,6 +287,14 @@ export default function SpeciesManager() {
       setSaving(false);
     }
   };
+  
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Escape') {
+      cancelEditing();
+    } else if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+      saveEdit();
+    }
+  };
 
   const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setSearchQuery(e.target.value);
@@ -398,7 +406,7 @@ export default function SpeciesManager() {
         <>
           <div className="flex-1 min-h-0 overflow-auto rounded-[1.5rem] border border-white bg-white/30 backdrop-blur-xl shadow-sm custom-scrollbar">
             <table className="w-max text-left border-collapse table-fixed">
-              <thead className="sticky top-0 z-40 bg-slate-50/90 backdrop-blur-md shadow-sm">
+              <thead className="sticky top-0 z-40 bg-slate-50 shadow-sm">
                 <tr className="border-b border-slate-100">
                   {Object.keys(columnWidths).map((key) => (
                     <th 
@@ -447,6 +455,7 @@ export default function SpeciesManager() {
                             value={editValues.informal_group_eng || ''} 
                             onChange={(e) => handleEditChange('informal_group_eng', e.target.value)}
                             className="w-full bg-white border border-emerald-200 rounded px-2 py-1 text-[11px] focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                            onKeyDown={handleKeyDown}
                             autoFocus
                           />
                         ) : item.informal_group_eng}
@@ -459,6 +468,7 @@ export default function SpeciesManager() {
                             value={editValues.scientific_name || ''} 
                             onChange={(e) => handleEditChange('scientific_name', e.target.value)}
                             className="w-full bg-white border border-emerald-200 rounded px-2 py-1 text-[12px] focus:outline-none focus:ring-1 focus:ring-emerald-500 italic"
+                            onKeyDown={handleKeyDown}
                           />
                         ) : item.scientific_name}
                       </td>
@@ -470,6 +480,7 @@ export default function SpeciesManager() {
                             value={editValues.common_name_eng || ''} 
                             onChange={(e) => handleEditChange('common_name_eng', e.target.value)}
                             className="w-full bg-white border border-emerald-200 rounded px-2 py-1 text-[11px] focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                            onKeyDown={handleKeyDown}
                           />
                         ) : item.common_name_eng}
                       </td>
@@ -481,6 +492,7 @@ export default function SpeciesManager() {
                             value={editValues.common_name_chi || ''} 
                             onChange={(e) => handleEditChange('common_name_chi', e.target.value)}
                             className="w-full bg-white border border-emerald-200 rounded px-2 py-1 text-[13px] focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                            onKeyDown={handleKeyDown}
                           />
                         ) : item.common_name_chi}
                       </td>
@@ -493,6 +505,7 @@ export default function SpeciesManager() {
                               value={(editValues as any)[key] || ''} 
                               onChange={(e) => handleEditChange(key as any, e.target.value)}
                               className="w-full bg-white border border-emerald-200 rounded px-2 py-1 text-[10px] focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                              onKeyDown={handleKeyDown}
                             />
                           ) : (item as any)[key]}
                         </td>

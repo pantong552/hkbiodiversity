@@ -256,7 +256,7 @@ export default function UsersManager({ onRequestConfirm }: UsersManagerProps) {
           <div className="hidden lg:block overflow-visible rounded-[1.5rem] border border-white bg-white/30 backdrop-blur-xl shadow-sm">
             <table className="w-full text-left border-collapse">
               <thead>
-                <tr className="bg-slate-50/50 border-bottom border-slate-100">
+                <tr className="bg-slate-50 border-b border-slate-100">
                   <th 
                     className="px-4 py-2.5 text-[9px] font-black text-slate-400 uppercase tracking-widest cursor-pointer group"
                     onClick={() => requestSort('username')}
