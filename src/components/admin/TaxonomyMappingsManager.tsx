@@ -74,6 +74,7 @@ export default function TaxonomyMappingsManager({ mode, onRequestConfirm }: Taxo
   const [editValues, setEditValues] = useState<Partial<TaxonomyMapping>>({});
   const [saving, setSaving] = useState(false);
   const [showDiscardConfirm, setShowDiscardConfirm] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   // Sorting & Filtering State
   const [sortConfig, setSortConfig] = useState<{ key: SortKey; direction: SortDirection }>({ 
@@ -322,7 +323,7 @@ export default function TaxonomyMappingsManager({ mode, onRequestConfirm }: Taxo
       }
 
       // 2. Sync with species/plant_species table if name_eng changed
-      if (editValues.name_eng && editValues.name_eng.trim() !== item.name_eng.trim()) {
+      if (dbField && editValues.name_eng && editValues.name_eng.trim() !== item.name_eng.trim()) {
         const { error: syncError } = await supabase
           .from(targetTable)
           .update({ [dbField]: editValues.name_eng.trim() })
@@ -347,8 +348,18 @@ export default function TaxonomyMappingsManager({ mode, onRequestConfirm }: Taxo
       setEditingId(null);
       setOriginalItem(null);
       setEditValues({});
-    } catch (err) {
+    } catch (err: any) {
       console.error('Error saving edit:', err);
+      // Log more details for Supabase errors
+      if (err.code || err.details || err.hint) {
+        console.error('Supabase Error Details:', {
+          code: err.code,
+          details: err.details,
+          hint: err.hint,
+          message: err.message
+        });
+      }
+      setErrorMessage(err.message || (typeof err === 'string' ? err : JSON.stringify(err)) || 'An unexpected error occurred while saving.');
     } finally {
       setSaving(false);
     }
@@ -549,7 +560,7 @@ export default function TaxonomyMappingsManager({ mode, onRequestConfirm }: Taxo
                 <th 
                   ref={rankFilterRef as any} 
                   style={{ width: columnWidths.rank }}
-                  className="px-4 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest relative group/header"
+                  className="px-4 py-2.5 text-[10px] font-black text-slate-400 uppercase tracking-widest relative group/header"
                 >
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2 cursor-pointer group" onClick={() => requestSort('rank')}>
@@ -592,7 +603,7 @@ export default function TaxonomyMappingsManager({ mode, onRequestConfirm }: Taxo
 
                 <th 
                   style={{ width: columnWidths.taxa_group }}
-                  className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest cursor-pointer group/header relative" 
+                  className="px-4 py-2.5 text-[10px] font-black text-slate-400 uppercase tracking-widest cursor-pointer group/header relative" 
                 >
                   <div className="flex items-center gap-2" onClick={() => requestSort('taxa_group')}>
                     {t('admin.taxa_group')}
@@ -608,7 +619,7 @@ export default function TaxonomyMappingsManager({ mode, onRequestConfirm }: Taxo
 
                 <th 
                   style={{ width: columnWidths.name_eng }}
-                  className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest cursor-pointer group/header relative" 
+                  className="px-4 py-2.5 text-[10px] font-black text-slate-400 uppercase tracking-widest cursor-pointer group/header relative" 
                 >
                   <div className="flex items-center gap-2" onClick={() => requestSort('name_eng')}>
                     {t('admin.name_eng')}
@@ -624,7 +635,7 @@ export default function TaxonomyMappingsManager({ mode, onRequestConfirm }: Taxo
 
                 <th 
                   style={{ width: columnWidths.name_chi }}
-                  className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest cursor-pointer group/header relative" 
+                  className="px-4 py-2.5 text-[10px] font-black text-slate-400 uppercase tracking-widest cursor-pointer group/header relative" 
                 >
                   <div className="flex items-center gap-2" onClick={() => requestSort('name_chi')}>
                     {t('admin.name_chi')}
@@ -640,7 +651,7 @@ export default function TaxonomyMappingsManager({ mode, onRequestConfirm }: Taxo
 
                 <th 
                   style={{ width: columnWidths.species_count }}
-                  className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest cursor-pointer group/header relative" 
+                  className="px-4 py-2.5 text-[10px] font-black text-slate-400 uppercase tracking-widest cursor-pointer group/header relative" 
                 >
                   <div className="flex items-center gap-2" onClick={() => requestSort('species_count')}>
                     {language === 'zh' ? '數量' : 'Count'}
@@ -671,11 +682,11 @@ export default function TaxonomyMappingsManager({ mode, onRequestConfirm }: Taxo
                         : 'hover:bg-emerald-50/60 hover:shadow-lg hover:shadow-slate-200/40 cursor-pointer'
                     }`}
                   >
-                    <td className="px-4 py-3 text-[11px] font-black text-slate-400 uppercase">{item.rank}</td>
+                    <td className="px-4 py-1.5 text-[11px] font-black text-slate-400 uppercase">{item.rank}</td>
                     
                     {/* Taxa Group / Informal Group */}
-                    <td className="px-6 py-3">
-                      <span className="px-2 py-1 bg-slate-50 text-slate-600 rounded-lg text-[10px] font-black uppercase ring-1 ring-slate-100/50">
+                    <td className="px-4 py-1.5">
+                      <span className="px-2 py-0.5 bg-slate-50 text-slate-600 rounded-lg text-[10px] font-black uppercase ring-1 ring-slate-100/50">
                         {language === 'zh' 
                           ? getTaxonomyChi('taxa_group', mode, item.taxa_group || '') 
                           : item.taxa_group
@@ -684,38 +695,38 @@ export default function TaxonomyMappingsManager({ mode, onRequestConfirm }: Taxo
                     </td>
                     
                     {/* Editable Eng Name */}
-                    <td className="px-6 py-3">
+                    <td className="px-4 py-1.5">
                       {isEditing ? (
                         <input
                           type="text"
                           value={editValues.name_eng || ''}
                           onChange={(e) => handleEditChange('name_eng', e.target.value)}
-                          className="bg-white border border-emerald-300 rounded-lg px-2 py-1 text-xs font-bold text-emerald-700 italic outline-none shadow-inner w-full focus:ring-1 focus:ring-emerald-500"
+                          className={`bg-white border border-emerald-300 rounded-lg px-2 py-0.5 text-xs font-bold text-emerald-700 outline-none shadow-inner w-full focus:ring-1 focus:ring-emerald-500 ${item.rank !== 'informal_group' ? 'italic' : ''}`}
                           onKeyDown={handleKeyDown}
                           autoFocus
                           onClick={(e) => e.stopPropagation()}
                         />
                       ) : (
-                        <span className="font-bold text-slate-700 text-xs italic">{item.name_eng}</span>
+                        <span className={`font-bold text-slate-700 text-xs ${item.rank !== 'informal_group' ? 'italic' : ''}`}>{item.name_eng}</span>
                       )}
                     </td>
 
                     {/* Editable Chi Name */}
-                    <td className="px-6 py-3">
+                    <td className="px-4 py-1.5">
                       {isEditing ? (
                         <input
                           type="text"
                           value={editValues.name_chi || ''}
                           onChange={(e) => handleEditChange('name_chi', e.target.value)}
-                          className="bg-white border border-emerald-300 rounded-lg px-2 py-1 text-xs font-black text-slate-800 outline-none shadow-inner w-full focus:ring-1 focus:ring-emerald-500"
+                          className="bg-white border border-emerald-300 rounded-lg px-2 py-0.5 text-xs font-black text-slate-800 outline-none shadow-inner w-full focus:ring-1 focus:ring-emerald-500"
                           onKeyDown={handleKeyDown}
                           onClick={(e) => e.stopPropagation()}
                         />
                       ) : (
                         item.name_chi ? (
-                          <span className="font-black text-slate-800 text-sm">{item.name_chi}</span>
+                          <span className="font-black text-slate-800 text-[13px]">{item.name_chi}</span>
                         ) : (
-                          <span className="flex items-center gap-1 text-[11px] font-black text-rose-500 bg-rose-50 px-2 py-0.5 rounded border border-rose-100">
+                          <span className="flex items-center gap-1 text-[10px] font-black text-rose-500 bg-rose-50 px-2 py-0.5 rounded border border-rose-100">
                             <X className="w-2.5 h-2.5" /> {language === 'zh' ? '缺中文' : 'Missing'}
                           </span>
                         )
@@ -723,7 +734,7 @@ export default function TaxonomyMappingsManager({ mode, onRequestConfirm }: Taxo
                     </td>
 
                     {/* Species Count */}
-                    <td className="px-6 py-3">
+                    <td className="px-4 py-1.5">
                       <div className="flex items-center gap-2">
                         <span className="px-2 py-0.5 bg-slate-100 text-slate-600 rounded-lg text-[10px] font-black min-w-[32px] text-center shadow-sm border border-slate-200/50">
                           {item.species_count || 0}
@@ -789,6 +800,16 @@ export default function TaxonomyMappingsManager({ mode, onRequestConfirm }: Taxo
         confirmLabel={language === 'zh' ? '不儲存並退出' : 'Discard & Exit'}
         cancelLabel={language === 'zh' ? '繼續編輯' : 'Continue Editing'}
         type="warning"
+      />
+
+      <AlertModal
+        isOpen={!!errorMessage}
+        onClose={() => setErrorMessage(null)}
+        onConfirm={() => setErrorMessage(null)}
+        title={language === 'zh' ? '儲存失敗' : 'Save Failed'}
+        description={errorMessage || ''}
+        confirmLabel={language === 'zh' ? '確定' : 'OK'}
+        type="danger"
       />
     </div>
   );
