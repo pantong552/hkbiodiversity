@@ -129,7 +129,7 @@ export default function SpeciesManager() {
         
         if (!data || data.length === 0) break;
         
-        data.forEach(d => {
+        (data as any[]).forEach(d => {
           if (d.taxa_group) allGroups.add(d.taxa_group);
         });
 
