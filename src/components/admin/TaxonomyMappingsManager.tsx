@@ -45,6 +45,7 @@ type SortDirection = 'asc' | 'desc';
 // Define the mapping between internal ranks and database columns
 const RANK_FIELD_MAP = {
   fauna: {
+    informal_group: 'informal_group_eng',
     class: 'class_eng',
     order: 'order_eng',
     family: 'family_eng',
@@ -90,6 +91,7 @@ export default function TaxonomyMappingsManager({ mode, onRequestConfirm }: Taxo
   // Column Resizing State
   const [columnWidths, setColumnWidths] = useState<Record<string, number>>({
     rank: 100,
+    taxa_group: 150,
     name_eng: 220,
     name_chi: 250,
     species_count: 100
@@ -127,7 +129,7 @@ export default function TaxonomyMappingsManager({ mode, onRequestConfirm }: Taxo
   const uniqueRanks = useMemo(() => {
     const ranks = Array.from(new Set(data.map(d => d.rank)));
     return ranks.sort((a, b) => {
-      const order = ['category', 'class', 'order', 'family', 'genus'];
+      const order = ['informal_group', 'category', 'class', 'order', 'family', 'genus'];
       return order.indexOf(a) - order.indexOf(b);
     });
   }, [data]);
@@ -558,6 +560,22 @@ export default function TaxonomyMappingsManager({ mode, onRequestConfirm }: Taxo
                 </th>
 
                 <th 
+                  style={{ width: columnWidths.taxa_group }}
+                  className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest cursor-pointer group/header relative" 
+                >
+                  <div className="flex items-center gap-2" onClick={() => requestSort('taxa_group')}>
+                    {t('admin.taxa_group')}
+                    <SortIcon column="taxa_group" />
+                  </div>
+                  
+                  {/* Resizer Handle */}
+                  <div 
+                    onMouseDown={(e) => handleMouseDown('taxa_group', e)}
+                    className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize group-hover/header:bg-emerald-500/20 active:bg-emerald-500 transition-colors z-30"
+                  />
+                </th>
+
+                <th 
                   style={{ width: columnWidths.name_eng }}
                   className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest cursor-pointer group/header relative" 
                 >
@@ -622,6 +640,16 @@ export default function TaxonomyMappingsManager({ mode, onRequestConfirm }: Taxo
                     }`}
                   >
                     <td className="px-4 py-3 text-[11px] font-black text-slate-400 uppercase">{item.rank}</td>
+                    
+                    {/* Taxa Group / Informal Group */}
+                    <td className="px-6 py-3">
+                      <span className="px-2 py-1 bg-slate-50 text-slate-600 rounded-lg text-[10px] font-black uppercase ring-1 ring-slate-100/50">
+                        {language === 'zh' 
+                          ? getTaxonomyChi('taxa_group', mode, item.taxa_group || '') 
+                          : item.taxa_group
+                        }
+                      </span>
+                    </td>
                     
                     {/* Editable Eng Name */}
                     <td className="px-6 py-3">
