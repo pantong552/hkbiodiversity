@@ -70,7 +70,9 @@ export const TaxonomyProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     const normalizedType = taxaType === 'plant' ? 'flora' : (taxaType === 'fauna' ? 'fauna' : taxaType.toLowerCase());
     
     // 標準化 rank 名稱，確保 informal_group_eng 也能匹配到 informal_group
-    const normalizedRank = rank.toLowerCase() === 'informal_group_eng' ? 'informal_group' : rank.toLowerCase();
+    let normalizedRank = rank.toLowerCase();
+    if (normalizedRank === 'informal_group_eng') normalizedRank = 'informal_group';
+    if (normalizedRank === 'category_eng') normalizedRank = 'category';
     
     const key = `${normalizedRank}:${normalizedType}:${nameEng.trim().toLowerCase()}`;
     const result = mappings[key];

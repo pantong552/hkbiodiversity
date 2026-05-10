@@ -20,11 +20,12 @@ import Link from 'next/link';
 import UsersManager from '@/components/admin/UsersManager';
 import TaxonomyMappingsManager from '@/components/admin/TaxonomyMappingsManager';
 import SpeciesManager from '@/components/admin/SpeciesManager';
+import PlantSpeciesManager from '@/components/admin/PlantSpeciesManager';
 import LanguageSwitcher from '@/components/admin/LanguageSwitcher';
 import { motion, AnimatePresence } from 'framer-motion';
 import AlertModal from '@/components/ui/AlertModal';
 
-type AdminTab = 'users' | 'taxonomy-fauna' | 'taxonomy-flora' | 'species-fauna';
+type AdminTab = 'users' | 'taxonomy-fauna' | 'taxonomy-flora' | 'species-fauna' | 'species-flora';
 
 export default function MaintainPage() {
   const { profile, isLoading } = useAuth();
@@ -254,6 +255,23 @@ export default function MaintainPage() {
                       )}
                       {t('admin.species_fauna')}
                     </button>
+                    <button 
+                      onClick={() => setActiveTab('species-flora')}
+                      className={`relative text-left pl-6 pr-4 py-2.5 rounded-xl text-[11px] font-black uppercase tracking-wider transition-all duration-300 flex items-center ${
+                        activeTab === 'species-flora' 
+                          ? 'text-emerald-700 bg-gradient-to-r from-emerald-50 to-transparent' 
+                          : 'text-slate-400 hover:text-emerald-600 hover:bg-emerald-50/30 hover:translate-x-1'
+                      }`}
+                    >
+                      {activeTab === 'species-flora' && (
+                        <motion.div 
+                          layoutId="submenu-active-indicator-species"
+                          className="absolute left-[-1px] top-2 bottom-2 w-0.5 bg-emerald-500 rounded-full"
+                          transition={{ type: "spring", stiffness: 300, damping: 30 }}
+                        />
+                      )}
+                      {t('admin.species_flora')}
+                    </button>
                   </motion.div>
                 )}
               </AnimatePresence>
@@ -284,7 +302,7 @@ export default function MaintainPage() {
               <div className="flex items-center justify-between mb-4 flex-shrink-0">
                 <h2 className="text-xl font-black text-slate-800 tracking-tight flex items-center gap-2">
                   <div className="w-2 h-6 bg-emerald-500 rounded-full" />
-                  {activeTab === 'users' ? t('admin.users_manager') : activeTab === 'taxonomy-fauna' ? t('admin.taxa_fauna') : activeTab === 'taxonomy-flora' ? t('admin.taxa_flora') : activeTab === 'species-fauna' ? t('admin.species_fauna') : t('admin.taxa_manager')}
+                  {activeTab === 'users' ? t('admin.users_manager') : activeTab === 'taxonomy-fauna' ? t('admin.taxa_fauna') : activeTab === 'taxonomy-flora' ? t('admin.taxa_flora') : activeTab === 'species-fauna' ? t('admin.species_fauna') : activeTab === 'species-flora' ? t('admin.species_flora') : t('admin.taxa_manager')}
                 </h2>
               </div>
               <div className="flex-1 min-h-0">
@@ -317,8 +335,10 @@ export default function MaintainPage() {
                       message: message || t('admin.confirm_remove')
                     })} 
                   />
-                ) : (
+                ) : activeTab === 'species-fauna' ? (
                   <SpeciesManager />
+                ) : (
+                  <PlantSpeciesManager />
                 )}
               </div>
             </motion.div>
