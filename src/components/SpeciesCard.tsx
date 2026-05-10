@@ -75,9 +75,9 @@ export default function SpeciesCard({
         common_name_eng: s.common_name_eng,
         scientific_name: s.scientific_name,
         author: s.author,
-        taxa_group: (s.informal_group_eng || s.informal_group_chi) ? { 
-          label: language === 'zh' ? (s.informal_group_chi || s.informal_group_eng) : (s.informal_group_eng || s.informal_group_chi),
-          value: s.informal_group_eng || s.informal_group_chi,
+        taxa_group: s.informal_group_eng ? { 
+          label: language === 'zh' ? getTaxonomyChi('informal_group', taxaType, s.informal_group_eng) : s.informal_group_eng,
+          value: s.informal_group_eng,
           level: 'informal_group_eng'
         } : null,
         order: s.order_eng ? { 

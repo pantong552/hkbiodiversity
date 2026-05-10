@@ -69,7 +69,10 @@ export const TaxonomyProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     // 標準化 taxaType 為 fauna 或 flora
     const normalizedType = taxaType === 'plant' ? 'flora' : (taxaType === 'fauna' ? 'fauna' : taxaType.toLowerCase());
     
-    const key = `${rank.toLowerCase()}:${normalizedType}:${nameEng.trim().toLowerCase()}`;
+    // 標準化 rank 名稱，確保 informal_group_eng 也能匹配到 informal_group
+    const normalizedRank = rank.toLowerCase() === 'informal_group_eng' ? 'informal_group' : rank.toLowerCase();
+    
+    const key = `${normalizedRank}:${normalizedType}:${nameEng.trim().toLowerCase()}`;
     const result = mappings[key];
     
     return result || nameEng; // 如果找不到，退而求其次顯示英文名
