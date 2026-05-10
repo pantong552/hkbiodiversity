@@ -384,7 +384,7 @@ export default function TaxonomyMappingsManager({ mode, onRequestConfirm }: Taxo
   };
 
   return (
-    <div className="h-full flex flex-col space-y-4">
+    <div className="h-full flex flex-col gap-2">
       {/* Search Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div className="flex flex-col gap-1 w-full max-w-xl">
@@ -473,7 +473,11 @@ export default function TaxonomyMappingsManager({ mode, onRequestConfirm }: Taxo
           </button>
           
           <div className="px-3 py-1 bg-white/40 border border-white rounded-full text-[10px] font-bold text-slate-500">
-            Total: <span className="text-emerald-600 font-black ml-1">{filteredAndSortedData.length}</span>
+            <span className="text-emerald-600 font-black">
+              {t('admin.total_ratio')
+                .replace('{filtered}', String(filteredAndSortedData.length))
+                .replace('{total}', String(data.length))}
+            </span>
           </div>
           {(rankFilters.length > 0 || groupFilters.length > 0 || searchQuery || showMissingOnly) && (
             <button 
@@ -485,7 +489,7 @@ export default function TaxonomyMappingsManager({ mode, onRequestConfirm }: Taxo
               }}
               className="px-3 py-1 text-[10px] font-black text-red-500 hover:bg-red-50 rounded-full transition-colors"
             >
-              Clear All
+              {t('admin.clear_all')}
             </button>
           )}
         </div>
@@ -660,7 +664,7 @@ export default function TaxonomyMappingsManager({ mode, onRequestConfirm }: Taxo
 
                     {/* Action Buttons */}
                     {isEditing && (
-                      <td className="px-4 py-3 text-right">
+                      <td className="px-4 py-2 text-right">
                         <div className="flex items-center gap-2 justify-end" onClick={(e) => e.stopPropagation()}>
                           <button 
                             onClick={saveEdit}

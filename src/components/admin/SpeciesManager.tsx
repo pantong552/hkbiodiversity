@@ -299,7 +299,7 @@ export default function SpeciesManager() {
   };
 
   return (
-    <div className="h-full flex flex-col space-y-4">
+    <div className="h-full flex flex-col gap-2">
       {/* Search Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 flex-shrink-0">
         <div className="flex flex-col gap-1 w-full max-w-xl">
@@ -368,7 +368,11 @@ export default function SpeciesManager() {
         <div className="flex items-center gap-3">
           <div className="px-3 py-1 bg-white/40 border border-white rounded-full text-[10px] font-bold text-slate-500 flex items-center gap-2">
             <Database className="w-3 h-3 text-emerald-500" />
-            Total: <span className="text-emerald-600 font-black">{filteredAndSortedData.length} / {data.length}</span>
+            <span className="text-emerald-600 font-black">
+              {t('admin.total_ratio')
+                .replace('{filtered}', String(filteredAndSortedData.length))
+                .replace('{total}', String(data.length))}
+            </span>
           </div>
           {(groupFilters.length > 0 || searchQuery) && (
             <button 
@@ -379,7 +383,7 @@ export default function SpeciesManager() {
               }}
               className="px-3 py-1 text-[10px] font-black text-red-500 hover:bg-red-50 rounded-full transition-colors"
             >
-              Clear All
+              {t('admin.clear_all')}
             </button>
           )}
         </div>
@@ -517,14 +521,17 @@ export default function SpeciesManager() {
                     </tr>
                   );
                 })}
-              </tbody>
+                  </tbody>
             </table>
           </div>
 
           {/* Pagination */}
-          <div className="flex items-center justify-between px-4 py-4">
-            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
-              Showing <span className="text-emerald-600">{(currentPage - 1) * PAGE_SIZE + 1}</span> to <span className="text-emerald-600">{Math.min(currentPage * PAGE_SIZE, filteredAndSortedData.length)}</span> of {filteredAndSortedData.length}
+          <div className="flex items-center justify-between py-2 border-t border-slate-50 flex-shrink-0">
+            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
+              {t('admin.showing')
+                .replace('{start}', String((currentPage - 1) * PAGE_SIZE + 1))
+                .replace('{end}', String(Math.min(currentPage * PAGE_SIZE, filteredAndSortedData.length)))
+                .replace('{total}', String(filteredAndSortedData.length))}
             </p>
             
             <div className="flex items-center gap-2">

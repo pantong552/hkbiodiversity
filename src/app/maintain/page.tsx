@@ -164,12 +164,20 @@ export default function MaintainPage() {
                 <ShieldCheck className="w-6 h-6 text-emerald-600" />
               </div>
               <div>
-                <h1 className="text-xl xl:text-2xl font-black text-slate-900 tracking-tighter leading-none">
-                  {t('admin.title')}
-                </h1>
-                <p className="text-[9px] text-slate-500 font-bold uppercase tracking-wider mt-1">
-                  Management
-                </p>
+                {language === 'zh' ? (
+                  <>
+                    <h1 className="text-xl xl:text-2xl font-black text-slate-900 tracking-tighter leading-none">
+                      系統管理
+                    </h1>
+                    <p className="text-[9px] text-slate-400 font-bold uppercase tracking-wider mt-1">
+                      System Management
+                    </p>
+                  </>
+                ) : (
+                  <h1 className="text-xl xl:text-2xl font-black text-slate-900 tracking-tighter leading-none uppercase">
+                    System Management
+                  </h1>
+                )}
               </div>
             </div>
           </div>
@@ -309,19 +317,21 @@ export default function MaintainPage() {
           </nav>
 
           {/* Language Switcher at Bottom */}
-          <div className="mt-auto pt-6 border-t border-slate-200/60 lg:pb-4">
-            <LanguageSwitcher />
+          <div className="mt-auto pt-4 border-t border-slate-100 lg:pb-0">
+            <div className="px-2">
+              <LanguageSwitcher />
+            </div>
           </div>
         </aside>
 
           {/* Main Content Area */}
-          <main className="flex-1 px-2 lg:pr-6 lg:pl-2 pb-6 min-w-0">
+          <main className="flex-1 px-2 lg:pr-6 lg:pl-2 pb-2 min-w-0">
             <motion.div
               key={activeTab}
               initial={{ opacity: 0, x: 20 }}
               animate={{ opacity: 1, x: 0 }}
               transition={{ duration: 0.4 }}
-              className="bg-white/40 backdrop-blur-2xl rounded-[2.5rem] border border-white p-4 md:p-6 shadow-2xl shadow-slate-200/40 flex flex-col h-[calc(100vh-80px)]"
+              className="bg-white/40 backdrop-blur-2xl rounded-[2.5rem] border border-white p-4 md:px-6 md:py-4 shadow-2xl shadow-slate-200/40 flex flex-col h-[calc(100vh-32px)]"
             >
               <div className="flex items-center justify-between mb-4 flex-shrink-0">
                 <h2 className="text-xl font-black text-slate-800 tracking-tight flex items-center gap-2">
