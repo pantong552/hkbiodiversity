@@ -17,10 +17,12 @@ import {
   ChevronRight,
   Database,
   X,
-  ShieldCheck
+  ShieldCheck,
+  RotateCcw
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useTaxonomy } from '@/context/TaxonomyContext';
+import MultiSelectDropdown from '@/components/ui/MultiSelectDropdown';
 
 interface SpeciesData {
   taxa_id: number;
@@ -62,6 +64,7 @@ export default function SpeciesManager() {
     key: 'taxa_id', 
     direction: 'asc' 
   });
+  const [multiFilters, setMultiFilters] = useState<Record<string, string[]>>({});
   const [isBilingual, setIsBilingual] = useState(false);
 
   // Editing State
@@ -220,7 +223,14 @@ export default function SpeciesManager() {
       );
     }
 
-    // 2. Sort
+    // 2. Multi-column Filters (MultiSelectDropdown)
+    Object.entries(multiFilters).forEach(([key, values]) => {
+      if (values && values.length > 0) {
+        result = result.filter(item => values.includes(String((item as any)[key] || '')));
+      }
+    });
+
+    // 3. Sort
     result.sort((a, b) => {
       let aVal: any = a[sortConfig.key];
       let bVal: any = b[sortConfig.key];
@@ -241,7 +251,7 @@ export default function SpeciesManager() {
     });
 
     return result;
-  }, [data, groupFilters, searchQuery, sortConfig]);
+  }, [data, groupFilters, searchQuery, sortConfig, multiFilters]);
 
   const paginatedData = useMemo(() => {
     const from = (currentPage - 1) * PAGE_SIZE;
@@ -306,6 +316,61 @@ export default function SpeciesManager() {
     if (sortConfig.key !== column) return <ArrowUpDown className="w-3 h-3 text-slate-200 transition-colors" />;
     return sortConfig.direction === 'asc' ? <ArrowUp className="w-3 h-3 text-emerald-500" /> : <ArrowDown className="w-3 h-3 text-emerald-500" />;
   };
+
+  // Compute options for each filter (Cross-filtering)
+  const filterOptions = useMemo(() => {
+    const options: Record<string, { name: string; display: string; count: number }[]> = {};
+    
+    Object.keys(columnWidths).forEach(key => {
+      // For each key, we want to know what values are available given ALL OTHER filters
+      const otherFilters = { ...multiFilters };
+      delete otherFilters[key];
+
+      const intermediateResult = data.filter(item => {
+        // Apply top-level taxa_group filter
+        if (groupFilters.length > 0 && !groupFilters.includes(item.taxa_group)) return false;
+        
+        // Apply global search
+        if (searchQuery) {
+          const q = searchQuery.toLowerCase();
+          const matches = (item.scientific_name?.toLowerCase() || '').includes(q) ||
+                        (item.common_name_eng?.toLowerCase() || '').includes(q) ||
+                        (item.common_name_chi?.toLowerCase() || '').includes(q);
+          if (!matches) return false;
+        }
+
+        // Apply all other multi-select filters
+        return Object.entries(otherFilters).every(([fKey, fValues]) => {
+          if (!fValues || fValues.length === 0) return true;
+          return fValues.includes(String((item as any)[fKey] || ''));
+        });
+      });
+
+      const counts: Record<string, number> = {};
+      intermediateResult.forEach(item => {
+        const val = String((item as any)[key] || '');
+        counts[val] = (counts[val] || 0) + 1;
+      });
+
+      options[key] = Object.entries(counts).map(([name, count]) => {
+        let display = name;
+        if (!name) display = language === 'zh' ? '(空白)' : '(Empty)';
+        
+        // Use translation for taxonomy ranks if bilingual is on
+        if (isBilingual && ['class_eng', 'order_eng', 'family_eng', 'genus_eng', 'species_eng', 'informal_group_eng'].includes(key) && name) {
+          const rank = key.replace('_eng', '');
+          const translated = getTaxonomyChi(rank, 'fauna', name);
+          if (translated && translated !== name) {
+            display = `${translated} (${name})`;
+          }
+        }
+
+        return { name, display, count };
+      }).sort((a, b) => b.count - a.count);
+    });
+
+    return options;
+  }, [data, multiFilters, groupFilters, searchQuery, language, isBilingual, getTaxonomyChi, columnWidths]);
 
   return (
     <div className="h-full flex flex-col gap-2">
@@ -395,6 +460,18 @@ export default function SpeciesManager() {
               {t('admin.clear_all')}
             </button>
           )}
+          {Object.values(multiFilters).some(v => v.length > 0) && (
+            <button 
+              onClick={() => {
+                setMultiFilters({});
+                setCurrentPage(1);
+              }}
+              className="px-3 py-1 text-[10px] font-black text-emerald-600 bg-emerald-50 hover:bg-emerald-100 rounded-full transition-colors flex items-center gap-1"
+            >
+              <RotateCcw className="w-3 h-3" />
+              {language === 'zh' ? '重設所有過濾器' : 'Reset All Filters'}
+            </button>
+          )}
 
           {/* Bilingual Toggle */}
           <button 
@@ -433,12 +510,32 @@ export default function SpeciesManager() {
                     <th 
                       key={key}
                       style={{ width: columnWidths[key] }}
-                      className="px-4 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest relative group/header cursor-pointer"
-                      onClick={() => requestSort(key as SortKey)}
+                      className="px-4 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest relative group/header overflow-visible"
                     >
-                      <div className="flex items-center gap-2">
-                        {t(`admin.${key}`)}
-                        <SortIcon column={key as SortKey} />
+                      <div className="flex items-center justify-between gap-1">
+                        <div 
+                          className="flex items-center gap-1 cursor-pointer hover:text-emerald-600 transition-colors shrink-0"
+                          onClick={() => requestSort(key as SortKey)}
+                        >
+                          <span className="whitespace-nowrap">{t(`admin.${key}`)}</span>
+                          <SortIcon column={key as SortKey} />
+                        </div>
+                        
+                        <div onClick={(e) => e.stopPropagation()} className="shrink-0">
+                          <MultiSelectDropdown
+                            label={t(`admin.${key}`)}
+                            options={filterOptions[key] || []}
+                            selectedValues={multiFilters[key] || []}
+                            onChange={(values) => {
+                              setMultiFilters(prev => ({ ...prev, [key]: values }));
+                              setCurrentPage(1);
+                            }}
+                            placeholder={language === 'zh' ? '搜尋...' : 'Search...'}
+                            align="right"
+                            minWidth="200px"
+                            variant="minimal"
+                          />
+                        </div>
                       </div>
                       
                       {/* Resizer Handle */}
@@ -536,7 +633,7 @@ export default function SpeciesManager() {
                       {['class_eng', 'order_eng', 'family_eng', 'genus_eng', 'species_eng'].map((key) => {
                         const rank = key.replace('_eng', '');
                         const englishValue = (item as any)[key];
-                        const chineseValue = isBilingual ? getTaxonomyChi(rank, 'fauna', englishValue) : null;
+                        const chineseValue = (isBilingual && key !== 'species_eng') ? getTaxonomyChi(rank, 'fauna', englishValue) : null;
 
                         return (
                           <td key={key} className="px-4 py-2 text-[11px] font-bold text-slate-400">

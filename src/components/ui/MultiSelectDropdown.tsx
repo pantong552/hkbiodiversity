@@ -21,6 +21,7 @@ interface MultiSelectDropdownProps {
   placeholder?: string;
   align?: 'left' | 'right';
   minWidth?: string;
+  variant?: 'default' | 'minimal';
 }
 
 export default function MultiSelectDropdown({
@@ -31,6 +32,7 @@ export default function MultiSelectDropdown({
   placeholder,
   align = 'left',
   minWidth = '240px',
+  variant = 'default',
 }: MultiSelectDropdownProps) {
   const { language, t } = useLanguage();
   const [isOpen, setIsOpen] = useState(false);
@@ -139,6 +141,12 @@ export default function MultiSelectDropdown({
     }
   };
 
+  const handleReset = () => {
+    setLocalSelected([]);
+    onChange([]);
+    setIsOpen(false);
+  };
+
   const selectedCount = selectedValues.length;
   const localCount = localSelected.length;
   const isAllSelected = localSelected.length === options.length && options.length > 0;
@@ -167,17 +175,26 @@ export default function MultiSelectDropdown({
           if (!isOpen) updatePosition();
           setIsOpen(!isOpen);
         }}
-        className={`w-full flex items-center justify-between px-3 py-1.5 rounded-xl text-[11px] font-black transition-all border group uppercase tracking-widest ${
-          isOpen || selectedCount > 0 
-            ? 'bg-white border-emerald-200 shadow-xl shadow-emerald-50/50 ring-4 ring-emerald-50/30' 
-            : 'bg-slate-50/50 border-slate-100 text-slate-400 hover:bg-white hover:border-emerald-100'
+        className={`flex items-center justify-between transition-all group uppercase tracking-widest ${
+          variant === 'minimal'
+            ? `px-1 py-0.5 rounded-md hover:bg-slate-100/50 ${selectedCount > 0 ? 'text-emerald-600' : 'text-slate-300'}`
+            : `w-full px-3 py-1.5 rounded-xl text-[11px] font-black border ${
+                isOpen || selectedCount > 0 
+                  ? 'bg-white border-emerald-200 shadow-xl shadow-emerald-50/50 ring-4 ring-emerald-50/30' 
+                  : 'bg-slate-50/50 border-slate-100 text-slate-400 hover:bg-white hover:border-emerald-100'
+              }`
         }`}
       >
-        <div className="flex items-center gap-2 overflow-hidden">
-          <div className={`w-1.5 h-1.5 rounded-full shrink-0 ${selectedCount > 0 ? 'bg-emerald-500 animate-pulse' : 'bg-slate-300'}`} />
-          <span className={`truncate ${selectedCount > 0 ? 'text-slate-700' : ''}`}>{triggerLabel}</span>
+        <div className="flex items-center gap-1.5 overflow-hidden">
+          <Filter className={`${variant === 'minimal' ? 'w-3 h-3' : 'w-3 h-3'} shrink-0 ${selectedCount > 0 ? 'text-emerald-500' : 'text-slate-300'}`} />
+          {variant !== 'minimal' && (
+            <span className={`truncate text-[11px] font-black ${selectedCount > 0 ? 'text-slate-700' : ''}`}>{triggerLabel}</span>
+          )}
+          {variant === 'minimal' && selectedCount > 0 && (
+            <span className="text-[10px] font-black">{selectedCount}</span>
+          )}
         </div>
-        <ChevronDown className={`w-3 h-3 text-slate-400 transition-transform duration-300 ${isOpen ? 'rotate-180 text-emerald-600' : 'group-hover:text-slate-600'}`} />
+        <ChevronDown className={`w-2.5 h-2.5 text-slate-400 transition-transform duration-300 ${isOpen ? 'rotate-180 text-emerald-600' : 'group-hover:text-slate-600'}`} />
       </button>
 
       {/* 桌面端下拉內容 - 使用 Portal + Framer Motion */}
@@ -282,6 +299,13 @@ export default function MultiSelectDropdown({
                   {language === 'zh' ? '取消' : 'Cancel'}
                 </button>
                 <button 
+                  onClick={handleReset}
+                  className="p-2 text-slate-300 hover:text-emerald-600 hover:bg-emerald-50 rounded-xl transition-all group/reset"
+                  title={language === 'zh' ? '重設' : 'Reset'}
+                >
+                  <RotateCcw className="w-4 h-4 group-active/reset:rotate-[-180deg] transition-transform duration-500" />
+                </button>
+                <button 
                   onClick={handleApply}
                   className="flex-1 py-2 bg-emerald-600 text-white rounded-xl text-[10px] font-black hover:bg-emerald-700 transition-all shadow-md shadow-emerald-200 uppercase tracking-widest active:scale-95"
                 >
@@ -315,6 +339,12 @@ export default function MultiSelectDropdown({
               {isAllSelected 
                 ? (language === 'zh' ? '取消全選' : 'Deselect All') 
                 : (language === 'zh' ? '全選' : 'Select All')}
+            </button>
+            <button 
+              onClick={handleReset}
+              className="px-3 py-2 bg-slate-50 rounded-xl text-[10px] font-black uppercase tracking-widest text-emerald-600 border border-emerald-100 ml-2"
+            >
+              {language === 'zh' ? '重設' : 'Reset'}
             </button>
           </div>
           
