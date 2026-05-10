@@ -62,6 +62,7 @@ export default function SpeciesManager() {
     key: 'taxa_id', 
     direction: 'asc' 
   });
+  const [isBilingual, setIsBilingual] = useState(false);
 
   // Editing State
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -73,9 +74,9 @@ export default function SpeciesManager() {
 
   // Column Resizing
   const [columnWidths, setColumnWidths] = useState<Record<string, number>>({
-    taxa_id: 80,
-    informal_group_eng: 150,
-    scientific_name: 200,
+    taxa_id: 100,
+    informal_group_eng: 100,
+    scientific_name: 250,
     common_name_eng: 180,
     common_name_chi: 150,
     class_eng: 100,
@@ -394,6 +395,26 @@ export default function SpeciesManager() {
               {t('admin.clear_all')}
             </button>
           )}
+
+          {/* Bilingual Toggle */}
+          <button 
+            onClick={() => setIsBilingual(!isBilingual)}
+            className={`flex items-center gap-2 px-3 py-1.5 rounded-2xl border transition-all duration-300 group ${
+              isBilingual 
+                ? 'bg-emerald-600 text-white border-emerald-500 shadow-lg shadow-emerald-200' 
+                : 'bg-white/60 text-slate-500 border-white/80 hover:bg-white/80'
+            }`}
+          >
+            <div className="relative w-7 h-4 bg-slate-200 rounded-full transition-colors group-hover:bg-slate-300 p-0.5">
+              <motion.div 
+                animate={{ x: isBilingual ? 12 : 0 }}
+                className={`w-3 h-3 rounded-full shadow-sm transition-colors ${isBilingual ? 'bg-white' : 'bg-slate-400'}`}
+              />
+            </div>
+            <span className="text-[9px] font-black uppercase tracking-widest whitespace-nowrap">
+              {language === 'zh' ? '雙語顯示' : 'Bilingual'}
+            </span>
+          </button>
         </div>
       </div>
 
@@ -446,10 +467,10 @@ export default function SpeciesManager() {
                           : 'hover:bg-emerald-50/60 hover:shadow-lg hover:shadow-slate-200/40 cursor-pointer'
                       }`}
                     >
-                      <td className="px-4 py-3 text-[11px] font-bold text-slate-500">{item.taxa_id}</td>
+                      <td className="px-4 py-2 text-[12px] font-bold text-slate-500">{item.taxa_id}</td>
                       
                       {/* Informal Group */}
-                      <td className="px-4 py-3 text-[11px] font-medium text-slate-700">
+                      <td className="px-4 py-2 text-[12px] font-medium text-slate-700">
                         {isEditing ? (
                           <input 
                             value={editValues.informal_group_eng || ''} 
@@ -458,11 +479,26 @@ export default function SpeciesManager() {
                             onKeyDown={handleKeyDown}
                             autoFocus
                           />
-                        ) : item.informal_group_eng}
+                        ) : (
+                          <div className="flex flex-col min-h-[1.4rem] justify-center">
+                            {isBilingual && (
+                              <motion.span 
+                                initial={{ opacity: 0, y: -2 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                className="text-[11px] font-black text-emerald-600 leading-none mb-0.5"
+                              >
+                                {getTaxonomyChi('informal_group_eng', 'fauna', item.informal_group_eng)}
+                              </motion.span>
+                            )}
+                            <span className={`transition-all duration-300 ${isBilingual ? 'text-[10px] opacity-60' : 'text-[12px]'}`}>
+                              {item.informal_group_eng}
+                            </span>
+                          </div>
+                        )}
                       </td>
 
                       {/* Scientific Name */}
-                      <td className="px-4 py-3 text-[12px] font-black text-emerald-700 italic">
+                      <td className="px-4 py-2 text-[13px] font-black text-emerald-700 italic">
                         {isEditing ? (
                           <input 
                             value={editValues.scientific_name || ''} 
@@ -474,7 +510,7 @@ export default function SpeciesManager() {
                       </td>
 
                       {/* Common Name Eng */}
-                      <td className="px-4 py-3 text-[11px] font-bold text-slate-600">
+                      <td className="px-4 py-2 text-[12px] font-bold text-slate-600">
                         {isEditing ? (
                           <input 
                             value={editValues.common_name_eng || ''} 
@@ -486,7 +522,7 @@ export default function SpeciesManager() {
                       </td>
 
                       {/* Common Name Chi */}
-                      <td className="px-4 py-3 text-[13px] font-black text-slate-900">
+                      <td className="px-4 py-2 text-[14px] font-black text-slate-900">
                         {isEditing ? (
                           <input 
                             value={editValues.common_name_chi || ''} 
@@ -497,19 +533,39 @@ export default function SpeciesManager() {
                         ) : item.common_name_chi}
                       </td>
 
-                      {/* Taxonomy Levels */}
-                      {['class_eng', 'order_eng', 'family_eng', 'genus_eng', 'species_eng'].map((key) => (
-                        <td key={key} className="px-4 py-3 text-[10px] font-bold text-slate-400">
-                          {isEditing ? (
-                            <input 
-                              value={(editValues as any)[key] || ''} 
-                              onChange={(e) => handleEditChange(key as any, e.target.value)}
-                              className="w-full bg-white border border-emerald-200 rounded px-2 py-1 text-[10px] focus:outline-none focus:ring-1 focus:ring-emerald-500"
-                              onKeyDown={handleKeyDown}
-                            />
-                          ) : (item as any)[key]}
-                        </td>
-                      ))}
+                      {['class_eng', 'order_eng', 'family_eng', 'genus_eng', 'species_eng'].map((key) => {
+                        const rank = key.replace('_eng', '');
+                        const englishValue = (item as any)[key];
+                        const chineseValue = isBilingual ? getTaxonomyChi(rank, 'fauna', englishValue) : null;
+
+                        return (
+                          <td key={key} className="px-4 py-2 text-[11px] font-bold text-slate-400">
+                            {isEditing ? (
+                              <input 
+                                value={englishValue || ''} 
+                                onChange={(e) => handleEditChange(key as any, e.target.value)}
+                                className="w-full bg-white border border-emerald-200 rounded px-2 py-1 text-[11px] focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                                onKeyDown={handleKeyDown}
+                              />
+                            ) : (
+                              <div className="flex flex-col min-h-[1.4rem] justify-center">
+                                {isBilingual && chineseValue && (
+                                  <motion.span 
+                                    initial={{ opacity: 0, y: -2 }}
+                                    animate={{ opacity: 1, y: 0 }}
+                                    className="text-[11px] font-black text-emerald-600 leading-none mb-0.5"
+                                  >
+                                    {chineseValue}
+                                  </motion.span>
+                                )}
+                                <span className={`transition-all duration-300 ${isBilingual && chineseValue ? 'text-[10px] opacity-60' : 'text-[11px]'}`}>
+                                  {englishValue}
+                                </span>
+                              </div>
+                            )}
+                          </td>
+                        );
+                      })}
 
                       {/* Action Buttons for Editing */}
                       {isEditing && (
