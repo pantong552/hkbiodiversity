@@ -12,10 +12,13 @@ import {
   ArrowDown,
   Filter,
   Check,
+  ChevronDown,
+  ShieldCheck,
   Edit2,
-  X,
   AlertCircle,
-  ChevronDown
+  ChevronRight,
+  Database,
+  X
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useTaxonomy } from '@/context/TaxonomyContext';
@@ -63,13 +66,11 @@ export default function TaxonomyMappingsManager({ mode, onRequestConfirm }: Taxo
   const [searchQuery, setSearchQuery] = useState('');
   const [actionLoading, setActionLoading] = useState<string | number | null>(null);
   
-  // Inline Editing State
-  const [editingCell, setEditingCell] = useState<{ id: string | number | null; field: keyof TaxonomyMapping | null }>({
-    id: null,
-    field: null
-  });
-  const [editValue, setEditValue] = useState('');
-  const inputRef = useRef<HTMLInputElement>(null);
+  // Inline Editing State (New Row-based system)
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [originalItem, setOriginalItem] = useState<TaxonomyMapping | null>(null);
+  const [editValues, setEditValues] = useState<Partial<TaxonomyMapping>>({});
+  const [saving, setSaving] = useState(false);
 
   // Sorting & Filtering State
   const [sortConfig, setSortConfig] = useState<{ key: SortKey; direction: SortDirection }>({ 
@@ -237,120 +238,87 @@ export default function TaxonomyMappingsManager({ mode, onRequestConfirm }: Taxo
     }
   };
 
-  const handleUpdate = async (item: TaxonomyMapping, field: keyof TaxonomyMapping, newValue: string) => {
-    const oldValue = String(item[field] || '');
-    if (oldValue === newValue) {
-      setEditingCell({ id: null, field: null });
-      return;
-    }
+  // Handle Edit Logic
+  const startEditing = (rowId: string, item: TaxonomyMapping) => {
+    setEditingId(rowId);
+    setOriginalItem({ ...item });
+    setEditValues({ ...item });
+  };
 
-    const loadingKey = item.id || `${item.rank}-${item.taxa_type}-${item.taxa_group || ''}-${item.name_eng}`;
-    
+  const cancelEditing = () => {
+    setEditingId(null);
+    setOriginalItem(null);
+    setEditValues({});
+  };
+
+  const handleEditChange = (field: keyof TaxonomyMapping, value: string) => {
+    setEditValues(prev => ({ ...prev, [field]: value }));
+  };
+
+  const saveEdit = async () => {
+    if (!editingId || !originalItem) return;
+    setSaving(true);
     try {
+      const item = originalItem;
+
       const taxaType = mode === 'fauna' ? 'fauna' : 'flora';
       const targetTable = mode === 'fauna' ? 'species' : 'plant_species';
       const dbField = RANK_FIELD_MAP[mode][item.rank];
 
-      if (field === 'name_eng') {
-        // --- MODIFYING ENGLISH NAME (Merge / Sync Logic) ---
-        const normalizedNewValue = newValue.trim();
-        
-        // 1. Check if the target name already exists in OUR LOCAL DATA (which includes species table results)
-        const targetExists = data.some(d => 
-          d.rank === item.rank && 
-          d.name_eng.trim().toLowerCase() === normalizedNewValue.toLowerCase() &&
-          d.name_eng.trim() !== oldValue.trim() // Ensure it's not the current item itself
-        );
-
-        if (targetExists) {
-          // TARGET EXISTS: This is a MERGE operation
-          setEditingCell({ id: null, field: null });
-          
-          const title = language === 'zh' ? '分類合併確認' : 'Taxonomy Merge Confirmation';
-          const message = language === 'zh' 
-            ? `警告：目標名稱 "${normalizedNewValue}" 已存在。\n\n所有原本屬於 "${oldValue}" 的物種將會被合併到 "${normalizedNewValue}" 之下。此操作無法復原，您確定要繼續嗎？`
-            : `Warning: Target name "${normalizedNewValue}" already exists.\n\nAll species currently under "${oldValue}" will be merged into "${normalizedNewValue}". This action cannot be undone. Do you want to proceed?`;
-
-          onRequestConfirm(async () => {
-            setActionLoading(loadingKey);
-            try {
-              // A. Update all species/plants to the NEW (existing) name
-              const { error: syncError } = await supabase.from(targetTable).update({ [dbField]: normalizedNewValue }).eq(dbField, oldValue);
-              if (syncError) throw syncError;
-
-              // B. Delete the old mapping record if it existed
-              if (item.is_from_mappings && item.id) {
-                const { error: delError } = await supabase.from('taxonomy_mappings').delete().eq('id', item.id);
-                if (delError) throw delError;
-              }
-
-              // C. Update local state
-              await fetchData();
-            } finally {
-              setActionLoading(null);
-            }
-          }, title, message);
-          return;
-        } else {
-          // TARGET DOES NOT EXIST: Standard Rename
-          setActionLoading(loadingKey);
-          // A. Update Taxonomy Mappings table
-          if (item.is_from_mappings && item.id) {
-            const { error } = await supabase.from('taxonomy_mappings').update({ name_eng: normalizedNewValue }).eq('id', item.id);
-            if (error) throw error;
-          }
-
-          // B. Update all occurrences in Species/Plant_Species table
-          const { error: syncError } = await supabase.from(targetTable).update({ [dbField]: normalizedNewValue }).eq(dbField, oldValue);
-          if (syncError) throw syncError;
-
-          // C. Refresh data to reflect the name change across all lists
-          await fetchData();
-        }
-
-      } else if (field === 'name_chi') {
-        // --- MODIFYING CHINESE NAME ---
-        setActionLoading(loadingKey);
-
-        if (item.is_from_mappings && item.id) {
-          // Update existing
-          const { error } = await supabase.from('taxonomy_mappings').update({ name_chi: newValue }).eq('id', item.id);
-          if (error) throw error;
-        } else {
-          // Insert new mapping
-          const { data: newData, error } = await supabase.from('taxonomy_mappings').insert({
-            rank: item.rank,
-            taxa_type: taxaType,
-            name_eng: item.name_eng,
-            name_chi: newValue
-          }).select().single();
-          
-          if (error) throw error;
-          
-          // Update local item with new ID and mark as mapped
-          setData(data.map(d => (d.rank === item.rank && d.name_eng === item.name_eng) ? { ...d, id: newData.id, name_chi: newValue, is_from_mappings: true } : d));
-          setActionLoading(null);
-          setEditingCell({ id: null, field: null });
-          return;
-        }
-        
-        // Update local state for simple update
-        setData(data.map(d => (d.rank === item.rank && d.name_eng === item.name_eng) ? { ...d, name_chi: newValue } : d));
+      // 1. Sync with taxonomy_mappings table
+      if (item.id) {
+        // Update existing mapping
+        const { error } = await supabase
+          .from('taxonomy_mappings')
+          .update({
+            name_eng: editValues.name_eng,
+            name_chi: editValues.name_chi
+          })
+          .eq('id', item.id);
+        if (error) throw error;
+      } else if (editValues.name_chi) {
+        // Create new mapping if Chinese name is provided for a missing one
+        const { error } = await supabase.from('taxonomy_mappings').insert({
+          rank: item.rank,
+          taxa_type: taxaType,
+          name_eng: item.name_eng,
+          name_chi: editValues.name_chi
+        });
+        if (error) throw error;
       }
 
-    } catch (err) {
-      console.error('Error updating data:', err);
-      alert('Update failed: ' + (err as any).message);
-    } finally {
-      setActionLoading(null);
-      setEditingCell({ id: null, field: null });
-    }
-  };
+      // 2. Sync with species/plant_species table if name_eng changed
+      if (editValues.name_eng && editValues.name_eng.trim() !== item.name_eng.trim()) {
+        const { error: syncError } = await supabase
+          .from(targetTable)
+          .update({ [dbField]: editValues.name_eng.trim() })
+          .eq(dbField, item.name_eng);
+        if (syncError) throw syncError;
+      }
 
-  const startEditing = (item: TaxonomyMapping, field: keyof TaxonomyMapping) => {
-    setEditingCell({ id: item.id || `${item.rank}-${item.taxa_type}-${item.name_eng}`, field });
-    setEditValue(String(item[field] || ''));
-    setTimeout(() => inputRef.current?.focus(), 50);
+      // 3. Update local state immediately for instant feedback
+      setData(prev => prev.map(d => {
+        // Find all rows that match the original name and rank to keep them in sync
+        if (d.rank === item.rank && d.name_eng === item.name_eng) {
+          return { 
+            ...d, 
+            name_eng: editValues.name_eng || d.name_eng, 
+            name_chi: editValues.name_chi || d.name_chi,
+            is_from_mappings: true // Since it now definitely has a mapping (new or updated)
+          };
+        }
+        return d;
+      }));
+
+      setEditingId(null);
+      setOriginalItem(null);
+      setEditValues({});
+    } catch (err) {
+      console.error('Error saving edit:', err);
+      alert('Failed to save: ' + (err as any).message);
+    } finally {
+      setSaving(false);
+    }
   };
 
   const requestSort = (key: SortKey) => {
@@ -416,7 +384,7 @@ export default function TaxonomyMappingsManager({ mode, onRequestConfirm }: Taxo
   };
 
   return (
-    <div className="space-y-4">
+    <div className="h-full flex flex-col space-y-4">
       {/* Search Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div className="flex flex-col gap-1 w-full max-w-xl">
@@ -524,15 +492,15 @@ export default function TaxonomyMappingsManager({ mode, onRequestConfirm }: Taxo
       </div>
 
       {loading ? (
-        <div className="flex flex-col items-center justify-center py-20">
+        <div className="flex-1 flex flex-col items-center justify-center py-20">
           <Loader2 className="w-8 h-8 text-emerald-500 animate-spin mb-3" />
           <p className="text-slate-400 text-xs font-medium">{t('loading.message')}</p>
         </div>
       ) : (
-        <div className="overflow-visible rounded-[1.5rem] border border-white bg-white/30 backdrop-blur-xl shadow-sm overflow-x-auto">
+        <div className="flex-1 min-h-0 overflow-auto rounded-[1.5rem] border border-white bg-white/30 backdrop-blur-xl shadow-sm custom-scrollbar">
           <table className="w-max text-left border-collapse table-fixed">
-            <thead>
-              <tr className="bg-slate-50/50 border-b border-slate-100">
+            <thead className="sticky top-0 z-40 bg-slate-50/90 backdrop-blur-md shadow-sm">
+              <tr className="border-b border-slate-100">
                 <th 
                   ref={rankFilterRef as any} 
                   style={{ width: columnWidths.rank }}
@@ -628,97 +596,60 @@ export default function TaxonomyMappingsManager({ mode, onRequestConfirm }: Taxo
             </thead>
             <tbody className="bg-white/20">
               {filteredAndSortedData.map((item, index) => {
-                // Generate a unique ID for this row. 
-                // We use index + taxa_group + rank + name to guarantee uniqueness, 
-                // as a single mapping record might be referenced by multiple taxa groups.
                 const rowId = `row-${index}-${item.rank}-${item.taxa_group || ''}-${item.name_eng.trim()}`;
-                
-                // For action loading, we use the specific mapping ID if available, otherwise the composite name
-                const loadingKey = item.id || `${item.rank}-${item.taxa_type}-${item.taxa_group || ''}-${item.name_eng}`;
-                const isActionLoading = actionLoading === loadingKey;
+                const isEditing = editingId === rowId;
 
                 return (
-                  <tr key={rowId} className="hover:bg-emerald-50/60 hover:shadow-lg hover:shadow-slate-200/40 transition-all duration-300 group border-b border-white/10 cursor-pointer">
-                    <td className="px-4 py-2 text-[11px] font-black text-slate-400 uppercase">{item.rank}</td>
+                  <tr 
+                    key={rowId} 
+                    onClick={() => !isEditing && startEditing(rowId, item)}
+                    className={`transition-all duration-300 group border-b border-white/10 ${
+                      isEditing 
+                        ? 'bg-emerald-50/80 shadow-inner' 
+                        : 'hover:bg-emerald-50/60 hover:shadow-lg hover:shadow-slate-200/40 cursor-pointer'
+                    }`}
+                  >
+                    <td className="px-4 py-3 text-[11px] font-black text-slate-400 uppercase">{item.rank}</td>
                     
                     {/* Editable Eng Name */}
-                    <td className="px-6 py-2">
-                      {editingCell.id === rowId && editingCell.field === 'name_eng' ? (
-                        <div className="flex items-center gap-2">
-                          <input
-                            ref={inputRef}
-                            type="text"
-                            value={editValue}
-                            onChange={(e) => setEditValue(e.target.value)}
-                            onKeyDown={(e) => {
-                              if (e.key === 'Enter') handleUpdate(item, 'name_eng', editValue);
-                              if (e.key === 'Escape') setEditingCell({ id: null, field: null });
-                            }}
-                            onBlur={() => handleUpdate(item, 'name_eng', editValue)}
-                            className="bg-white border border-emerald-300 rounded-lg px-2 py-0.5 text-xs font-bold text-slate-700 outline-none shadow-inner w-full"
-                          />
-                        </div>
+                    <td className="px-6 py-3">
+                      {isEditing ? (
+                        <input
+                          type="text"
+                          value={editValues.name_eng || ''}
+                          onChange={(e) => handleEditChange('name_eng', e.target.value)}
+                          className="bg-white border border-emerald-300 rounded-lg px-2 py-1 text-xs font-bold text-emerald-700 italic outline-none shadow-inner w-full focus:ring-1 focus:ring-emerald-500"
+                          autoFocus
+                          onClick={(e) => e.stopPropagation()}
+                        />
                       ) : (
-                        <div 
-                          onClick={() => {
-                            setEditingCell({ id: rowId, field: 'name_eng' });
-                            setEditValue(item.name_eng);
-                            setTimeout(() => inputRef.current?.focus(), 50);
-                          }} 
-                          className="flex items-center justify-between group/cell cursor-pointer py-0.5"
-                        >
-                          <div className="flex items-center gap-2">
-                            {isActionLoading && editingCell.field === 'name_eng' && <Loader2 className="w-2.5 h-2.5 text-emerald-500 animate-spin" />}
-                            <span className="font-bold text-slate-700 text-xs italic">{item.name_eng}</span>
-                          </div>
-                          <Edit2 className="w-2.5 h-2.5 text-emerald-500 opacity-0 group-hover/cell:opacity-100 transition-opacity ml-2" />
-                        </div>
+                        <span className="font-bold text-slate-700 text-xs italic">{item.name_eng}</span>
                       )}
                     </td>
 
                     {/* Editable Chi Name */}
-                    <td className="px-6 py-2">
-                      {editingCell.id === rowId && editingCell.field === 'name_chi' ? (
-                        <div className="flex items-center gap-2">
-                          <input
-                            ref={inputRef}
-                            type="text"
-                            value={editValue}
-                            onChange={(e) => setEditValue(e.target.value)}
-                            onKeyDown={(e) => {
-                              if (e.key === 'Enter') handleUpdate(item, 'name_chi', editValue);
-                              if (e.key === 'Escape') setEditingCell({ id: null, field: null });
-                            }}
-                            onBlur={() => handleUpdate(item, 'name_chi', editValue)}
-                            className="bg-white border border-emerald-300 rounded-lg px-2 py-0.5 text-xs font-bold text-slate-700 outline-none shadow-inner w-full"
-                          />
-                        </div>
+                    <td className="px-6 py-3">
+                      {isEditing ? (
+                        <input
+                          type="text"
+                          value={editValues.name_chi || ''}
+                          onChange={(e) => handleEditChange('name_chi', e.target.value)}
+                          className="bg-white border border-emerald-300 rounded-lg px-2 py-1 text-xs font-black text-slate-800 outline-none shadow-inner w-full focus:ring-1 focus:ring-emerald-500"
+                          onClick={(e) => e.stopPropagation()}
+                        />
                       ) : (
-                        <div 
-                          onClick={() => {
-                            setEditingCell({ id: rowId, field: 'name_chi' });
-                            setEditValue(item.name_chi || '');
-                            setTimeout(() => inputRef.current?.focus(), 50);
-                          }} 
-                          className="flex items-center justify-between group/cell cursor-pointer py-0.5"
-                        >
-                          <div className="flex items-center gap-2">
-                            {isActionLoading && editingCell.field === 'name_chi' && <Loader2 className="w-2.5 h-2.5 text-emerald-500 animate-spin" />}
-                            {item.name_chi ? (
-                              <span className="font-black text-slate-800 text-sm">{item.name_chi}</span>
-                            ) : (
-                              <span className="flex items-center gap-1 text-[11px] font-black text-rose-500 bg-rose-50 px-2 py-0.5 rounded border border-rose-100">
-                                <X className="w-2.5 h-2.5" /> {language === 'zh' ? '缺中文' : 'Missing'}
-                              </span>
-                            )}
-                          </div>
-                          <Edit2 className="w-2.5 h-2.5 text-emerald-500 opacity-0 group-hover/cell:opacity-100 transition-opacity ml-2" />
-                        </div>
+                        item.name_chi ? (
+                          <span className="font-black text-slate-800 text-sm">{item.name_chi}</span>
+                        ) : (
+                          <span className="flex items-center gap-1 text-[11px] font-black text-rose-500 bg-rose-50 px-2 py-0.5 rounded border border-rose-100">
+                            <X className="w-2.5 h-2.5" /> {language === 'zh' ? '缺中文' : 'Missing'}
+                          </span>
+                        )
                       )}
                     </td>
 
                     {/* Species Count */}
-                    <td className="px-6 py-2">
+                    <td className="px-6 py-3">
                       <div className="flex items-center gap-2">
                         <span className="px-2 py-0.5 bg-slate-100 text-slate-600 rounded-lg text-[10px] font-black min-w-[32px] text-center shadow-sm border border-slate-200/50">
                           {item.species_count || 0}
@@ -726,6 +657,27 @@ export default function TaxonomyMappingsManager({ mode, onRequestConfirm }: Taxo
                         <span className="text-[9px] text-slate-400 font-bold uppercase tracking-tighter">Species</span>
                       </div>
                     </td>
+
+                    {/* Action Buttons */}
+                    {isEditing && (
+                      <td className="px-4 py-3 text-right">
+                        <div className="flex items-center gap-2 justify-end" onClick={(e) => e.stopPropagation()}>
+                          <button 
+                            onClick={saveEdit}
+                            disabled={saving}
+                            className="p-1.5 bg-emerald-500 text-white rounded-lg hover:bg-emerald-600 transition-colors shadow-sm disabled:opacity-50"
+                          >
+                            {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <ShieldCheck className="w-3.5 h-3.5" />}
+                          </button>
+                          <button 
+                            onClick={cancelEditing}
+                            className="p-1.5 bg-slate-200 text-slate-500 rounded-lg hover:bg-slate-300 transition-colors shadow-sm"
+                          >
+                            <X className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      </td>
+                    )}
                   </tr>
                 );
               })}
@@ -733,6 +685,24 @@ export default function TaxonomyMappingsManager({ mode, onRequestConfirm }: Taxo
           </table>
         </div>
       )}
+      <style jsx global>{`
+        .custom-scrollbar::-webkit-scrollbar {
+          width: 6px;
+          height: 6px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+          background: rgba(241, 245, 249, 0.5);
+          border-radius: 10px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+          background: rgba(16, 185, 129, 0.2);
+          border-radius: 10px;
+          transition: all 0.2s;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+          background: rgba(16, 185, 129, 0.5);
+        }
+      `}</style>
     </div>
   );
 }

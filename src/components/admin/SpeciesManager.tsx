@@ -15,7 +15,9 @@ import {
   ChevronDown,
   ChevronLeft,
   ChevronRight,
-  Database
+  Database,
+  X,
+  ShieldCheck
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useTaxonomy } from '@/context/TaxonomyContext';
@@ -60,6 +62,11 @@ export default function SpeciesManager() {
     key: 'taxa_id', 
     direction: 'asc' 
   });
+
+  // Editing State
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editValues, setEditValues] = useState<Partial<SpeciesData>>({});
+  const [saving, setSaving] = useState(false);
 
   // Refs
   const groupFilterRef = useClickOutside(() => setShowGroupFilter(false));
@@ -243,6 +250,44 @@ export default function SpeciesManager() {
 
   const totalPages = Math.ceil(filteredAndSortedData.length / PAGE_SIZE);
 
+  // Handle Edit
+  const startEditing = (item: SpeciesData) => {
+    setEditingId(item.taxa_id);
+    setEditValues({ ...item });
+  };
+
+  const cancelEditing = () => {
+    setEditingId(null);
+    setEditValues({});
+  };
+
+  const handleEditChange = (key: keyof SpeciesData, value: string) => {
+    setEditValues(prev => ({ ...prev, [key]: value }));
+  };
+
+  const saveEdit = async () => {
+    if (!editingId) return;
+    setSaving(true);
+    try {
+      const { error } = await supabase
+        .from('species')
+        .update(editValues)
+        .eq('taxa_id', editingId);
+
+      if (error) throw error;
+
+      // Update local data
+      setData(prev => prev.map(item => item.taxa_id === editingId ? { ...item, ...editValues } : item));
+      setEditingId(null);
+      setEditValues({});
+    } catch (err) {
+      console.error('Error saving edit:', err);
+      alert('Failed to save changes. Please try again.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setSearchQuery(e.target.value);
     setCurrentPage(1);
@@ -376,20 +421,102 @@ export default function SpeciesManager() {
                 </tr>
               </thead>
               <tbody className="bg-white/20">
-                {paginatedData.map((item) => (
-                  <tr key={item.taxa_id} className="hover:bg-emerald-50/60 hover:shadow-lg hover:shadow-slate-200/40 transition-all duration-300 group border-b border-white/10">
-                    <td className="px-4 py-3 text-[11px] font-bold text-slate-500">{item.taxa_id}</td>
-                    <td className="px-4 py-3 text-[11px] font-medium text-slate-700">{item.informal_group_eng}</td>
-                    <td className="px-4 py-3 text-[12px] font-black text-emerald-700 italic">{item.scientific_name}</td>
-                    <td className="px-4 py-3 text-[11px] font-bold text-slate-600">{item.common_name_eng}</td>
-                    <td className="px-4 py-3 text-[13px] font-black text-slate-900">{item.common_name_chi}</td>
-                    <td className="px-4 py-3 text-[10px] font-bold text-slate-400">{item.class_eng}</td>
-                    <td className="px-4 py-3 text-[10px] font-bold text-slate-400">{item.order_eng}</td>
-                    <td className="px-4 py-3 text-[10px] font-bold text-slate-400">{item.family_eng}</td>
-                    <td className="px-4 py-3 text-[10px] font-bold text-slate-400">{item.genus_eng}</td>
-                    <td className="px-4 py-3 text-[10px] font-bold text-slate-400">{item.species_eng}</td>
-                  </tr>
-                ))}
+                {paginatedData.map((item) => {
+                  const isEditing = editingId === item.taxa_id;
+                  
+                  return (
+                    <tr 
+                      key={item.taxa_id} 
+                      onClick={() => !isEditing && startEditing(item)}
+                      className={`transition-all duration-300 group border-b border-white/10 ${
+                        isEditing 
+                          ? 'bg-emerald-50/80 shadow-inner' 
+                          : 'hover:bg-emerald-50/60 hover:shadow-lg hover:shadow-slate-200/40 cursor-pointer'
+                      }`}
+                    >
+                      <td className="px-4 py-3 text-[11px] font-bold text-slate-500">{item.taxa_id}</td>
+                      
+                      {/* Informal Group */}
+                      <td className="px-4 py-3 text-[11px] font-medium text-slate-700">
+                        {isEditing ? (
+                          <input 
+                            value={editValues.informal_group_eng || ''} 
+                            onChange={(e) => handleEditChange('informal_group_eng', e.target.value)}
+                            className="w-full bg-white border border-emerald-200 rounded px-2 py-1 text-[11px] focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                            autoFocus
+                          />
+                        ) : item.informal_group_eng}
+                      </td>
+
+                      {/* Scientific Name */}
+                      <td className="px-4 py-3 text-[12px] font-black text-emerald-700 italic">
+                        {isEditing ? (
+                          <input 
+                            value={editValues.scientific_name || ''} 
+                            onChange={(e) => handleEditChange('scientific_name', e.target.value)}
+                            className="w-full bg-white border border-emerald-200 rounded px-2 py-1 text-[12px] focus:outline-none focus:ring-1 focus:ring-emerald-500 italic"
+                          />
+                        ) : item.scientific_name}
+                      </td>
+
+                      {/* Common Name Eng */}
+                      <td className="px-4 py-3 text-[11px] font-bold text-slate-600">
+                        {isEditing ? (
+                          <input 
+                            value={editValues.common_name_eng || ''} 
+                            onChange={(e) => handleEditChange('common_name_eng', e.target.value)}
+                            className="w-full bg-white border border-emerald-200 rounded px-2 py-1 text-[11px] focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                          />
+                        ) : item.common_name_eng}
+                      </td>
+
+                      {/* Common Name Chi */}
+                      <td className="px-4 py-3 text-[13px] font-black text-slate-900">
+                        {isEditing ? (
+                          <input 
+                            value={editValues.common_name_chi || ''} 
+                            onChange={(e) => handleEditChange('common_name_chi', e.target.value)}
+                            className="w-full bg-white border border-emerald-200 rounded px-2 py-1 text-[13px] focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                          />
+                        ) : item.common_name_chi}
+                      </td>
+
+                      {/* Taxonomy Levels */}
+                      {['class_eng', 'order_eng', 'family_eng', 'genus_eng', 'species_eng'].map((key) => (
+                        <td key={key} className="px-4 py-3 text-[10px] font-bold text-slate-400">
+                          {isEditing ? (
+                            <input 
+                              value={(editValues as any)[key] || ''} 
+                              onChange={(e) => handleEditChange(key as any, e.target.value)}
+                              className="w-full bg-white border border-emerald-200 rounded px-2 py-1 text-[10px] focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                            />
+                          ) : (item as any)[key]}
+                        </td>
+                      ))}
+
+                      {/* Action Buttons for Editing */}
+                      {isEditing && (
+                        <td className="px-4 py-3 text-right">
+                          <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+                            <button 
+                              onClick={saveEdit}
+                              disabled={saving}
+                              className="p-1.5 bg-emerald-500 text-white rounded-lg hover:bg-emerald-600 transition-colors shadow-sm disabled:opacity-50"
+                            >
+                              {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <ShieldCheck className="w-3.5 h-3.5" />}
+                            </button>
+                            <button 
+                              onClick={cancelEditing}
+                              className="p-1.5 bg-slate-200 text-slate-500 rounded-lg hover:bg-slate-300 transition-colors shadow-sm"
+                            >
+                              <X className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        </td>
+                      )}
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
