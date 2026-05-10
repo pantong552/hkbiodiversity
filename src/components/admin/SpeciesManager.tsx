@@ -65,7 +65,7 @@ export default function SpeciesManager() {
   const [isBilingual, setIsBilingual] = useState(false);
 
   // Editing State
-  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editingId, setEditingId] = useState<number | string | null>(null);
   const [editValues, setEditValues] = useState<Partial<SpeciesData>>({});
   const [saving, setSaving] = useState(false);
 
