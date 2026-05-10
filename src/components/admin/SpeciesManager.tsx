@@ -23,6 +23,7 @@ import {
 import { motion, AnimatePresence } from 'framer-motion';
 import { useTaxonomy } from '@/context/TaxonomyContext';
 import MultiSelectDropdown from '@/components/ui/MultiSelectDropdown';
+import AlertModal from '@/components/ui/AlertModal';
 
 interface SpeciesData {
   taxa_id: number;
@@ -70,10 +71,17 @@ export default function SpeciesManager() {
   // Editing State
   const [editingId, setEditingId] = useState<number | string | null>(null);
   const [editValues, setEditValues] = useState<Partial<SpeciesData>>({});
+  const [originalValues, setOriginalValues] = useState<Partial<SpeciesData>>({});
   const [saving, setSaving] = useState(false);
+  const [showDiscardConfirm, setShowDiscardConfirm] = useState(false);
 
   // Refs
   const groupFilterRef = useClickOutside(() => setShowGroupFilter(false));
+  const editingRowRef = useClickOutside(() => {
+    if (editingId && !showDiscardConfirm) {
+      handleExitAttempt();
+    }
+  });
 
   // Column Resizing
   const [columnWidths, setColumnWidths] = useState<Record<string, number>>({
@@ -188,6 +196,45 @@ export default function SpeciesManager() {
     fetchData();
   }, [fetchData]);
 
+  // Handle Edit Actions (defined before useEffect uses them)
+  const cancelEditing = useCallback(() => {
+    setEditingId(null);
+    setEditValues({});
+    setOriginalValues({});
+    setShowDiscardConfirm(false);
+  }, []);
+
+  const startEditing = useCallback((item: SpeciesData) => {
+    setEditingId(item.taxa_id);
+    const vals = { ...item };
+    setEditValues(vals);
+    setOriginalValues(vals);
+  }, []);
+
+  const isDirty = useMemo(() => {
+    if (!editingId) return false;
+    return JSON.stringify(editValues) !== JSON.stringify(originalValues);
+  }, [editValues, originalValues, editingId]);
+
+  const handleExitAttempt = useCallback(() => {
+    if (isDirty) {
+      setShowDiscardConfirm(true);
+    } else {
+      cancelEditing();
+    }
+  }, [isDirty, cancelEditing]);
+
+  // Global Keyboard Listener for Esc when editing
+  useEffect(() => {
+    const handleGlobalKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && editingId && !showDiscardConfirm) {
+        handleExitAttempt();
+      }
+    };
+    window.addEventListener('keydown', handleGlobalKeyDown);
+    return () => window.removeEventListener('keydown', handleGlobalKeyDown);
+  }, [editingId, showDiscardConfirm, handleExitAttempt]);
+
   const requestSort = (key: SortKey) => {
     let direction: SortDirection = 'asc';
     if (sortConfig.key === key && sortConfig.direction === 'asc') {
@@ -262,16 +309,6 @@ export default function SpeciesManager() {
   const totalPages = Math.ceil(filteredAndSortedData.length / PAGE_SIZE);
 
   // Handle Edit
-  const startEditing = (item: SpeciesData) => {
-    setEditingId(item.taxa_id);
-    setEditValues({ ...item });
-  };
-
-  const cancelEditing = () => {
-    setEditingId(null);
-    setEditValues({});
-  };
-
   const handleEditChange = (key: keyof SpeciesData, value: string) => {
     setEditValues(prev => ({ ...prev, [key]: value }));
   };
@@ -291,6 +328,7 @@ export default function SpeciesManager() {
       setData(prev => prev.map(item => item.taxa_id === editingId ? { ...item, ...editValues } : item));
       setEditingId(null);
       setEditValues({});
+      setOriginalValues({});
     } catch (err) {
       console.error('Error saving edit:', err);
       alert('Failed to save changes. Please try again.');
@@ -301,7 +339,7 @@ export default function SpeciesManager() {
   
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Escape') {
-      cancelEditing();
+      handleExitAttempt();
     } else if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
       saveEdit();
     }
@@ -494,7 +532,7 @@ export default function SpeciesManager() {
           </button>
         </div>
       </div>
-
+      
       {loading ? (
         <div className="flex-1 flex flex-col items-center justify-center py-20">
           <Loader2 className="w-8 h-8 text-emerald-500 animate-spin mb-3" />
@@ -557,6 +595,7 @@ export default function SpeciesManager() {
                   return (
                     <tr 
                       key={item.taxa_id} 
+                      ref={isEditing ? (editingRowRef as React.RefObject<HTMLTableRowElement>) : null}
                       onClick={() => !isEditing && startEditing(item)}
                       className={`transition-all duration-300 group border-b border-white/10 ${
                         isEditing 
@@ -745,6 +784,20 @@ export default function SpeciesManager() {
           </div>
         </>
       )}
+
+      <AlertModal
+        isOpen={showDiscardConfirm}
+        onClose={() => setShowDiscardConfirm(false)}
+        onConfirm={cancelEditing}
+        title={language === 'zh' ? '尚未儲存變更' : 'Unsaved Changes'}
+        description={language === 'zh' 
+          ? '您剛才進行了修改，如果不儲存直接退出，所有變更將會遺失。確定要退出嗎？' 
+          : 'You have made changes. If you leave without saving, your changes will be lost. Are you sure?'}
+        confirmLabel={language === 'zh' ? '不儲存並退出' : 'Discard & Exit'}
+        cancelLabel={language === 'zh' ? '繼續編輯' : 'Continue Editing'}
+        type="warning"
+      />
+
       <style jsx global>{`
         .custom-scrollbar::-webkit-scrollbar {
           width: 6px;

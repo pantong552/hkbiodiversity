@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo, useRef } from 'react';
+import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { createClient } from '@/utils/supabase/client';
 import { useLanguage } from '@/context/LanguageContext';
 import { useClickOutside } from '@/hooks/useClickOutside';
@@ -22,6 +22,7 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useTaxonomy } from '@/context/TaxonomyContext';
+import AlertModal from '@/components/ui/AlertModal';
 
 interface TaxonomyMappingsManagerProps {
   mode: 'fauna' | 'flora';
@@ -66,12 +67,13 @@ export default function TaxonomyMappingsManager({ mode, onRequestConfirm }: Taxo
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [actionLoading, setActionLoading] = useState<string | number | null>(null);
-  
+
   // Inline Editing State (New Row-based system)
   const [editingId, setEditingId] = useState<string | null>(null);
   const [originalItem, setOriginalItem] = useState<TaxonomyMapping | null>(null);
   const [editValues, setEditValues] = useState<Partial<TaxonomyMapping>>({});
   const [saving, setSaving] = useState(false);
+  const [showDiscardConfirm, setShowDiscardConfirm] = useState(false);
 
   // Sorting & Filtering State
   const [sortConfig, setSortConfig] = useState<{ key: SortKey; direction: SortDirection }>({ 
@@ -84,19 +86,56 @@ export default function TaxonomyMappingsManager({ mode, onRequestConfirm }: Taxo
   const [showGroupFilter, setShowGroupFilter] = useState(false);
   const [showMissingOnly, setShowMissingOnly] = useState(false);
 
-  // Click Outside Refs
-  const rankFilterRef = useClickOutside(() => setShowRankFilter(false));
-  const groupFilterRef = useClickOutside(() => setShowGroupFilter(false));
-
   // Column Resizing State
   const [columnWidths, setColumnWidths] = useState<Record<string, number>>({
     rank: 100,
-    taxa_group: 150,
+    taxa_group: 250,
     name_eng: 220,
     name_chi: 250,
     species_count: 100
   });
+
   const resizingRef = useRef<{ key: string; startX: number; startWidth: number } | null>(null);
+
+  const isDirty = useMemo(() => {
+    if (!editingId) return false;
+    return JSON.stringify(editValues) !== JSON.stringify(originalItem);
+  }, [editValues, originalItem, editingId]);
+
+  const cancelEditing = useCallback(() => {
+    setEditingId(null);
+    setOriginalItem(null);
+    setEditValues({});
+    setShowDiscardConfirm(false);
+  }, []);
+
+  const handleExitAttempt = useCallback(() => {
+    if (isDirty) {
+      setShowDiscardConfirm(true);
+    } else {
+      cancelEditing();
+    }
+  }, [isDirty, cancelEditing]);
+
+  // Click Outside Refs
+  const rankFilterRef = useClickOutside(() => setShowRankFilter(false));
+  const groupFilterRef = useClickOutside(() => setShowGroupFilter(false));
+  const editingRowRef = useClickOutside(() => {
+    if (editingId && !showDiscardConfirm) {
+      handleExitAttempt();
+    }
+  });
+
+  // Global Keyboard Listener
+  useEffect(() => {
+    const handleGlobalKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && editingId && !showDiscardConfirm) {
+        handleExitAttempt();
+      }
+    };
+    window.addEventListener('keydown', handleGlobalKeyDown);
+    return () => window.removeEventListener('keydown', handleGlobalKeyDown);
+  }, [editingId, showDiscardConfirm, handleExitAttempt]);
 
   const handleMouseDown = (key: string, e: React.MouseEvent) => {
     resizingRef.current = {
@@ -240,17 +279,10 @@ export default function TaxonomyMappingsManager({ mode, onRequestConfirm }: Taxo
     }
   };
 
-  // Handle Edit Logic
   const startEditing = (rowId: string, item: TaxonomyMapping) => {
     setEditingId(rowId);
     setOriginalItem({ ...item });
     setEditValues({ ...item });
-  };
-
-  const cancelEditing = () => {
-    setEditingId(null);
-    setOriginalItem(null);
-    setEditValues({});
   };
 
   const handleEditChange = (field: keyof TaxonomyMapping, value: string) => {
@@ -317,7 +349,6 @@ export default function TaxonomyMappingsManager({ mode, onRequestConfirm }: Taxo
       setEditValues({});
     } catch (err) {
       console.error('Error saving edit:', err);
-      alert('Failed to save: ' + (err as any).message);
     } finally {
       setSaving(false);
     }
@@ -325,7 +356,7 @@ export default function TaxonomyMappingsManager({ mode, onRequestConfirm }: Taxo
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Escape') {
-      cancelEditing();
+      handleExitAttempt();
     } else if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
       saveEdit();
     }
@@ -632,6 +663,7 @@ export default function TaxonomyMappingsManager({ mode, onRequestConfirm }: Taxo
                 return (
                   <tr 
                     key={rowId} 
+                    ref={isEditing ? (editingRowRef as React.RefObject<HTMLTableRowElement>) : null}
                     onClick={() => !isEditing && startEditing(rowId, item)}
                     className={`transition-all duration-300 group border-b border-white/10 ${
                       isEditing 
@@ -745,6 +777,19 @@ export default function TaxonomyMappingsManager({ mode, onRequestConfirm }: Taxo
           background: rgba(16, 185, 129, 0.5);
         }
       `}</style>
+
+      <AlertModal
+        isOpen={showDiscardConfirm}
+        onClose={() => setShowDiscardConfirm(false)}
+        onConfirm={cancelEditing}
+        title={language === 'zh' ? '尚未儲存變更' : 'Unsaved Changes'}
+        description={language === 'zh' 
+          ? '您剛才進行了修改，如果不儲存直接退出，所有變更將會遺失。確定要退出嗎？' 
+          : 'You have made changes. If you leave without saving, your changes will be lost. Are you sure?'}
+        confirmLabel={language === 'zh' ? '不儲存並退出' : 'Discard & Exit'}
+        cancelLabel={language === 'zh' ? '繼續編輯' : 'Continue Editing'}
+        type="warning"
+      />
     </div>
   );
 }

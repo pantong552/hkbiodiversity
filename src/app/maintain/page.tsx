@@ -22,89 +22,9 @@ import TaxonomyMappingsManager from '@/components/admin/TaxonomyMappingsManager'
 import SpeciesManager from '@/components/admin/SpeciesManager';
 import LanguageSwitcher from '@/components/admin/LanguageSwitcher';
 import { motion, AnimatePresence } from 'framer-motion';
+import AlertModal from '@/components/ui/AlertModal';
 
 type AdminTab = 'users' | 'taxonomy-fauna' | 'taxonomy-flora' | 'species-fauna';
-
-// --- Custom Confirmation Modal ---
-function CustomConfirmModal({ 
-  isOpen, 
-  onClose, 
-  onConfirm, 
-  title, 
-  message, 
-  confirmText, 
-  cancelText 
-}: { 
-  isOpen: boolean; 
-  onClose: () => void; 
-  onConfirm: () => void; 
-  title: string;
-  message: string;
-  confirmText: string;
-  cancelText: string;
-}) {
-  useEffect(() => {
-    if (!isOpen) return;
-    
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Enter') {
-        e.preventDefault();
-        onConfirm();
-      } else if (e.key === 'Escape') {
-        onClose();
-      }
-    };
-
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isOpen, onConfirm, onClose]);
-
-  return (
-    <AnimatePresence>
-      {isOpen && (
-        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4">
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            onClick={onClose}
-            className="absolute inset-0 bg-slate-900/60 backdrop-blur-md"
-          />
-          <motion.div
-            initial={{ opacity: 0, scale: 0.95, y: 10 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.95, y: 10 }}
-            className="relative w-full max-w-[320px] bg-white rounded-[2rem] shadow-2xl shadow-slate-900/40 overflow-hidden"
-          >
-            <div className="p-6 text-center">
-              <div className="w-12 h-12 bg-red-50 rounded-xl flex items-center justify-center mb-4 mx-auto">
-                <ShieldCheck className="w-6 h-6 text-red-500" />
-              </div>
-              <h3 className="text-lg font-black text-slate-900 tracking-tight mb-2">{title}</h3>
-              <p className="text-xs text-slate-500 font-medium leading-relaxed px-2">
-                {message}
-              </p>
-            </div>
-            <div className="flex border-t border-slate-100">
-              <button
-                onClick={onClose}
-                className="flex-1 px-4 py-4 text-xs font-bold text-slate-400 hover:text-slate-600 hover:bg-slate-50 transition-colors"
-              >
-                {cancelText}
-              </button>
-              <button
-                onClick={onConfirm}
-                className="flex-1 px-4 py-4 text-xs font-bold text-red-500 hover:bg-red-50 transition-colors border-l border-slate-100"
-              >
-                {confirmText}
-              </button>
-            </div>
-          </motion.div>
-        </div>
-      )}
-    </AnimatePresence>
-  );
-}
 
 export default function MaintainPage() {
   const { profile, isLoading } = useAuth();
@@ -405,7 +325,7 @@ export default function MaintainPage() {
           </main>
         </div>
 
-      <CustomConfirmModal 
+      <AlertModal 
         isOpen={confirmModal.isOpen}
         onClose={() => setConfirmModal({ ...confirmModal, isOpen: false, onConfirm: null })}
         onConfirm={() => {
@@ -413,9 +333,10 @@ export default function MaintainPage() {
           setConfirmModal({ ...confirmModal, isOpen: false, onConfirm: null });
         }}
         title={confirmModal.title || t('admin.confirm_remove_title')}
-        message={confirmModal.message || t('admin.confirm_remove')}
-        confirmText={t('common.confirm')}
-        cancelText={t('common.cancel')}
+        description={confirmModal.message || t('admin.confirm_remove')}
+        confirmLabel={t('common.confirm')}
+        cancelLabel={t('common.cancel')}
+        type="danger"
       />
 
       <style jsx global>{`
