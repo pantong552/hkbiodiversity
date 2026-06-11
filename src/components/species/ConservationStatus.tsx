@@ -72,6 +72,11 @@ export default function ConservationStatus({ species }: ConservationStatusProps)
       labelEng: 'Category (HKBWS)', 
       value: species.hkbws_cat 
     }] : []),
+    ...(species.afcd ? [{ 
+      labelChi: '漁農自然護理署 (AFCD) 評級', 
+      labelEng: 'AFCD Rating', 
+      value: species.afcd 
+    }] : []),
   ];
 
   return (

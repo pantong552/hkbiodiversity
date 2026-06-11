@@ -92,7 +92,7 @@ const SpeciesHeroBackground = ({ photos, defaultImage, isLoading }: { photos: In
               alt="Species background"
               fill
               sizes="100vw"
-              onLoadingComplete={() => index === 0 && setImgLoaded(true)}
+              onLoad={() => index === 0 && setImgLoaded(true)}
               unoptimized={hasPhotos ? (isMobile ? (displayPhotos[index].medium_url || displayPhotos[index].url) : (displayPhotos[index].large_url || displayPhotos[index].url)).includes('/api/image/transform') : defaultImage.includes('/api/image/transform')}
               className="object-cover opacity-70"
               priority={index === 0}

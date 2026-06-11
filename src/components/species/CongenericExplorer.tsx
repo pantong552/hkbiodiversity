@@ -79,7 +79,7 @@ const MiniSpeciesCard = ({ species }: { species: Species }) => {
               alt={commonName || species.scientific_name}
               fill
               sizes="64px"
-              onLoadingComplete={() => setImgLoaded(true)}
+              onLoad={() => setImgLoaded(true)}
               unoptimized={finalImage.includes('/api/image/transform')}
               className={`
                 object-cover transition-all duration-700 group-hover:scale-115
