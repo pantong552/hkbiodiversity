@@ -4,7 +4,7 @@ import React from 'react';
 import Image from 'next/image';
 import { Species } from '@/types/species';
 import { useLanguage } from '@/context/LanguageContext';
-import { Bookmark, Map, ExternalLink, Shield, Image as ImageIcon, Leaf } from 'lucide-react';
+import { Bookmark, Map, ExternalLink, Shield, Image as ImageIcon, Leaf, Compass } from 'lucide-react';
 import TaxonomyDisplay from './TaxonomyDisplay';
 import ConservationStatus from './ConservationStatus';
 import CommentSection from '../comments/CommentSection';
@@ -15,6 +15,7 @@ import { useRef } from 'react';
 import SpeciesMap from './SpeciesMap';
 import { formatScientificName } from '@/utils/formatters';
 import CongenericExplorer from './CongenericExplorer';
+import SimilarSpeciesExplorer from './SimilarSpeciesExplorer';
 import { useTaxonomy } from '@/context/TaxonomyContext';
 
 interface SpeciesContentProps {
@@ -182,6 +183,8 @@ export default function SpeciesContent({ species, showBreadcrumb = true }: Speci
   const hkDist = language === 'zh' ? species.hk_distribution_chi : species.hk_distribution_eng;
   const globalDist = language === 'zh' ? species.global_distribution_chi : species.global_distribution_eng;
   const refs = language === 'zh' ? species.references_chi : species.references_eng;
+  const introduction = language === 'zh' ? species.introduction_chi : species.introduction_eng;
+  const microhabitat = language === 'zh' ? species.microhabitat_chi : species.microhabitat_eng;
 
   return (
     <div className="bg-slate-50 min-h-full">
@@ -261,11 +264,23 @@ export default function SpeciesContent({ species, showBreadcrumb = true }: Speci
             </section>
 
 
-            {/* Description */}
-            {(description || habitat || hostPlants) && (
+            {/* Description, Introduction, Habitat, Microhabitat, Host Plants */}
+            {(introduction || description || habitat || microhabitat || hostPlants) && (
               <section className="bg-white p-8 rounded-[2.5rem] shadow-sm border border-slate-100 divide-y divide-slate-50">
+                {introduction && (
+                  <div className="py-8 first:pt-0 last:pb-0">
+                    <h2 className="text-2xl font-black text-slate-800 mb-6 flex items-center gap-3">
+                      <Bookmark className="w-6 h-6 text-emerald-500" />
+                      {language === 'zh' ? '物種簡介' : 'Introduction'}
+                    </h2>
+                    <div className="prose prose-slate max-w-none text-slate-600 leading-relaxed">
+                      <p>{introduction}</p>
+                    </div>
+                  </div>
+                )}
+
                 {description && (
-                  <div className="pb-8">
+                  <div className="py-8 first:pt-0 last:pb-0">
                     <h2 className="text-2xl font-black text-slate-800 mb-6 flex items-center gap-3">
                       <Bookmark className="w-6 h-6 text-emerald-500" />
                       {language === 'zh' ? '形態特徵' : 'Description'}
@@ -277,7 +292,7 @@ export default function SpeciesContent({ species, showBreadcrumb = true }: Speci
                 )}
 
                 {habitat && (
-                  <div className="py-8">
+                  <div className="py-8 first:pt-0 last:pb-0">
                     <h2 className="text-2xl font-black text-slate-800 mb-6 flex items-center gap-3">
                       <Map className="w-6 h-6 text-emerald-500" />
                       {language === 'zh' ? '棲息地' : 'Habitat'}
@@ -288,8 +303,20 @@ export default function SpeciesContent({ species, showBreadcrumb = true }: Speci
                   </div>
                 )}
 
+                {microhabitat && (
+                  <div className="py-8 first:pt-0 last:pb-0">
+                    <h2 className="text-2xl font-black text-slate-800 mb-6 flex items-center gap-3">
+                      <Compass className="w-6 h-6 text-emerald-500" />
+                      {language === 'zh' ? '微棲地' : 'Microhabitat'}
+                    </h2>
+                    <div className="prose prose-slate max-w-none text-slate-600 leading-relaxed">
+                      <p>{microhabitat}</p>
+                    </div>
+                  </div>
+                )}
+
                 {hostPlants && (
-                  <div className="pt-8">
+                  <div className="py-8 first:pt-0 last:pb-0">
                     <h2 className="text-2xl font-black text-slate-800 mb-6 flex items-center gap-3">
                       <Leaf className="w-6 h-6 text-emerald-500" />
                       {language === 'zh' ? '寄主植物' : 'Host Plants'}
@@ -343,6 +370,9 @@ export default function SpeciesContent({ species, showBreadcrumb = true }: Speci
 
             {/* Conservation Status - Back to original place */}
             <ConservationStatus species={species} />
+
+            {/* Similar Species Section */}
+            <SimilarSpeciesExplorer species={species} />
 
             {/* References */}
             {refs && (

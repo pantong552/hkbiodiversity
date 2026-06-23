@@ -11,22 +11,11 @@ import { formatScientificName, getSpeciesImageUrl } from '@/utils/formatters';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Sparkles, Leaf } from 'lucide-react';
 
-interface CongenericExplorerProps {
+interface SimilarSpeciesExplorerProps {
   species: Species;
-  isMobile?: boolean;
 }
 
-const SkeletonCard = () => (
-  <div className="flex items-center gap-3 p-2 rounded-2xl bg-slate-50 animate-pulse border border-slate-100">
-    <div className="w-16 h-16 rounded-xl bg-slate-200" />
-    <div className="flex flex-col flex-1 gap-2">
-      <div className="h-4 w-2/3 bg-slate-200 rounded" />
-      <div className="h-3 w-1/2 bg-slate-100 rounded" />
-    </div>
-  </div>
-);
-
-// 橫向卡片 - 用於 Tablet mode
+// 橫向卡片 - 用於 Tablet 與 Desktop
 const HorizontalSpeciesCard = ({ species }: { species: Species }) => {
   const { language } = useLanguage();
   const { addSpecies, profilePictureMap } = useSpeciesPanel();
@@ -120,7 +109,7 @@ const HorizontalSpeciesCard = ({ species }: { species: Species }) => {
   );
 };
 
-// 垂直卡片 - 用於 Mobile 與 Desktop Sidebar
+// 垂直卡片 - 用於 Mobile
 const MiniSpeciesCard = ({ species }: { species: Species }) => {
   const { language } = useLanguage();
   const { addSpecies, profilePictureMap } = useSpeciesPanel();
@@ -138,7 +127,6 @@ const MiniSpeciesCard = ({ species }: { species: Species }) => {
   const placeholderImage = '/images/placeholder/no-species-image.svg';
   const commonName = language === 'zh' ? species.common_name_chi : species.common_name_eng;
 
-  // Handle seamless transition delay
   useEffect(() => {
     if (imgLoaded || (!species.inat_id && mounted)) {
       const timer = setTimeout(() => setIsFullyReady(true), 250);
@@ -155,7 +143,6 @@ const MiniSpeciesCard = ({ species }: { species: Species }) => {
       className="group relative flex items-center gap-3 p-2.5 rounded-2xl bg-slate-50/50 hover:bg-emerald-50 border border-slate-100/60 hover:border-emerald-100 hover:shadow-lg hover:shadow-emerald-900/5 transition-all duration-300 cursor-pointer overflow-hidden shrink-0"
     >
       <div className="relative w-16 h-16 shrink-0 rounded-xl overflow-hidden bg-white shadow-inner flex items-center justify-center">
-        {/* Actual Image */}
         {(() => {
           const taxaId = species.taxa_id || '';
           const globalProfilePic = taxaId ? profilePictureMap[taxaId] : undefined;
@@ -181,28 +168,19 @@ const MiniSpeciesCard = ({ species }: { species: Species }) => {
           );
         })()}
 
-        {/* Nature Loader Overlay (Seamless Transition) */}
         {!isFullyReady && (
           <div className={`
             absolute inset-0 flex flex-col items-center justify-center bg-slate-50 z-10 overflow-hidden
             transition-all duration-500 ease-in-out
             ${imgLoaded ? 'opacity-0 scale-105 blur-sm' : 'opacity-100 scale-100 blur-0'}
           `}>
-            {/* Spinning Rings - Scaled Down */}
             <div className="relative w-10 h-10 flex items-center justify-center scale-75">
               <div className="absolute inset-0 border-t border-emerald-500/40 border-r border-emerald-500/10 rounded-full animate-spin duration-[1500ms]"></div>
               <div className="absolute inset-1.5 border-b border-emerald-500/50 border-l border-emerald-500/5 rounded-full animate-spin-reverse duration-[2000ms]"></div>
               
-              {/* Pulsing Leaf Center */}
               <div className="relative bg-white p-1.5 rounded-full shadow-lg shadow-emerald-900/20 animate-pulse">
                 <Leaf className="w-3.5 h-3.5 text-emerald-500 fill-emerald-500/10" />
               </div>
-            </div>
-            
-            {/* Tiny Dots */}
-            <div className="mt-1.5 flex gap-1 animate-pulse">
-              <span className="w-0.5 h-0.5 bg-emerald-500/40 rounded-full"></span>
-              <span className="w-0.5 h-0.5 bg-emerald-500/40 rounded-full"></span>
             </div>
           </div>
         )}
@@ -229,114 +207,110 @@ const MiniSpeciesCard = ({ species }: { species: Species }) => {
   );
 };
 
-export default function CongenericExplorer({ species, isMobile = false }: CongenericExplorerProps) {
+// 輔助函數：將植物資料映射為 Species 結構
+function mapPlantToSpecies(plantData: any): Species {
+  return {
+    ...plantData,
+    taxa_group: 'FLORA',
+    common_name_chi: plantData.common_name_chi,
+    common_name_eng: plantData.common_name_eng,
+    scientific_name: plantData.scientific_name,
+    family_eng: plantData.family_eng,
+    genus_eng: plantData.genus_eng,
+    class_eng: plantData.category_eng,
+    order_eng: plantData.family_eng,
+    habitat_chi: plantData.habitat_chi,
+    habitat_eng: plantData.habitat_eng,
+    description_chi: plantData.description_chi,
+    description_eng: plantData.description_eng,
+    remarks_chi: plantData.remark_chi,
+    remarks_eng: plantData.remark_eng,
+  } as unknown as Species;
+}
+
+export default function SimilarSpeciesExplorer({ species }: SimilarSpeciesExplorerProps) {
   const { language } = useLanguage();
   const supabase = useMemo(() => createClient(), []);
   
-  const [congenericSpecies, setCongenericSpecies] = useState<Species[]>([]);
-  const [discoveryLevel, setDiscoveryLevel] = useState<'genus' | 'subfamily' | 'family' | null>(null);
+  const [similarSpecies, setSimilarSpecies] = useState<Species[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    async function fetchRelated() {
+    async function fetchSimilar() {
+      if (!species.similar_species) {
+        setSimilarSpecies([]);
+        setIsLoading(false);
+        return;
+      }
+
       setIsLoading(true);
       try {
-        const isFlora = species.taxa_group === 'FLORA';
-        const genusField = 'genus_eng';
-        const familyField = 'family_eng';
+        const taxaIds = species.similar_species
+          .split(',')
+          .map((id) => id.trim())
+          .filter(Boolean);
+
+        if (taxaIds.length === 0) {
+          setSimilarSpecies([]);
+          setIsLoading(false);
+          return;
+        }
+
+        const faunaIds = taxaIds.filter(id => id.startsWith('fauna_'));
+        const floraIds = taxaIds.filter(id => id.startsWith('flora_'));
+
+        let faunaData: any[] = [];
+        if (faunaIds.length > 0) {
+          const { data } = await supabase
+            .from('species')
+            .select('*')
+            .in('taxa_id', faunaIds);
+          faunaData = data || [];
+        }
+
+        let floraData: any[] = [];
+        if (floraIds.length > 0) {
+          const { data } = await supabase
+            .from('plant_species')
+            .select('*')
+            .in('taxa_id', floraIds);
+          floraData = (data || []).map(mapPlantToSpecies);
+        }
+
+        const allSimilar = [...faunaData, ...floraData];
         
-        const genusValue = species.genus_eng;
-        const familyValue = species.family_eng;
+        const orderedSimilar = taxaIds
+          .map(id => allSimilar.find(s => s.taxa_id === id))
+          .filter(Boolean) as Species[];
 
-        // Step 1: Try Genus
-        if (genusValue) {
-          const { data, error } = await supabase
-            .from(isFlora ? 'plant_species' : 'species')
-            .select('*')
-            .eq(genusField, genusValue)
-            .neq('inat_id', species.inat_id)
-            .limit(20);
-          
-          if (data && data.length > 0) {
-            const mappedData = isFlora ? data.map((p: any) => ({
-              ...p,
-              id: p.inat_id,
-              common_name_chi: p.common_name_chi,
-              common_name_eng: p.common_name_eng,
-              taxa_group: 'FLORA',
-              family_eng: p.family_eng,
-              genus_eng: p.genus_eng,
-            })) : data;
-
-            setCongenericSpecies([...mappedData].sort(() => Math.random() - 0.5));
-            setDiscoveryLevel('genus');
-            setIsLoading(false);
-            return;
-          }
-        }
-
-        // Step 2: Try Family
-        if (familyValue) {
-          const { data, error } = await supabase
-            .from(isFlora ? 'plant_species' : 'species')
-            .select('*')
-            .eq(familyField, familyValue)
-            .neq('inat_id', species.inat_id)
-            .limit(20);
-          
-          if (data && data.length > 0) {
-            const mappedData = isFlora ? data.map((p: any) => ({
-              ...p,
-              id: p.inat_id,
-              common_name_chi: p.common_name_chi,
-              common_name_eng: p.common_name_eng,
-              taxa_group: 'FLORA',
-              family_chi: p.family_chi,
-              family_eng: p.family_eng,
-              genus_chi: p.genus_chi,
-              genus_eng: p.genus_eng,
-            })) : data;
-
-            setCongenericSpecies([...mappedData].sort(() => Math.random() - 0.5));
-            setDiscoveryLevel('family');
-            setIsLoading(false);
-            return;
-          }
-        }
-
-        setCongenericSpecies([]);
-        setDiscoveryLevel(null);
+        setSimilarSpecies(orderedSimilar);
       } catch (err) {
-        console.error('Error fetching related species:', err);
+        console.error('Error fetching similar species:', err);
       } finally {
         setIsLoading(false);
       }
     }
 
-    fetchRelated();
-  }, [species, supabase]);
+    fetchSimilar();
+  }, [species.similar_species, supabase]);
 
-  const getTitle = () => {
-    if (language === 'zh') {
-      switch (discoveryLevel) {
-        case 'genus': return '探索同屬物種';
-        case 'family': return '探索同科物種';
-        default: return '探索相關物種';
-      }
-    } else {
-      switch (discoveryLevel) {
-        case 'genus': return 'Congeneric Species';
-        case 'family': return 'Family Relatives';
-        default: return 'Related Species';
-      }
-    }
-  };
-
-  if (!isLoading && congenericSpecies.length === 0) return null;
+  if (!isLoading && similarSpecies.length === 0) return null;
 
   return (
-    <div className={`p-6 rounded-[2.5rem] bg-white border border-slate-100 shadow-sm ${isMobile ? 'mt-6 mb-8' : ''}`}>
-      <div className="flex items-center justify-between mb-6">
+    <div className="bg-white p-8 rounded-[2.5rem] shadow-sm border border-slate-100 w-full mb-12">
+      {/* Tablet & Desktop Title (md以上) */}
+      <div className="hidden md:flex items-center justify-between mb-8">
+        <h2 className="text-2xl font-black text-slate-800 flex items-center gap-3">
+          <Sparkles className="w-6 h-6 text-emerald-500" />
+          {language === 'zh' ? '相似物種' : 'Similar Species'}
+        </h2>
+        <span className="text-[10px] font-bold text-slate-400 bg-slate-50 border border-slate-100 px-2.5 py-1 rounded-full uppercase tracking-widest">
+          Total {similarSpecies.length} Records
+        </span>
+      </div>
+
+      {/* Mobile Title (md以下) - 保留使用之前 "Congeneric species" 般的2行顯示方式 */}
+      <div className="flex md:hidden items-center justify-between mb-6">
         <div className="flex items-center gap-3">
           <div className="p-2 bg-emerald-100 rounded-xl shadow-sm border border-emerald-200/50 text-emerald-700">
             <Sparkles className="w-5 h-5" />
@@ -344,58 +318,43 @@ export default function CongenericExplorer({ species, isMobile = false }: Congen
           
           <div className="flex flex-col">
             <h3 className="text-sm md:text-md font-black text-slate-800 leading-tight">
-              {getTitle()}
+              {language === 'zh' ? '相似物種' : 'Similar Species'}
             </h3>
             <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">
-              Total {congenericSpecies.length} Records
+              Total {similarSpecies.length} Records
             </span>
           </div>
         </div>
       </div>
 
-      <div className="space-y-1">
+      <div>
         {isLoading ? (
-          <div className="space-y-2">
-            {[1, 2, 3, 4, 5].map((i) => <SkeletonCard key={i} />)}
+          <div className="flex gap-4 overflow-x-auto pb-2">
+            {[1, 2, 3].map((i) => (
+              <div key={i} className="w-48 h-56 rounded-3xl bg-slate-50 animate-pulse border border-slate-100 flex-shrink-0" />
+            ))}
           </div>
         ) : (
           <AnimatePresence initial={false}>
-            {/* Desktop Sidebar Layout - Always Vertical */}
-            {!isMobile && (
-              <motion.div 
-                layout
-                className="flex flex-col gap-2 h-[460px] overflow-y-auto pr-1.5 custom-scrollbar"
-              >
-                {congenericSpecies.map((item) => (
-                  <MiniSpeciesCard key={item.taxa_id || item.id} species={item} />
-                ))}
-              </motion.div>
-            )}
+            {/* Tablet & Desktop Layout - Horizontal scroll */}
+            <motion.div 
+              layout
+              className="hidden md:flex gap-4 overflow-x-auto pb-2 scrollbar-thin scrollbar-thumb-slate-200"
+            >
+              {similarSpecies.map((item) => (
+                <HorizontalSpeciesCard key={item.taxa_id || item.id} species={item} />
+              ))}
+            </motion.div>
 
-            {/* In-page Layout (isMobile) */}
-            {isMobile && (
-              <>
-                {/* Tablet Mode - Horizontal scroll (hidden md:flex xl:hidden) */}
-                <motion.div 
-                  layout
-                  className="hidden md:flex gap-4 overflow-x-auto pb-2 scrollbar-thin scrollbar-thumb-slate-200"
-                >
-                  {congenericSpecies.map((item) => (
-                    <HorizontalSpeciesCard key={item.taxa_id || item.id} species={item} />
-                  ))}
-                </motion.div>
-
-                {/* Mobile Mode - Vertical List (flex md:hidden) */}
-                <motion.div 
-                  layout
-                  className="flex md:hidden flex-col gap-2"
-                >
-                  {congenericSpecies.map((item) => (
-                    <MiniSpeciesCard key={item.taxa_id || item.id} species={item} />
-                  ))}
-                </motion.div>
-              </>
-            )}
+            {/* Mobile Layout - Vertical List */}
+            <motion.div 
+              layout
+              className="flex md:hidden flex-col gap-2"
+            >
+              {similarSpecies.map((item) => (
+                <MiniSpeciesCard key={item.taxa_id || item.id} species={item} />
+              ))}
+            </motion.div>
           </AnimatePresence>
         )}
       </div>

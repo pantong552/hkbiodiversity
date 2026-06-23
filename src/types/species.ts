@@ -57,6 +57,11 @@ export interface Species {
   references_eng?: string;
   references_chi?: string;
   profile_picture?: string;
+  introduction_chi?: string;
+  introduction_eng?: string;
+  microhabitat_chi?: string;
+  microhabitat_eng?: string;
+  similar_species?: string;
 }
 
 export type TaxonomyLevel = 'phylum_eng' | 'class_eng' | 'order_eng' | 'family_eng' | 'genus_eng' | 'informal_group_eng';
