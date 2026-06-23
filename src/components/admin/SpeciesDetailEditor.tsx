@@ -15,9 +15,224 @@ import {
   ShieldAlert, 
   MapPin, 
   Plus,
-  ExternalLink
+  ExternalLink,
+  Search
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+
+interface SimilarSpeciesPickerProps {
+  value: string;
+  onChange: (value: string) => void;
+  table: string;
+  supabase: any;
+  language: string;
+}
+
+function SimilarSpeciesPicker({ value, onChange, table, supabase, language }: SimilarSpeciesPickerProps) {
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState<any[]>([]);
+  const [selectedDetails, setSelectedDetails] = useState<any[]>([]);
+  const [isSearching, setIsSearching] = useState(false);
+  const [showDropdown, setShowDropdown] = useState(false);
+  const containerRef = React.useRef<HTMLDivElement>(null);
+
+  // 監聽點擊外部關閉下拉選單
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
+        setShowDropdown(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  // 解析並加載已選物種詳情
+  useEffect(() => {
+    async function loadSelectedDetails() {
+      const ids = value.split(',').map(id => id.trim()).filter(Boolean);
+      if (ids.length === 0) {
+        setSelectedDetails([]);
+        return;
+      }
+      const targetTable = table === 'plant_species' ? 'plant_species' : 'species';
+      const { data, error } = await supabase
+        .from(targetTable)
+        .select('taxa_id, scientific_name, common_name_chi, common_name_eng')
+        .in('taxa_id', ids);
+      
+      if (!error && data) {
+        // 保留原 ids 的順序
+        const sorted = ids.map(id => data.find(item => item.taxa_id === id)).filter(Boolean);
+        setSelectedDetails(sorted);
+      }
+    }
+    loadSelectedDetails();
+  }, [value, table, supabase]);
+
+  // 搜尋處理
+  useEffect(() => {
+    if (!searchQuery.trim()) {
+      setSearchResults([]);
+      return;
+    }
+
+    const timer = setTimeout(async () => {
+      setIsSearching(true);
+      const targetTable = table === 'plant_species' ? 'plant_species' : 'species';
+      const ids = value.split(',').map(id => id.trim()).filter(Boolean);
+
+      const { data, error } = await supabase
+        .from(targetTable)
+        .select('taxa_id, scientific_name, common_name_chi, common_name_eng')
+        .or(`scientific_name.ilike.%${searchQuery}%,common_name_chi.ilike.%${searchQuery}%,common_name_eng.ilike.%${searchQuery}%`)
+        .limit(8);
+
+      if (!error && data) {
+        // 過濾已選中的項目
+        const filtered = data.filter((item: any) => !ids.includes(item.taxa_id));
+        setSearchResults(filtered);
+      }
+      setIsSearching(false);
+    }, 300);
+
+    return () => clearTimeout(timer);
+  }, [searchQuery, value, table, supabase]);
+
+  // 新增選擇
+  const handleSelect = (item: any) => {
+    const ids = value.split(',').map(id => id.trim()).filter(Boolean);
+    if (!ids.includes(item.taxa_id)) {
+      const newIds = [...ids, item.taxa_id];
+      onChange(newIds.join(', '));
+    }
+    setSearchQuery('');
+    setShowDropdown(false);
+  };
+
+  // 移除選擇
+  const handleRemove = (taxaId: string) => {
+    const ids = value.split(',').map(id => id.trim()).filter(Boolean);
+    const newIds = ids.filter(id => id !== taxaId);
+    onChange(newIds.join(', '));
+  };
+
+  return (
+    <div ref={containerRef} className="relative flex flex-col gap-3 w-full bg-slate-50/30 border border-slate-100/80 rounded-2xl p-4">
+      {/* 搜尋框 */}
+      <div className="relative">
+        <div className="flex items-center bg-white border border-slate-200 focus-within:border-emerald-500 focus-within:ring-1 focus-within:ring-emerald-500/20 rounded-xl px-3 py-2 transition-all shadow-sm">
+          <Search className="w-4 h-4 text-slate-400 mr-2 shrink-0" />
+          <input
+            type="text"
+            placeholder={language === 'zh' ? '搜尋物種中文名稱、英文名稱或學名...' : 'Search common name or scientific name...'}
+            value={searchQuery}
+            onChange={(e) => {
+              setSearchQuery(e.target.value);
+              setShowDropdown(true);
+            }}
+            onFocus={() => setShowDropdown(true)}
+            className="w-full bg-transparent border-none outline-none text-xs font-semibold text-slate-700 placeholder:text-slate-400"
+          />
+          {searchQuery && (
+            <button
+              onClick={() => {
+                setSearchQuery('');
+                setSearchResults([]);
+              }}
+              className="text-slate-400 hover:text-slate-600 transition-colors p-0.5 cursor-pointer"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+          )}
+        </div>
+
+        {/* 搜尋下拉結果 */}
+        <AnimatePresence>
+          {showDropdown && (searchQuery.trim() !== '') && (
+            <motion.div
+              initial={{ opacity: 0, y: -5 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -5 }}
+              className="absolute z-50 left-0 right-0 mt-1 bg-white/95 backdrop-blur-md border border-slate-100 rounded-xl shadow-xl max-h-60 overflow-y-auto custom-scrollbar"
+            >
+              {isSearching ? (
+                <div className="p-3 text-center text-xs text-slate-400 font-bold flex items-center justify-center gap-1.5">
+                  <Loader2 className="w-3.5 h-3.5 animate-spin text-emerald-500" />
+                  <span>{language === 'zh' ? '搜尋中...' : 'Searching...'}</span>
+                </div>
+              ) : searchResults.length === 0 ? (
+                <div className="p-3 text-center text-xs text-slate-400 font-bold">
+                  {language === 'zh' ? '未找到符合的物種' : 'No matching species found'}
+                </div>
+              ) : (
+                searchResults.map((item) => {
+                  const chiName = item.common_name_chi;
+                  const engName = item.common_name_eng;
+                  const showName = chiName && engName ? `${chiName} (${engName})` : (chiName || engName || '');
+                  return (
+                    <button
+                      key={item.taxa_id}
+                      onClick={() => handleSelect(item)}
+                      className="w-full text-left px-4 py-2.5 hover:bg-emerald-50/50 flex flex-col transition-colors border-b border-slate-50 last:border-0 cursor-pointer"
+                    >
+                      <span className="text-xs font-bold text-slate-700">
+                        {showName}
+                        <span className="text-[10px] font-medium text-slate-400 ml-2">({item.taxa_id})</span>
+                      </span>
+                      <span className="text-[10px] text-slate-400 font-serif italic">{item.scientific_name}</span>
+                    </button>
+                  );
+                })
+              )}
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
+
+      {/* 已選物種列表 */}
+      <div className="flex flex-col gap-1.5">
+        <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider">
+          {language === 'zh' ? '已選擇的相似物種' : 'Selected Similar Species'} ({selectedDetails.length})
+        </span>
+        {selectedDetails.length === 0 ? (
+          <div className="text-center py-4 border border-dashed border-slate-200 rounded-xl text-slate-400 text-xs font-bold bg-white/20">
+            {language === 'zh' ? '尚未選擇任何相似物種' : 'No similar species selected yet'}
+          </div>
+        ) : (
+          <div className="flex flex-wrap gap-2">
+            {selectedDetails.map((item) => {
+              const chiName = item.common_name_chi;
+              const engName = item.common_name_eng;
+              const displayName = language === 'zh' ? (chiName || engName) : (engName || chiName);
+              return (
+                <motion.div
+                  key={item.taxa_id}
+                  layout
+                  className="flex items-center gap-2 pl-3 pr-2 py-1.5 bg-white border border-slate-100 rounded-xl shadow-sm hover:border-emerald-200 transition-colors"
+                >
+                  <div className="flex flex-col min-w-0">
+                    <span className="text-xs font-bold text-slate-700 truncate leading-snug">
+                      {displayName}
+                    </span>
+                    <span className="text-[9px] font-serif italic text-slate-400 leading-none mt-0.5">{item.scientific_name}</span>
+                  </div>
+                  <button
+                    onClick={() => handleRemove(item.taxa_id)}
+                    className="p-1 rounded-lg text-slate-400 hover:text-red-500 hover:bg-red-50 transition-all cursor-pointer hover:scale-105"
+                    title={language === 'zh' ? '移除' : 'Remove'}
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                </motion.div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
 
 interface FieldConfig {
   key: string;
@@ -38,7 +253,7 @@ interface FieldGroup {
 interface SpeciesDetailEditorProps {
   table: string;
   data: any;
-  onSave: (updatedItem: any) => void;
+  onSave: (updatedItem: any, affectedUpdates?: Record<string, string>) => void;
   onCancel: () => void;
   onDirtyChange?: (isDirty: boolean) => void;
 }
@@ -313,9 +528,66 @@ export default function SpeciesDetailEditor({ table, data, onSave, onCancel, onD
 
       if (error) throw error;
 
+      // 雙向同步相似物種邏輯 (Bidirectional similar species sync)
+      const affectedUpdates: Record<string, string> = {};
+      if (Object.keys(updatedFields).includes('similar_species')) {
+        const origList = (originalValues.similar_species || '').split(',').map((id: string) => id.trim()).filter(Boolean);
+        const newList = (formValues.similar_species || '').split(',').map((id: string) => id.trim()).filter(Boolean);
+
+        const added = newList.filter((id: string) => !origList.includes(id));
+        const removed = origList.filter((id: string) => !newList.includes(id));
+        const currentTaxaId = data.taxa_id;
+
+        // 處理新增：把目前物種 A 加到被新增物種 B 的 similar_species 中
+        for (const targetId of added) {
+          const targetTable = targetId.startsWith('flora_') ? 'plant_species' : 'species';
+          const { data: targetData } = await supabase
+            .from(targetTable)
+            .select('similar_species')
+            .eq('taxa_id', targetId)
+            .maybeSingle();
+
+          const currentSim = (targetData?.similar_species || '').split(',').map((id: string) => id.trim()).filter(Boolean);
+          if (!currentSim.includes(currentTaxaId)) {
+            currentSim.push(currentTaxaId);
+            const nextSimVal = currentSim.join(', ');
+            await supabase
+              .from(targetTable)
+              .update({ similar_species: nextSimVal })
+              .eq('taxa_id', targetId);
+
+            affectedUpdates[targetId] = nextSimVal;
+          }
+        }
+
+        // 處理移除：把目前物種 A 從被移除物種 C 的 similar_species 中刪除
+        for (const targetId of removed) {
+          const targetTable = targetId.startsWith('flora_') ? 'plant_species' : 'species';
+          const { data: targetData } = await supabase
+            .from(targetTable)
+            .select('similar_species')
+            .eq('taxa_id', targetId)
+            .maybeSingle();
+
+          if (targetData) {
+            const currentSim = (targetData.similar_species || '').split(',').map((id: string) => id.trim()).filter(Boolean);
+            if (currentSim.includes(currentTaxaId)) {
+              const updatedSim = currentSim.filter((id: string) => id !== currentTaxaId);
+              const nextSimVal = updatedSim.join(', ');
+              await supabase
+                .from(targetTable)
+                .update({ similar_species: nextSimVal })
+                .eq('taxa_id', targetId);
+
+              affectedUpdates[targetId] = nextSimVal;
+            }
+          }
+        }
+      }
+
       const finalItem = { ...data, ...formValues };
       setOriginalValues({ ...formValues });
-      onSave(finalItem);
+      onSave(finalItem, affectedUpdates);
     } catch (err) {
       console.error('Error saving species detail:', err);
       alert(language === 'zh' ? '儲存失敗，請重試。' : 'Failed to save changes.');
@@ -452,7 +724,7 @@ export default function SpeciesDetailEditor({ table, data, onSave, onCancel, onD
               const label = language === 'zh' ? field.labelChi : field.labelEng;
               const isFieldDirty = formValues[field.key] !== originalValues[field.key];
               const isBilingualField = field.key.endsWith('_chi') || field.key.endsWith('_eng');
-              const useFullWidth = isTextarea && !isBilingualField;
+              const useFullWidth = (isTextarea && !isBilingualField) || field.key === 'similar_species';
 
               return (
                 <div 
@@ -490,6 +762,14 @@ export default function SpeciesDetailEditor({ table, data, onSave, onCancel, onD
                           : 'bg-slate-50/50 hover:bg-slate-50 border-slate-100 hover:border-slate-200 focus:border-emerald-400 focus:ring-emerald-400'
                       }`}
                       placeholder={language === 'zh' ? `請輸入 ${label}...` : `Enter ${label}...`}
+                    />
+                  ) : field.key === 'similar_species' ? (
+                    <SimilarSpeciesPicker
+                      value={String(val)}
+                      onChange={(newVal) => handleFieldChange(field.key, newVal, field.type)}
+                      table={table}
+                      supabase={supabase}
+                      language={language}
                     />
                   ) : (
                     <div className="flex gap-2 w-full items-center">

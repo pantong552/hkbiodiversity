@@ -448,7 +448,7 @@ export default function PlantSpeciesManager() {
         </div>
         
         <div className="flex items-center gap-3">
-          <div className="px-3 py-1 bg-white/40 border border-white rounded-full text-[10px] font-bold text-slate-500 flex items-center gap-2">
+          <div className="px-3 py-1 bg-white/40 border border-white rounded-full text-[12px] font-bold text-slate-500 flex items-center gap-2">
             <Database className="w-3 h-3 text-emerald-500" />
             <span className="text-emerald-600 font-black">
               {t('admin.total_ratio')
@@ -459,7 +459,7 @@ export default function PlantSpeciesManager() {
           {searchQuery && (
             <button 
               onClick={() => { setSearchQuery(''); setCurrentPage(1); }}
-              className="px-3 py-1 text-[10px] font-black text-red-500 hover:bg-red-50 rounded-full transition-colors"
+              className="px-3 py-1 text-[12px] font-black text-red-500 hover:bg-red-50 rounded-full transition-colors cursor-pointer"
             >
               {t('admin.clear_all')}
             </button>
@@ -467,7 +467,7 @@ export default function PlantSpeciesManager() {
           {Object.values(multiFilters).some(v => v.length > 0) && (
             <button 
               onClick={() => { setMultiFilters({}); setCurrentPage(1); }}
-              className="px-3 py-1 text-[10px] font-black text-emerald-600 bg-emerald-50 hover:bg-emerald-100 rounded-full transition-colors flex items-center gap-1"
+              className="px-3 py-1 text-[12px] font-black text-emerald-600 bg-emerald-50 hover:bg-emerald-100 rounded-full transition-colors flex items-center gap-1 cursor-pointer"
             >
               <RotateCcw className="w-3 h-3" />
               {language === 'zh' ? '重設所有過濾器' : 'Reset All Filters'}
@@ -483,7 +483,7 @@ export default function PlantSpeciesManager() {
                 : 'bg-white/60 text-slate-500 border-white/80 hover:bg-white/80'
             }`}
           >
-            <span className="text-[9px] font-black uppercase tracking-widest whitespace-nowrap">
+            <span className="text-[11px] font-black uppercase tracking-wider whitespace-nowrap">
               {language === 'zh' ? '編輯詳細資料' : 'Edit Species Detail'}
             </span>
           </button>
@@ -502,7 +502,7 @@ export default function PlantSpeciesManager() {
                 className={`w-3 h-3 rounded-full shadow-sm transition-colors ${isBilingual ? 'bg-white' : 'bg-slate-400'}`}
               />
             </div>
-            <span className="text-[9px] font-black uppercase tracking-widest whitespace-nowrap">
+            <span className="text-[11px] font-black uppercase tracking-wider whitespace-nowrap">
               {language === 'zh' ? '雙語顯示' : 'Bilingual'}
             </span>
           </button>
@@ -739,8 +739,16 @@ export default function PlantSpeciesManager() {
                 <SpeciesDetailEditor
                   table="plant_species"
                   data={selectedSpecies}
-                  onSave={(updatedItem) => {
-                    setData(prev => prev.map(item => item.taxa_id === updatedItem.taxa_id ? (updatedItem as PlantSpeciesData) : item));
+                  onSave={(updatedItem, affectedUpdates) => {
+                    setData(prev => prev.map(item => {
+                      if (item.taxa_id === updatedItem.taxa_id) {
+                        return updatedItem as PlantSpeciesData;
+                      }
+                      if (affectedUpdates && affectedUpdates[item.taxa_id] !== undefined) {
+                        return { ...item, similar_species: affectedUpdates[item.taxa_id] };
+                      }
+                      return item;
+                    }));
                     setSelectedSpecies(updatedItem);
                     setIsEditorDirty(false);
                   }}
