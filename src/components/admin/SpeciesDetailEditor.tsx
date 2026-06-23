@@ -63,7 +63,7 @@ function SimilarSpeciesPicker({ value, onChange, table, supabase, language }: Si
       
       if (!error && data) {
         // 保留原 ids 的順序
-        const sorted = ids.map(id => data.find(item => item.taxa_id === id)).filter(Boolean);
+        const sorted = ids.map(id => data.find((item: any) => item.taxa_id === id)).filter(Boolean);
         setSelectedDetails(sorted);
       }
     }

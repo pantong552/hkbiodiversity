@@ -98,24 +98,29 @@ export default function MaintainPage() {
               </button>
             </div>
             
-            <div className={`flex items-center gap-3 ${isCollapsed ? 'justify-center' : ''}`}>
-              <div className="p-2.5 bg-white rounded-xl shadow-lg shadow-emerald-200/30 border border-emerald-50 flex-shrink-0">
-                <ShieldCheck className="w-6 h-6 text-emerald-600" />
+            <div className={`flex items-center gap-3 group/title ${isCollapsed ? 'justify-center' : ''}`}>
+              <div className="p-2.5 bg-gradient-to-br from-emerald-600 to-teal-500 rounded-2xl shadow-lg shadow-emerald-600/20 border border-emerald-400/20 flex-shrink-0 transition-transform duration-300 group-hover/title:scale-105 group-hover/title:rotate-3">
+                <ShieldCheck className="w-5 h-5 text-white" />
               </div>
               <div className={`transition-all duration-300 origin-left ${isCollapsed ? 'opacity-0 scale-0 w-0 overflow-hidden' : 'opacity-100 scale-100'}`}>
                 {language === 'zh' ? (
                   <>
-                    <h1 className="text-xl xl:text-2xl font-black text-slate-900 tracking-tighter leading-none whitespace-nowrap">
+                    <h1 className="text-lg xl:text-xl font-extrabold text-slate-800 tracking-tight leading-none whitespace-nowrap bg-clip-text text-transparent bg-gradient-to-r from-slate-900 via-slate-800 to-slate-700">
                       系統管理
                     </h1>
-                    <p className="text-[9px] text-slate-400 font-bold uppercase tracking-wider mt-1 whitespace-nowrap">
-                      System Management
+                    <p className="text-[9px] text-emerald-600 font-black uppercase tracking-widest mt-1 whitespace-nowrap font-mono opacity-80">
+                      SYSTEM MANAGEMENT
                     </p>
                   </>
                 ) : (
-                  <h1 className="text-xl xl:text-2xl font-black text-slate-900 tracking-tighter leading-none uppercase whitespace-nowrap">
-                    System Management
-                  </h1>
+                  <>
+                    <h1 className="text-lg xl:text-xl font-extrabold text-slate-800 tracking-tight leading-none uppercase whitespace-nowrap bg-clip-text text-transparent bg-gradient-to-r from-slate-900 via-slate-800 to-slate-700">
+                      Console
+                    </h1>
+                    <p className="text-[9px] text-emerald-600 font-black uppercase tracking-widest mt-1 whitespace-nowrap font-mono opacity-80">
+                      SYSTEM MANAGEMENT
+                    </p>
+                  </>
                 )}
               </div>
             </div>

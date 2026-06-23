@@ -18,7 +18,8 @@ import {
   Database,
   X,
   ShieldCheck,
-  RotateCcw
+  RotateCcw,
+  SlidersHorizontal
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useTaxonomy } from '@/context/TaxonomyContext';
@@ -601,36 +602,39 @@ export default function SpeciesManager() {
           {/* Edit Species Detail Button */}
           <button 
             onClick={handleToggleDetailEditMode}
-            className={`flex items-center gap-2 px-3 py-1.5 rounded-2xl border transition-all duration-300 hover:scale-[1.02] active:scale-95 cursor-pointer hover:shadow-sm ${
+            className={`flex items-center gap-2 px-3.5 py-1.5 rounded-2xl border transition-all duration-300 hover:scale-[1.02] active:scale-95 cursor-pointer hover:shadow-md ${
               isDetailEditMode 
-                ? 'bg-emerald-600 text-white border-emerald-500 shadow-lg shadow-emerald-200' 
-                : 'bg-white/60 text-slate-500 border-white/80 hover:bg-white/80'
+                ? 'bg-emerald-600 text-white border-emerald-500 shadow-lg shadow-emerald-200 hover:bg-emerald-700' 
+                : 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100 hover:border-emerald-300'
             }`}
           >
+            <SlidersHorizontal className="w-3.5 h-3.5" />
             <span className="text-[11px] font-black uppercase tracking-wider whitespace-nowrap">
               {language === 'zh' ? '編輯詳細資料' : 'Edit Species Detail'}
             </span>
           </button>
 
           {/* Bilingual Toggle */}
-          <button 
-            onClick={() => setIsBilingual(!isBilingual)}
-            className={`flex items-center gap-2 px-3 py-1.5 rounded-2xl border transition-all duration-300 hover:scale-[1.02] active:scale-95 cursor-pointer hover:shadow-sm ${
-              isBilingual 
-                ? 'bg-emerald-600 text-white border-emerald-500 shadow-lg shadow-emerald-200' 
-                : 'bg-white/60 text-slate-500 border-white/80 hover:bg-white/80'
-            }`}
-          >
-            <div className="relative w-7 h-4 bg-slate-200 rounded-full transition-colors group-hover:bg-slate-300 p-0.5">
-              <motion.div 
-                animate={{ x: isBilingual ? 12 : 0 }}
-                className={`w-3 h-3 rounded-full shadow-sm transition-colors ${isBilingual ? 'bg-white' : 'bg-slate-400'}`}
-              />
-            </div>
-            <span className="text-[11px] font-black uppercase tracking-wider whitespace-nowrap">
-              {language === 'zh' ? '雙語顯示' : 'Bilingual'}
-            </span>
-          </button>
+          {!isDetailEditMode && (
+            <button 
+              onClick={() => setIsBilingual(!isBilingual)}
+              className={`flex items-center gap-2 px-3 py-1.5 rounded-2xl border transition-all duration-300 hover:scale-[1.02] active:scale-95 cursor-pointer hover:shadow-sm ${
+                isBilingual 
+                  ? 'bg-emerald-600 text-white border-emerald-500 shadow-lg shadow-emerald-200' 
+                  : 'bg-white/60 text-slate-500 border-white/80 hover:bg-white/80'
+              }`}
+            >
+              <div className="relative w-7 h-4 bg-slate-200 rounded-full transition-colors group-hover:bg-slate-300 p-0.5">
+                <motion.div 
+                  animate={{ x: isBilingual ? 12 : 0 }}
+                  className={`w-3 h-3 rounded-full shadow-sm transition-colors ${isBilingual ? 'bg-white' : 'bg-slate-400'}`}
+                />
+              </div>
+              <span className="text-[11px] font-black uppercase tracking-wider whitespace-nowrap">
+                {language === 'zh' ? '雙語顯示' : 'Bilingual'}
+              </span>
+            </button>
+          )}
         </div>
       </div>
       
