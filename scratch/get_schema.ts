@@ -16,16 +16,16 @@ if (!supabaseUrl || !supabaseAnonKey) {
 const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 async function getSchema() {
-  // 先嘗試拿取一筆資料以得到所有的 keys (因為有些 RLS 限制可能不允許讀 information_schema)
+  // 先嘗試拿取一筆資料以得到所有的 keys
   const { data, error } = await supabase
-    .from('species')
+    .from('plant_species')
     .select('*')
     .limit(1);
 
   if (error) {
     console.error('Error fetching data:', error);
   } else {
-    console.log('Columns from one record:', Object.keys(data[0] || {}));
+    console.log('Columns from one plant record:', Object.keys(data[0] || {}));
   }
 
   // 嘗試查詢 information_schema 看看是否被允許

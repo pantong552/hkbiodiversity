@@ -19,10 +19,11 @@ import {
   ShieldCheck,
   RotateCcw
 } from 'lucide-react';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { useTaxonomy } from '@/context/TaxonomyContext';
 import MultiSelectDropdown from '@/components/ui/MultiSelectDropdown';
 import AlertModal from '@/components/ui/AlertModal';
+import SpeciesDetailEditor from './SpeciesDetailEditor';
 
 interface PlantSpeciesData {
   taxa_id: string;
@@ -66,6 +67,46 @@ export default function PlantSpeciesManager() {
   const [originalValues, setOriginalValues] = useState<Partial<PlantSpeciesData>>({});
   const [saving, setSaving] = useState(false);
   const [showDiscardConfirm, setShowDiscardConfirm] = useState(false);
+
+  // Detail Edit Mode State
+  const [isDetailEditMode, setIsDetailEditMode] = useState(false);
+  const [selectedSpecies, setSelectedSpecies] = useState<PlantSpeciesData | null>(null);
+  const [isEditorDirty, setIsEditorDirty] = useState(false);
+  const [pendingSelection, setPendingSelection] = useState<PlantSpeciesData | null>(null);
+  const [showEditorDiscardConfirm, setShowEditorDiscardConfirm] = useState(false);
+
+  // Split Pane Resize States & Handlers
+  const [leftWidth, setLeftWidth] = useState(38); // 預設 38%
+  const [isResizing, setIsResizing] = useState(false);
+  const splitContainerRef = useRef<HTMLDivElement>(null);
+
+  const startResize = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    setIsResizing(true);
+  }, []);
+
+  useEffect(() => {
+    if (!isResizing) return;
+
+    const handleMouseMove = (e: MouseEvent) => {
+      if (!splitContainerRef.current) return;
+      const rect = splitContainerRef.current.getBoundingClientRect();
+      const newWidth = ((e.clientX - rect.left) / rect.width) * 100;
+      // 限制左邊表格寬度在 20% ~ 70%
+      setLeftWidth(Math.max(20, Math.min(70, newWidth)));
+    };
+
+    const handleMouseUp = () => {
+      setIsResizing(false);
+    };
+
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, [isResizing]);
 
   // Column Resizing
   const [columnWidths, setColumnWidths] = useState<Record<string, number>>({
@@ -170,6 +211,52 @@ export default function PlantSpeciesManager() {
       cancelEditing();
     }
   }, [isDirty, cancelEditing]);
+
+  // Detail Edit Mode Actions
+  const handleToggleDetailEditMode = () => {
+    if (isDetailEditMode) {
+      if (isEditorDirty) {
+        setPendingSelection(null);
+        setShowEditorDiscardConfirm(true);
+      } else {
+        setIsDetailEditMode(false);
+        setSelectedSpecies(null);
+      }
+    } else {
+      setIsDetailEditMode(true);
+      if (paginatedData.length > 0) {
+        setSelectedSpecies(paginatedData[0]);
+      }
+    }
+  };
+
+  const handleRowClick = (item: PlantSpeciesData) => {
+    if (isDetailEditMode) {
+      if (selectedSpecies?.taxa_id === item.taxa_id) return;
+      
+      if (isEditorDirty) {
+        setPendingSelection(item);
+        setShowEditorDiscardConfirm(true);
+      } else {
+        setSelectedSpecies(item);
+      }
+    } else {
+      startEditing(item);
+    }
+  };
+
+  // Active columns configuration
+  const activeColumnWidths = useMemo(() => {
+    if (isDetailEditMode) {
+      return {
+        taxa_id: columnWidths.taxa_id ?? 80,
+        scientific_name: columnWidths.scientific_name ?? 180,
+        common_name_chi: columnWidths.common_name_chi ?? 120,
+        common_name_eng: columnWidths.common_name_eng ?? 150
+      };
+    }
+    return columnWidths;
+  }, [isDetailEditMode, columnWidths]);
 
   const editingRowRef = useClickOutside(() => {
     if (editingId && !showDiscardConfirm) {
@@ -387,9 +474,23 @@ export default function PlantSpeciesManager() {
             </button>
           )}
 
+          {/* Edit Species Detail Button */}
+          <button 
+            onClick={handleToggleDetailEditMode}
+            className={`flex items-center gap-2 px-3 py-1.5 rounded-2xl border transition-all duration-300 hover:scale-[1.02] active:scale-95 cursor-pointer hover:shadow-sm ${
+              isDetailEditMode 
+                ? 'bg-emerald-600 text-white border-emerald-500 shadow-lg shadow-emerald-200' 
+                : 'bg-white/60 text-slate-500 border-white/80 hover:bg-white/80'
+            }`}
+          >
+            <span className="text-[9px] font-black uppercase tracking-widest whitespace-nowrap">
+              {language === 'zh' ? '編輯詳細資料' : 'Edit Species Detail'}
+            </span>
+          </button>
+
           <button 
             onClick={() => setIsBilingual(!isBilingual)}
-            className={`flex items-center gap-2 px-3 py-1.5 rounded-2xl border transition-all duration-300 group ${
+            className={`flex items-center gap-2 px-3 py-1.5 rounded-2xl border transition-all duration-300 hover:scale-[1.02] active:scale-95 cursor-pointer hover:shadow-sm ${
               isBilingual 
                 ? 'bg-emerald-600 text-white border-emerald-500 shadow-lg shadow-emerald-200' 
                 : 'bg-white/60 text-slate-500 border-white/80 hover:bg-white/80'
@@ -415,80 +516,93 @@ export default function PlantSpeciesManager() {
         </div>
       ) : (
         <>
-          <div className="flex-1 min-h-0 overflow-auto rounded-[1.5rem] border border-white bg-white/30 backdrop-blur-xl shadow-sm custom-scrollbar">
-            <table className="w-max text-left border-collapse table-fixed">
-              <thead className="sticky top-0 z-40 bg-slate-50 shadow-sm">
-                <tr className="border-b border-slate-100">
-                  {Object.keys(columnWidths).map((key) => (
-                    <th 
-                      key={key}
-                      style={{ width: columnWidths[key] }}
-                      className="px-4 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest relative group/header overflow-visible"
-                    >
-                      <div className="flex items-center justify-between gap-1">
-                        <div 
-                          className="flex items-center gap-1 cursor-pointer hover:text-emerald-600 transition-colors shrink-0"
-                          onClick={() => requestSort(key as SortKey)}
-                        >
-                          <span className="whitespace-nowrap">{t(`admin.${key}`)}</span>
-                          <SortIcon column={key as SortKey} />
+          <div 
+            ref={splitContainerRef}
+            className={`flex-1 min-h-0 flex ${isDetailEditMode ? 'flex-row gap-1' : 'flex-col gap-6'}`}
+          >
+            {/* Table Container */}
+            <motion.div 
+              layout
+              transition={{ type: "spring", stiffness: 300, damping: 30 }}
+              style={{ width: isDetailEditMode ? `${leftWidth}%` : '100%' }}
+              className={`overflow-auto rounded-[1.5rem] border border-white bg-white/30 backdrop-blur-xl shadow-sm custom-scrollbar ${isDetailEditMode ? '' : 'flex-1'}`}
+            >
+              <table className={`text-left border-collapse table-fixed ${isDetailEditMode ? 'w-full' : 'w-max'}`}>
+                <thead className="sticky top-0 z-40 bg-slate-50 shadow-sm">
+                  <tr className="border-b border-slate-100">
+                    {Object.keys(activeColumnWidths).map((key) => (
+                      <th 
+                        key={key}
+                        style={{ width: activeColumnWidths[key] }}
+                        className="px-4 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest relative group/header overflow-visible"
+                      >
+                        <div className="flex items-center justify-between gap-1">
+                          <div 
+                            className="flex items-center gap-1 cursor-pointer hover:text-emerald-600 transition-colors shrink-0"
+                            onClick={() => requestSort(key as SortKey)}
+                          >
+                            <span className="whitespace-nowrap">{t(`admin.${key}`)}</span>
+                            <SortIcon column={key as SortKey} />
+                          </div>
+                          
+                          <div onClick={(e) => e.stopPropagation()} className="shrink-0">
+                            <MultiSelectDropdown
+                              label={t(`admin.${key}`)}
+                              options={filterOptions[key] || []}
+                              selectedValues={multiFilters[key] || []}
+                              onChange={(values) => {
+                                setMultiFilters(prev => ({ ...prev, [key]: values }));
+                                setCurrentPage(1);
+                              }}
+                              placeholder={language === 'zh' ? '搜尋...' : 'Search...'}
+                              align="right"
+                              minWidth="200px"
+                              variant="minimal"
+                            />
+                          </div>
                         </div>
                         
-                        <div onClick={(e) => e.stopPropagation()} className="shrink-0">
-                          <MultiSelectDropdown
-                            label={t(`admin.${key}`)}
-                            options={filterOptions[key] || []}
-                            selectedValues={multiFilters[key] || []}
-                            onChange={(values) => {
-                              setMultiFilters(prev => ({ ...prev, [key]: values }));
-                              setCurrentPage(1);
-                            }}
-                            placeholder={language === 'zh' ? '搜尋...' : 'Search...'}
-                            align="right"
-                            minWidth="200px"
-                            variant="minimal"
-                          />
-                        </div>
-                      </div>
-                      
-                      <div 
-                        onMouseDown={(e) => { e.stopPropagation(); handleMouseDown(key, e); }}
-                        className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize group-hover/header:bg-emerald-500/20 active:bg-emerald-500 transition-colors z-30"
-                      />
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody className="bg-white/20">
-                {paginatedData.map((item) => {
-                  const isEditing = editingId === item.taxa_id;
-                  
-                  return (
-                    <tr 
-                      key={item.taxa_id} 
-                      ref={isEditing ? (editingRowRef as React.RefObject<HTMLTableRowElement>) : null}
-                      onClick={() => !isEditing && startEditing(item)}
-                      className={`transition-all duration-300 group border-b border-white/10 ${
-                        isEditing 
-                          ? 'bg-emerald-50/80 shadow-inner' 
-                          : 'hover:bg-emerald-50/60 hover:shadow-lg hover:shadow-slate-200/40 cursor-pointer'
-                      }`}
-                    >
-                      <td className="px-4 py-2 text-[12px] font-bold text-slate-500">{item.taxa_id}</td>
-                      
-                      {/* Category */}
-                      <td className="px-4 py-2 text-[12px] font-medium text-slate-700">
-                        {isEditing ? (
-                          <input 
-                            value={editValues.category_eng || ''} 
-                            onChange={(e) => handleEditChange('category_eng', e.target.value)}
-                            className="w-full bg-white border border-emerald-200 rounded px-2 py-1 text-[11px] focus:outline-none focus:ring-1 focus:ring-emerald-500"
-                            onKeyDown={handleKeyDown}
-                            autoFocus
-                          />
-                        ) : (
-                          <div className="flex flex-col min-h-[1.4rem] justify-center">
-                            {isBilingual && (
+                        <div 
+                          onMouseDown={(e) => { e.stopPropagation(); handleMouseDown(key, e); }}
+                          className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize group-hover/header:bg-emerald-500/20 active:bg-emerald-500 transition-colors z-30"
+                        />
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody className="bg-white/20">
+                  {paginatedData.map((item) => {
+                    const isEditing = editingId === item.taxa_id;
+                    
+                    return (
+                      <tr 
+                        key={item.taxa_id} 
+                        ref={isEditing ? (editingRowRef as React.RefObject<HTMLTableRowElement>) : null}
+                        onClick={() => !isEditing && handleRowClick(item)}
+                        className={`transition-all duration-300 group border-b border-white/10 ${
+                          isEditing 
+                            ? 'bg-emerald-50/80 shadow-inner' 
+                            : selectedSpecies?.taxa_id === item.taxa_id && isDetailEditMode
+                              ? 'bg-emerald-100/70 border-emerald-200 shadow-sm'
+                              : 'hover:bg-emerald-50/60 hover:shadow-lg hover:shadow-slate-200/40 cursor-pointer'
+                        }`}
+                      >
+                        <td className="px-4 py-2 text-[12px] font-bold text-slate-500">{item.taxa_id}</td>
+                        
+                        {/* Category */}
+                        {!isDetailEditMode && (
+                          <td className="px-4 py-2 text-[12px] font-medium text-slate-700">
+                            {isEditing ? (
+                              <input 
+                                value={editValues.category_eng || ''} 
+                                onChange={(e) => handleEditChange('category_eng', e.target.value)}
+                                className="w-full bg-white border border-emerald-200 rounded px-2 py-1 text-[11px] focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                                onKeyDown={handleKeyDown}
+                                autoFocus
+                              />
+                            ) : (
+                              <div className="flex flex-col min-h-[1.4rem] justify-center">
+                                {isBilingual && (
                               <motion.span 
                                 initial={{ opacity: 0, y: -2 }}
                                 animate={{ opacity: 1, y: 0 }}
@@ -503,6 +617,7 @@ export default function PlantSpeciesManager() {
                           </div>
                         )}
                       </td>
+                      )}
 
                       <td className="px-4 py-2 text-[13px] font-black text-emerald-700 italic">
                         {isEditing ? (
@@ -515,6 +630,7 @@ export default function PlantSpeciesManager() {
                         ) : item.scientific_name}
                       </td>
 
+                      {/* Common Name Eng */}
                       <td className="px-4 py-2 text-[12px] font-bold text-slate-600">
                         {isEditing ? (
                           <input 
@@ -526,6 +642,7 @@ export default function PlantSpeciesManager() {
                         ) : item.common_name_eng}
                       </td>
 
+                      {/* Common Name Chi */}
                       <td className="px-4 py-2 text-[14px] font-black text-slate-900">
                         {isEditing ? (
                           <input 
@@ -537,7 +654,7 @@ export default function PlantSpeciesManager() {
                         ) : item.common_name_chi}
                       </td>
 
-                      {['family_eng', 'genus_eng', 'species_eng'].map((key) => {
+                      {!isDetailEditMode && ['family_eng', 'genus_eng', 'species_eng'].map((key) => {
                         const rank = key.replace('_eng', '');
                         const englishValue = (item as any)[key];
                         const chineseValue = (isBilingual && key !== 'species_eng') ? getTaxonomyChi(rank, 'flora', englishValue) : null;
@@ -571,7 +688,7 @@ export default function PlantSpeciesManager() {
                         );
                       })}
 
-                      {isEditing && (
+                      {!isDetailEditMode && isEditing && (
                         <td className="px-4 py-3 text-right">
                           <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
                             <button 
@@ -595,7 +712,53 @@ export default function PlantSpeciesManager() {
                 })}
               </tbody>
             </table>
-          </div>
+          </motion.div>
+
+          {/* Resizer Divider Bar */}
+          {isDetailEditMode && (
+            <div 
+              onMouseDown={startResize}
+              className="w-2 hover:w-2.5 hover:bg-emerald-500/20 active:bg-emerald-500/40 cursor-col-resize transition-all self-stretch flex items-center justify-center relative group z-50 shrink-0 mx-1 rounded-full"
+              title={language === 'zh' ? '拖曳調整寬度' : 'Drag to resize'}
+            >
+              <div className="w-0.5 h-16 bg-slate-200 rounded-full group-hover:bg-emerald-400 group-active:bg-emerald-500 transition-colors" />
+            </div>
+          )}
+
+          {/* Right Editor Side Panel */}
+          <AnimatePresence mode="wait">
+            {isDetailEditMode && (
+              <motion.div 
+                initial={{ opacity: 0, x: 80, scale: 0.95 }}
+                animate={{ opacity: 1, x: 0, scale: 1 }}
+                exit={{ opacity: 0, x: 80, scale: 0.95 }}
+                transition={{ type: "spring", stiffness: 300, damping: 30 }}
+                style={{ width: `${100 - leftWidth}%` }}
+                className="min-h-0 bg-white shadow-xl shadow-slate-200/50 rounded-3xl border border-slate-100/60 overflow-hidden flex-shrink-0"
+              >
+                <SpeciesDetailEditor
+                  table="plant_species"
+                  data={selectedSpecies}
+                  onSave={(updatedItem) => {
+                    setData(prev => prev.map(item => item.taxa_id === updatedItem.taxa_id ? (updatedItem as PlantSpeciesData) : item));
+                    setSelectedSpecies(updatedItem);
+                    setIsEditorDirty(false);
+                  }}
+                  onCancel={() => {
+                    if (isEditorDirty) {
+                      setPendingSelection(null);
+                      setShowEditorDiscardConfirm(true);
+                    } else {
+                      setIsDetailEditMode(false);
+                      setSelectedSpecies(null);
+                    }
+                  }}
+                  onDirtyChange={(dirty) => setIsEditorDirty(dirty)}
+                />
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
 
           {/* Pagination */}
           <div className="flex items-center justify-between py-2 border-t border-slate-50 flex-shrink-0">
@@ -656,6 +819,32 @@ export default function PlantSpeciesManager() {
           ? '您剛才進行了修改，如果不儲存直接退出，所有變更將會遺失。確定要退出嗎？' 
           : 'You have made changes. If you leave without saving, your changes will be lost. Are you sure?'}
         confirmLabel={language === 'zh' ? '不儲存並退出' : 'Discard & Exit'}
+        cancelLabel={language === 'zh' ? '繼續編輯' : 'Continue Editing'}
+        type="warning"
+      />
+
+      <AlertModal
+        isOpen={showEditorDiscardConfirm}
+        onClose={() => {
+          setShowEditorDiscardConfirm(false);
+          setPendingSelection(null);
+        }}
+        onConfirm={() => {
+          setIsEditorDirty(false);
+          setShowEditorDiscardConfirm(false);
+          if (pendingSelection) {
+            setSelectedSpecies(pendingSelection);
+            setPendingSelection(null);
+          } else {
+            setIsDetailEditMode(false);
+            setSelectedSpecies(null);
+          }
+        }}
+        title={language === 'zh' ? '尚未儲存編輯器變更' : 'Unsaved Editor Changes'}
+        description={language === 'zh' 
+          ? '編輯器中有未儲存的修改。如果繼續，這些變更將會遺失。是否確定？' 
+          : 'You have unsaved changes in the editor. If you continue, they will be lost. Are you sure?'}
+        confirmLabel={language === 'zh' ? '捨棄變更' : 'Discard Changes'}
         cancelLabel={language === 'zh' ? '繼續編輯' : 'Continue Editing'}
         type="warning"
       />
