@@ -56,7 +56,7 @@ const faunaFieldGroups = (t: any): FieldGroup[] => [
       { key: 'col_usage_id', labelChi: 'Catalogue of Life ID', labelEng: 'Catalogue of Life ID', type: 'text' },
       { key: 'taxa_group', labelChi: '物種分類群', labelEng: 'Taxa Group', type: 'text' },
       { key: 'informal_group_eng', labelChi: '非正式群組 (英)', labelEng: 'Informal Group (Eng)', type: 'text' },
-      { key: 'informal_group_chi', labelChi: '非正式群組 (中)', labelEng: 'Informal Group (Chi)', type: 'text' },
+      { key: 'informal_group_chi', labelChi: '非正式群組 (中)', labelEng: 'Informal Group (Chi)', type: 'text', readOnly: true },
       { key: 'common_name_chi', labelChi: '中文俗名', labelEng: 'Common Name (Chi)', type: 'text' },
       { key: 'common_name_eng', labelChi: '英文俗名', labelEng: 'Common Name (Eng)', type: 'text' },
       { key: 'scientific_name', labelChi: '學名', labelEng: 'Scientific Name', type: 'text' },
@@ -74,15 +74,15 @@ const faunaFieldGroups = (t: any): FieldGroup[] => [
     icon: <Layers className="w-4 h-4" />,
     fields: [
       { key: 'phylum_eng', labelChi: '門 (英)', labelEng: 'Phylum (Eng)', type: 'text' },
-      { key: 'phylum_chi', labelChi: '門 (中)', labelEng: 'Phylum (Chi)', type: 'text' },
+      { key: 'phylum_chi', labelChi: '門 (中)', labelEng: 'Phylum (Chi)', type: 'text', readOnly: true },
       { key: 'class_eng', labelChi: '綱 (英)', labelEng: 'Class (Eng)', type: 'text' },
-      { key: 'class_chi', labelChi: '綱 (中)', labelEng: 'Class (Chi)', type: 'text' },
+      { key: 'class_chi', labelChi: '綱 (中)', labelEng: 'Class (Chi)', type: 'text', readOnly: true },
       { key: 'order_eng', labelChi: '目 (英)', labelEng: 'Order (Eng)', type: 'text' },
-      { key: 'order_chi', labelChi: '目 (中)', labelEng: 'Order (Chi)', type: 'text' },
+      { key: 'order_chi', labelChi: '目 (中)', labelEng: 'Order (Chi)', type: 'text', readOnly: true },
       { key: 'family_eng', labelChi: '科 (英)', labelEng: 'Family (Eng)', type: 'text' },
-      { key: 'family_chi', labelChi: '科 (中)', labelEng: 'Family (Chi)', type: 'text' },
+      { key: 'family_chi', labelChi: '科 (中)', labelEng: 'Family (Chi)', type: 'text', readOnly: true },
       { key: 'genus_eng', labelChi: '屬 (英)', labelEng: 'Genus (Eng)', type: 'text' },
-      { key: 'genus_chi', labelChi: '屬 (中)', labelEng: 'Genus (Chi)', type: 'text' },
+      { key: 'genus_chi', labelChi: '屬 (中)', labelEng: 'Genus (Chi)', type: 'text', readOnly: true },
       { key: 'species_eng', labelChi: '種 (英)', labelEng: 'Species (Eng)', type: 'text' },
       { key: 'sub_species_eng', labelChi: '亞種 (英)', labelEng: 'Sub-species (Eng)', type: 'text' },
     ]
@@ -162,9 +162,9 @@ const floraFieldGroups = (t: any): FieldGroup[] => [
     nameEng: 'Taxonomy',
     icon: <Layers className="w-4 h-4" />,
     fields: [
-      { key: 'family_chi1', labelChi: '科 (中)', labelEng: 'Family (Chi)', type: 'text' },
+      { key: 'family_chi1', labelChi: '科 (中)', labelEng: 'Family (Chi)', type: 'text', readOnly: true },
       { key: 'family_eng', labelChi: '科 (英)', labelEng: 'Family (Eng)', type: 'text' },
-      { key: 'genus_chi1', labelChi: '屬 (中)', labelEng: 'Genus (Chi)', type: 'text' },
+      { key: 'genus_chi1', labelChi: '屬 (中)', labelEng: 'Genus (Chi)', type: 'text', readOnly: true },
       { key: 'genus_eng', labelChi: '屬 (英)', labelEng: 'Genus (Eng)', type: 'text' },
       { key: 'species_eng', labelChi: '種 (英)', labelEng: 'Species (Eng)', type: 'text' },
     ]
@@ -207,6 +207,7 @@ const floraFieldGroups = (t: any): FieldGroup[] => [
 
 export default function SpeciesDetailEditor({ table, data, onSave, onCancel, onDirtyChange }: SpeciesDetailEditorProps) {
   const { language, t } = useLanguage();
+  const { getTaxonomyChi } = useTaxonomy();
   const supabase = useMemo(() => createClient(), []);
   
   const [formValues, setFormValues] = useState<any>({});
@@ -430,7 +431,18 @@ export default function SpeciesDetailEditor({ table, data, onSave, onCancel, onD
           <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
             
             {currentGroup.fields.map(field => {
-              const val = formValues[field.key] ?? '';
+              let val = formValues[field.key] ?? '';
+              
+              // 動態計算分類學中文翻譯 (門, 綱, 目, 科, 屬, 非正式群組)
+              if (field.key.endsWith('_chi') || field.key.endsWith('_chi1')) {
+                const rank = field.key.replace('_chi1', '').replace('_chi', '');
+                const engKey = rank === 'informal_group' ? 'informal_group_eng' : `${rank}_eng`;
+                const engVal = formValues[engKey];
+                if (engVal) {
+                  val = getTaxonomyChi(rank, table === 'plant_species' ? 'flora' : 'fauna', engVal) || '';
+                }
+              }
+
               const isReadOnly = field.readOnly;
               const isTextarea = field.type === 'textarea';
               const label = language === 'zh' ? field.labelChi : field.labelEng;
