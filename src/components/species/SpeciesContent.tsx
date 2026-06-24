@@ -4,7 +4,8 @@ import React from 'react';
 import Image from 'next/image';
 import { Species } from '@/types/species';
 import { useLanguage } from '@/context/LanguageContext';
-import { Bookmark, Map, ExternalLink, Shield, Image as ImageIcon, Leaf, Compass } from 'lucide-react';
+import { Bookmark, Map, ExternalLink, Shield, Image as ImageIcon, Leaf, Compass, Loader2 } from 'lucide-react';
+import { createClient } from '@/utils/supabase/client';
 import TaxonomyDisplay from './TaxonomyDisplay';
 import ConservationStatus from './ConservationStatus';
 import CommentSection from '../comments/CommentSection';
@@ -166,11 +167,48 @@ export default function SpeciesContent({ species, showBreadcrumb = true }: Speci
   const { getTaxonomyChi } = useTaxonomy();
   const { photos, isLoading } = useInaturalistSpeciesPhotos(species.inat_id);
   const [currentProfilePic, setCurrentProfilePic] = React.useState(species.profile_picture);
+  const [refsList, setRefsList] = React.useState<any[]>([]);
+  const [refsLoading, setRefsLoading] = React.useState(false);
 
   // 當傳入的 species 改變時重置狀態
   React.useEffect(() => {
     setCurrentProfilePic(species.profile_picture);
   }, [species.taxa_id, species.profile_picture]);
+
+  // 載入關聯的參考文獻
+  React.useEffect(() => {
+    async function fetchReferences() {
+      if (!species.reference_codes) {
+        setRefsList([]);
+        return;
+      }
+      setRefsLoading(true);
+      try {
+        const codes = species.reference_codes.split(',').map(c => c.trim()).filter(Boolean);
+        if (codes.length === 0) {
+          setRefsList([]);
+          return;
+        }
+
+        const supabase = createClient();
+        const { data, error } = await supabase
+          .from('references')
+          .select('code, zh, en, url')
+          .in('code', codes);
+
+        if (!error && data) {
+          // 依照 codes 的順序排列文獻
+          const sorted = codes.map(code => data.find((r: any) => r.code === code)).filter(Boolean);
+          setRefsList(sorted);
+        }
+      } catch (err) {
+        console.error('Error fetching references:', err);
+      } finally {
+        setRefsLoading(false);
+      }
+    }
+    fetchReferences();
+  }, [species.reference_codes]);
 
   const isPlant = species.taxa_group === 'FLORA' || (!species.phylum_eng && !!(species as any).family_chi);
   const taxaType = isPlant ? 'flora' : 'fauna';
@@ -182,7 +220,6 @@ export default function SpeciesContent({ species, showBreadcrumb = true }: Speci
   const remarks = language === 'zh' ? species.remarks_chi : species.remarks_eng;
   const hkDist = language === 'zh' ? species.hk_distribution_chi : species.hk_distribution_eng;
   const globalDist = language === 'zh' ? species.global_distribution_chi : species.global_distribution_eng;
-  const refs = language === 'zh' ? species.references_chi : species.references_eng;
   const introduction = language === 'zh' ? species.introduction_chi : species.introduction_eng;
   const microhabitat = language === 'zh' ? species.microhabitat_chi : species.microhabitat_eng;
 
@@ -375,17 +412,39 @@ export default function SpeciesContent({ species, showBreadcrumb = true }: Speci
             <SimilarSpeciesExplorer species={species} />
 
             {/* References */}
-            {refs && (
+            {species.reference_codes && (
               <section className="bg-slate-900 text-slate-300 p-8 rounded-[2.5rem]">
                 <h2 className="text-xl font-bold text-white mb-6 flex items-center gap-3">
                   <ExternalLink className="w-5 h-5 text-emerald-400" />
                   {language === 'zh' ? '參考文獻' : 'References'}
                 </h2>
-                <ul className="space-y-4 text-xs leading-relaxed opacity-80 list-disc pl-5">
-                  {refs.split('。/').map((ref, idx) => (
-                    <li key={idx}>{ref.trim()}</li>
-                  ))}
-                </ul>
+                {refsLoading ? (
+                  <div className="flex items-center gap-2 text-xs text-slate-400">
+                    <Loader2 className="w-3.5 h-3.5 animate-spin text-emerald-400" />
+                    <span>Loading references...</span>
+                  </div>
+                ) : refsList.length === 0 ? (
+                  <p className="text-xs text-slate-500 italic">No references found for codes: {species.reference_codes}</p>
+                ) : (
+                  <ul className="space-y-4 text-xs leading-relaxed opacity-80 list-disc pl-5">
+                    {refsList.map((ref, idx) => (
+                      <li key={idx} className="leading-relaxed">
+                        <span className="align-middle">{language === 'zh' ? ref.zh : ref.en}</span>
+                        {ref.url && (
+                          <a
+                            href={ref.url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center text-emerald-400 hover:text-emerald-300 transition-colors ml-1.5 align-middle p-0.5 hover:scale-105"
+                            title={language === 'zh' ? '開啟連結' : 'Open Link'}
+                          >
+                            <ExternalLink className="w-3.5 h-3.5" />
+                          </a>
+                        )}
+                      </li>
+                    ))}
+                  </ul>
+                )}
               </section>
             )}
 

@@ -16,7 +16,8 @@ import {
   MapPin, 
   Plus,
   ExternalLink,
-  Search
+  Search,
+  BookOpen
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -234,6 +235,233 @@ function SimilarSpeciesPicker({ value, onChange, table, supabase, language }: Si
   );
 }
 
+interface ReferencePickerProps {
+  value: string;
+  onChange: (value: string) => void;
+  supabase: any;
+  language: string;
+}
+
+function ReferencePicker({ value, onChange, supabase, language }: ReferencePickerProps) {
+  const [allReferences, setAllReferences] = useState<any[]>([]);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [isSearching, setIsSearching] = useState(false);
+  const [showDropdown, setShowDropdown] = useState(false);
+  const containerRef = React.useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
+        setShowDropdown(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  useEffect(() => {
+    async function loadAllReferences() {
+      setIsSearching(true);
+      const { data, error } = await supabase
+        .from('references')
+        .select('code, zh, en')
+        .order('code', { ascending: true });
+      if (!error && data) {
+        setAllReferences(data);
+      }
+      setIsSearching(false);
+    }
+    loadAllReferences();
+  }, [supabase]);
+
+  const selectedRefs = useMemo(() => {
+    const codes = value.split(',').map(c => c.trim()).filter(Boolean);
+    return codes.map(code => allReferences.find(r => r.code === code)).filter(Boolean);
+  }, [value, allReferences]);
+
+  const dropdownResults = useMemo(() => {
+    const codes = value.split(',').map(c => c.trim()).filter(Boolean);
+    
+    // 如果沒有輸入任何搜尋字，預設列出所有未選取文獻供直接選擇
+    if (!searchQuery.trim()) {
+      return allReferences.filter(r => !codes.includes(r.code)).slice(0, 15);
+    }
+    
+    const q = searchQuery.toLowerCase();
+    return allReferences.filter(r => 
+      !codes.includes(r.code) && 
+      (r.code.toLowerCase().includes(q) || 
+       r.zh.toLowerCase().includes(q) || 
+       r.en.toLowerCase().includes(q))
+    ).slice(0, 8);
+  }, [searchQuery, allReferences, value]);
+
+  const handleSelect = (code: string) => {
+    const codes = value.split(',').map(c => c.trim()).filter(Boolean);
+    if (!codes.includes(code)) {
+      const newCodes = [...codes, code];
+      onChange(newCodes.join(', '));
+    }
+    setSearchQuery('');
+    setShowDropdown(false);
+  };
+
+  const handleRemove = (code: string) => {
+    const codes = value.split(',').map(c => c.trim()).filter(Boolean);
+    const newCodes = codes.filter(c => c !== code);
+    onChange(newCodes.join(', '));
+  };
+
+  const handleMoveUp = (index: number) => {
+    if (index === 0) return;
+    const codes = value.split(',').map(c => c.trim()).filter(Boolean);
+    const temp = codes[index];
+    codes[index] = codes[index - 1];
+    codes[index - 1] = temp;
+    onChange(codes.join(', '));
+  };
+
+  const handleMoveDown = (index: number) => {
+    const codes = value.split(',').map(c => c.trim()).filter(Boolean);
+    if (index === codes.length - 1) return;
+    const temp = codes[index];
+    codes[index] = codes[index + 1];
+    codes[index + 1] = temp;
+    onChange(codes.join(', '));
+  };
+
+  return (
+    <div ref={containerRef} className="relative flex flex-col gap-3 w-full bg-slate-50/30 border border-slate-100/80 rounded-2xl p-4">
+      <div className="relative">
+        <div className="flex items-center bg-white border border-slate-200 focus-within:border-emerald-500 focus-within:ring-1 focus-within:ring-emerald-500/20 rounded-xl px-3 py-2 transition-all shadow-sm">
+          <Search className="w-4 h-4 text-slate-400 mr-2 shrink-0" />
+          <input
+            type="text"
+            placeholder={language === 'zh' ? '搜尋文獻代碼、內容...' : 'Search reference code, content...'}
+            value={searchQuery}
+            onChange={(e) => {
+              setSearchQuery(e.target.value);
+              setShowDropdown(true);
+            }}
+            onFocus={() => setShowDropdown(true)}
+            onClick={() => setShowDropdown(true)}
+            className="w-full bg-transparent border-none outline-none text-xs font-semibold text-slate-700 placeholder:text-slate-400"
+          />
+          {searchQuery && (
+            <button
+              onClick={() => {
+                setSearchQuery('');
+              }}
+              className="text-slate-400 hover:text-slate-600 transition-colors p-0.5 cursor-pointer"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+          )}
+        </div>
+
+        <AnimatePresence>
+          {showDropdown && (
+            <motion.div
+              initial={{ opacity: 0, y: -5 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -5 }}
+              className="absolute z-50 left-0 right-0 mt-1 bg-white/95 backdrop-blur-md border border-slate-100 rounded-xl shadow-xl max-h-60 overflow-y-auto custom-scrollbar"
+            >
+              {isSearching ? (
+                <div className="p-3 text-center text-xs text-slate-400 font-bold flex items-center justify-center gap-1.5">
+                  <Loader2 className="w-3.5 h-3.5 animate-spin text-emerald-500" />
+                  <span>{language === 'zh' ? '載入中...' : 'Loading...'}</span>
+                </div>
+              ) : dropdownResults.length === 0 ? (
+                <div className="p-3 text-center text-xs text-slate-400 font-bold">
+                  {language === 'zh' ? '未找到符合的文獻' : 'No matching references found'}
+                </div>
+              ) : (
+                dropdownResults.map((item) => (
+                  <button
+                    key={item.code}
+                    onClick={() => handleSelect(item.code)}
+                    className="w-full text-left px-4 py-2.5 hover:bg-emerald-50/50 flex flex-col transition-colors border-b border-slate-50 last:border-0 cursor-pointer"
+                  >
+                    <span className="text-xs font-bold text-slate-700">
+                      [{item.code}]
+                    </span>
+                    <span className="text-[10px] text-slate-400 truncate mt-0.5">
+                      {language === 'zh' ? item.zh : item.en}
+                    </span>
+                  </button>
+                ))
+              )}
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
+
+      <div className="flex flex-col gap-1.5">
+        <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider">
+          {language === 'zh' ? '已選擇的參考文獻' : 'Selected References'} ({selectedRefs.length})
+        </span>
+        {selectedRefs.length === 0 ? (
+          <div className="text-center py-4 border border-dashed border-slate-200 rounded-xl text-slate-400 text-xs font-bold bg-white/20">
+            {language === 'zh' ? '尚未選擇任何參考文獻' : 'No references selected yet'}
+          </div>
+        ) : (
+          <div className="flex flex-col gap-2">
+            {selectedRefs.map((item, idx) => {
+              const text = language === 'zh' ? item.zh : item.en;
+              return (
+                <motion.div
+                  key={item.code}
+                  layout
+                  className="flex items-center justify-between gap-3 p-3 bg-white border border-slate-100 rounded-xl shadow-sm hover:border-emerald-200 transition-colors"
+                >
+                  <div className="flex flex-col min-w-0">
+                    <span className="text-[10px] font-mono font-bold text-emerald-700 bg-emerald-50 border border-emerald-100 rounded px-1.5 py-0.5 w-max">
+                      {item.code}
+                    </span>
+                    <span className="text-xs font-semibold text-slate-600 leading-relaxed mt-1.5">
+                      {text}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-1 shrink-0">
+                    <button
+                      onClick={() => handleMoveUp(idx)}
+                      disabled={idx === 0}
+                      className="p-1 rounded-lg text-slate-450 hover:text-emerald-600 hover:bg-slate-50 transition-colors disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer"
+                      title={language === 'zh' ? '上移' : 'Move Up'}
+                    >
+                      <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M5 15l7-7 7 7" />
+                      </svg>
+                    </button>
+                    <button
+                      onClick={() => handleMoveDown(idx)}
+                      disabled={idx === selectedRefs.length - 1}
+                      className="p-1 rounded-lg text-slate-450 hover:text-emerald-600 hover:bg-slate-50 transition-colors disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer"
+                      title={language === 'zh' ? '下移' : 'Move Down'}
+                    >
+                      <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+                      </svg>
+                    </button>
+                    <button
+                      onClick={() => handleRemove(item.code)}
+                      className="p-1 rounded-lg text-slate-400 hover:text-red-500 hover:bg-red-50 transition-all cursor-pointer hover:scale-105"
+                      title={language === 'zh' ? '移除' : 'Remove'}
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                </motion.div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 interface FieldConfig {
   key: string;
   labelChi: string;
@@ -341,8 +569,7 @@ const faunaFieldGroups = (t: any): FieldGroup[] => [
       {key: 'global_distribution_eng', labelChi: '全球分布 (英)', labelEng: 'Global Distribution (Eng)', type: 'textarea'},
       {key: 'remarks_chi', labelChi: '備註 (中)', labelEng: 'Remarks (Chi)', type: 'textarea'},
       {key: 'remarks_eng', labelChi: '備註 (英)', labelEng: 'Remarks (Eng)', type: 'textarea'},
-      {key: 'references_chi', labelChi: '參考文獻 (中)', labelEng: 'References (Chi)', type: 'textarea'},
-      {key: 'references_eng', labelChi: '參考文獻 (英)', labelEng: 'References (Eng)', type: 'textarea'},
+      {key: 'reference_codes', labelChi: '參考文獻 (APA 7th)', labelEng: 'References (APA 7th)', type: 'text'},
     ]
   }
 ];
@@ -413,6 +640,7 @@ const floraFieldGroups = (t: any): FieldGroup[] => [
       { key: 'remark_eng', labelChi: '備註 (英)', labelEng: 'Remarks (Eng)', type: 'textarea' },
       { key: 'flowering_period', labelChi: '花期 (文字描述)', labelEng: 'Flowering Period', type: 'text' },
       { key: 'fruiting_period', labelChi: '果期 (文字描述)', labelEng: 'Fruiting Period', type: 'text' },
+      { key: 'reference_codes', labelChi: '參考文獻 (APA 7th)', labelEng: 'References (APA 7th)', type: 'text' },
     ]
   }
 ];
@@ -468,20 +696,29 @@ export default function SpeciesDetailEditor({ table, data, onSave, onCancel, onD
         } as FieldConfig;
       });
 
+    let groups = [...baseGroups];
     if (otherFields.length > 0) {
-      return [
-        ...baseGroups,
-        {
-          id: 'others',
-          nameChi: '其他屬性',
-          nameEng: 'Others',
-          icon: <Plus className="w-4 h-4" />,
-          fields: otherFields
-        }
-      ];
+      groups.push({
+        id: 'others',
+        nameChi: '其他屬性',
+        nameEng: 'Others',
+        icon: <Plus className="w-4 h-4" />,
+        fields: otherFields
+      });
     }
 
-    return baseGroups;
+    // 無論如何，都在最後加上獨立的「參考文獻」分頁
+    groups.push({
+      id: 'references',
+      nameChi: '參考文獻',
+      nameEng: 'References',
+      icon: <BookOpen className="w-4 h-4" />,
+      fields: [
+        { key: 'reference_codes', labelChi: '物種參考文獻 (APA 7th)', labelEng: 'Species References (APA 7th)', type: 'text' }
+      ]
+    });
+
+    return groups;
   }, [baseGroups, data]);
 
   // 4. 偵測是否有欄位被修改
@@ -724,7 +961,7 @@ export default function SpeciesDetailEditor({ table, data, onSave, onCancel, onD
               const label = language === 'zh' ? field.labelChi : field.labelEng;
               const isFieldDirty = formValues[field.key] !== originalValues[field.key];
               const isBilingualField = field.key.endsWith('_chi') || field.key.endsWith('_eng');
-              const useFullWidth = (isTextarea && !isBilingualField) || field.key === 'similar_species';
+              const useFullWidth = (isTextarea && !isBilingualField) || field.key === 'similar_species' || field.key === 'reference_codes';
 
               return (
                 <div 
@@ -768,6 +1005,13 @@ export default function SpeciesDetailEditor({ table, data, onSave, onCancel, onD
                       value={String(val)}
                       onChange={(newVal) => handleFieldChange(field.key, newVal, field.type)}
                       table={table}
+                      supabase={supabase}
+                      language={language}
+                    />
+                  ) : field.key === 'reference_codes' ? (
+                    <ReferencePicker
+                      value={String(val)}
+                      onChange={(newVal) => handleFieldChange(field.key, newVal, field.type)}
                       supabase={supabase}
                       language={language}
                     />

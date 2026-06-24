@@ -14,18 +14,20 @@ import {
   ListTree,
   ChevronDown,
   PanelLeftClose,
-  PanelLeftOpen
+  PanelLeftOpen,
+  BookOpen
 } from 'lucide-react';
 import Link from 'next/link';
 import UsersManager from '@/components/admin/UsersManager';
 import TaxonomyMappingsManager from '@/components/admin/TaxonomyMappingsManager';
 import SpeciesManager from '@/components/admin/SpeciesManager';
 import PlantSpeciesManager from '@/components/admin/PlantSpeciesManager';
+import ReferenceManager from '@/components/admin/ReferenceManager';
 import LanguageSwitcher from '@/components/admin/LanguageSwitcher';
 import { motion, AnimatePresence } from 'framer-motion';
 import AlertModal from '@/components/ui/AlertModal';
 
-type AdminTab = 'users' | 'taxonomy-fauna' | 'taxonomy-flora' | 'species-fauna' | 'species-flora';
+type AdminTab = 'users' | 'taxonomy-fauna' | 'taxonomy-flora' | 'species-fauna' | 'species-flora' | 'references';
 
 export default function MaintainPage() {
   const { profile, isLoading } = useAuth();
@@ -142,6 +144,23 @@ export default function MaintainPage() {
                 {!isCollapsed && <span className="font-bold text-sm whitespace-nowrap">{t('admin.users_manager')}</span>}
               </div>
               {!isCollapsed && <ChevronRight className={`w-3.5 h-3.5 transition-transform ${activeTab === 'users' ? 'opacity-100' : 'opacity-0 -translate-x-2'}`} />}
+            </button>
+
+            <button
+              onClick={() => setActiveTab('references')}
+              className={`w-full flex items-center p-3 rounded-2xl transition-all duration-200 group outline-none select-none active:scale-[0.98] ${
+                activeTab === 'references' 
+                  ? 'bg-white shadow-lg shadow-slate-200/40 border border-slate-100 text-slate-900' 
+                  : 'text-slate-500 hover:bg-white/50 border border-transparent'
+              } ${isCollapsed ? 'justify-center' : 'justify-between'}`}
+            >
+              <div className="flex items-center gap-2.5">
+                <div className={`p-2 rounded-xl transition-colors flex-shrink-0 ${activeTab === 'references' ? 'bg-emerald-600 text-white' : 'bg-slate-100 text-slate-400 group-hover:bg-emerald-100 group-hover:text-emerald-600'}`}>
+                  <BookOpen className="w-4 h-4" />
+                </div>
+                {!isCollapsed && <span className="font-bold text-sm whitespace-nowrap">{t('admin.reference_manager')}</span>}
+              </div>
+              {!isCollapsed && <ChevronRight className={`w-3.5 h-3.5 transition-transform ${activeTab === 'references' ? 'opacity-100' : 'opacity-0 -translate-x-2'}`} />}
             </button>
 
             {/* Taxonomy Management with Sub-options */}
@@ -307,7 +326,7 @@ export default function MaintainPage() {
               <div className="flex items-center justify-between mb-4 flex-shrink-0">
                 <h2 className="text-xl font-black text-slate-800 tracking-tight flex items-center gap-2">
                   <div className="w-2 h-6 bg-emerald-500 rounded-full" />
-                  {activeTab === 'users' ? t('admin.users_manager') : activeTab === 'taxonomy-fauna' ? t('admin.taxa_fauna') : activeTab === 'taxonomy-flora' ? t('admin.taxa_flora') : activeTab === 'species-fauna' ? t('admin.species_fauna') : activeTab === 'species-flora' ? t('admin.species_flora') : t('admin.taxa_manager')}
+                  {activeTab === 'users' ? t('admin.users_manager') : activeTab === 'references' ? t('admin.reference_manager') : activeTab === 'taxonomy-fauna' ? t('admin.taxa_fauna') : activeTab === 'taxonomy-flora' ? t('admin.taxa_flora') : activeTab === 'species-fauna' ? t('admin.species_fauna') : activeTab === 'species-flora' ? t('admin.species_flora') : t('admin.taxa_manager')}
                 </h2>
               </div>
               <div className="flex-1 min-h-0">
@@ -342,8 +361,10 @@ export default function MaintainPage() {
                   />
                 ) : activeTab === 'species-fauna' ? (
                   <SpeciesManager />
-                ) : (
+                ) : activeTab === 'species-flora' ? (
                   <PlantSpeciesManager />
+                ) : (
+                  <ReferenceManager />
                 )}
               </div>
             </motion.div>

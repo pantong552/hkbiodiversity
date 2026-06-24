@@ -54,8 +54,7 @@ export interface Species {
   hk_distribution_chi?: string;
   global_distribution_eng?: string;
   global_distribution_chi?: string;
-  references_eng?: string;
-  references_chi?: string;
+  reference_codes?: string;
   profile_picture?: string;
   introduction_chi?: string;
   introduction_eng?: string;
