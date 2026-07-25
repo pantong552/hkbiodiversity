@@ -55,6 +55,9 @@ export interface Species {
   global_distribution_eng?: string;
   global_distribution_chi?: string;
   reference_codes?: string;
+  references_codes?: string;
+  references_eng?: string;
+  references_chi?: string;
   profile_picture?: string;
   introduction_chi?: string;
   introduction_eng?: string;

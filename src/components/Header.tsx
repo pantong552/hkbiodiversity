@@ -116,7 +116,7 @@ export default function Header() {
     { name: t('nav.database'), href: '/database' },
     // 以下頁面尚未建立，暫時停用以避免 404 prefetch 錯誤
     { name: t('nav.about'), href: '#', disabled: true },
-    { name: t('nav.blog'), href: '#', disabled: true },
+    { name: t('nav.blog'), href: '/journal' },
     ...(profile?.role === 'admin' ? [{ name: t('nav.manage'), href: '/maintain' }] : []),
   ];
 
