@@ -24,7 +24,16 @@ import { useRef } from 'react';
 
 const ReactQuill = dynamic(
   async () => {
-    const { default: RQ } = await import('react-quill-new');
+    const { default: RQ, Quill } = await import('react-quill-new');
+    
+    // Register Style Attributors so Quill applies style="color: ..." and style="font-size: ..." inline
+    const SizeStyle = Quill.import('attributors/style/size') as any;
+    const ColorStyle = Quill.import('attributors/style/color') as any;
+    SizeStyle.whitelist = ['0.875rem', '1rem', '1.25rem', '1.5rem', '2rem'];
+    
+    Quill.register(SizeStyle, true);
+    Quill.register(ColorStyle, true);
+
     // eslint-disable-next-line react/display-name
     return ({ forwardedRef, ...props }: any) => <RQ ref={forwardedRef} {...props} />;
   },
@@ -37,6 +46,25 @@ const ReactQuill = dynamic(
 const turndownService = new TurndownService({
   headingStyle: 'atx',
   codeBlockStyle: 'fenced'
+});
+
+turndownService.keep(['span' as any]);
+
+// Preserve <span> tags with style attribute (for text colors & font sizes) when converting HTML to Markdown
+turndownService.addRule('keepInlineSpans', {
+  filter: (node: HTMLElement) => {
+    const tag = node.nodeName ? node.nodeName.toLowerCase() : '';
+    return (tag === 'span' || tag === 'font') && (node.hasAttribute('style') || node.hasAttribute('class') || node.hasAttribute('color'));
+  },
+  replacement: (content, node: any) => {
+    const style = node.getAttribute('style');
+    const className = node.getAttribute('class');
+    const color = node.getAttribute('color');
+    const attrStyle = style ? ` style="${style}"` : '';
+    const attrClass = className ? ` class="${className}"` : '';
+    const attrColor = color ? ` color="${color}"` : '';
+    return `<span${attrStyle}${attrClass}${attrColor}>${content}</span>`;
+  }
 });
 
 interface NewsItem {
@@ -84,10 +112,16 @@ export default function NewsEditor({ news, onClose, onSave }: NewsEditorProps) {
       content_eng: '',
       ...news
     };
+    const parseContent = (text?: string | null): string => {
+      if (!text) return '';
+      const cleaned = text.replace(/\\n/g, '\n');
+      return cleaned.startsWith('<') ? cleaned : (marked.parse(cleaned) as string);
+    };
+
     return {
       ...initial,
-      content_chi: news?.content_chi ? marked.parse(news.content_chi) as string : '',
-      content_eng: news?.content_eng ? marked.parse(news.content_eng) as string : ''
+      content_chi: parseContent(news?.content_chi),
+      content_eng: parseContent(news?.content_eng)
     };
   });
 
@@ -251,7 +285,7 @@ export default function NewsEditor({ news, onClose, onSave }: NewsEditorProps) {
           break;
         }
         case 'color': quill.format('color', value || '#679758'); break;
-        case 'size': quill.format('size', value === '1.25rem' ? 'large' : value === '1.5rem' ? 'huge' : value === '0.875rem' ? 'small' : value); break;
+        case 'size': quill.format('size', value); break;
       }
     }
   };
@@ -277,9 +311,7 @@ export default function NewsEditor({ news, onClose, onSave }: NewsEditorProps) {
     try {
       // 儲存前將 HTML 轉回 Markdown 以保持資料格式一致性
       const payload: any = { 
-        ...formData,
-        content_chi: turndownService.turndown(formData.content_chi),
-        content_eng: turndownService.turndown(formData.content_eng)
+        ...formData
       };
       
       if (!payload.id) delete payload.id;
@@ -561,7 +593,7 @@ export default function NewsEditor({ news, onClose, onSave }: NewsEditorProps) {
                       ]}
                       remarkPlugins={[remarkBreaks]}
                     >
-                      {turndownService.turndown(activeTab === 'chi' ? formData.content_chi : formData.content_eng)}
+                      {activeTab === 'chi' ? formData.content_chi : formData.content_eng}
                     </ReactMarkdown>
                   </div>
                 </article>

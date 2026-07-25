@@ -15,10 +15,20 @@ import dynamic from 'next/dynamic';
 import 'react-quill-new/dist/quill.snow.css';
 import { marked } from 'marked';
 import TurndownService from 'turndown';
+import { HexColorPicker } from 'react-colorful';
 
 const ReactQuill = dynamic(
   async () => {
-    const { default: RQ } = await import('react-quill-new');
+    const { default: RQ, Quill } = await import('react-quill-new');
+    
+    // Register Style Attributors so Quill applies style="color: ..." and style="font-size: ..." inline
+    const SizeStyle = Quill.import('attributors/style/size') as any;
+    const ColorStyle = Quill.import('attributors/style/color') as any;
+    SizeStyle.whitelist = ['0.875rem', '1rem', '1.25rem', '1.5rem', '2rem'];
+    
+    Quill.register(SizeStyle, true);
+    Quill.register(ColorStyle, true);
+
     // eslint-disable-next-line react/display-name
     return ({ forwardedRef, ...props }: any) => <RQ ref={forwardedRef} {...props} />;
   },
@@ -31,6 +41,25 @@ const ReactQuill = dynamic(
 const turndownService = new TurndownService({
   headingStyle: 'atx',
   codeBlockStyle: 'fenced'
+});
+
+turndownService.keep(['span' as any]);
+
+// Preserve <span> tags with style attribute (for text colors & font sizes) when converting HTML to Markdown
+turndownService.addRule('keepInlineSpans', {
+  filter: (node: HTMLElement) => {
+    const tag = node.nodeName ? node.nodeName.toLowerCase() : '';
+    return (tag === 'span' || tag === 'font') && (node.hasAttribute('style') || node.hasAttribute('class') || node.hasAttribute('color'));
+  },
+  replacement: (content, node: any) => {
+    const style = node.getAttribute('style');
+    const className = node.getAttribute('class');
+    const color = node.getAttribute('color');
+    const attrStyle = style ? ` style="${style}"` : '';
+    const attrClass = className ? ` class="${className}"` : '';
+    const attrColor = color ? ` color="${color}"` : '';
+    return `<span${attrStyle}${attrClass}${attrColor}>${content}</span>`;
+  }
 });
 
 interface JournalEditorModalProps {
@@ -73,6 +102,7 @@ export default function JournalEditorModal({
   const [status, setStatus] = useState<'submitted' | 'published' | 'rejected'>('submitted');
 
   const [openDropdown, setOpenDropdown] = useState<'size' | 'color' | null>(null);
+  const [pickerColor, setPickerColor] = useState('#10B981');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
@@ -94,9 +124,15 @@ export default function JournalEditorModal({
       setSummaryChi(articleToEdit.summary_chi || '');
       setSummaryEng(articleToEdit.summary_eng || '');
       
-      // Convert Markdown to HTML for Quill Editor
-      setContentChi(articleToEdit.content_chi ? marked.parse(articleToEdit.content_chi) as string : '');
-      setContentEng(articleToEdit.content_eng ? marked.parse(articleToEdit.content_eng) as string : '');
+      // Load HTML/Markdown into Quill Editor seamlessly with \n escape cleanup
+      const parseContent = (text?: string | null): string => {
+        if (!text) return '';
+        const cleaned = text.replace(/\\n/g, '\n');
+        return cleaned.startsWith('<') ? cleaned : (marked.parse(cleaned) as string);
+      };
+
+      setContentChi(parseContent(articleToEdit.content_chi));
+      setContentEng(parseContent(articleToEdit.content_eng));
       
       setCoverImage(articleToEdit.cover_image || '');
       setTags(articleToEdit.tags || []);
@@ -156,7 +192,7 @@ export default function JournalEditorModal({
           break;
         }
         case 'color': quill.format('color', value || '#10B981'); break;
-        case 'size': quill.format('size', value === '1.25rem' ? 'large' : value === '1.5rem' ? 'huge' : value === '0.875rem' ? 'small' : value); break;
+        case 'size': quill.format('size', value); break;
       }
     }
   };
@@ -196,10 +232,6 @@ export default function JournalEditorModal({
 
     try {
       const now = new Date().toISOString();
-      
-      // Convert HTML from Quill editor back to Markdown for DB storage
-      const finalMdChi = contentChi ? turndownService.turndown(contentChi) : '';
-      const finalMdEng = contentEng ? turndownService.turndown(contentEng) : '';
 
       const payload: any = {
         category_id: categoryId,
@@ -208,14 +240,17 @@ export default function JournalEditorModal({
         title_eng: articleLanguage === 'zh' ? '' : titleEng.trim(),
         summary_chi: articleLanguage === 'en' ? null : (summaryChi.trim() || null),
         summary_eng: articleLanguage === 'zh' ? null : (summaryEng.trim() || null),
-        content_chi: articleLanguage === 'en' ? '' : finalMdChi,
-        content_eng: articleLanguage === 'zh' ? '' : finalMdEng,
+        content_chi: articleLanguage === 'en' ? '' : contentChi,
+        content_eng: articleLanguage === 'zh' ? '' : contentEng,
         cover_image: coverImage.trim() || null,
         tags,
         updated_at: now,
       };
 
+      const editorName = profile?.username || user?.user_metadata?.full_name || user?.email || 'Editor';
+
       if (articleToEdit) {
+        payload.last_edited_by_name = editorName;
         if (isAdmin) {
           payload.status = status;
           if (status === 'published' && !articleToEdit.published_at) {
@@ -258,7 +293,7 @@ export default function JournalEditorModal({
 
   return (
     <AnimatePresence>
-      <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-md overflow-y-auto">
+      <div key="journal-editor-modal-wrapper" className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-md overflow-y-auto">
         <motion.div
           initial={{ opacity: 0, scale: 0.95, y: 20 }}
           animate={{ opacity: 1, scale: 1, y: 0 }}
@@ -350,9 +385,9 @@ export default function JournalEditorModal({
                   className="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:border-emerald-500 outline-none text-slate-800 font-bold bg-white text-sm"
                   required
                 >
-                  <option value="">{language === 'zh' ? '-- 請選擇分類 --' : '-- Select Category --'}</option>
-                  {categories.map((cat) => (
-                    <option key={cat.id} value={cat.id}>
+                  <option key="default-placeholder" value="">{language === 'zh' ? '-- 請選擇分類 --' : '-- Select Category --'}</option>
+                  {categories.map((cat, idx) => (
+                    <option key={cat.id || `cat-${idx}`} value={cat.id}>
                       {language === 'zh' ? cat.name_chi : cat.name_eng}
                     </option>
                   ))}
@@ -431,6 +466,7 @@ export default function JournalEditorModal({
                   </label>
                   <input
                     type="text"
+                    suppressHydrationWarning
                     value={titleChi}
                     onChange={(e) => setTitleChi(e.target.value)}
                     placeholder="例如：米埔濕地水鳥遷徙與全球保育挑戰"
@@ -460,6 +496,7 @@ export default function JournalEditorModal({
                   </label>
                   <input
                     type="text"
+                    suppressHydrationWarning
                     value={titleEng}
                     onChange={(e) => setTitleEng(e.target.value)}
                     placeholder="e.g. Migratory Waterbirds and Conservation at Mai Po"
@@ -494,10 +531,38 @@ export default function JournalEditorModal({
                 </span>
               </label>
 
-              {/* Full Toolbar */}
-              <div className="p-2 rounded-2xl border border-slate-200 bg-slate-50/70 flex flex-wrap items-center gap-1.5">
+              {/* Full Toolbar - Matches NewsEditor Bar */}
+              <div className="p-2 rounded-2xl border border-slate-200 bg-slate-50/70 flex flex-wrap items-center gap-1">
                 <button
                   type="button"
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={() => {
+                    const quill = activeTab === 'zh' ? quillRefChi.current?.getEditor() : quillRefEng.current?.getEditor();
+                    if (quill) quill.history.undo();
+                  }}
+                  className="p-2 rounded-xl hover:bg-white hover:shadow-sm text-slate-600 hover:text-emerald-600 transition-colors"
+                  title="Undo (Ctrl+Z)"
+                >
+                  <Undo className="w-4 h-4" />
+                </button>
+                <button
+                  type="button"
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={() => {
+                    const quill = activeTab === 'zh' ? quillRefChi.current?.getEditor() : quillRefEng.current?.getEditor();
+                    if (quill) quill.history.redo();
+                  }}
+                  className="p-2 rounded-xl hover:bg-white hover:shadow-sm text-slate-600 hover:text-emerald-600 transition-colors"
+                  title="Redo (Ctrl+Shift+Z)"
+                >
+                  <Redo className="w-4 h-4" />
+                </button>
+
+                <div className="w-px h-4 bg-slate-300 mx-1" />
+
+                <button
+                  type="button"
+                  onMouseDown={(e) => e.preventDefault()}
                   onClick={() => insertFormat('bold')}
                   className="p-2 rounded-xl hover:bg-white hover:shadow-sm text-slate-700 hover:text-emerald-700 transition-colors"
                   title="Bold"
@@ -506,15 +571,19 @@ export default function JournalEditorModal({
                 </button>
                 <button
                   type="button"
+                  onMouseDown={(e) => e.preventDefault()}
                   onClick={() => insertFormat('italic')}
                   className="p-2 rounded-xl hover:bg-white hover:shadow-sm text-slate-700 hover:text-emerald-700 transition-colors"
                   title="Italic"
                 >
                   <Italic className="w-4 h-4" />
                 </button>
+
                 <div className="w-px h-4 bg-slate-300 mx-1" />
+
                 <button
                   type="button"
+                  onMouseDown={(e) => e.preventDefault()}
                   onClick={() => insertFormat('h1')}
                   className="p-2 rounded-xl hover:bg-white hover:shadow-sm text-slate-700 hover:text-emerald-700 transition-colors"
                   title="Heading 1"
@@ -523,15 +592,19 @@ export default function JournalEditorModal({
                 </button>
                 <button
                   type="button"
+                  onMouseDown={(e) => e.preventDefault()}
                   onClick={() => insertFormat('h2')}
                   className="p-2 rounded-xl hover:bg-white hover:shadow-sm text-slate-700 hover:text-emerald-700 transition-colors"
                   title="Heading 2"
                 >
                   <Heading2 className="w-4 h-4" />
                 </button>
+
                 <div className="w-px h-4 bg-slate-300 mx-1" />
+
                 <button
                   type="button"
+                  onMouseDown={(e) => e.preventDefault()}
                   onClick={() => insertFormat('list')}
                   className="p-2 rounded-xl hover:bg-white hover:shadow-sm text-slate-700 hover:text-emerald-700 transition-colors"
                   title="Bullet List"
@@ -540,15 +613,112 @@ export default function JournalEditorModal({
                 </button>
                 <button
                   type="button"
+                  onMouseDown={(e) => e.preventDefault()}
                   onClick={() => insertFormat('ol')}
                   className="p-2 rounded-xl hover:bg-white hover:shadow-sm text-slate-700 hover:text-emerald-700 transition-colors"
                   title="Numbered List"
                 >
                   <ListOrdered className="w-4 h-4" />
                 </button>
+
                 <div className="w-px h-4 bg-slate-300 mx-1" />
+
+                {/* Font Size Dropdown */}
+                <div className="relative toolbar-dropdown-container">
+                  <button
+                    type="button"
+                    onMouseDown={(e) => e.preventDefault()}
+                    onClick={() => setOpenDropdown(openDropdown === 'size' ? null : 'size')}
+                    className={`p-2 rounded-xl transition-colors ${openDropdown === 'size' ? 'bg-emerald-50 text-emerald-600' : 'hover:bg-white text-slate-700 hover:text-emerald-700'}`}
+                    title="Font Size"
+                  >
+                    <Type className="w-4 h-4" />
+                  </button>
+                  <AnimatePresence>
+                    {openDropdown === 'size' && (
+                      <motion.div
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: 10 }}
+                        className="absolute top-full left-0 mt-2 bg-white border border-slate-200 shadow-xl rounded-2xl p-1.5 z-50 min-w-[130px]"
+                      >
+                        {[
+                          { label: 'Small', value: '0.875rem' },
+                          { label: 'Normal', value: '1rem' },
+                          { label: 'Large', value: '1.25rem' },
+                          { label: 'Extra Large', value: '1.5rem' },
+                          { label: 'Heading', value: '2rem' }
+                        ].map((size, idx) => (
+                          <button
+                            key={`font-size-${size.value}-${idx}`}
+                            type="button"
+                            onMouseDown={(e) => e.preventDefault()}
+                            onClick={() => {
+                              insertFormat(`size:${size.value}`);
+                              setOpenDropdown(null);
+                            }}
+                            className="w-full text-left px-3 py-1.5 rounded-xl text-xs font-bold text-slate-700 hover:bg-emerald-50 hover:text-emerald-700 transition-colors"
+                          >
+                            {size.label}
+                          </button>
+                        ))}
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </div>
+
+                {/* Color Palette Dropdown */}
+                <div className="relative toolbar-dropdown-container">
+                  <button
+                    type="button"
+                    onMouseDown={(e) => e.preventDefault()}
+                    onClick={() => setOpenDropdown(openDropdown === 'color' ? null : 'color')}
+                    className={`p-2 rounded-xl transition-colors ${openDropdown === 'color' ? 'bg-emerald-50 text-emerald-600' : 'hover:bg-white text-slate-700 hover:text-emerald-700'}`}
+                    title="Text Color"
+                  >
+                    <Palette className="w-4 h-4" />
+                  </button>
+                  <AnimatePresence>
+                    {openDropdown === 'color' && (
+                      <motion.div
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: 10 }}
+                        className="absolute top-full left-0 mt-2 bg-white border border-slate-200 shadow-2xl rounded-2xl p-4 z-50 flex flex-col gap-3 min-w-[220px]"
+                      >
+                        <HexColorPicker
+                          color={pickerColor}
+                          onChange={(c) => {
+                            setPickerColor(c);
+                            insertFormat(`color:${c}`);
+                          }}
+                        />
+                        <div className="grid grid-cols-6 gap-1.5 pt-2 border-t border-slate-100">
+                          {["#10B981", "#059669", "#3B82F6", "#6366F1", "#8B5CF6", "#EC4899", "#EF4444", "#F59E0B", "#D97706", "#0F172A", "#475569", "#94A3B8"].map((c, idx) => (
+                            <button
+                              key={`${c}-${idx}`}
+                              type="button"
+                              onMouseDown={(e) => e.preventDefault()}
+                              onClick={() => {
+                                setPickerColor(c);
+                                insertFormat(`color:${c}`);
+                                setOpenDropdown(null);
+                              }}
+                              className="w-5 h-5 rounded-md border border-slate-200 transition-transform hover:scale-110"
+                              style={{ backgroundColor: c }}
+                            />
+                          ))}
+                        </div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </div>
+
+                <div className="w-px h-4 bg-slate-300 mx-1" />
+
                 <button
                   type="button"
+                  onMouseDown={(e) => e.preventDefault()}
                   onClick={() => insertFormat('quote')}
                   className="p-2 rounded-xl hover:bg-white hover:shadow-sm text-slate-700 hover:text-emerald-700 transition-colors"
                   title="Quote"
@@ -557,6 +727,7 @@ export default function JournalEditorModal({
                 </button>
                 <button
                   type="button"
+                  onMouseDown={(e) => e.preventDefault()}
                   onClick={() => insertFormat('code')}
                   className="p-2 rounded-xl hover:bg-white hover:shadow-sm text-slate-700 hover:text-emerald-700 transition-colors"
                   title="Code Block"
@@ -565,6 +736,7 @@ export default function JournalEditorModal({
                 </button>
                 <button
                   type="button"
+                  onMouseDown={(e) => e.preventDefault()}
                   onClick={() => insertFormat('link')}
                   className="p-2 rounded-xl hover:bg-white hover:shadow-sm text-slate-700 hover:text-emerald-700 transition-colors"
                   title="Insert Link"
@@ -573,30 +745,28 @@ export default function JournalEditorModal({
                 </button>
               </div>
 
-              {/* ReactQuill Content Editors */}
-              {activeTab === 'zh' ? (
-                <div className="rounded-2xl overflow-hidden border border-slate-200 bg-white min-h-[220px]">
+              {/* ReactQuill Content Editors (Borderless Clean View) */}
+              <div className="rounded-2xl border border-slate-200 bg-white overflow-hidden quill-editor-wrapper">
+                {activeTab === 'zh' ? (
                   <ReactQuill
                     forwardedRef={quillRefChi}
                     value={contentChi}
                     onChange={(val: string) => setContentChi(val)}
                     placeholder="請撰寫中文文章內容..."
                     modules={{ toolbar: false }}
-                    className="prose max-w-none p-2"
+                    className="h-full flex flex-col min-h-[260px]"
                   />
-                </div>
-              ) : (
-                <div className="rounded-2xl overflow-hidden border border-slate-200 bg-white min-h-[220px]">
+                ) : (
                   <ReactQuill
                     forwardedRef={quillRefEng}
                     value={contentEng}
                     onChange={(val: string) => setContentEng(val)}
                     placeholder="Write English article content here..."
                     modules={{ toolbar: false }}
-                    className="prose max-w-none p-2"
+                    className="h-full flex flex-col min-h-[260px]"
                   />
-                </div>
-              )}
+                )}
+              </div>
             </div>
 
             {/* Cover Image URL */}
@@ -648,9 +818,9 @@ export default function JournalEditorModal({
                 </button>
               </div>
               <div className="flex flex-wrap gap-2">
-                {tags.map((tag) => (
+                {tags.map((tag, idx) => (
                   <span
-                    key={tag}
+                    key={`${tag}-${idx}`}
                     className="inline-flex items-center gap-1.5 px-3 py-1 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-full text-xs font-medium"
                   >
                     #{tag}
@@ -744,6 +914,30 @@ export default function JournalEditorModal({
           </form>
         </motion.div>
       </div>
+
+      <style jsx global>{`
+        .quill-editor-wrapper .ql-toolbar.ql-snow {
+          border: none !important;
+        }
+        .quill-editor-wrapper .ql-container.ql-snow {
+          border: none !important;
+        }
+        .quill-editor-wrapper .ql-editor {
+          border: none !important;
+          outline: none !important;
+          box-shadow: none !important;
+          padding: 1.25rem 1.5rem !important;
+          font-size: 1rem !important;
+          line-height: 1.7 !important;
+          color: #1e293b !important;
+          min-height: 240px !important;
+        }
+        .quill-editor-wrapper .ql-editor.ql-blank::before {
+          font-style: normal !important;
+          color: #94a3b8 !important;
+          left: 1.5rem !important;
+        }
+      `}</style>
     </AnimatePresence>
   );
 }

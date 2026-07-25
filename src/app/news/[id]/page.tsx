@@ -114,11 +114,11 @@ function NewsDetailClient({ news }: { news: any }) {
             .news-content p {
               margin-bottom: 1.5rem;
             }
-            .news-content strong {
+            .news-content strong:not([style*="color"]) {
               font-weight: 800;
               color: #0f172a;
             }
-            .news-content em {
+            .news-content em:not([style*="color"]) {
               font-style: italic;
               color: #475569;
             }
@@ -128,14 +128,16 @@ function NewsDetailClient({ news }: { news: any }) {
             }
             .news-content h1, .news-content h2, .news-content h3 {
               font-weight: 900;
-              color: #0f172a;
               margin-top: 2.5rem;
               margin-bottom: 1.25rem;
               letter-spacing: -0.025em;
             }
-            .news-content h1 { font-size: 1.75rem; border-bottom: 1px solid #e2e8f0; padding-bottom: 0.5rem; }
-            .news-content h2 { font-size: 1.5rem; }
-            .news-content h3 { font-size: 1.25rem; }
+            .news-content h1:not([style*="color"]) { color: #0f172a; }
+            .news-content h2:not([style*="color"]) { color: #0f172a; }
+            .news-content h3:not([style*="color"]) { color: #0f172a; }
+            .news-content h1:not([style*="font-size"]) { font-size: 1.75rem; border-bottom: 1px solid #e2e8f0; padding-bottom: 0.5rem; }
+            .news-content h2:not([style*="font-size"]) { font-size: 1.5rem; }
+            .news-content h3:not([style*="font-size"]) { font-size: 1.25rem; }
             .news-content ul, .news-content ol {
               margin-bottom: 1.5rem !important;
               padding-left: 2rem !important;

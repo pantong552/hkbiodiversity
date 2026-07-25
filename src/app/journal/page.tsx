@@ -185,9 +185,11 @@ export default function JournalPage() {
   };
 
   const getArticleContent = (art: EcoArticle) => {
-    if (art.article_language === 'zh') return art.content_chi || art.content_eng;
-    if (art.article_language === 'en') return art.content_eng || art.content_chi;
-    return language === 'zh' ? (art.content_chi || art.content_eng) : (art.content_eng || art.content_chi);
+    let raw = '';
+    if (art.article_language === 'zh') raw = art.content_chi || art.content_eng;
+    else if (art.article_language === 'en') raw = art.content_eng || art.content_chi;
+    else raw = language === 'zh' ? (art.content_chi || art.content_eng) : (art.content_eng || art.content_chi);
+    return (raw || '').replace(/\\n/g, '\n');
   };
 
   // Estimated reading time calculation (approx 250 words per min)
@@ -426,9 +428,36 @@ export default function JournalPage() {
                   <div className="font-bold text-slate-900">
                     {selectedArticle.profiles?.username || 'Hong Kong Nature Observer'}
                   </div>
-                  <div className="text-slate-500 text-xs">
-                    {t('journal.published_at')}{' '}
-                    {new Date(selectedArticle.published_at || selectedArticle.created_at).toLocaleDateString()}
+                  <div className="text-slate-500 text-xs flex flex-wrap items-center gap-x-2 gap-y-0.5">
+                    <span>
+                      {t('journal.published_at')}{' '}
+                      {new Date(selectedArticle.published_at || selectedArticle.created_at).toLocaleString(language === 'zh' ? 'zh-HK' : 'en-US', {
+                        year: 'numeric',
+                        month: 'short',
+                        day: 'numeric',
+                        hour: '2-digit',
+                        minute: '2-digit',
+                        hour12: false
+                      })}
+                    </span>
+                    {selectedArticle.updated_at && (new Date(selectedArticle.updated_at).getTime() - new Date(selectedArticle.published_at || selectedArticle.created_at).getTime() > 60000) && (
+                      <span className="text-amber-800 bg-amber-50 border border-amber-200/80 px-2 py-0.5 rounded-md text-[11px] font-medium flex items-center gap-1">
+                        <span>{t('journal.updated_at')}:</span>
+                        <span>
+                          {new Date(selectedArticle.updated_at).toLocaleString(language === 'zh' ? 'zh-HK' : 'en-US', {
+                            year: 'numeric',
+                            month: 'short',
+                            day: 'numeric',
+                            hour: '2-digit',
+                            minute: '2-digit',
+                            hour12: false
+                          })}
+                        </span>
+                        <span>
+                          ({language === 'zh' ? '編輯者' : 'Editor'}: {selectedArticle.last_edited_by_name || selectedArticle.profiles?.username || 'Author'})
+                        </span>
+                      </span>
+                    )}
                   </div>
                 </div>
               </div>
@@ -457,11 +486,80 @@ export default function JournalPage() {
               </div>
             )}
 
-            {/* Article Markdown Content Body */}
-            <div className="prose prose-lg prose-slate max-w-none prose-headings:font-serif prose-headings:font-bold prose-headings:text-slate-900 prose-p:leading-relaxed prose-p:text-slate-800 prose-img:rounded-2xl prose-img:shadow-md mb-12">
+            {/* Article Content Body (Editorial Rich Typography) */}
+            <div className="text-slate-800 text-base sm:text-lg leading-relaxed mb-12">
               <ReactMarkdown
                 rehypePlugins={[rehypeRaw, [rehypeExternalLinks, { target: '_blank' }]]}
                 remarkPlugins={[remarkBreaks]}
+                components={{
+                  h1: ({ children }) => (
+                    <h1 className="text-2xl sm:text-3xl font-bold font-serif text-slate-900 mt-8 mb-4 border-b border-slate-200 pb-3">
+                      {children}
+                    </h1>
+                  ),
+                  h2: ({ children }) => (
+                    <h2 className="text-xl sm:text-2xl font-bold font-serif text-slate-900 mt-6 mb-3">
+                      {children}
+                    </h2>
+                  ),
+                  h3: ({ children }) => (
+                    <h3 className="text-lg sm:text-xl font-bold font-serif text-slate-800 mt-5 mb-2">
+                      {children}
+                    </h3>
+                  ),
+                  p: ({ children }) => (
+                    <p className="my-4 text-slate-800 leading-relaxed text-base sm:text-lg">
+                      {children}
+                    </p>
+                  ),
+                  ul: ({ children }) => (
+                    <ul className="list-disc list-outside ml-6 my-4 space-y-2 text-slate-800">
+                      {children}
+                    </ul>
+                  ),
+                  ol: ({ children }) => (
+                    <ol className="list-decimal list-outside ml-6 my-4 space-y-2 text-slate-800">
+                      {children}
+                    </ol>
+                  ),
+                  li: ({ children }) => (
+                    <li className="pl-1 leading-relaxed">{children}</li>
+                  ),
+                  blockquote: ({ children }) => (
+                    <blockquote className="border-l-4 border-emerald-600 pl-5 py-3 my-6 bg-emerald-50/60 rounded-r-2xl italic text-slate-700 font-serif">
+                      {children}
+                    </blockquote>
+                  ),
+                  code: ({ children }) => (
+                    <code className="px-2 py-1 bg-slate-100 border border-slate-200 rounded-lg font-mono text-xs text-emerald-800">
+                      {children}
+                    </code>
+                  ),
+                  a: ({ href, children }) => (
+                    <a
+                      href={href}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-emerald-700 font-semibold underline underline-offset-4 hover:text-emerald-900 transition-colors"
+                    >
+                      {children}
+                    </a>
+                  ),
+                  img: ({ src, alt }) => (
+                    <span className="block my-8">
+                      <img
+                        src={src}
+                        alt={alt || 'Article illustration'}
+                        className="w-full rounded-3xl shadow-lg border border-slate-200 object-cover max-h-[500px]"
+                      />
+                      {alt && (
+                        <span className="block text-center text-xs text-slate-500 mt-2 font-medium">
+                          {alt}
+                        </span>
+                      )}
+                    </span>
+                  ),
+                }}
               >
                 {getArticleContent(selectedArticle)}
               </ReactMarkdown>
@@ -638,6 +736,7 @@ export default function JournalPage() {
                   <Search className="absolute left-4 top-1/2 -translate-y-12 w-4 h-4 text-slate-400" />
                   <input
                     type="text"
+                    suppressHydrationWarning
                     value={searchQuery}
                     onChange={(e) => {
                       setSearchQuery(e.target.value);

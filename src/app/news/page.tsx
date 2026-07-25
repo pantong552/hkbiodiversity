@@ -430,8 +430,8 @@ function NewsContent() {
           margin-bottom: 1rem;
           letter-spacing: -0.025em;
         }
-        .news-content h1 { font-size: 1.5rem; }
-        .news-content h2 { font-size: 1.25rem; }
+        .news-content h1:not([style*="font-size"]) { font-size: 1.5rem; }
+        .news-content h2:not([style*="font-size"]) { font-size: 1.25rem; }
         .news-content blockquote {
           border-left: 4px solid #10b981;
           padding: 0.75rem 1.25rem;

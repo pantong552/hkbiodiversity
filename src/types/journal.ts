@@ -41,6 +41,7 @@ export interface EcoArticle {
   status: ArticleStatus;
   rejection_reason?: string | null;
   rejection_history?: RejectionLog[];
+  last_edited_by_name?: string | null;
   views: number;
   published_at?: string | null;
   created_at: string;

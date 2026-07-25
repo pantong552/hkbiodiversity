@@ -47,6 +47,10 @@ BEGIN
   IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='eco_articles' AND column_name='rejection_history') THEN
     ALTER TABLE eco_articles ADD COLUMN rejection_history JSONB DEFAULT '[]'::jsonb;
   END IF;
+
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='eco_articles' AND column_name='last_edited_by_name') THEN
+    ALTER TABLE eco_articles ADD COLUMN last_edited_by_name TEXT;
+  END IF;
 END $$;
 
 -- 預設分類預填數據
