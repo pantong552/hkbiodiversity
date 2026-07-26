@@ -44,7 +44,15 @@ export default function SpeciesContributionCard({ speciesId }: SpeciesContributi
           .order('approved_at', { ascending: true });
 
         if (!error && data) {
-          setApprovedRevisions(data as SpeciesDraft[]);
+          // 過濾掉 Admin 直接編輯產生的記錄 (僅採計 Curator 提交並獲批准的修訂貢獻)
+          const curatorRevisions = (data as SpeciesDraft[]).filter(draft => {
+            // 若 curator_id 與 approved_by 相同，代表是 Admin 自己直接修改，不列入 Curator 貢獻
+            if (draft.curator_id && draft.approved_by && draft.curator_id === draft.approved_by) {
+              return false;
+            }
+            return true;
+          });
+          setApprovedRevisions(curatorRevisions);
         }
       } catch (err) {
         console.error('Error fetching approved revisions:', err);

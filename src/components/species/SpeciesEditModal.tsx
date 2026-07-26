@@ -205,7 +205,7 @@ export default function SpeciesEditModal({
 
         if (updateError) throw updateError;
 
-        // 同時將任何 pending 草稿設為 approved
+        // 同時將任何 pending 草稿設為 approved (若原本有館員草稿，則標記批准)
         if (activeDraft) {
           await supabase
             .from('species_drafts')
@@ -217,22 +217,6 @@ export default function SpeciesEditModal({
               approved_at: new Date().toISOString()
             })
             .eq('id', activeDraft.id);
-        } else {
-          // 建立一筆已批准的紀錄
-          await supabase
-            .from('species_drafts')
-            .insert({
-              species_id: speciesId,
-              table_name: targetTable,
-              curator_id: user.id,
-              curator_name: profile.username || user.email?.split('@')[0],
-              curator_avatar: profile.avatar_url,
-              draft_data: updatedData,
-              status: 'approved',
-              approved_by: user.id,
-              approved_by_name: profile.username || user.email?.split('@')[0],
-              approved_at: new Date().toISOString()
-            });
         }
 
         showToast('success', language === 'zh' ? '物種資料已即時更新並發布！' : 'Species updated and published successfully!');
