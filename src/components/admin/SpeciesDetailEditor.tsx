@@ -4,6 +4,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { createClient } from '@/utils/supabase/client';
 import { useLanguage } from '@/context/LanguageContext';
 import { useTaxonomy } from '@/context/TaxonomyContext';
+import { useAuth } from '@/context/AuthContext';
 import { 
   Save, 
   RotateCcw, 
@@ -481,9 +482,14 @@ interface FieldGroup {
 interface SpeciesDetailEditorProps {
   table: string;
   data: any;
+  originalData?: any;
   onSave: (updatedItem: any, affectedUpdates?: Record<string, string>) => void;
   onCancel: () => void;
   onDirtyChange?: (isDirty: boolean) => void;
+  saveButtonLabel?: string;
+  hideHeader?: boolean;
+  onRegisterSave?: (saveFn: () => void) => void;
+  disableDirectDatabaseUpdate?: boolean;
 }
 
 // 1. 動物 (species) 欄位組配置
@@ -645,8 +651,9 @@ const floraFieldGroups = (t: any): FieldGroup[] => [
   }
 ];
 
-export default function SpeciesDetailEditor({ table, data, onSave, onCancel, onDirtyChange }: SpeciesDetailEditorProps) {
+export default function SpeciesDetailEditor({ table, data, originalData, onSave, onCancel, onDirtyChange, saveButtonLabel, hideHeader, onRegisterSave, disableDirectDatabaseUpdate }: SpeciesDetailEditorProps) {
   const { language, t } = useLanguage();
+  const { profile } = useAuth();
   const { getTaxonomyChi } = useTaxonomy();
   const supabase = useMemo(() => createClient(), []);
   
@@ -655,13 +662,25 @@ export default function SpeciesDetailEditor({ table, data, onSave, onCancel, onD
   const [activeTab, setActiveTab] = useState<string>('basic');
   const [saving, setSaving] = useState(false);
 
-  // 1. 初始化資料
+  // 1. 初始化資料 (formValues 裝草稿/編輯中資料，publishedOriginal 裝純淨正本發布資料)
   useEffect(() => {
     if (data) {
       setFormValues({ ...data });
-      setOriginalValues({ ...data });
     }
   }, [data]);
+
+  // 使用 useMemo 確保正本發布資料 (originalData) 不會因為 state 異步落後或被改動
+  const publishedOriginal = useMemo(() => {
+    return originalData ? { ...originalData } : null;
+  }, [originalData]);
+
+  useEffect(() => {
+    if (originalData) {
+      setOriginalValues({ ...originalData });
+    } else if (data) {
+      setOriginalValues({ ...data });
+    }
+  }, [originalData]);
 
   // 2. 獲取當前資料表預定義的分組
   const baseGroups = useMemo(() => {
@@ -758,59 +777,42 @@ export default function SpeciesDetailEditor({ table, data, onSave, onCancel, onD
         }
       });
 
-      const { error } = await supabase
-        .from(table)
-        .update(updatedFields)
-        .eq('taxa_id', data.taxa_id);
-
-      if (error) throw error;
-
-      // 雙向同步相似物種邏輯 (Bidirectional similar species sync)
       const affectedUpdates: Record<string, string> = {};
-      if (Object.keys(updatedFields).includes('similar_species')) {
-        const origList = (originalValues.similar_species || '').split(',').map((id: string) => id.trim()).filter(Boolean);
-        const newList = (formValues.similar_species || '').split(',').map((id: string) => id.trim()).filter(Boolean);
 
-        const added = newList.filter((id: string) => !origList.includes(id));
-        const removed = origList.filter((id: string) => !newList.includes(id));
-        const currentTaxaId = data.taxa_id;
+      // 如果有傳入 originalData (即在 SpeciesEditModal 草稿審核模式)，
+      // 絕對不可直接更新 Supabase 的正本 species / plant_species 表！
+      const isDirectDbDisabled = disableDirectDatabaseUpdate || !!originalData;
 
-        // 處理新增：把目前物種 A 加到被新增物種 B 的 similar_species 中
-        for (const targetId of added) {
-          const targetTable = targetId.startsWith('flora_') ? 'plant_species' : 'species';
-          const { data: targetData } = await supabase
-            .from(targetTable)
-            .select('similar_species')
-            .eq('taxa_id', targetId)
-            .maybeSingle();
+      if (!isDirectDbDisabled) {
+        const { error } = await supabase
+          .from(table)
+          .update(updatedFields)
+          .eq('taxa_id', data.taxa_id);
 
-          const currentSim = (targetData?.similar_species || '').split(',').map((id: string) => id.trim()).filter(Boolean);
-          if (!currentSim.includes(currentTaxaId)) {
-            currentSim.push(currentTaxaId);
-            const nextSimVal = currentSim.join(', ');
-            await supabase
+        if (error) throw error;
+
+        // 雙向同步相似物種邏輯 (Bidirectional similar species sync)
+        if (Object.keys(updatedFields).includes('similar_species')) {
+          const origList = (originalValues.similar_species || '').split(',').map((id: string) => id.trim()).filter(Boolean);
+          const newList = (formValues.similar_species || '').split(',').map((id: string) => id.trim()).filter(Boolean);
+
+          const added = newList.filter((id: string) => !origList.includes(id));
+          const removed = origList.filter((id: string) => !newList.includes(id));
+          const currentTaxaId = data.taxa_id;
+
+          // 處理新增：把目前物種 A 加到被新增物種 B 的 similar_species 中
+          for (const targetId of added) {
+            const targetTable = targetId.startsWith('flora_') ? 'plant_species' : 'species';
+            const { data: targetData } = await supabase
               .from(targetTable)
-              .update({ similar_species: nextSimVal })
-              .eq('taxa_id', targetId);
+              .select('similar_species')
+              .eq('taxa_id', targetId)
+              .maybeSingle();
 
-            affectedUpdates[targetId] = nextSimVal;
-          }
-        }
-
-        // 處理移除：把目前物種 A 從被移除物種 C 的 similar_species 中刪除
-        for (const targetId of removed) {
-          const targetTable = targetId.startsWith('flora_') ? 'plant_species' : 'species';
-          const { data: targetData } = await supabase
-            .from(targetTable)
-            .select('similar_species')
-            .eq('taxa_id', targetId)
-            .maybeSingle();
-
-          if (targetData) {
-            const currentSim = (targetData.similar_species || '').split(',').map((id: string) => id.trim()).filter(Boolean);
-            if (currentSim.includes(currentTaxaId)) {
-              const updatedSim = currentSim.filter((id: string) => id !== currentTaxaId);
-              const nextSimVal = updatedSim.join(', ');
+            const currentSim = (targetData?.similar_species || '').split(',').map((id: string) => id.trim()).filter(Boolean);
+            if (!currentSim.includes(currentTaxaId)) {
+              currentSim.push(currentTaxaId);
+              const nextSimVal = currentSim.join(', ');
               await supabase
                 .from(targetTable)
                 .update({ similar_species: nextSimVal })
@@ -819,11 +821,39 @@ export default function SpeciesDetailEditor({ table, data, onSave, onCancel, onD
               affectedUpdates[targetId] = nextSimVal;
             }
           }
+
+          // 處理移除：把目前物種 A 從被移除物種 C 的 similar_species 中刪除
+          for (const targetId of removed) {
+            const targetTable = targetId.startsWith('flora_') ? 'plant_species' : 'species';
+            const { data: targetData } = await supabase
+              .from(targetTable)
+              .select('similar_species')
+              .eq('taxa_id', targetId)
+              .maybeSingle();
+
+            if (targetData) {
+              const currentSim = (targetData.similar_species || '').split(',').map((id: string) => id.trim()).filter(Boolean);
+              if (currentSim.includes(currentTaxaId)) {
+                const updatedSim = currentSim.filter((id: string) => id !== currentTaxaId);
+                const nextSimVal = updatedSim.join(', ');
+                await supabase
+                  .from(targetTable)
+                  .update({ similar_species: nextSimVal })
+                  .eq('taxa_id', targetId);
+
+                affectedUpdates[targetId] = nextSimVal;
+              }
+            }
+          }
         }
       }
 
       const finalItem = { ...data, ...formValues };
-      setOriginalValues({ ...formValues });
+      // 僅在非 Review 模式（沒有 originalData prop）時才重設 originalValues
+      // 以免覆蓋掉 Curator/Admin 用於 Highlight 對比的正本基準
+      if (!originalData) {
+        setOriginalValues({ ...formValues });
+      }
       onSave(finalItem, affectedUpdates);
     } catch (err) {
       console.error('Error saving species detail:', err);
@@ -832,6 +862,13 @@ export default function SpeciesDetailEditor({ table, data, onSave, onCancel, onD
       setSaving(false);
     }
   };
+
+  // 註冊保存觸發函式給外層元件
+  useEffect(() => {
+    if (onRegisterSave) {
+      onRegisterSave(handleSave);
+    }
+  }, [onRegisterSave, handleSave]);
 
   if (!data) {
     return (
@@ -844,98 +881,125 @@ export default function SpeciesDetailEditor({ table, data, onSave, onCancel, onD
   const currentGroup = finalGroups.find(g => g.id === activeTab) || finalGroups[0];
   const commonName = language === 'zh' ? data.common_name_chi : data.common_name_eng;
 
+  // 通用欄位異動檢查：
+  // 優先與正本發布數據 (publishedOriginal) 比對，確保草稿修改欄位 100% 亮起 Highlight。
+  const checkIsDirty = (key: string) => {
+    const v1 = formValues[key];
+    const comparisonBase = publishedOriginal || originalValues;
+    if (!comparisonBase) return false;
+    const v2 = comparisonBase[key];
+    if (v1 === undefined && v2 === undefined) return false;
+    const s1 = v1 === null || v1 === undefined ? '' : String(v1).trim();
+    const s2 = v2 === null || v2 === undefined ? '' : String(v2).trim();
+    return s1 !== s2;
+  };
+
   return (
     <div className="h-full flex flex-col min-h-0 bg-white rounded-3xl overflow-hidden relative border border-slate-100">
       
-      {/* 1. Header Area */}
-      <div className="px-6 py-5 border-b border-slate-50 flex items-center justify-between flex-shrink-0 bg-slate-50/50">
-        <div className="flex flex-col min-w-0">
-          <div className="flex items-center gap-2">
-            <span className="text-[10px] font-black px-2 py-0.5 bg-emerald-50 text-emerald-700 border border-emerald-100 rounded-md">
-              {data.taxa_id}
+      {/* 1. Header Area (Optionally hidden when embedded in modals) */}
+      {!hideHeader && (
+        <div className="px-6 py-5 border-b border-slate-50 flex items-center justify-between flex-shrink-0 bg-slate-50/50">
+          <div className="flex flex-col min-w-0">
+            <div className="flex items-center gap-2">
+              <span className="text-[10px] font-black px-2 py-0.5 bg-emerald-50 text-emerald-700 border border-emerald-100 rounded-md">
+                {data.taxa_id}
+              </span>
+              <h3 className="text-md font-black text-slate-800 truncate">
+                {commonName || data.scientific_name}
+              </h3>
+            </div>
+            <span className="text-[11px] text-slate-400 font-serif italic truncate mt-1">
+              {data.scientific_name}
             </span>
-            <h3 className="text-md font-black text-slate-800 truncate">
-              {commonName || data.scientific_name}
-            </h3>
           </div>
-          <span className="text-[11px] text-slate-400 font-serif italic truncate mt-1">
-            {data.scientific_name}
-          </span>
-        </div>
 
-        <div className="flex items-center gap-3">
-          {/* Reset Button */}
-          {isDirty && (
-            <button
-              onClick={handleReset}
-              disabled={saving}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-200 text-slate-500 text-xs font-bold hover:bg-slate-100 hover:border-slate-300 transition-all hover:scale-[1.02] active:scale-95 disabled:opacity-50 cursor-pointer"
-              title="Reset changes"
-            >
-              <RotateCcw className="w-3.5 h-3.5" />
-              <span>{language === 'zh' ? '重設' : 'Reset'}</span>
-            </button>
-          )}
-
-          {/* Save Button */}
-          <button
-            onClick={handleSave}
-            disabled={!isDirty || saving}
-            className={`flex items-center gap-1.5 px-4 py-1.5 rounded-xl text-xs font-bold transition-all border cursor-pointer ${
-              isDirty 
-                ? 'bg-emerald-600 border-emerald-500 text-white shadow-md shadow-emerald-100 hover:bg-emerald-700 hover:shadow-lg hover:shadow-emerald-200 hover:scale-[1.02] active:scale-95' 
-                : 'bg-slate-100 border-slate-100 text-slate-400 cursor-not-allowed'
-            }`}
-          >
-            {saving ? (
-              <Loader2 className="w-3.5 h-3.5 animate-spin" />
-            ) : (
-              <Save className="w-3.5 h-3.5" />
+          <div className="flex items-center gap-3">
+            {/* Reset Button */}
+            {isDirty && (
+              <button
+                onClick={handleReset}
+                disabled={saving}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-200 text-slate-500 text-xs font-bold hover:bg-slate-100 hover:border-slate-300 transition-all hover:scale-[1.02] active:scale-95 disabled:opacity-50 cursor-pointer"
+                title="Reset changes"
+              >
+                <RotateCcw className="w-3.5 h-3.5" />
+                <span>{language === 'zh' ? '重設' : 'Reset'}</span>
+              </button>
             )}
-            <span>{language === 'zh' ? '儲存變更' : 'Save Changes'}</span>
-          </button>
 
-          {/* Close Button */}
-          <button 
-            onClick={onCancel}
-            className="p-1.5 rounded-xl text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-all hover:scale-105 active:scale-95 border border-transparent hover:border-slate-100 cursor-pointer"
-            title="Close Editor"
-          >
-            <X className="w-5 h-5" />
-          </button>
+            {/* Save Button */}
+            <button
+              onClick={handleSave}
+              disabled={!isDirty || saving}
+              className={`flex items-center gap-1.5 px-4 py-1.5 rounded-xl text-xs font-bold transition-all border cursor-pointer ${
+                isDirty 
+                  ? 'bg-emerald-600 border-emerald-500 text-white shadow-md shadow-emerald-100 hover:bg-emerald-700 hover:shadow-lg hover:shadow-emerald-200 hover:scale-[1.02] active:scale-95' 
+                  : 'bg-slate-100 border-slate-100 text-slate-400 cursor-not-allowed'
+              }`}
+            >
+              {saving ? (
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+              ) : (
+                <Save className="w-3.5 h-3.5" />
+              )}
+              <span>{saveButtonLabel || (language === 'zh' ? '儲存變更' : 'Save Changes')}</span>
+            </button>
+
+            {/* Close Button */}
+            <button 
+              onClick={onCancel}
+              className="p-1.5 rounded-xl text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-all hover:scale-105 active:scale-95 border border-transparent hover:border-slate-100 cursor-pointer"
+              title="Close Editor"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
         </div>
-      </div>
+      )}
 
       {/* 2. Body Area (Split into Left Tabs and Right Fields Scroll) */}
       <div className="flex-1 flex min-h-0">
         
         {/* Left Tabs Column */}
         <div className="w-1/4 min-w-[150px] border-r border-slate-50 py-4 flex flex-col gap-1.5 bg-slate-50/20">
-          {finalGroups.map(group => (
-            <button
-              key={group.id}
-              onClick={() => setActiveTab(group.id)}
-              className={`w-[calc(100%-16px)] mx-2 px-3 py-2.5 rounded-xl font-bold text-xs flex items-center gap-2.5 transition-all text-left outline-none relative cursor-pointer ${
-                activeTab === group.id
-                  ? 'bg-white text-emerald-700 shadow-sm border border-slate-100'
-                  : 'text-slate-500 hover:bg-slate-100/60 hover:text-slate-700 border border-transparent active:scale-[0.98]'
-              }`}
-            >
-              {activeTab === group.id && (
-                <motion.div 
-                  layoutId="active-editor-tab-indicator"
-                  className="absolute left-[-2px] top-2.5 bottom-2.5 w-0.5 bg-emerald-500 rounded-full"
-                  transition={{ type: "spring", stiffness: 300, damping: 30 }}
-                />
-              )}
-              <span className={activeTab === group.id ? 'text-emerald-600' : 'text-slate-400 transition-colors group-hover:text-slate-600'}>
-                {group.icon}
-              </span>
-              <span className="truncate">
-                {language === 'zh' ? group.nameChi : group.nameEng}
-              </span>
-            </button>
-          ))}
+          {finalGroups.map(group => {
+            const hasGroupDirty = group.fields.some(f => checkIsDirty(f.key));
+            return (
+              <button
+                key={group.id}
+                onClick={() => setActiveTab(group.id)}
+                className={`w-[calc(100%-16px)] mx-2 px-3 py-2.5 rounded-xl font-bold text-xs flex items-center justify-between gap-2 transition-all text-left outline-none relative cursor-pointer ${
+                  activeTab === group.id
+                    ? 'bg-white text-emerald-700 shadow-sm border border-slate-100'
+                    : 'text-slate-500 hover:bg-slate-100/60 hover:text-slate-700 border border-transparent active:scale-[0.98]'
+                }`}
+              >
+                {activeTab === group.id && (
+                  <motion.div 
+                    layoutId="active-editor-tab-indicator"
+                    className="absolute left-[-2px] top-2.5 bottom-2.5 w-0.5 bg-emerald-500 rounded-full"
+                    transition={{ type: "spring", stiffness: 300, damping: 30 }}
+                  />
+                )}
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <span className={activeTab === group.id ? 'text-emerald-600' : 'text-slate-400 transition-colors group-hover:text-slate-600'}>
+                    {group.icon}
+                  </span>
+                  <span className="truncate">
+                    {language === 'zh' ? group.nameChi : group.nameEng}
+                  </span>
+                </div>
+
+                {hasGroupDirty && (
+                  <span 
+                    className="w-2 h-2 rounded-full bg-emerald-500 shadow-sm shadow-emerald-400 animate-pulse shrink-0" 
+                    title={language === 'zh' ? '包含修訂欄位' : 'Contains modified fields'}
+                  />
+                )}
+              </button>
+            );
+          })}
         </div>
 
         {/* Right Fields Scroll Column */}
@@ -959,33 +1023,46 @@ export default function SpeciesDetailEditor({ table, data, onSave, onCancel, onD
               const isReadOnly = field.readOnly;
               const isTextarea = field.type === 'textarea';
               const label = language === 'zh' ? field.labelChi : field.labelEng;
-              const isFieldDirty = formValues[field.key] !== originalValues[field.key];
+              const isFieldDirty = checkIsDirty(field.key);
               const isBilingualField = field.key.endsWith('_chi') || field.key.endsWith('_eng');
               const useFullWidth = (isTextarea && !isBilingualField) || field.key === 'similar_species' || field.key === 'reference_codes';
 
               return (
                 <div 
                   key={field.key} 
-                  className={`flex flex-col gap-1.5 ${useFullWidth ? 'md:col-span-2' : ''}`}
+                  className={`flex flex-col gap-1.5 p-2.5 rounded-2xl transition-all ${
+                    isFieldDirty 
+                      ? 'bg-emerald-50/30 border border-emerald-300/70 shadow-sm ring-1 ring-emerald-500/20' 
+                      : 'border border-transparent'
+                  } ${useFullWidth ? 'md:col-span-2' : ''}`}
                 >
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
-                    {isReadOnly && <Lock className="w-3 h-3 text-slate-300" />}
-                    <span className={isFieldDirty ? 'text-emerald-600 font-bold' : ''}>{label}</span>
-                    <span className="text-[8px] font-mono opacity-50 lowercase">({field.key})</span>
+                  <label className="text-[10px] font-black uppercase tracking-wider flex items-center justify-between gap-1.5">
+                    <div className="flex items-center gap-1.5">
+                      {isReadOnly && <Lock className="w-3 h-3 text-slate-300" />}
+                      <span className={isFieldDirty ? 'text-emerald-700 font-black' : 'text-slate-400'}>{label}</span>
+                      {profile?.role === 'admin' && (
+                        <span className="text-[8px] font-mono opacity-50 lowercase">({field.key})</span>
+                      )}
+                    </div>
+
                     {isFieldDirty && (
                       <span 
-                        className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse shrink-0" 
+                        className="px-1.5 py-0.5 bg-emerald-100 text-emerald-800 text-[8px] font-black rounded-md uppercase tracking-wider ring-1 ring-emerald-200" 
                         title={language === 'zh' ? '已修改' : 'Modified'} 
-                      />
+                      >
+                        {language === 'zh' ? '已修訂' : 'MODIFIED'}
+                      </span>
                     )}
                   </label>
 
                   {isReadOnly ? (
                     <div 
-                      className="bg-slate-50/80 border border-slate-100 text-slate-400 rounded-xl px-4 py-2.5 text-xs font-semibold select-none flex items-center justify-between cursor-not-allowed group/readonly"
+                      className={`border rounded-xl px-4 py-2.5 text-xs font-semibold select-none flex items-center justify-between cursor-not-allowed group/readonly ${
+                        isFieldDirty ? 'bg-emerald-100/50 border-emerald-300 text-emerald-900 font-bold' : 'bg-slate-50/80 border-slate-100 text-slate-400'
+                      }`}
                       title={language === 'zh' ? '此為系統唯讀欄位' : 'This field is read-only'}
                     >
-                      <span className="font-mono opacity-70">{String(val)}</span>
+                      <span className="font-mono opacity-80">{String(val)}</span>
                       <Lock className="w-3.5 h-3.5 text-slate-300 group-hover/readonly:text-slate-400 transition-colors" />
                     </div>
                   ) : isTextarea ? (
@@ -996,7 +1073,7 @@ export default function SpeciesDetailEditor({ table, data, onSave, onCancel, onD
                         rows={5}
                         className={`w-full focus:bg-white border rounded-xl px-4 py-3 text-xs font-semibold resize-y transition-[border-color,box-shadow] focus:outline-none focus:ring-1 custom-scrollbar leading-relaxed ${
                           isFieldDirty 
-                            ? 'border-emerald-300/80 focus:border-emerald-500 focus:ring-emerald-500/20 bg-emerald-50/5' 
+                            ? 'border-emerald-400 font-bold bg-white text-emerald-950 focus:border-emerald-500 focus:ring-emerald-500/20 shadow-xs' 
                             : 'bg-slate-50/50 hover:bg-slate-50 border-slate-100 hover:border-slate-200 focus:border-emerald-400 focus:ring-emerald-400'
                         }`}
                         placeholder={language === 'zh' ? `請輸入 ${label}...` : `Enter ${label}...`}
@@ -1030,7 +1107,7 @@ export default function SpeciesDetailEditor({ table, data, onSave, onCancel, onD
                         onChange={(e) => handleFieldChange(field.key, e.target.value, field.type)}
                         className={`flex-1 min-w-0 focus:bg-white border rounded-xl px-4 py-2.5 text-xs font-semibold transition-colors duration-200 focus:outline-none focus:ring-1 ${
                           isFieldDirty 
-                            ? 'border-emerald-300/80 focus:border-emerald-500 focus:ring-emerald-500/20 bg-emerald-50/5' 
+                            ? 'border-emerald-400 font-bold bg-white text-emerald-950 focus:border-emerald-500 focus:ring-emerald-500/20 shadow-xs' 
                             : 'bg-slate-50/50 hover:bg-slate-50 border-slate-100 hover:border-slate-200 focus:border-emerald-400 focus:ring-emerald-400'
                         }`}
                         placeholder={language === 'zh' ? `請輸入 ${label}...` : `Enter ${label}...`}
@@ -1061,6 +1138,24 @@ export default function SpeciesDetailEditor({ table, data, onSave, onCancel, onD
                       )}
                     </div>
                   )}
+                  {/* 正本發布內容與修訂內容對比小列 */}
+                  {isFieldDirty && (publishedOriginal || originalValues) && (() => {
+                    const compBase = publishedOriginal || originalValues;
+                    const origVal = compBase?.[field.key];
+                    return (
+                      <div className="text-[10px] text-amber-900 bg-amber-50/90 border border-amber-200/80 rounded-xl px-3 py-1.5 font-sans leading-relaxed mt-1 flex items-start gap-1.5 shadow-xs">
+                        <span className="font-black shrink-0 text-amber-700">
+                          {language === 'zh' ? '正本發布內容 (Publish Data)：' : 'Publish Data: '}
+                        </span>
+                        <span className="font-mono text-amber-950 break-all font-semibold">
+                          {origVal === null || origVal === undefined || String(origVal).trim() === ''
+                            ? (language === 'zh' ? '(正本尚無內容 / Empty)' : '(Empty in publish data)')
+                            : String(origVal)
+                          }
+                        </span>
+                      </div>
+                    );
+                  })()}
                 </div>
               );
             })}

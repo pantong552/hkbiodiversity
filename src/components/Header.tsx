@@ -21,7 +21,7 @@ export default function Header() {
   const isHomePage = pathname === '/';
   const isHeaderTransparent = isHomePage && !isScrolled;
 
-  const { isExpanded, isGalleryOpen, isUploadModalOpen, isFilterOpen, toggleExpand, setIsAccountOpen, isAccountOpen } = useSpeciesPanel();
+  const { isExpanded, isGalleryOpen, isUploadModalOpen, isFilterOpen, isEditModalOpen, toggleExpand, setIsAccountOpen, isAccountOpen } = useSpeciesPanel();
   const lastScrollYRef = useRef(0);
   const mobileMenuRef = useRef<HTMLDivElement>(null);
   const menuToggleRef = useRef<HTMLButtonElement>(null);
@@ -125,7 +125,7 @@ export default function Header() {
       fixed top-4 inset-x-0 z-[60] 
       px-6 md:px-8 lg:px-10 xl:px-16
       transition-all duration-500 cubic-bezier(0.16, 1, 0.3, 1)
-      ${(isVisible && !isGalleryOpen && !isUploadModalOpen && !isAccountOpen) ? 'translate-y-0 opacity-100' : '-translate-y-40 opacity-0'}
+      ${(isVisible && !isGalleryOpen && !isUploadModalOpen && !isAccountOpen && !isEditModalOpen) ? 'translate-y-0 opacity-100' : '-translate-y-40 opacity-0 pointer-events-none'}
     `}>
       <nav className={`
         max-w-[1920px] mx-auto rounded-[2rem]

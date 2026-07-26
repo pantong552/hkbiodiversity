@@ -13,6 +13,11 @@ import { useInaturalistPhoto } from '@/hooks/useInaturalistPhoto';
 import { usePathname } from 'next/navigation';
 import { getSpeciesImageUrl } from '@/utils/formatters';
 import { useTaxonomy } from '@/context/TaxonomyContext';
+import { useAuth } from '@/context/AuthContext';
+import { Sliders } from 'lucide-react';
+import SpeciesEditModal from './SpeciesEditModal';
+import AdminDraftReviewBanner from './AdminDraftReviewBanner';
+import { SpeciesDraft } from '@/types/speciesDraft';
 
 // --- Subcomponent: Species Tab Preview (Tooltip) ---
 function SpeciesTabPreview({ 
@@ -164,10 +169,13 @@ export default function SpeciesFloatingPanel() {
     removeSpecies, 
     setActiveSpecies, 
     toggleExpand,
-    isFilterOpen
+    isFilterOpen,
+    isEditModalOpen,
+    setIsEditModalOpen
   } = useSpeciesPanel();
   
   const { language, t } = useLanguage();
+  const { profile } = useAuth();
   const { getTaxonomyChi } = useTaxonomy();
   const pathname = usePathname();
   const [speciesData, setSpeciesData] = useState<Record<string, Species>>({});
@@ -178,6 +186,60 @@ export default function SpeciesFloatingPanel() {
   const tabsRef = useRef<HTMLDivElement>(null);
   const lastScrollYRef = useRef(0);
   const { share, isCopied } = useShare();
+
+  const isCanEdit = profile?.role === 'admin' || profile?.role === 'curator';
+  const activeSpecies = activeSpeciesId ? speciesData[activeSpeciesId] : null;
+  const [reviewDraft, setReviewDraft] = useState<SpeciesDraft | null>(null);
+
+  const handleApproveDraft = async (draft: SpeciesDraft) => {
+    if (!activeSpecies || !profile) return;
+    const targetTable = activeSpecies.taxa_group === 'FLORA' || (activeSpecies as any).category_chi ? 'plant_species' : 'species';
+
+    // 1. 更新正式物種表
+    const { error: updateError } = await supabase
+      .from(targetTable)
+      .update(draft.draft_data)
+      .eq('id', activeSpecies.id);
+
+    if (updateError) throw updateError;
+
+    // 2. 更新 species_drafts 狀態為 approved
+    const { error: draftError } = await supabase
+      .from('species_drafts')
+      .update({
+        status: 'approved',
+        approved_by: profile.id,
+        approved_by_name: profile.username || profile.email?.split('@')[0],
+        approved_at: new Date().toISOString()
+      })
+      .eq('id', draft.id);
+
+    if (draftError) throw draftError;
+
+    // 重新載入該物種最新資料
+    const { data } = await supabase.from(targetTable).select('*').eq('id', activeSpecies.id).maybeSingle();
+    if (data && activeSpeciesId) {
+      setSpeciesData(prev => ({ ...prev, [activeSpeciesId]: data as Species }));
+    }
+    setReviewDraft(null);
+  };
+
+  const handleRejectDraft = async (draft: SpeciesDraft, reason: string) => {
+    if (!profile) return;
+    const { error } = await supabase
+      .from('species_drafts')
+      .update({
+        status: 'rejected',
+        rejection_reason: reason,
+        approved_by: profile.id,
+        approved_by_name: profile.username || profile.email?.split('@')[0],
+        approved_at: new Date().toISOString()
+      })
+      .eq('id', draft.id);
+
+    if (error) throw error;
+    setReviewDraft(null);
+  };
 
   // Check if tabs are scrollable to show gradient
   useEffect(() => {
@@ -491,7 +553,25 @@ export default function SpeciesFloatingPanel() {
               className="h-full"
             >
               {speciesData[activeSpeciesId] ? (
-                <SpeciesContent species={speciesData[activeSpeciesId]} showBreadcrumb={true} />
+                <>
+                  <AdminDraftReviewBanner
+                    speciesId={String(speciesData[activeSpeciesId].id || speciesData[activeSpeciesId].taxa_id || activeSpeciesId)}
+                    tableName={speciesData[activeSpeciesId].taxa_group === 'FLORA' || (speciesData[activeSpeciesId] as any).category_chi ? 'plant_species' : 'species'}
+                    onApproved={async () => {
+                      // 重新載入物種資料
+                      const targetTable = speciesData[activeSpeciesId].taxa_group === 'FLORA' || (speciesData[activeSpeciesId] as any).category_chi ? 'plant_species' : 'species';
+                      const { data } = await supabase.from(targetTable).select('*').eq('id', speciesData[activeSpeciesId].id).maybeSingle();
+                      if (data) {
+                        setSpeciesData(prev => ({ ...prev, [activeSpeciesId]: data as Species }));
+                      }
+                    }}
+                    onOpenReviewModal={(draft) => {
+                      setReviewDraft(draft);
+                      setIsEditModalOpen(true);
+                    }}
+                  />
+                  <SpeciesContent species={speciesData[activeSpeciesId]} showBreadcrumb={true} />
+                </>
               ) : (
                 <div className="h-full flex flex-col items-center justify-center py-20">
                   <Loader2 className="w-12 h-12 text-emerald-500 animate-spin mb-4" />
@@ -505,7 +585,7 @@ export default function SpeciesFloatingPanel() {
         </AnimatePresence>
       </motion.div>
 
-      <div className="w-full flex justify-center pointer-events-auto relative overflow-visible">
+      <div className={`w-full flex justify-center pointer-events-auto relative overflow-visible ${isEditModalOpen ? 'hidden' : ''}`}>
         {/* Global Tooltip Portal (Rendered here to escape internal Tab overflow) */}
         {openSpeciesIds.map(id => (
           <SpeciesTabPreview 
@@ -629,6 +709,18 @@ export default function SpeciesFloatingPanel() {
               )}
             </AnimatePresence>
 
+            {/* EDIT SPECIES DETAIL Button for Admin / Curator */}
+            {isCanEdit && activeSpecies && (
+              <button 
+                onClick={() => setIsEditModalOpen(true)}
+                title={language === 'zh' ? '編輯物種詳情' : 'Edit species detail'}
+                className="px-4 py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-black rounded-2xl shadow-lg shadow-emerald-600/20 hover:scale-105 active:scale-95 transition-all duration-300 border border-emerald-500 flex items-center gap-2 shrink-0"
+              >
+                <Sliders className="w-4 h-4" />
+                <span className="hidden md:inline text-xs uppercase tracking-wider">{language === 'zh' ? '編輯物種詳情' : 'EDIT SPECIES DETAIL'}</span>
+              </button>
+            )}
+
             {/* Share Button */}
             <button 
               onClick={handleShare}
@@ -673,6 +765,31 @@ export default function SpeciesFloatingPanel() {
           </div>
         </div>
       </div>
+
+      {/* Edit Species Detail Modal */}
+      {activeSpecies && isCanEdit && (
+        <SpeciesEditModal
+          isOpen={isEditModalOpen}
+          onClose={() => {
+            setIsEditModalOpen(false);
+            setReviewDraft(null);
+          }}
+          species={activeSpecies}
+          tableName={activeSpecies.taxa_group === 'FLORA' || (activeSpecies as any).category_chi ? 'plant_species' : 'species'}
+          reviewDraft={reviewDraft}
+          onApproveDraft={handleApproveDraft}
+          onRejectDraft={handleRejectDraft}
+          onSuccess={async () => {
+            if (activeSpeciesId) {
+              const targetTable = activeSpecies.taxa_group === 'FLORA' || (activeSpecies as any).category_chi ? 'plant_species' : 'species';
+              const { data } = await supabase.from(targetTable).select('*').eq('id', activeSpecies.id).maybeSingle();
+              if (data) {
+                setSpeciesData(prev => ({ ...prev, [activeSpeciesId]: data as Species }));
+              }
+            }
+          }}
+        />
+      )}
     </motion.div>
   );
 }

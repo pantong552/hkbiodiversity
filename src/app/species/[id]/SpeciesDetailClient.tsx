@@ -4,9 +4,14 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { supabase } from '@/lib/supabase';
 import { Species } from '@/types/species';
-import { ArrowLeft, Loader2, Share2, Check, Copy } from 'lucide-react';
+import { SpeciesDraft } from '@/types/speciesDraft';
+import { ArrowLeft, Loader2, Share2, Check, Sliders } from 'lucide-react';
 import { useLanguage } from '@/context/LanguageContext';
+import { useAuth } from '@/context/AuthContext';
+import { useSpeciesPanel } from '@/context/SpeciesPanelContext';
 import SpeciesContent from '@/components/species/SpeciesContent';
+import SpeciesEditModal from '@/components/species/SpeciesEditModal';
+import AdminDraftReviewBanner from '@/components/species/AdminDraftReviewBanner';
 import { useShare } from '@/hooks/useShare';
 
 export default function SpeciesDetailClient({ 
@@ -17,15 +22,18 @@ export default function SpeciesDetailClient({
   initialSpecies: Species | null;
 }) {
   const { language } = useLanguage();
+  const { user, profile } = useAuth();
+  const { isEditModalOpen, setIsEditModalOpen } = useSpeciesPanel();
   const [species, setSpecies] = useState<Species | null>(initialSpecies);
   const [isLoading, setIsLoading] = useState(!initialSpecies);
+  const [reviewDraft, setReviewDraft] = useState<SpeciesDraft | null>(null);
   const { share, isCopied } = useShare();
-  
+
+  const isCanEdit = profile?.role === 'admin' || profile?.role === 'curator';
+
   const handleShare = () => {
     if (!species) return;
     const commonName = language === 'zh' ? species.common_name_chi : species.common_name_eng;
-    
-    // 生成首頁連結帶物種參數，以顯示完整網頁結構
     const baseUrl = typeof window !== 'undefined' ? window.location.origin : '';
     const shareUrl = `${baseUrl}/?species=${species.id}`;
 
@@ -34,6 +42,54 @@ export default function SpeciesDetailClient({
       text: `在香港生物多樣性圖鑑查看 ${commonName} (${species.scientific_name}) 的詳細資料`,
       url: shareUrl
     });
+  };
+
+  const handleApproveDraft = async (draft: SpeciesDraft) => {
+    if (!species || !user) return;
+    const targetTable = 'species';
+
+    // 1. 更新正式物種表
+    const { error: updateError } = await supabase
+      .from(targetTable)
+      .update(draft.draft_data)
+      .eq('id', species.id);
+
+    if (updateError) throw updateError;
+
+    // 2. 更新 species_drafts 狀態為 approved
+    const { error: draftError } = await supabase
+      .from('species_drafts')
+      .update({
+        status: 'approved',
+        approved_by: user.id,
+        approved_by_name: profile?.username || user.email?.split('@')[0],
+        approved_at: new Date().toISOString()
+      })
+      .eq('id', draft.id);
+
+    if (draftError) throw draftError;
+
+    // 刷新物種資料
+    const { data: updatedSpecies } = await supabase.from('species').select('*').eq('id', species.id).maybeSingle();
+    if (updatedSpecies) setSpecies(updatedSpecies as Species);
+    setReviewDraft(null);
+  };
+
+  const handleRejectDraft = async (draft: SpeciesDraft, reason: string) => {
+    if (!user) return;
+    const { error } = await supabase
+      .from('species_drafts')
+      .update({
+        status: 'rejected',
+        rejection_reason: reason,
+        approved_by: user.id,
+        approved_by_name: profile?.username || user.email?.split('@')[0],
+        approved_at: new Date().toISOString()
+      })
+      .eq('id', draft.id);
+
+    if (error) throw error;
+    setReviewDraft(null);
   };
 
   useEffect(() => {
@@ -109,8 +165,25 @@ export default function SpeciesDetailClient({
         </div>
       </div>
 
+      {/* Admin Draft Review Banner if there's pending curator edit */}
+      {species && (
+        <AdminDraftReviewBanner
+          speciesId={String(species.id || species.taxa_id || '')}
+          tableName="species"
+          onApproved={() => {
+            supabase.from('species').select('*').eq('id', species.id).maybeSingle().then(({ data }: { data: any }) => {
+              if (data) setSpecies(data as Species);
+            });
+          }}
+          onOpenReviewModal={(draft) => {
+            setReviewDraft(draft);
+            setIsEditModalOpen(true);
+          }}
+        />
+      )}
+
       {/* Navigation Bar / Breadcrumb area */}
-      <div className="sticky top-0 z-40 bg-white/80 backdrop-blur-lg border-b border-slate-200/60 px-6 py-4">
+      <div className={`sticky top-0 z-40 bg-white/80 backdrop-blur-lg border-b border-slate-200/60 px-6 py-4 ${isEditModalOpen ? 'hidden' : ''}`}>
         <div className="max-w-7xl mx-auto flex items-center justify-between">
           <Link href="/" className="group inline-flex items-center gap-2 text-slate-600 font-bold hover:text-emerald-600 transition-all duration-300">
             <div className="w-8 h-8 rounded-xl bg-slate-100 group-hover:bg-emerald-50 flex items-center justify-center transition-colors">
@@ -119,17 +192,55 @@ export default function SpeciesDetailClient({
             <span className="hidden sm:inline">{language === 'zh' ? '返回圖鑑' : 'Back to Directory'}</span>
           </Link>
 
-          <button 
-            onClick={handleShare}
-            className="inline-flex items-center gap-2.5 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold text-sm shadow-lg shadow-emerald-200 hover:shadow-emerald-300 hover:-translate-y-0.5 active:scale-95 transition-all duration-300 group"
-          >
-            <Share2 className="w-4 h-4 group-hover:rotate-12 transition-transform" />
-            <span>{language === 'zh' ? '分享此物種' : 'Share Species'}</span>
-          </button>
+          <div className="flex items-center gap-3">
+            {/* EDIT SPECIES DETAIL Button for Admin / Curator */}
+            {isCanEdit && species && (
+              <button
+                onClick={() => {
+                  setReviewDraft(null);
+                  setIsEditModalOpen(true);
+                }}
+                className="inline-flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-black text-xs uppercase tracking-wider shadow-lg shadow-emerald-200 hover:shadow-emerald-300 hover:-translate-y-0.5 active:scale-95 transition-all duration-300 cursor-pointer"
+              >
+                <Sliders className="w-4 h-4" />
+                <span>{language === 'zh' ? '編輯物種詳情' : 'EDIT SPECIES DETAIL'}</span>
+              </button>
+            )}
+
+            <button 
+              onClick={handleShare}
+              className="inline-flex items-center gap-2.5 px-4 py-2 bg-slate-800 hover:bg-slate-900 text-white rounded-xl font-bold text-sm shadow-md hover:-translate-y-0.5 active:scale-95 transition-all duration-300 group cursor-pointer"
+            >
+              <Share2 className="w-4 h-4 group-hover:rotate-12 transition-transform" />
+              <span>{language === 'zh' ? '分享此物種' : 'Share Species'}</span>
+            </button>
+          </div>
         </div>
       </div>
 
       <SpeciesContent species={species} showBreadcrumb={true} />
+
+      {/* Edit Species Detail Modal */}
+      {species && isCanEdit && (
+        <SpeciesEditModal
+          isOpen={isEditModalOpen}
+          onClose={() => {
+            setIsEditModalOpen(false);
+            setReviewDraft(null);
+          }}
+          species={species}
+          tableName="species"
+          reviewDraft={reviewDraft}
+          onApproveDraft={handleApproveDraft}
+          onRejectDraft={handleRejectDraft}
+          onSuccess={() => {
+            // 重新刷新物種資料
+            supabase.from('species').select('*').eq('id', species.id).maybeSingle().then(({ data }: { data: any }) => {
+              if (data) setSpecies(data as Species);
+            });
+          }}
+        />
+      )}
     </div>
   );
 }

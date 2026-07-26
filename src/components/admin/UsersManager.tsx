@@ -35,6 +35,98 @@ interface UsersManagerProps {
 type SortKey = 'username' | 'created_at' | 'last_online_at' | 'status';
 type SortDirection = 'asc' | 'desc';
 
+interface RoleSelectDropdownProps {
+  currentRole: UserRole;
+  onRoleChange: (newRole: UserRole) => void;
+  disabled?: boolean;
+}
+
+function RoleSelectDropdown({ currentRole, onRoleChange, disabled }: RoleSelectDropdownProps) {
+  const [isOpen, setIsOpen] = useState(false);
+  const { t } = useLanguage();
+  const ref = useClickOutside(() => setIsOpen(false));
+
+  const roleOptions: { role: UserRole; label: string; icon: any; badgeStyle: string; activeStyle: string }[] = [
+    {
+      role: 'admin',
+      label: t('account.role_admin'),
+      icon: ShieldCheck,
+      badgeStyle: 'bg-red-50 text-red-600 border-red-100 hover:bg-red-100/70',
+      activeStyle: 'bg-red-50 text-red-600 font-bold',
+    },
+    {
+      role: 'curator',
+      label: t('account.role_curator'),
+      icon: Shield,
+      badgeStyle: 'bg-amber-50 text-amber-600 border-amber-100 hover:bg-amber-100/70',
+      activeStyle: 'bg-amber-50 text-amber-600 font-bold',
+    },
+    {
+      role: 'guest',
+      label: t('account.role_guest'),
+      icon: UserCircle,
+      badgeStyle: 'bg-slate-50 text-slate-500 border-slate-100 hover:bg-slate-100/70',
+      activeStyle: 'bg-slate-100 text-slate-700 font-bold',
+    },
+  ];
+
+  const currentOption = roleOptions.find((o) => o.role === currentRole) || roleOptions[2];
+  const Icon = currentOption.icon;
+
+  return (
+    <div ref={ref as any} className="relative inline-block text-left" onClick={(e) => e.stopPropagation()}>
+      <button
+        type="button"
+        disabled={disabled}
+        onClick={() => setIsOpen(!isOpen)}
+        className={`flex items-center gap-1 px-2 py-0.5 rounded-lg border text-[9px] font-black uppercase transition-all shadow-xs hover:shadow-sm active:scale-95 disabled:opacity-50 ${currentOption.badgeStyle}`}
+      >
+        <Icon className="w-2.5 h-2.5" />
+        <span>{currentOption.label}</span>
+        <ChevronDown className={`w-2.5 h-2.5 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`} />
+      </button>
+
+      <AnimatePresence>
+        {isOpen && (
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95, y: 4 }}
+            animate={{ opacity: 1, scale: 1, y: 4 }}
+            exit={{ opacity: 0, scale: 0.95, y: 4 }}
+            transition={{ duration: 0.15 }}
+            className="absolute left-0 top-full z-30 mt-1 w-32 rounded-xl bg-white/95 backdrop-blur-md p-1 shadow-xl border border-slate-100 ring-1 ring-slate-900/5"
+          >
+            {roleOptions.map((opt) => {
+              const OptIcon = opt.icon;
+              const isSelected = currentRole === opt.role;
+              return (
+                <button
+                  key={opt.role}
+                  type="button"
+                  onClick={() => {
+                    if (!isSelected) {
+                      onRoleChange(opt.role);
+                    }
+                    setIsOpen(false);
+                  }}
+                  className={`w-full flex items-center justify-between px-2 py-1.5 text-[10px] rounded-lg transition-all ${
+                    isSelected ? opt.activeStyle : 'text-slate-600 hover:bg-slate-50'
+                  }`}
+                >
+                  <div className="flex items-center gap-1.5 font-bold">
+                    <OptIcon className="w-3 h-3" />
+                    <span>{opt.label}</span>
+                  </div>
+                  {isSelected && <Check className="w-3 h-3 text-emerald-500" />}
+                </button>
+              );
+            })}
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
+
 export default function UsersManager({ onRequestConfirm }: UsersManagerProps) {
   const { language, t } = useLanguage();
   const supabase = createClient();
@@ -384,14 +476,11 @@ export default function UsersManager({ onRequestConfirm }: UsersManagerProps) {
                     <td className="px-4 py-2 text-xs text-slate-500 font-bold border-b border-white/10">{formatDate(profile.created_at)}</td>
                     <td className="px-4 py-2 text-xs text-slate-400 border-b border-white/10 font-medium">{formatDate(profile.last_online_at)}</td>
                     <td className="px-4 py-2 border-b border-white/10">
-                      <div className="relative inline-block scale-110 origin-left">
-                        <select value={profile.role} onChange={(e) => handleRoleChange(profile.id, e.target.value as UserRole)} className="absolute inset-0 opacity-0 cursor-pointer">
-                          <option value="guest">Guest</option>
-                          <option value="curator">Curator</option>
-                          <option value="admin">Admin</option>
-                        </select>
-                        {getRoleBadge(profile.role)}
-                      </div>
+                      <RoleSelectDropdown
+                        currentRole={profile.role}
+                        onRoleChange={(newRole) => handleRoleChange(profile.id, newRole)}
+                        disabled={actionLoading === profile.id}
+                      />
                     </td>
                     <td className="px-4 py-2 text-center border-b border-white/10 scale-105">{getStatusBadge(profile.status)}</td>
                     <td className="px-4 py-2 text-right border-b border-white/10">
@@ -474,18 +563,11 @@ export default function UsersManager({ onRequestConfirm }: UsersManagerProps) {
                         </div>
                         <div className="flex items-center justify-between pt-2 border-t border-slate-100/50">
                           <div className="flex items-center gap-3">
-                            <div className="relative inline-block">
-                              <select 
-                                value={profile.role} 
-                                onChange={(e) => handleRoleChange(profile.id, e.target.value as UserRole)}
-                                className="absolute inset-0 opacity-0 cursor-pointer"
-                              >
-                                <option value="guest">Guest</option>
-                                <option value="curator">Curator</option>
-                                <option value="admin">Admin</option>
-                              </select>
-                              {getRoleBadge(profile.role)}
-                            </div>
+                            <RoleSelectDropdown
+                              currentRole={profile.role}
+                              onRoleChange={(newRole) => handleRoleChange(profile.id, newRole)}
+                              disabled={actionLoading === profile.id}
+                            />
                             {getStatusBadge(profile.status)}
                           </div>
                           <button 

@@ -17,6 +17,7 @@ import SpeciesMap from './SpeciesMap';
 import { formatScientificName } from '@/utils/formatters';
 import CongenericExplorer from './CongenericExplorer';
 import SimilarSpeciesExplorer from './SimilarSpeciesExplorer';
+import SpeciesContributionCard from './SpeciesContributionCard';
 import { useTaxonomy } from '@/context/TaxonomyContext';
 
 interface SpeciesContentProps {
@@ -447,6 +448,9 @@ export default function SpeciesContent({ species, showBreadcrumb = true }: Speci
                 )}
               </section>
             )}
+
+            {/* 館員修訂歷史與貢獻者表揚卡片 */}
+            <SpeciesContributionCard speciesId={String(species.id || species.taxa_id || '')} />
 
             {/* 社群討論系統 */}
             <div className="xl:hidden">
