@@ -989,17 +989,24 @@ export default function SpeciesDetailEditor({ table, data, onSave, onCancel, onD
                       <Lock className="w-3.5 h-3.5 text-slate-300 group-hover/readonly:text-slate-400 transition-colors" />
                     </div>
                   ) : isTextarea ? (
-                    <textarea
-                      value={String(val)}
-                      onChange={(e) => handleFieldChange(field.key, e.target.value, field.type)}
-                      rows={5}
-                      className={`w-full focus:bg-white border rounded-xl px-4 py-3 text-xs font-semibold transition-colors duration-200 focus:outline-none focus:ring-1 custom-scrollbar leading-relaxed ${
-                        isFieldDirty 
-                          ? 'border-emerald-300/80 focus:border-emerald-500 focus:ring-emerald-500/20 bg-emerald-50/5' 
-                          : 'bg-slate-50/50 hover:bg-slate-50 border-slate-100 hover:border-slate-200 focus:border-emerald-400 focus:ring-emerald-400'
-                      }`}
-                      placeholder={language === 'zh' ? `請輸入 ${label}...` : `Enter ${label}...`}
-                    />
+                    <div className="relative">
+                      <textarea
+                        value={String(val)}
+                        onChange={(e) => handleFieldChange(field.key, e.target.value, field.type)}
+                        rows={5}
+                        className={`w-full focus:bg-white border rounded-xl px-4 py-3 text-xs font-semibold resize-y transition-[border-color,box-shadow] focus:outline-none focus:ring-1 custom-scrollbar leading-relaxed ${
+                          isFieldDirty 
+                            ? 'border-emerald-300/80 focus:border-emerald-500 focus:ring-emerald-500/20 bg-emerald-50/5' 
+                            : 'bg-slate-50/50 hover:bg-slate-50 border-slate-100 hover:border-slate-200 focus:border-emerald-400 focus:ring-emerald-400'
+                        }`}
+                        placeholder={language === 'zh' ? `請輸入 ${label}...` : `Enter ${label}...`}
+                      />
+                      <div className="absolute right-2.5 bottom-2.5 pointer-events-none text-slate-400 opacity-60">
+                        <svg width="10" height="10" viewBox="0 0 10 10" fill="none" xmlns="http://www.w3.org/2000/svg">
+                          <path d="M8 2L2 8M8 5L5 8M8 8H8.01" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+                        </svg>
+                      </div>
+                    </div>
                   ) : field.key === 'similar_species' ? (
                     <SimilarSpeciesPicker
                       value={String(val)}
@@ -1064,4 +1071,20 @@ export default function SpeciesDetailEditor({ table, data, onSave, onCancel, onD
       </div>
     </div>
   );
+}
+
+// Scoped style overrides for clean single gray resizer handle
+if (typeof document !== 'undefined') {
+  const styleId = 'species-detail-editor-custom-styles';
+  if (!document.getElementById(styleId)) {
+    const styleEl = document.createElement('style');
+    styleEl.id = styleId;
+    styleEl.innerHTML = `
+      textarea::-webkit-resizer {
+        display: none !important;
+        background: transparent !important;
+      }
+    `;
+    document.head.appendChild(styleEl);
+  }
 }

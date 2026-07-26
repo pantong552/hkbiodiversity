@@ -4,7 +4,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { 
   X, Image as ImageIcon, Tag, Send, CheckCircle2, AlertCircle, FileText,
   Languages, Globe, Undo, Redo, Bold, Italic, Heading1, Heading2, List,
-  ListOrdered, Type, Palette, Link as LinkIcon, Quote, Code
+  ListOrdered, Type, Palette, Link as LinkIcon, Quote, Code, Folder, ChevronDown, Check
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { EcoCategory, EcoArticle, ArticleLanguage } from '@/types/journal';
@@ -24,7 +24,8 @@ const ReactQuill = dynamic(
     // Register Style Attributors so Quill applies style="color: ..." and style="font-size: ..." inline
     const SizeStyle = Quill.import('attributors/style/size') as any;
     const ColorStyle = Quill.import('attributors/style/color') as any;
-    SizeStyle.whitelist = ['0.875rem', '1rem', '1.25rem', '1.5rem', '2rem'];
+    const fontSizesPx = Array.from({ length: 120 }, (_, i) => `${i + 1}px`).concat(['0.875rem', '1rem', '1.25rem', '1.5rem', '2rem']);
+    SizeStyle.whitelist = fontSizesPx;
     
     Quill.register(SizeStyle, true);
     Quill.register(ColorStyle, true);
@@ -102,12 +103,30 @@ export default function JournalEditorModal({
   const [status, setStatus] = useState<'submitted' | 'published' | 'rejected'>('submitted');
 
   const [openDropdown, setOpenDropdown] = useState<'size' | 'color' | null>(null);
+  const [isCategoryOpen, setIsCategoryOpen] = useState(false);
   const [pickerColor, setPickerColor] = useState('#10B981');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   const quillRefChi = useRef<any>(null);
   const quillRefEng = useRef<any>(null);
+
+  const [customFontSize, setCustomFontSize] = useState('16');
+
+  // Close dropdown when clicking outside (keep open when selecting/highlighting text in Quill editor)
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      const isInsideDropdown = target.closest('.toolbar-dropdown-container');
+      const isInsideEditor = target.closest('.quill-editor-wrapper') || target.closest('.ql-editor');
+      if (!isInsideDropdown && !isInsideEditor) {
+        setOpenDropdown(null);
+        setIsCategoryOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [openDropdown, isCategoryOpen]);
 
   // Undo & Redo History
   const [history, setHistory] = useState<any[]>([]);
@@ -374,24 +393,50 @@ export default function JournalEditorModal({
 
             {/* Language & Category Selection Bar */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 p-4 rounded-2xl bg-slate-50 border border-slate-200/80">
-              {/* Category Select */}
-              <div>
+              {/* Category Custom Dropdown (Parity with News Editor) */}
+              <div className="relative toolbar-dropdown-container">
                 <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-2">
                   {language === 'zh' ? '1. 文章分類 Category' : '1. Article Category'} *
                 </label>
-                <select
-                  value={categoryId}
-                  onChange={(e) => setCategoryId(e.target.value)}
-                  className="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:border-emerald-500 outline-none text-slate-800 font-bold bg-white text-sm"
-                  required
+                <button
+                  type="button"
+                  onClick={() => setIsCategoryOpen(!isCategoryOpen)}
+                  className="w-full flex items-center justify-between px-4 py-2.5 rounded-xl border border-slate-200 focus:border-emerald-500 outline-none text-slate-800 font-bold bg-white text-sm cursor-pointer shadow-sm hover:bg-slate-50 transition-colors"
                 >
-                  <option key="default-placeholder" value="">{language === 'zh' ? '-- 請選擇分類 --' : '-- Select Category --'}</option>
-                  {categories.map((cat, idx) => (
-                    <option key={cat.id || `cat-${idx}`} value={cat.id}>
-                      {language === 'zh' ? cat.name_chi : cat.name_eng}
-                    </option>
-                  ))}
-                </select>
+                  <span className="flex items-center gap-2">
+                    <Folder className="w-4 h-4 text-emerald-600" />
+                    {categories.find(c => c.id === categoryId) 
+                      ? (language === 'zh' ? categories.find(c => c.id === categoryId)?.name_chi : categories.find(c => c.id === categoryId)?.name_eng)
+                      : (language === 'zh' ? '-- 請選擇分類 --' : '-- Select Category --')}
+                  </span>
+                  <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform ${isCategoryOpen ? 'rotate-180' : ''}`} />
+                </button>
+
+                <AnimatePresence>
+                  {isCategoryOpen && (
+                    <motion.div
+                      initial={{ opacity: 0, y: 5 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: 5 }}
+                      className="absolute top-full left-0 right-0 mt-2 bg-white border border-slate-200 shadow-2xl rounded-2xl p-1.5 z-50 flex flex-col gap-1 max-h-60 overflow-y-auto"
+                    >
+                      {categories.map((cat, idx) => (
+                        <button
+                          key={cat.id || `cat-${idx}`}
+                          type="button"
+                          onClick={() => {
+                            setCategoryId(cat.id);
+                            setIsCategoryOpen(false);
+                          }}
+                          className={`w-full text-left px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center justify-between cursor-pointer ${categoryId === cat.id ? 'bg-emerald-50 text-emerald-700 font-extrabold' : 'text-slate-700 hover:bg-slate-50'}`}
+                        >
+                          <span>{language === 'zh' ? cat.name_chi : cat.name_eng}</span>
+                          {categoryId === cat.id && <Check className="w-4 h-4 text-emerald-600" />}
+                        </button>
+                      ))}
+                    </motion.div>
+                  )}
+                </AnimatePresence>
               </div>
 
               {/* Language Selection Field */}
@@ -477,13 +522,20 @@ export default function JournalEditorModal({
                   <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-2">
                     {language === 'zh' ? '中文摘要 Summary (Chinese)' : 'Summary (Chinese)'}
                   </label>
-                  <textarea
-                    rows={2}
-                    value={summaryChi}
-                    onChange={(e) => setSummaryChi(e.target.value)}
-                    placeholder="簡短描述文章重點（展示於卡片與搜尋預覽）..."
-                    className="w-full px-4 py-3 rounded-2xl border border-slate-200 focus:border-emerald-500 outline-none text-slate-800 text-sm bg-slate-50/50"
-                  />
+                  <div className="relative">
+                    <textarea
+                      rows={2}
+                      value={summaryChi}
+                      onChange={(e) => setSummaryChi(e.target.value)}
+                      placeholder="簡短描述文章重點（展示於卡片與搜尋預覽）..."
+                      className="w-full px-4 py-3 rounded-2xl border border-slate-200 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200/60 outline-none text-slate-800 text-sm bg-slate-50/50 resize-y transition-[border-color,box-shadow]"
+                    />
+                    <div className="absolute right-2 bottom-2 pointer-events-none text-slate-400 opacity-60">
+                      <svg width="10" height="10" viewBox="0 0 10 10" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M8 2L2 8M8 5L5 8M8 8H8.01" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+                      </svg>
+                    </div>
+                  </div>
                 </div>
               </div>
             )}
@@ -507,13 +559,20 @@ export default function JournalEditorModal({
                   <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-2">
                     {language === 'zh' ? '英文摘要 Summary (English)' : 'Summary (English)'}
                   </label>
-                  <textarea
-                    rows={2}
-                    value={summaryEng}
-                    onChange={(e) => setSummaryEng(e.target.value)}
-                    placeholder="Brief summary for card list preview..."
-                    className="w-full px-4 py-3 rounded-2xl border border-slate-200 focus:border-emerald-500 outline-none text-slate-800 text-sm bg-slate-50/50"
-                  />
+                  <div className="relative">
+                    <textarea
+                      rows={2}
+                      value={summaryEng}
+                      onChange={(e) => setSummaryEng(e.target.value)}
+                      placeholder="Brief summary for card list preview..."
+                      className="w-full px-4 py-3 rounded-2xl border border-slate-200 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200/60 outline-none text-slate-800 text-sm bg-slate-50/50 resize-y transition-[border-color,box-shadow]"
+                    />
+                    <div className="absolute right-2 bottom-2 pointer-events-none text-slate-400 opacity-60">
+                      <svg width="10" height="10" viewBox="0 0 10 10" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M8 2L2 8M8 5L5 8M8 8H8.01" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+                      </svg>
+                    </div>
+                  </div>
                 </div>
               </div>
             )}
@@ -640,28 +699,56 @@ export default function JournalEditorModal({
                         initial={{ opacity: 0, y: 10 }}
                         animate={{ opacity: 1, y: 0 }}
                         exit={{ opacity: 0, y: 10 }}
-                        className="absolute top-full left-0 mt-2 bg-white border border-slate-200 shadow-xl rounded-2xl p-1.5 z-50 min-w-[130px]"
+                        className="absolute top-full left-0 mt-2 bg-white border border-slate-200 shadow-2xl rounded-2xl p-3.5 z-50 flex flex-col gap-3.5 w-[232px]"
                       >
-                        {[
-                          { label: 'Small', value: '0.875rem' },
-                          { label: 'Normal', value: '1rem' },
-                          { label: 'Large', value: '1.25rem' },
-                          { label: 'Extra Large', value: '1.5rem' },
-                          { label: 'Heading', value: '2rem' }
-                        ].map((size, idx) => (
-                          <button
-                            key={`font-size-${size.value}-${idx}`}
-                            type="button"
-                            onMouseDown={(e) => e.preventDefault()}
-                            onClick={() => {
-                              insertFormat(`size:${size.value}`);
+                        <div className="flex items-center gap-2">
+                          <div className="w-8 h-8 rounded-xl bg-slate-100 border border-slate-200 flex items-center justify-center font-bold text-xs text-slate-500 shrink-0">
+                            px
+                          </div>
+                          <input 
+                            type="number"
+                            min="8"
+                            max="120"
+                            suppressHydrationWarning
+                            value={customFontSize} 
+                            onChange={(e) => setCustomFontSize(e.target.value)}
+                            placeholder="8-72"
+                            className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5 text-xs font-mono font-bold text-slate-700 focus:outline-none focus:border-emerald-500"
+                          />
+                        </div>
+
+                        <button
+                          type="button"
+                          onMouseDown={(e) => e.preventDefault()}
+                          onClick={() => {
+                            const val = parseInt(customFontSize, 10);
+                            if (val > 0) {
+                              insertFormat(`size:${val}px`);
                               setOpenDropdown(null);
-                            }}
-                            className="w-full text-left px-3 py-1.5 rounded-xl text-xs font-bold text-slate-700 hover:bg-emerald-50 hover:text-emerald-700 transition-colors"
-                          >
-                            {size.label}
-                          </button>
-                        ))}
+                            }
+                          }}
+                          className="w-full py-2 bg-slate-900 text-white rounded-xl text-xs font-bold uppercase tracking-wider hover:bg-emerald-600 transition-all shadow-md shadow-slate-900/10 active:scale-95 cursor-pointer"
+                        >
+                          {language === 'zh' ? '套用字級' : 'Apply Size'}
+                        </button>
+
+                        <div className="grid grid-cols-4 gap-1.5 pt-2 border-t border-slate-100 max-h-44 overflow-y-auto pr-0.5">
+                          {[8, 10, 12, 14, 16, 18, 20, 24, 28, 32, 36, 48, 72].map((num) => (
+                            <button
+                              key={num}
+                              type="button"
+                              onMouseDown={(e) => e.preventDefault()}
+                              onClick={() => {
+                                setCustomFontSize(num.toString());
+                                insertFormat(`size:${num}px`);
+                                setOpenDropdown(null);
+                              }}
+                              className="py-1.5 px-2 rounded-xl text-xs font-bold text-slate-700 bg-slate-50 hover:bg-emerald-50 hover:text-emerald-700 transition-colors text-center border border-slate-100 cursor-pointer"
+                            >
+                              {num}px
+                            </button>
+                          ))}
+                        </div>
                       </motion.div>
                     )}
                   </AnimatePresence>
@@ -684,15 +771,41 @@ export default function JournalEditorModal({
                         initial={{ opacity: 0, y: 10 }}
                         animate={{ opacity: 1, y: 0 }}
                         exit={{ opacity: 0, y: 10 }}
-                        className="absolute top-full left-0 mt-2 bg-white border border-slate-200 shadow-2xl rounded-2xl p-4 z-50 flex flex-col gap-3 min-w-[220px]"
+                        className="absolute top-full left-0 mt-2 bg-white border border-slate-200 shadow-2xl rounded-2xl p-3.5 z-50 flex flex-col gap-3.5 w-[232px]"
                       >
-                        <HexColorPicker
-                          color={pickerColor}
-                          onChange={(c) => {
-                            setPickerColor(c);
-                            insertFormat(`color:${c}`);
+                        <div 
+                          className="custom-color-picker w-full [&_.react-colorful]:w-full [&_.react-colorful]:h-[160px]"
+                          onMouseDown={(e) => e.preventDefault()}
+                        >
+                          <HexColorPicker color={pickerColor} onChange={setPickerColor} />
+                        </div>
+                        
+                        <div className="flex items-center gap-2.5">
+                          <div 
+                            className="w-8 h-8 rounded-xl border border-slate-200 shadow-inner shrink-0"
+                            style={{ backgroundColor: pickerColor }}
+                          />
+                          <input 
+                            type="text" 
+                            suppressHydrationWarning
+                            value={pickerColor} 
+                            onChange={(e) => setPickerColor(e.target.value)}
+                            className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5 text-xs font-mono font-bold text-slate-700 focus:outline-none focus:border-emerald-500 uppercase"
+                          />
+                        </div>
+
+                        <button
+                          type="button"
+                          onMouseDown={(e) => e.preventDefault()}
+                          onClick={() => {
+                            insertFormat(`color:${pickerColor}`);
+                            setOpenDropdown(null);
                           }}
-                        />
+                          className="w-full py-2 bg-slate-900 text-white rounded-xl text-xs font-bold uppercase tracking-wider hover:bg-emerald-600 transition-all shadow-md shadow-slate-900/10 active:scale-95 cursor-pointer"
+                        >
+                          {language === 'zh' ? '套用顏色' : 'Apply Color'}
+                        </button>
+
                         <div className="grid grid-cols-6 gap-1.5 pt-2 border-t border-slate-100">
                           {["#10B981", "#059669", "#3B82F6", "#6366F1", "#8B5CF6", "#EC4899", "#EF4444", "#F59E0B", "#D97706", "#0F172A", "#475569", "#94A3B8"].map((c, idx) => (
                             <button
@@ -704,7 +817,7 @@ export default function JournalEditorModal({
                                 insertFormat(`color:${c}`);
                                 setOpenDropdown(null);
                               }}
-                              className="w-5 h-5 rounded-md border border-slate-200 transition-transform hover:scale-110"
+                              className="w-5 h-5 rounded-md border border-slate-200 transition-transform hover:scale-110 cursor-pointer"
                               style={{ backgroundColor: c }}
                             />
                           ))}
@@ -745,8 +858,8 @@ export default function JournalEditorModal({
                 </button>
               </div>
 
-              {/* ReactQuill Content Editors (Borderless Clean View) */}
-              <div className="rounded-2xl border border-slate-200 bg-white overflow-hidden quill-editor-wrapper">
+              {/* ReactQuill Content Editors (Borderless Clean View with Resizer) */}
+              <div className="rounded-2xl border border-slate-200 bg-white quill-editor-wrapper relative resize-y overflow-auto min-h-[260px] max-h-[75vh] focus-within:border-emerald-500 focus-within:ring-2 focus-within:ring-emerald-200/60 transition-[border-color,box-shadow]">
                 {activeTab === 'zh' ? (
                   <ReactQuill
                     forwardedRef={quillRefChi}
@@ -754,7 +867,7 @@ export default function JournalEditorModal({
                     onChange={(val: string) => setContentChi(val)}
                     placeholder="請撰寫中文文章內容..."
                     modules={{ toolbar: false }}
-                    className="h-full flex flex-col min-h-[260px]"
+                    className="h-full flex flex-col"
                   />
                 ) : (
                   <ReactQuill
@@ -763,9 +876,15 @@ export default function JournalEditorModal({
                     onChange={(val: string) => setContentEng(val)}
                     placeholder="Write English article content here..."
                     modules={{ toolbar: false }}
-                    className="h-full flex flex-col min-h-[260px]"
+                    className="h-full flex flex-col"
                   />
                 )}
+                {/* Drag Handle Visual Icon */}
+                <div className="absolute right-1.5 bottom-1.5 pointer-events-none text-slate-400 opacity-60">
+                  <svg width="10" height="10" viewBox="0 0 10 10" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M8 2L2 8M8 5L5 8M8 8H8.01" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+                  </svg>
+                </div>
               </div>
             </div>
 
@@ -931,6 +1050,10 @@ export default function JournalEditorModal({
           line-height: 1.7 !important;
           color: #1e293b !important;
           min-height: 240px !important;
+        }
+        .quill-editor-wrapper::-webkit-resizer {
+          display: none !important;
+          background: transparent !important;
         }
         .quill-editor-wrapper .ql-editor.ql-blank::before {
           font-style: normal !important;

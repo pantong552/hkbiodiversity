@@ -29,7 +29,8 @@ const ReactQuill = dynamic(
     // Register Style Attributors so Quill applies style="color: ..." and style="font-size: ..." inline
     const SizeStyle = Quill.import('attributors/style/size') as any;
     const ColorStyle = Quill.import('attributors/style/color') as any;
-    SizeStyle.whitelist = ['0.875rem', '1rem', '1.25rem', '1.5rem', '2rem'];
+    const fontSizesPx = Array.from({ length: 120 }, (_, i) => `${i + 1}px`).concat(['0.875rem', '1rem', '1.25rem', '1.5rem', '2rem']);
+    SizeStyle.whitelist = fontSizesPx;
     
     Quill.register(SizeStyle, true);
     Quill.register(ColorStyle, true);
@@ -98,6 +99,23 @@ export default function NewsEditor({ news, onClose, onSave }: NewsEditorProps) {
   const [isSaving, setIsSaving] = useState(false);
   const [openDropdown, setOpenDropdown] = useState<'size' | 'color' | null>(null);
   const [pickerColor, setPickerColor] = useState("#679758");
+  const [customFontSize, setCustomFontSize] = useState('16');
+
+  // Close dropdown when clicking outside (keep open when selecting/highlighting text in Quill editor)
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (openDropdown) {
+        const target = e.target as HTMLElement;
+        const isInsideDropdown = target.closest('.toolbar-dropdown-container');
+        const isInsideEditor = target.closest('.quill-editor-wrapper') || target.closest('.ql-editor');
+        if (!isInsideDropdown && !isInsideEditor) {
+          setOpenDropdown(null);
+        }
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [openDropdown]);
   const [confirmAction, setConfirmAction] = useState<'cancel' | 'save' | null>(null);
   const quillRefChi = useRef<any>(null);
   const quillRefEng = useRef<any>(null);
@@ -438,27 +456,56 @@ export default function NewsEditor({ news, onClose, onSave }: NewsEditorProps) {
                     initial={{ opacity: 0, y: 10 }}
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, y: 10 }}
-                    className="absolute top-full left-0 mt-2 bg-white border border-slate-100 shadow-xl rounded-xl p-1.5 z-50 min-w-[120px]"
+                    className="absolute top-full left-0 mt-2 bg-white border border-slate-200 shadow-2xl rounded-2xl p-3.5 z-50 flex flex-col gap-3.5 w-[232px]"
                   >
-                    {[
-                      { label: 'Small', value: '0.875rem' },
-                      { label: 'Normal', value: '1rem' },
-                      { label: 'Large', value: '1.25rem' },
-                      { label: 'Extra Large', value: '1.5rem' },
-                      { label: 'Heading', value: '2rem' }
-                    ].map(size => (
-                      <button
-                        key={size.value}
-                        onMouseDown={(e) => e.preventDefault()}
-                        onClick={() => {
-                          insertMarkdown(`size:${size.value}`);
+                    <div className="flex items-center gap-2">
+                      <div className="w-8 h-8 rounded-xl bg-slate-100 border border-slate-200 flex items-center justify-center font-bold text-xs text-slate-500 shrink-0">
+                        px
+                      </div>
+                      <input 
+                        type="number"
+                        min="8"
+                        max="120"
+                        suppressHydrationWarning
+                        value={customFontSize} 
+                        onChange={(e) => setCustomFontSize(e.target.value)}
+                        placeholder="8-72"
+                        className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5 text-xs font-mono font-bold text-slate-700 focus:outline-none focus:border-emerald-500"
+                      />
+                    </div>
+
+                    <button
+                      type="button"
+                      onMouseDown={(e) => e.preventDefault()}
+                      onClick={() => {
+                        const val = parseInt(customFontSize, 10);
+                        if (val > 0) {
+                          insertMarkdown(`size:${val}px`);
                           setOpenDropdown(null);
-                        }}
-                        className="w-full text-left px-3 py-1.5 rounded-lg text-xs font-bold text-slate-600 hover:bg-slate-50 hover:text-emerald-600 transition-colors"
-                      >
-                        {size.label}
-                      </button>
-                    ))}
+                        }
+                      }}
+                      className="w-full py-2 bg-slate-900 text-white rounded-xl text-xs font-bold uppercase tracking-wider hover:bg-emerald-600 transition-all shadow-md shadow-slate-900/10 active:scale-95 cursor-pointer"
+                    >
+                      {language === 'zh' ? '套用字級' : 'Apply Size'}
+                    </button>
+
+                    <div className="grid grid-cols-4 gap-1.5 pt-2 border-t border-slate-100 max-h-44 overflow-y-auto pr-0.5">
+                      {[8, 10, 12, 14, 16, 18, 20, 24, 28, 32, 36, 48, 72].map((num) => (
+                        <button
+                          key={num}
+                          type="button"
+                          onMouseDown={(e) => e.preventDefault()}
+                          onClick={() => {
+                            setCustomFontSize(num.toString());
+                            insertMarkdown(`size:${num}px`);
+                            setOpenDropdown(null);
+                          }}
+                          className="py-1.5 px-2 rounded-xl text-xs font-bold text-slate-700 bg-slate-50 hover:bg-emerald-50 hover:text-emerald-700 transition-colors text-center border border-slate-100 cursor-pointer"
+                        >
+                          {num}px
+                        </button>
+                      ))}
+                    </div>
                   </motion.div>
                 )}
               </AnimatePresence>
@@ -474,53 +521,60 @@ export default function NewsEditor({ news, onClose, onSave }: NewsEditorProps) {
               />
               <AnimatePresence>
                 {openDropdown === 'color' && (
-                  <motion.div 
+                  <motion.div
                     initial={{ opacity: 0, y: 10 }}
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, y: 10 }}
-                    className="absolute top-full left-0 mt-2 bg-white border border-slate-100 shadow-2xl rounded-2xl p-4 z-50 flex flex-col gap-4"
+                    className="absolute top-full left-0 mt-2 bg-white border border-slate-200 shadow-2xl rounded-2xl p-3.5 z-50 flex flex-col gap-3.5 w-[232px]"
                   >
                     <div 
-                      className="custom-color-picker"
+                      className="custom-color-picker w-full [&_.react-colorful]:w-full [&_.react-colorful]:h-[160px]"
                       onMouseDown={(e) => e.preventDefault()}
                     >
                       <HexColorPicker color={pickerColor} onChange={setPickerColor} />
                     </div>
                     
-                    <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-2.5">
                       <div 
-                        className="w-10 h-10 rounded-xl border border-slate-100 shadow-inner"
+                        className="w-8 h-8 rounded-xl border border-slate-200 shadow-inner shrink-0"
                         style={{ backgroundColor: pickerColor }}
                       />
                       <input 
                         type="text" 
+                        suppressHydrationWarning
                         value={pickerColor} 
                         onChange={(e) => setPickerColor(e.target.value)}
-                        className="flex-1 bg-slate-50 border border-slate-100 rounded-lg px-2 py-1.5 text-xs font-mono font-bold text-slate-600 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 uppercase"
+                        className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5 text-xs font-mono font-bold text-slate-700 focus:outline-none focus:border-emerald-500 uppercase"
                       />
                     </div>
 
                     <button
+                      type="button"
                       onMouseDown={(e) => e.preventDefault()}
                       onClick={() => {
                         insertMarkdown(`color:${pickerColor}`);
                         setOpenDropdown(null);
                       }}
-                      className="w-full py-2 bg-slate-900 text-white rounded-xl text-xs font-black uppercase tracking-widest hover:bg-emerald-600 transition-all shadow-lg shadow-slate-200"
+                      className="w-full py-2 bg-slate-900 text-white rounded-xl text-xs font-bold uppercase tracking-wider hover:bg-emerald-600 transition-all shadow-md shadow-slate-900/10 active:scale-95 cursor-pointer"
                     >
                       {language === 'zh' ? '套用顏色' : 'Apply Color'}
                     </button>
 
-                    <div className="grid grid-cols-6 gap-1.5 pt-2 border-t border-slate-50">
+                    <div className="grid grid-cols-6 gap-1.5 pt-2 border-t border-slate-100">
                       {[
                         '#1e293b', '#64748b', '#ef4444', '#f59e0b', '#10b981', '#059669',
                         '#3b82f6', '#6366f1', '#8b5cf6', '#ec4899', '#78350f', '#000000'
-                      ].map(c => (
+                      ].map((c, idx) => (
                         <button
-                          key={c}
+                          key={`${c}-${idx}`}
+                          type="button"
                           onMouseDown={(e) => e.preventDefault()}
-                          onClick={() => setPickerColor(c)}
-                          className="w-5 h-5 rounded-md border border-slate-100 transition-transform hover:scale-110"
+                          onClick={() => {
+                            setPickerColor(c);
+                            insertMarkdown(`color:${c}`);
+                            setOpenDropdown(null);
+                          }}
+                          className="w-5 h-5 rounded-md border border-slate-200 transition-transform hover:scale-110 cursor-pointer"
                           style={{ backgroundColor: c }}
                         />
                       ))}
@@ -537,8 +591,8 @@ export default function NewsEditor({ news, onClose, onSave }: NewsEditorProps) {
             <div className="flex-1" />
           </div>
 
-          {/* Content Area */}
-          <div className="flex-1 relative bg-white overflow-hidden flex flex-col quill-editor-wrapper">
+          {/* Content Area with Smooth Resizer & Emerald Focus Ring */}
+          <div className="mx-4 mb-4 rounded-2xl border border-slate-200 bg-white quill-editor-wrapper relative resize-y overflow-auto min-h-[260px] max-h-[65vh] focus-within:border-emerald-500 focus-within:ring-2 focus-within:ring-emerald-200/60 transition-[border-color,box-shadow]">
             <ReactQuill
               forwardedRef={activeTab === 'chi' ? quillRefChi : quillRefEng}
               value={activeTab === 'chi' ? formData.content_chi : formData.content_eng}
@@ -550,6 +604,12 @@ export default function NewsEditor({ news, onClose, onSave }: NewsEditorProps) {
               }}
               className="h-full flex flex-col"
             />
+            {/* Single Elegant Gray Drag Handle Icon */}
+            <div className="absolute right-1.5 bottom-1.5 pointer-events-none text-slate-400 opacity-60">
+              <svg width="10" height="10" viewBox="0 0 10 10" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M8 2L2 8M8 5L5 8M8 8H8.01" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+              </svg>
+            </div>
           </div>
         </div>
 
@@ -804,4 +864,20 @@ function ToolbarButton({ icon, onClick, title, active = false, disabled = false 
       {icon}
     </button>
   );
+}
+
+// Scoped style overrides for Quill borderless editor and single gray resizer handle
+if (typeof document !== 'undefined') {
+  const styleId = 'news-editor-custom-styles';
+  if (!document.getElementById(styleId)) {
+    const styleEl = document.createElement('style');
+    styleEl.id = styleId;
+    styleEl.innerHTML = `
+      .quill-editor-wrapper::-webkit-resizer {
+        display: none !important;
+        background: transparent !important;
+      }
+    `;
+    document.head.appendChild(styleEl);
+  }
 }
