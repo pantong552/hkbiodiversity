@@ -23,13 +23,15 @@ interface AdminDraftReviewBannerProps {
   tableName?: string;
   onApproved?: () => void;
   onOpenReviewModal?: (draft: SpeciesDraft) => void;
+  refreshTrigger?: number;
 }
 
 export default function AdminDraftReviewBanner({
   speciesId,
   tableName = 'species',
   onApproved,
-  onOpenReviewModal
+  onOpenReviewModal,
+  refreshTrigger = 0
 }: AdminDraftReviewBannerProps) {
   const { user, profile } = useAuth();
   const { language } = useLanguage();
@@ -43,9 +45,10 @@ export default function AdminDraftReviewBanner({
   const [actionLoading, setActionLoading] = useState(false);
 
   const isAdmin = profile?.role === 'admin';
+  const isCurator = profile?.role === 'curator';
 
   const fetchPendingDraft = async () => {
-    if (!isAdmin || !speciesId) {
+    if (!speciesId) {
       setLoading(false);
       return;
     }
@@ -55,7 +58,7 @@ export default function AdminDraftReviewBanner({
         .from('species_drafts')
         .select('*')
         .eq('species_id', speciesId)
-        .eq('status', 'pending')
+        .in('status', ['pending', 'rejected'])
         .order('submitted_at', { ascending: false })
         .limit(1)
         .maybeSingle();
@@ -66,7 +69,7 @@ export default function AdminDraftReviewBanner({
         setPendingDraft(null);
       }
     } catch (err) {
-      console.error('Error fetching pending draft:', err);
+      console.error('Error fetching species draft status:', err);
     } finally {
       setLoading(false);
     }
@@ -74,7 +77,7 @@ export default function AdminDraftReviewBanner({
 
   useEffect(() => {
     fetchPendingDraft();
-  }, [speciesId, isAdmin]);
+  }, [speciesId, user?.id, refreshTrigger]);
 
   // 同意 Approve
   const handleApprove = async () => {
@@ -84,12 +87,15 @@ export default function AdminDraftReviewBanner({
     try {
       const targetTable = tableName === 'plant_species' ? 'plant_species' : 'species';
 
-      // 1. 更新正式物種表
-      const { error: updateError } = await supabase
-        .from(targetTable)
-        .update(pendingDraft.draft_data)
-        .eq('id', speciesId);
+      // 1. 更新正式物種表 (同時嘗試對比 id 與 taxa_id)
+      let query = supabase.from(targetTable).update(pendingDraft.draft_data);
+      if (String(speciesId).includes('-')) {
+        query = query.or(`id.eq.${speciesId},taxa_id.eq.${speciesId}`);
+      } else {
+        query = query.eq('taxa_id', speciesId);
+      }
 
+      const { error: updateError } = await query;
       if (updateError) throw updateError;
 
       // 2. 更新 species_drafts 狀態為 approved
@@ -143,6 +149,7 @@ export default function AdminDraftReviewBanner({
       setShowRejectModal(false);
       setShowReviewModal(false);
       setRejectionReason('');
+      if (onApproved) onApproved();
     } catch (err) {
       console.error('Error rejecting draft:', err);
       alert(language === 'zh' ? '退回草稿失敗' : 'Reject failed');
@@ -151,7 +158,14 @@ export default function AdminDraftReviewBanner({
     }
   };
 
-  if (!isAdmin || loading || !pendingDraft) return null;
+  if (loading || !pendingDraft || pendingDraft.status === 'approved') return null;
+
+  const isDraftOwner = user?.id === pendingDraft.curator_id;
+  const isRejected = pendingDraft.status === 'rejected';
+  const isPending = pendingDraft.status === 'pending';
+
+  // 非 Admin 且非草稿所有者時，只在 pending 狀態顯示鎖定
+  if (!isAdmin && !isDraftOwner && !isPending) return null;
 
   return (
     <>
@@ -159,21 +173,51 @@ export default function AdminDraftReviewBanner({
       <motion.div
         initial={{ opacity: 0, y: -10 }}
         animate={{ opacity: 1, y: 0 }}
-        className="w-full bg-gradient-to-r from-amber-500 via-amber-600 to-emerald-600 text-white shadow-lg py-3 px-6"
+        className={`w-full text-white shadow-lg py-3 px-6 ${
+          isRejected 
+            ? 'bg-gradient-to-r from-rose-600 via-rose-700 to-amber-600' 
+            : 'bg-gradient-to-r from-amber-500 via-amber-600 to-emerald-600'
+        }`}
       >
         <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-3 text-xs sm:text-sm">
           <div className="flex items-center gap-3">
             <div className="w-8 h-8 rounded-full bg-white/20 backdrop-blur-md flex items-center justify-center shrink-0">
-              <ShieldCheck className="w-4 h-4 text-white" />
+              {isRejected ? (
+                <AlertTriangle className="w-4 h-4 text-rose-100" />
+              ) : (
+                <ShieldCheck className="w-4 h-4 text-white" />
+              )}
             </div>
             <div>
               <span className="font-black">
-                {language === 'zh' ? '【待管理員審核】' : '[Pending Review] '}
+                {isRejected 
+                  ? (language === 'zh' ? '【草稿已被退回】' : '[Revision Rejected] ')
+                  : (language === 'zh' ? '【待管理員審核】' : '[Pending Review] ')
+                }
               </span>
               <span>
-                {language === 'zh'
-                  ? `Curator ${pendingDraft.curator_name || '館員'} 提交了此物種的修訂草稿`
-                  : `Curator ${pendingDraft.curator_name || 'Curator'} submitted a revision for this species.`}
+                {isRejected ? (
+                  isAdmin
+                    ? (language === 'zh'
+                        ? `Curator (${pendingDraft.curator_name || '館員'}) 的修訂草稿已被退回 (Rejected)，等待 Curator 查看退回原因並重新提交 (Resubmit)。`
+                        : `Draft by Curator (${pendingDraft.curator_name}) was rejected. Waiting for curator to review and resubmit.`)
+                    : (language === 'zh'
+                        ? `您的修訂草稿已被退回。退回原因："${pendingDraft.rejection_reason || '未填寫原因'}"。請進行修正後重新提交 (Resubmit)。`
+                        : `Your draft was rejected. Reason: "${pendingDraft.rejection_reason || 'N/A'}". Click to revise and resubmit.`)
+                ) : (
+                  isAdmin
+                    ? (language === 'zh'
+                        ? `Curator ${pendingDraft.curator_name || '館員'} 提交了此物種的修訂草稿`
+                        : `Curator ${pendingDraft.curator_name || 'Curator'} submitted a revision for this species.`)
+                    : (isDraftOwner
+                        ? (language === 'zh'
+                            ? `您於 ${new Date(pendingDraft.submitted_at).toLocaleString()} 提交了此物種修訂草稿，正在等待管理員審核中。`
+                            : `You submitted a draft on ${new Date(pendingDraft.submitted_at).toLocaleString()}. Waiting for admin approval.`)
+                        : (language === 'zh'
+                            ? `Curator (${pendingDraft.curator_name || '館員'}) 已提交修訂草稿，本物種目前處於獨佔鎖定狀態。`
+                            : `Curator (${pendingDraft.curator_name}) has submitted a pending revision for this species.`)
+                      )
+                )}
               </span>
             </div>
           </div>
@@ -186,10 +230,21 @@ export default function AdminDraftReviewBanner({
                 setShowReviewModal(true);
               }
             }}
-            className="flex items-center gap-1.5 bg-white text-amber-800 hover:bg-amber-50 font-black px-4 py-2 rounded-xl shadow-md transition-all hover:scale-105 active:scale-95 shrink-0 cursor-pointer"
+            className="flex items-center gap-1.5 bg-white text-slate-800 hover:bg-slate-50 font-black px-4 py-2 rounded-xl shadow-md transition-all hover:scale-105 active:scale-95 shrink-0 cursor-pointer text-xs"
           >
-            <span>{language === 'zh' ? '查看並審核修訂' : 'Review Revision'}</span>
-            <ChevronRight className="w-4 h-4 text-amber-600" />
+            <span>
+              {isRejected
+                ? (isAdmin 
+                    ? (language === 'zh' ? '檢視退回草稿' : 'View Rejected Draft')
+                    : (language === 'zh' ? '修正並重新提交' : 'Revise & Resubmit')
+                  )
+                : (isAdmin
+                    ? (language === 'zh' ? '查看並審核修訂' : 'Review Revision')
+                    : (language === 'zh' ? '檢視草稿' : 'View Draft')
+                  )
+              }
+            </span>
+            <ChevronRight className="w-4 h-4 text-slate-600" />
           </button>
         </div>
       </motion.div>

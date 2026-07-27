@@ -190,6 +190,7 @@ export default function SpeciesFloatingPanel() {
   const isCanEdit = profile?.role === 'admin' || profile?.role === 'curator';
   const activeSpecies = activeSpeciesId ? speciesData[activeSpeciesId] : null;
   const [reviewDraft, setReviewDraft] = useState<SpeciesDraft | null>(null);
+  const [bannerRefreshKey, setBannerRefreshKey] = useState(0);
 
   const handleApproveDraft = async (draft: SpeciesDraft) => {
     if (!activeSpecies || !profile) return;
@@ -222,10 +223,13 @@ export default function SpeciesFloatingPanel() {
       setSpeciesData(prev => ({ ...prev, [activeSpeciesId]: data as Species }));
     }
     setReviewDraft(null);
+    setBannerRefreshKey(prev => prev + 1);
   };
 
   const handleRejectDraft = async (draft: SpeciesDraft, reason: string) => {
-    if (!profile) return;
+    if (!profile || !activeSpecies) return;
+    const targetTable = activeSpecies.taxa_group === 'FLORA' || (activeSpecies as any).category_chi ? 'plant_species' : 'species';
+    
     const { error } = await supabase
       .from('species_drafts')
       .update({
@@ -238,7 +242,13 @@ export default function SpeciesFloatingPanel() {
       .eq('id', draft.id);
 
     if (error) throw error;
+
+    const { data } = await supabase.from(targetTable).select('*').eq('id', activeSpecies.id).maybeSingle();
+    if (data && activeSpeciesId) {
+      setSpeciesData(prev => ({ ...prev, [activeSpeciesId]: data as Species }));
+    }
     setReviewDraft(null);
+    setBannerRefreshKey(prev => prev + 1);
   };
 
   // Check if tabs are scrollable to show gradient
@@ -557,6 +567,7 @@ export default function SpeciesFloatingPanel() {
                   <AdminDraftReviewBanner
                     speciesId={String(speciesData[activeSpeciesId].id || speciesData[activeSpeciesId].taxa_id || activeSpeciesId)}
                     tableName={speciesData[activeSpeciesId].taxa_group === 'FLORA' || (speciesData[activeSpeciesId] as any).category_chi ? 'plant_species' : 'species'}
+                    refreshTrigger={bannerRefreshKey}
                     onApproved={async () => {
                       // 重新載入物種資料
                       const targetTable = speciesData[activeSpeciesId].taxa_group === 'FLORA' || (speciesData[activeSpeciesId] as any).category_chi ? 'plant_species' : 'species';
@@ -564,13 +575,14 @@ export default function SpeciesFloatingPanel() {
                       if (data) {
                         setSpeciesData(prev => ({ ...prev, [activeSpeciesId]: data as Species }));
                       }
+                      setBannerRefreshKey(prev => prev + 1);
                     }}
                     onOpenReviewModal={(draft) => {
                       setReviewDraft(draft);
                       setIsEditModalOpen(true);
                     }}
                   />
-                  <SpeciesContent species={speciesData[activeSpeciesId]} showBreadcrumb={true} />
+                  <SpeciesContent species={speciesData[activeSpeciesId]} showBreadcrumb={true} refreshTrigger={bannerRefreshKey} />
                 </>
               ) : (
                 <div className="h-full flex flex-col items-center justify-center py-20">
@@ -787,6 +799,7 @@ export default function SpeciesFloatingPanel() {
                 setSpeciesData(prev => ({ ...prev, [activeSpeciesId]: data as Species }));
               }
             }
+            setBannerRefreshKey(prev => prev + 1);
           }}
         />
       )}

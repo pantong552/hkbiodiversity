@@ -4,6 +4,8 @@ import React, { useState, useEffect } from 'react';
 import { createClient } from '@/utils/supabase/client';
 import { useAuth } from '@/context/AuthContext';
 import { useLanguage } from '@/context/LanguageContext';
+import { fetchSpeciesOrPlantRow } from '@/utils/speciesQuery';
+import { Species } from '@/types/species';
 import { SpeciesDraft } from '@/types/speciesDraft';
 import SpeciesDetailEditor from '@/components/admin/SpeciesDetailEditor';
 import { 
@@ -69,53 +71,57 @@ export default function SpeciesEditModal({
   // 獨佔鎖定判斷：非 Admin、草稿處於 pending 狀態、且草稿屬於其他 Curator
   const isLockedByOtherCurator = !isAdmin && isPending && !!currentDraft?.curator_id && !isDraftOwner;
 
-  // 載入草稿資料 (如果有傳入 reviewDraft 則優先使用，否則搜尋最新未完成草稿)
+  const [publishedSpecies, setPublishedSpecies] = useState<Species | null>(species);
+
+  // 載入草稿資料與資料庫正本 (確保全站對比基準 100% 絕對一致)
   useEffect(() => {
     if (!isOpen || !speciesId) return;
 
-    if (reviewDraft) {
-      setActiveDraft(reviewDraft);
-      setEditorData({
-        ...species,
-        ...reviewDraft.draft_data
-      });
-      return;
-    }
-
-    async function loadLatestDraft() {
+    async function loadLatestDraftAndPublished() {
       setLoadingDraft(true);
       try {
-        const { data, error } = await supabase
-          .from('species_drafts')
-          .select('*')
-          .eq('species_id', speciesId)
-          .in('status', ['pending', 'rejected'])
-          .order('created_at', { ascending: false })
-          .limit(1)
-          .maybeSingle();
+        const isPlant = tableName === 'plant_species' || species?.taxa_group === 'FLORA' || (species as any)?.category_chi || String(speciesId).startsWith('flora_');
+        const targetTable = isPlant ? 'plant_species' : 'species';
 
-        if (!error && data) {
-          setActiveDraft(data as SpeciesDraft);
-          // 如果有草稿，載入草稿的內容到 editorData
-          if (data.draft_data) {
-            setEditorData({
-              ...species,
-              ...data.draft_data
-            });
-          }
+        // 1. 調用強健查詢函數抓取 Supabase 正式資料庫中最純淨的正本行數據
+        const pubData = await fetchSpeciesOrPlantRow(speciesId, tableName);
+        const basePub = pubData || species;
+        setPublishedSpecies(basePub);
+
+        // 2. 確定草稿資料 (若傳入 reviewDraft 優先使用，否則搜尋最新未完成草稿)
+        let targetDraft: SpeciesDraft | null = reviewDraft || null;
+        if (!targetDraft) {
+          const { data: draftData } = await supabase
+            .from('species_drafts')
+            .select('*')
+            .eq('species_id', speciesId)
+            .in('status', ['pending', 'rejected'])
+            .order('submitted_at', { ascending: false })
+            .limit(1)
+            .maybeSingle();
+
+          if (draftData) targetDraft = draftData as SpeciesDraft;
+        }
+
+        if (targetDraft) {
+          setActiveDraft(targetDraft);
+          setEditorData({
+            ...basePub,
+            ...targetDraft.draft_data
+          });
         } else {
           setActiveDraft(null);
-          setEditorData(species);
+          setEditorData(basePub);
         }
       } catch (err) {
-        console.error('Error loading species draft:', err);
+        console.error('Error loading species draft and published row:', err);
       } finally {
         setLoadingDraft(false);
       }
     }
 
-    loadLatestDraft();
-  }, [isOpen, speciesId, species, reviewDraft]);
+    loadLatestDraftAndPublished();
+  }, [isOpen, speciesId, reviewDraft]);
 
   const formatDate = (isoString?: string | null) => {
     if (!isoString) return language === 'zh' ? '未知時間' : 'Unknown';
@@ -197,12 +203,19 @@ export default function SpeciesEditModal({
     try {
       if (isAdmin) {
         // Admin: 直接更新正本 species / plant_species 表
-        const targetTable = tableName === 'plant_species' ? 'plant_species' : 'species';
-        const { error: updateError } = await supabase
-          .from(targetTable)
-          .update(updatedData)
-          .eq('id', species.id);
+        const isPlant = tableName === 'plant_species' || species?.taxa_group === 'FLORA' || (species as any)?.category_chi || String(species?.taxa_id || '').startsWith('flora_');
+        const targetTable = isPlant ? 'plant_species' : 'species';
+        
+        let query = supabase.from(targetTable).update(updatedData);
+        if (species.id) {
+          query = query.eq('id', species.id);
+        } else if (species.taxa_id) {
+          query = query.eq('taxa_id', species.taxa_id);
+        } else if (speciesId) {
+          query = query.eq('taxa_id', speciesId);
+        }
 
+        const { error: updateError } = await query;
         if (updateError) throw updateError;
 
         // 同時將任何 pending 草稿設為 approved (若原本有館員草稿，則標記批准)
@@ -379,6 +392,7 @@ export default function SpeciesEditModal({
                       try {
                         await onApproveDraft(currentDraft);
                         showToast('success', language === 'zh' ? '已成功批准修訂並發布！' : 'Draft approved and published!');
+                        if (onSuccess) onSuccess();
                         setTimeout(() => onClose(), 1200);
                       } catch (err) {
                         showToast('error', language === 'zh' ? '審核失敗' : 'Approval failed');
@@ -400,8 +414,8 @@ export default function SpeciesEditModal({
             ) : (
               /* Regular Edit / Curator Update Mode */
               <>
-                {/* 如果當前使用者是草稿擁有人且有待審草稿，顯示刪除草稿按鈕 */}
-                {(isDraftOwner || isAdmin) && isPending && (
+                {/* 如果當前使用者是草稿擁有人/Admin 且有 pending/rejected 草稿，顯示刪除草稿按鈕 */}
+                {(isDraftOwner || isAdmin) && !!currentDraft && (currentDraft.status === 'pending' || currentDraft.status === 'rejected') && (
                   <button
                     type="button"
                     disabled={submitting || deletingDraft}
@@ -437,9 +451,12 @@ export default function SpeciesEditModal({
                   <span>
                     {isAdmin 
                       ? (language === 'zh' ? '儲存變更' : 'Save Changes')
-                      : (isPending && isDraftOwner
-                          ? (language === 'zh' ? '更新草稿 (Update Draft)' : 'Update Draft')
-                          : (language === 'zh' ? '提交草稿 (Submit Draft)' : 'Submit Draft')
+                      : (currentDraft?.status === 'rejected' && isDraftOwner
+                          ? (language === 'zh' ? '重新提交草稿' : 'Resubmit Draft')
+                          : (isPending && isDraftOwner
+                              ? (language === 'zh' ? '更新草稿' : 'Update Draft')
+                              : (language === 'zh' ? '提交草稿' : 'Submit Draft')
+                            )
                         )
                     }
                   </span>
@@ -501,7 +518,7 @@ export default function SpeciesEditModal({
                 <span className="italic">"{ currentDraft.rejection_reason || (language === 'zh' ? '未提供特定理由' : 'No specific reason provided') }"</span>
               </p>
               <p className="text-[11px] text-rose-500 mt-1">
-                {language === 'zh' ? 'Curator 可根據退回原因重新修正內容後按右上角「更新草稿 (Update Draft)」重新提交審核。' : 'Curator may update the fields and click "Update Draft" to re-submit.'}
+                {language === 'zh' ? 'Curator 可根據退回原因重新修正內容後按右上角「重新提交草稿 (Resubmit Draft)」，或點擊右上角「刪除」撤回此草稿。' : 'Curator may update the fields to resubmit or click "Delete" at top right to remove this draft.'}
               </p>
             </div>
           </div>
@@ -550,7 +567,7 @@ export default function SpeciesEditModal({
             <SpeciesDetailEditor
               table={tableName}
               data={editorData}
-              originalData={species}
+              originalData={publishedSpecies || species}
               onSave={handleSave}
               onCancel={onClose}
               hideHeader={true}
@@ -621,6 +638,7 @@ export default function SpeciesEditModal({
                         }
                         setShowRejectModal(false);
                         showToast('success', language === 'zh' ? '草稿已退回' : 'Draft rejected');
+                        if (onSuccess) onSuccess();
                         setTimeout(() => onClose(), 1200);
                       } catch (err) {
                         showToast('error', language === 'zh' ? '退回草稿失敗' : 'Reject failed');

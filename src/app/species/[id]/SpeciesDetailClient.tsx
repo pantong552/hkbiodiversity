@@ -44,16 +44,41 @@ export default function SpeciesDetailClient({
     });
   };
 
+  const [refreshKey, setRefreshKey] = useState(0);
+
+  // 全面重新整理物種數據與草稿狀態 (用於 Admin Approve / Reject 及 Curator 提交草稿後自動更新)
+  const reloadSpeciesAndDrafts = async () => {
+    if (!species) return;
+    const isPlant = species.taxa_group === 'FLORA' || (species as any).category_chi || String(species.taxa_id || '').startsWith('flora_');
+    const targetTable = isPlant ? 'plant_species' : 'species';
+    
+    let query = supabase.from(targetTable).select('*');
+    if (species.id) {
+      query = query.eq('id', species.id);
+    } else if (species.taxa_id) {
+      query = query.eq('taxa_id', species.taxa_id);
+    }
+    const { data: updatedSpecies } = await query.maybeSingle();
+
+    if (updatedSpecies) {
+      setSpecies(updatedSpecies as Species);
+    }
+    setRefreshKey(prev => prev + 1);
+  };
+
   const handleApproveDraft = async (draft: SpeciesDraft) => {
     if (!species || !user) return;
-    const targetTable = 'species';
+    const isPlant = species.taxa_group === 'FLORA' || (species as any).category_chi || String(species.taxa_id || '').startsWith('flora_');
+    const targetTable = isPlant ? 'plant_species' : 'species';
 
     // 1. 更新正式物種表
-    const { error: updateError } = await supabase
-      .from(targetTable)
-      .update(draft.draft_data)
-      .eq('id', species.id);
-
+    let query = supabase.from(targetTable).update(draft.draft_data);
+    if (species.id) {
+      query = query.eq('id', species.id);
+    } else if (species.taxa_id) {
+      query = query.eq('taxa_id', species.taxa_id);
+    }
+    const { error: updateError } = await query;
     if (updateError) throw updateError;
 
     // 2. 更新 species_drafts 狀態為 approved
@@ -69,10 +94,8 @@ export default function SpeciesDetailClient({
 
     if (draftError) throw draftError;
 
-    // 刷新物種資料
-    const { data: updatedSpecies } = await supabase.from('species').select('*').eq('id', species.id).maybeSingle();
-    if (updatedSpecies) setSpecies(updatedSpecies as Species);
     setReviewDraft(null);
+    await reloadSpeciesAndDrafts();
   };
 
   const handleRejectDraft = async (draft: SpeciesDraft, reason: string) => {
@@ -89,7 +112,9 @@ export default function SpeciesDetailClient({
       .eq('id', draft.id);
 
     if (error) throw error;
+
     setReviewDraft(null);
+    await reloadSpeciesAndDrafts();
   };
 
   useEffect(() => {
@@ -168,13 +193,11 @@ export default function SpeciesDetailClient({
       {/* Admin Draft Review Banner if there's pending curator edit */}
       {species && (
         <AdminDraftReviewBanner
+          key={`review-banner-${refreshKey}`}
           speciesId={String(species.id || species.taxa_id || '')}
           tableName="species"
-          onApproved={() => {
-            supabase.from('species').select('*').eq('id', species.id).maybeSingle().then(({ data }: { data: any }) => {
-              if (data) setSpecies(data as Species);
-            });
-          }}
+          onApproved={reloadSpeciesAndDrafts}
+          refreshTrigger={refreshKey}
           onOpenReviewModal={(draft) => {
             setReviewDraft(draft);
             setIsEditModalOpen(true);
@@ -218,7 +241,7 @@ export default function SpeciesDetailClient({
         </div>
       </div>
 
-      <SpeciesContent species={species} showBreadcrumb={true} />
+      <SpeciesContent key={`content-${refreshKey}`} species={species} showBreadcrumb={true} refreshTrigger={refreshKey} />
 
       {/* Edit Species Detail Modal */}
       {species && isCanEdit && (
@@ -233,12 +256,7 @@ export default function SpeciesDetailClient({
           reviewDraft={reviewDraft}
           onApproveDraft={handleApproveDraft}
           onRejectDraft={handleRejectDraft}
-          onSuccess={() => {
-            // 重新刷新物種資料
-            supabase.from('species').select('*').eq('id', species.id).maybeSingle().then(({ data }: { data: any }) => {
-              if (data) setSpecies(data as Species);
-            });
-          }}
+          onSuccess={reloadSpeciesAndDrafts}
         />
       )}
     </div>

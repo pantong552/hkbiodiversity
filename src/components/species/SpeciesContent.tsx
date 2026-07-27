@@ -23,6 +23,7 @@ import { useTaxonomy } from '@/context/TaxonomyContext';
 interface SpeciesContentProps {
   species: Species;
   showBreadcrumb?: boolean;
+  refreshTrigger?: number;
 }
 
 const SpeciesHeroBackground = ({ photos, defaultImage, isLoading }: { photos: InatGalleryPhoto[], defaultImage: string, isLoading: boolean }) => {
@@ -163,7 +164,7 @@ const SpeciesHeroBackground = ({ photos, defaultImage, isLoading }: { photos: In
   );
 };
 
-export default function SpeciesContent({ species, showBreadcrumb = true }: SpeciesContentProps) {
+export default function SpeciesContent({ species, showBreadcrumb = true, refreshTrigger = 0 }: SpeciesContentProps) {
   const { language } = useLanguage();
   const { getTaxonomyChi } = useTaxonomy();
   const { photos, isLoading } = useInaturalistSpeciesPhotos(species.inat_id);
@@ -450,7 +451,7 @@ export default function SpeciesContent({ species, showBreadcrumb = true }: Speci
             )}
 
             {/* 館員修訂歷史與貢獻者表揚卡片 */}
-            <SpeciesContributionCard speciesId={String(species.id || species.taxa_id || '')} />
+            <SpeciesContributionCard speciesId={String(species.id || species.taxa_id || '')} refreshTrigger={refreshTrigger} />
 
             {/* 社群討論系統 */}
             <div className="xl:hidden">

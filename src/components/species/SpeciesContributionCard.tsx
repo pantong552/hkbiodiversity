@@ -19,9 +19,10 @@ import { zhTW, enUS } from 'date-fns/locale';
 
 interface SpeciesContributionCardProps {
   speciesId: string;
+  refreshTrigger?: number;
 }
 
-export default function SpeciesContributionCard({ speciesId }: SpeciesContributionCardProps) {
+export default function SpeciesContributionCard({ speciesId, refreshTrigger = 0 }: SpeciesContributionCardProps) {
   const { language } = useLanguage();
   const supabase = createClient();
 
@@ -62,7 +63,7 @@ export default function SpeciesContributionCard({ speciesId }: SpeciesContributi
     }
 
     fetchApprovedRevisions();
-  }, [speciesId]);
+  }, [speciesId, refreshTrigger]);
 
   if (loading || approvedRevisions.length === 0) {
     return null;
