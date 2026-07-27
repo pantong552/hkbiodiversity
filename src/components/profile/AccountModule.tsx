@@ -1,15 +1,16 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { User, Heart, Calendar, Clock, Mail, X, Settings, ArrowLeft, ShieldCheck } from 'lucide-react';
+import { User, Heart, Calendar, Clock, Mail, X, Settings, ArrowLeft, ShieldCheck, FileEdit } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '@/context/AuthContext';
 import { useLanguage } from '@/context/LanguageContext';
 import { useSpeciesPanel } from '@/context/SpeciesPanelContext';
 import UsernameForm from './UsernameForm';
 import BookmarksSection from './BookmarksSection';
+import CuratorDraftsSection from './CuratorDraftsSection';
 
-type TabType = 'profile' | 'bookmarks';
+type TabType = 'profile' | 'bookmarks' | 'drafts';
 
 export default function AccountModule() {
   const { user, profile, isLoading } = useAuth();
@@ -55,6 +56,14 @@ export default function AccountModule() {
     { id: 'profile', label: t('account.tab_profile'), icon: <User className="w-4 h-4" /> },
     { id: 'bookmarks', label: t('account.tab_bookmarks'), icon: <Heart className="w-4 h-4" /> },
   ];
+
+  if (profile?.role === 'curator' || profile?.role === 'admin') {
+    tabs.push({
+      id: 'drafts',
+      label: language === 'zh' ? '修訂草稿' : 'My Drafts',
+      icon: <FileEdit className="w-4 h-4 text-amber-500" />
+    });
+  }
 
   return (
     <AnimatePresence>
@@ -208,8 +217,10 @@ export default function AccountModule() {
                           <UsernameForm />
                         </div>
                       </div>
-                    ) : (
+                    ) : activeTab === 'bookmarks' ? (
                       <BookmarksSection />
+                    ) : (
+                      <CuratorDraftsSection />
                     )}
                   </div>
                 </>
