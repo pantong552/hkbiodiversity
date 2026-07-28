@@ -345,11 +345,14 @@ export default function SpeciesFloatingPanel() {
     }
   }, [isExpanded, pathname]);
 
-  // Auto-collapse panel when navigating away from home or database
+  // Auto-collapse panel when navigating to any new page (including /database)
+  const prevPathnameRef = useRef(pathname);
   useEffect(() => {
-    const isMainRoute = pathname === '/' || pathname === '/database';
-    if (isExpanded && !isMainRoute) {
-      toggleExpand(false);
+    if (prevPathnameRef.current !== pathname) {
+      if (isExpanded) {
+        toggleExpand(false);
+      }
+      prevPathnameRef.current = pathname;
     }
   }, [pathname, isExpanded, toggleExpand]);
 
