@@ -171,7 +171,8 @@ export default function SpeciesFloatingPanel() {
     toggleExpand,
     isFilterOpen,
     isEditModalOpen,
-    setIsEditModalOpen
+    setIsEditModalOpen,
+    skipAutoCollapseRef
   } = useSpeciesPanel();
   
   const { language, t } = useLanguage();
@@ -328,22 +329,21 @@ export default function SpeciesFloatingPanel() {
     };
   }, [isExpanded, toggleExpand]);
 
-  // Handle history cleanup when panel closes via UI
+
+
+  // Auto-collapse panel when navigating to any new page (e.g. Home, Database, Eco-journal, Manage, etc.)
+  // EXCEPT when navigating intentionally from search bar dropdown species click
+  const prevPathnameRef = useRef(pathname);
   useEffect(() => {
-    // Only go back if we are still on the same page where the panel was opened
-    // and if the panel was manually closed via UI (not via browser back button)
-    const isMainRoute = pathname === '/' || pathname === '/database';
-    if (!isExpanded && isMainRoute && typeof window !== 'undefined' && window.history.state?.panelOpen === true) {
-      // Small delay to ensure any pending navigations are settled
-      const timer = setTimeout(() => {
-        // Double check: if we've already navigated away, don't go back
-        if (window.location.pathname === '/' && window.history.state?.panelOpen === true) {
-          window.history.back();
-        }
-      }, 100);
-      return () => clearTimeout(timer);
+    if (prevPathnameRef.current !== pathname) {
+      if (skipAutoCollapseRef.current) {
+        skipAutoCollapseRef.current = false;
+      } else if (isExpanded) {
+        toggleExpand(false);
+      }
+      prevPathnameRef.current = pathname;
     }
-  }, [isExpanded, pathname]);
+  }, [pathname, isExpanded, toggleExpand, skipAutoCollapseRef]);
 
 
 
@@ -715,8 +715,8 @@ export default function SpeciesFloatingPanel() {
               )}
             </AnimatePresence>
 
-            {/* EDIT SPECIES DETAIL Button for Admin / Curator */}
-            {isCanEdit && activeSpecies && (
+            {/* EDIT SPECIES DETAIL Button for Admin / Curator (Only visible when floating panel is expanded) */}
+            {isExpanded && isCanEdit && activeSpecies && (
               <button 
                 onClick={() => setIsEditModalOpen(true)}
                 title={language === 'zh' ? '編輯物種詳情' : 'Edit species detail'}

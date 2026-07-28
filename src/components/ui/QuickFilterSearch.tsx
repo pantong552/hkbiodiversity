@@ -65,7 +65,7 @@ export default function QuickFilterSearch({
   taxaType = 'all'
 }: QuickFilterSearchProps) {
   const { language, t } = useLanguage();
-  const { addSpecies, setIsFilterOpen } = useSpeciesPanel();
+  const { addSpecies, setIsFilterOpen, skipNextAutoCollapse } = useSpeciesPanel();
   const [localValue, setLocalValue] = useState(initialValue);
 
   // Suggestions state
@@ -135,6 +135,7 @@ export default function QuickFilterSearch({
 
     setLocalValue(selectedName);
     onSubmit(selectedName);
+    skipNextAutoCollapse();
     addSpecies(item.taxa_id);
 
     // 在行動版模式 (<= 1100px)，點選建議物種後自動收合側邊欄

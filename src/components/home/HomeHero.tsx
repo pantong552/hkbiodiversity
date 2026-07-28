@@ -115,7 +115,7 @@ export default function HomeHero() {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  const { addSpecies } = useSpeciesPanel();
+  const { addSpecies, skipNextAutoCollapse } = useSpeciesPanel();
 
   // Open species in Floating Panel AND navigate background to /database with keyword search
   const navigateToSpecies = useCallback((taxaId: string) => {
@@ -135,12 +135,15 @@ export default function HomeHero() {
       }
     }
 
-    // 2. 切換背景頁面至 /database
+    // 2. 跳過本次導航的自動收合浮動面板
+    skipNextAutoCollapse();
+
+    // 3. 切換背景頁面至 /database
     router.push('/database');
 
-    // 3. 同時開啟浮動面板顯示選中的物種詳情
+    // 4. 同時開啟浮動面板顯示選中的物種詳情
     addSpecies(taxaId);
-  }, [searchQuery, searchType, router, addSpecies]);
+  }, [searchQuery, searchType, router, addSpecies, skipNextAutoCollapse]);
 
   const handleSearch = (e?: React.FormEvent) => {
     if (e) e.preventDefault();

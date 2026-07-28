@@ -203,6 +203,11 @@ export default function Header() {
                 <Link
                   key={link.name}
                   href={link.href}
+                  onClick={() => {
+                    if (pathname === link.href) {
+                      toggleExpand(false);
+                    }
+                  }}
                   className={`${language === 'en' ? 'text-xs xl:text-sm' : 'text-sm'} font-bold transition-colors duration-500 ${isHeaderTransparent ? 'text-white drop-shadow-sm hover:text-emerald-300' : 'text-slate-500 hover:text-emerald-600'}`}
                 >
                   {link.name}
@@ -312,6 +317,9 @@ export default function Header() {
                     href={link.href}
                     onClick={() => {
                       setIsMobileMenuOpen(false);
+                      if (pathname === link.href) {
+                        toggleExpand(false);
+                      }
                     }}
                     className="text-lg font-bold text-slate-700 hover:text-emerald-600 px-4 py-2 rounded-xl hover:bg-emerald-50 transition-all"
                   >

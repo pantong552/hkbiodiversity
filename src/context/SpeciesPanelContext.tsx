@@ -24,6 +24,8 @@ interface SpeciesPanelContextType {
   updateProfilePicture: (taxaId: string, url: string | null) => void;
   pendingTaxonomyFilter: { level: string; value: string } | null;
   setPendingTaxonomyFilter: (filter: { level: string; value: string } | null) => void;
+  skipNextAutoCollapse: () => void;
+  skipAutoCollapseRef: React.MutableRefObject<boolean>;
 }
 
 const SpeciesPanelContext = createContext<SpeciesPanelContextType | undefined>(undefined);
@@ -95,6 +97,11 @@ export const SpeciesPanelProvider: React.FC<{ children: React.ReactNode }> = ({ 
     setIsUploadModalOpen(open);
   };
 
+  const skipAutoCollapseRef = React.useRef<boolean>(false);
+  const skipNextAutoCollapse = () => {
+    skipAutoCollapseRef.current = true;
+  };
+
   return (
     <SpeciesPanelContext.Provider
       value={{
@@ -119,6 +126,8 @@ export const SpeciesPanelProvider: React.FC<{ children: React.ReactNode }> = ({ 
         updateProfilePicture,
         pendingTaxonomyFilter,
         setPendingTaxonomyFilter,
+        skipNextAutoCollapse,
+        skipAutoCollapseRef,
       }}
     >
       {children}
