@@ -71,6 +71,120 @@ export function formatScientificName(
 }
 
 /**
+ * 關鍵字高亮與學名格式化渲染組件
+ * 當 isScientific 為 true 時，自動調用與 formatScientificName 相同的邏輯（屬及物種階層斜體，縮寫/符號/年份/作者正體）
+ */
+export function HighlightText({ 
+  text, 
+  query, 
+  isSelected, 
+  isScientific = false,
+  className = ''
+}: { 
+  text: string | undefined | null; 
+  query: string; 
+  isSelected?: boolean; 
+  isScientific?: boolean;
+  className?: string;
+}) {
+  if (!text) return null;
+
+  const highlightClass = isSelected 
+    ? "text-yellow-300 font-extrabold bg-white/20 px-0.5 rounded" 
+    : "text-emerald-600 font-extrabold bg-emerald-500/10 px-0.5 rounded";
+
+  const renderPartWithHighlight = (partText: string, isItalic: boolean) => {
+    if (!query) {
+      return (
+        <span className={isItalic ? 'italic' : 'not-italic font-sans font-normal'}>
+          {partText}
+        </span>
+      );
+    }
+
+    const regex = new RegExp(`(${query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi');
+    const subParts = partText.split(regex);
+
+    return (
+      <span className={isItalic ? 'italic' : 'not-italic font-sans font-normal'}>
+        {subParts.map((sub, i) =>
+          regex.test(sub) ? (
+            <span key={i} className={highlightClass}>
+              {sub}
+            </span>
+          ) : (
+            <span key={i}>{sub}</span>
+          )
+        )}
+      </span>
+    );
+  };
+
+  if (!isScientific) {
+    if (!query) return <span className={className}>{text}</span>;
+    const regex = new RegExp(`(${query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi');
+    const parts = text.split(regex);
+    return (
+      <span className={className}>
+        {parts.map((part, i) =>
+          regex.test(part) ? (
+            <span key={i} className={highlightClass}>
+              {part}
+            </span>
+          ) : (
+            <span key={i}>{part}</span>
+          )
+        )}
+      </span>
+    );
+  }
+
+  // 依據 formatScientificName 的指引格式化學名
+  const abbreviations = [
+    'subsp.', 'ssp.', 'var.', 'f.', 'cv.', 'cf.', 'aff.', 'sp. nov.', 'comb. nov.', 'sp.', 'spp.'
+  ];
+  const tokens = text.split(/(\s+|\(|\)|,)/g);
+  let entityCount = 0;
+  const maxEntities = 3;
+
+  return (
+    <span className={className}>
+      {tokens.map((token, index) => {
+        if (!token) return null;
+        const trimmed = token.trim();
+        if (!trimmed) {
+          return <span key={index}>{token}</span>;
+        }
+
+        const isSymbol = /^[\(\),]$/.test(trimmed);
+        const isAbbr = abbreviations.includes(trimmed.toLowerCase());
+        const isYear = /^\d{4}$/.test(trimmed);
+        const isCapitalized = /^[A-Z]/.test(trimmed);
+
+        if (isSymbol || isAbbr || isYear) {
+          return <React.Fragment key={index}>{renderPartWithHighlight(token, false)}</React.Fragment>;
+        }
+
+        let isEntity = false;
+        if (entityCount === 0) {
+          isEntity = true;
+          entityCount++;
+        } else if (entityCount < maxEntities && !isCapitalized) {
+          isEntity = true;
+          entityCount++;
+        }
+
+        return (
+          <React.Fragment key={index}>
+            {renderPartWithHighlight(token, isEntity)}
+          </React.Fragment>
+        );
+      })}
+    </span>
+  );
+}
+
+/**
  * 格式化原生狀態，根據語言環境將英文狀態轉換為中文。
  * @param status 原始狀態字串 (如 Native, Exotic, Reintroduced, Introduced)
  * @param language 當前語言 ('zh' | 'en')

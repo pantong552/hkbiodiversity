@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, Fragment } from 'react';
 import { useRouter } from 'next/navigation';
 import { Search, ChevronRight, ChevronDown, Sparkles, Loader2, Leaf, Bug, ArrowRight, CornerDownLeft } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -9,34 +9,7 @@ import { SuggestionItem } from '@/app/api/species/suggest/route';
 import { useInaturalistPhoto } from '@/hooks/useInaturalistPhoto';
 import { useSpeciesPanel } from '@/context/SpeciesPanelContext';
 
-// 關鍵字高亮渲染組件
-function HighlightText({ text, query, isSelected }: { text: string; query: string; isSelected?: boolean }) {
-  if (!query || !text) return <>{text}</>;
-  
-  const regex = new RegExp(`(${query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi');
-  const parts = text.split(regex);
-
-  return (
-    <>
-      {parts.map((part, i) => (
-        regex.test(part) ? (
-          <span 
-            key={i} 
-            className={
-              isSelected 
-                ? "text-yellow-300 font-extrabold bg-white/20 px-0.5 rounded" 
-                : "text-emerald-600 font-extrabold bg-emerald-500/10 px-0.5 rounded"
-            }
-          >
-            {part}
-          </span>
-        ) : (
-          <span key={i}>{part}</span>
-        )
-      ))}
-    </>
-  );
-}
+import { HighlightText } from '@/utils/formatters';
 
 // 建議物種頭像/縮圖組件 (動態獲取 iNaturalist 圖片)
 function SuggestionItemAvatar({ item, isSelected }: { item: SuggestionItem; isSelected: boolean }) {
@@ -431,13 +404,10 @@ export default function HomeHero() {
                     <div ref={listRef} className="max-h-[340px] overflow-y-auto space-y-1 pr-1 custom-scrollbar">
                       {suggestions.map((item, index) => {
                         const isSelected = index === selectedIndex;
-                        const mainName = language === 'zh' 
-                          ? (item.common_name_chi || item.scientific_name)
-                          : (item.common_name_eng || item.scientific_name);
-                        
-                        const subName = language === 'zh'
-                          ? (item.common_name_eng ? `${item.common_name_eng} · ` : '') + item.scientific_name
-                          : item.common_name_chi ? `${item.common_name_chi} · ${item.scientific_name}` : item.scientific_name;
+                        const mainName = item.scientific_name;
+                        const subName = language === 'zh' 
+                          ? [item.common_name_chi, item.common_name_eng].filter(Boolean).join(' · ')
+                          : [item.common_name_eng, item.common_name_chi].filter(Boolean).join(' · ');
 
                         return (
                           <div
@@ -458,7 +428,7 @@ export default function HomeHero() {
                               <div className="flex flex-col min-w-0 flex-1">
                                 <div className="flex items-center gap-2">
                                   <span className={`font-black text-sm md:text-base truncate ${isSelected ? 'text-white' : 'text-slate-800'}`}>
-                                    <HighlightText text={mainName} query={searchQuery} isSelected={isSelected} />
+                                    <HighlightText text={mainName} query={searchQuery} isSelected={isSelected} isScientific={true} />
                                   </span>
                                   
                                   {/* Badge */}
@@ -471,7 +441,7 @@ export default function HomeHero() {
                                   </span>
                                 </div>
 
-                                <span className={`text-xs truncate italic ${isSelected ? 'text-emerald-100/90' : 'text-slate-400'}`}>
+                                <span className={`text-xs truncate not-italic font-normal ${isSelected ? 'text-emerald-100/90' : 'text-slate-400'}`}>
                                   <HighlightText text={subName} query={searchQuery} isSelected={isSelected} />
                                 </span>
                               </div>

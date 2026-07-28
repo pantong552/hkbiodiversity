@@ -338,6 +338,7 @@ export default function SimilarSpeciesExplorer({ species }: SimilarSpeciesExplor
           <AnimatePresence initial={false}>
             {/* Tablet & Desktop Layout - Horizontal scroll */}
             <motion.div 
+              key="similar-desktop-layout"
               layout
               className="hidden md:flex gap-4 overflow-x-auto pb-2 scrollbar-thin scrollbar-thumb-slate-200"
             >
@@ -348,6 +349,7 @@ export default function SimilarSpeciesExplorer({ species }: SimilarSpeciesExplor
 
             {/* Mobile Layout - Vertical List */}
             <motion.div 
+              key="similar-mobile-layout"
               layout
               className="flex md:hidden flex-col gap-2"
             >

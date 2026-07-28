@@ -283,6 +283,7 @@ export default function SidebarFilter({
           <QuickFilterSearch
             initialValue={searchQuery}
             onSubmit={onSearchSubmit}
+            taxaType="fauna"
             className="mb-6"
           />
 

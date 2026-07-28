@@ -120,6 +120,7 @@ export default function PlantFilterPanel({
       <QuickFilterSearch 
         initialValue={filters.searchQuery}
         onSubmit={handleSearchSubmit}
+        taxaType="flora"
       />
 
       {/* Category */}

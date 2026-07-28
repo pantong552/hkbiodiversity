@@ -363,6 +363,7 @@ export default function CongenericExplorer({ species, isMobile = false }: Congen
             {/* Desktop Sidebar Layout - Always Vertical */}
             {!isMobile && (
               <motion.div 
+                key="congeneric-desktop-vertical"
                 layout
                 className="flex flex-col gap-2 h-[460px] overflow-y-auto pr-1.5 custom-scrollbar"
               >
@@ -374,9 +375,10 @@ export default function CongenericExplorer({ species, isMobile = false }: Congen
 
             {/* In-page Layout (isMobile) */}
             {isMobile && (
-              <>
+              <React.Fragment key="congeneric-mobile-wrapper">
                 {/* Tablet Mode - Horizontal scroll (hidden md:flex xl:hidden) */}
                 <motion.div 
+                  key="congeneric-tablet-horizontal"
                   layout
                   className="hidden md:flex gap-4 overflow-x-auto pb-2 scrollbar-thin scrollbar-thumb-slate-200"
                 >
@@ -387,6 +389,7 @@ export default function CongenericExplorer({ species, isMobile = false }: Congen
 
                 {/* Mobile Mode - Vertical List (flex md:hidden) */}
                 <motion.div 
+                  key="congeneric-mobile-vertical"
                   layout
                   className="flex md:hidden flex-col gap-2"
                 >
@@ -394,7 +397,7 @@ export default function CongenericExplorer({ species, isMobile = false }: Congen
                     <MiniSpeciesCard key={item.taxa_id || item.id} species={item} />
                   ))}
                 </motion.div>
-              </>
+              </React.Fragment>
             )}
           </AnimatePresence>
         )}
