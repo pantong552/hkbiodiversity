@@ -1,21 +1,10 @@
 import { Metadata } from 'next';
-import { supabase } from '@/lib/supabase';
 import { Species } from '@/types/species';
+import { getSpeciesById } from '@/lib/species';
 import SpeciesDetailClient from './SpeciesDetailClient';
 
 interface Props {
   params: Promise<{ id: string }>;
-}
-
-async function getSpecies(id: string): Promise<Species | null> {
-  const { data, error } = await supabase
-    .from('species')
-    .select('*')
-    .eq('id', id)
-    .maybeSingle();
-
-  if (error || !data) return null;
-  return data as Species;
 }
 
 // 獲取 iNaturalist 圖片的輔助函數（伺服器端）
@@ -42,7 +31,7 @@ async function getInaturalistPhoto(taxonId: number | string): Promise<string | n
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { id } = await params;
-  const species = await getSpecies(id);
+  const species = await getSpeciesById(id);
 
   if (!species) {
     return {
@@ -84,7 +73,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
 export default async function SpeciesPage({ params }: Props) {
   const { id } = await params;
-  const species = await getSpecies(id);
+  const species = await getSpeciesById(id);
 
   return (
     <SpeciesDetailClient id={id} initialSpecies={species} />

@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { supabase } from '@/lib/supabase';
 import { Species } from '@/types/species';
+import { getSpeciesById } from '@/lib/species';
 import { SpeciesDraft } from '@/types/speciesDraft';
 import { ArrowLeft, Loader2, Share2, Check, Sliders } from 'lucide-react';
 import { useLanguage } from '@/context/LanguageContext';
@@ -124,15 +125,9 @@ export default function SpeciesDetailClient({
       
       setIsLoading(true);
       try {
-        const { data, error } = await supabase
-          .from('species')
-          .select('*')
-          .eq('id', id)
-          .maybeSingle();
-
-        if (error) throw error;
+        const data = await getSpeciesById(id);
         if (data) {
-          setSpecies(data as Species);
+          setSpecies(data);
         }
       } catch (err: any) {
         console.error('fetchSpeciesDetail 發生錯誤:', err.message || err);
