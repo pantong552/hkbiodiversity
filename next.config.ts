@@ -1,6 +1,14 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  async rewrites() {
+    return [
+      {
+        source: '/bgis-api/:path*',
+        destination: 'https://bih.gov.hk/BGIS/API/:path*',
+      },
+    ];
+  },
   images: {
     remotePatterns: [
       {

@@ -387,8 +387,12 @@ export default function SpeciesContent({ species, showBreadcrumb = true, refresh
                 {language === 'zh' ? '地理分布' : 'Distribution'}
               </h2>
               
-              {species.inat_id ? (
-                <SpeciesMap taxonId={species.inat_id} />
+              {species.inat_id || species.scientific_name ? (
+                <SpeciesMap
+                  taxonId={species.inat_id ?? 0}
+                  scientificName={species.scientific_name}
+                  chineseName={species.common_name_chi}
+                />
               ) : (
                 <div className="w-full h-[300px] bg-slate-200 rounded-[2.5rem] flex items-center justify-center text-slate-500">
                   <p>{language === 'zh' ? '無 iNaturalist ID' : 'No iNaturalist ID available'}</p>
