@@ -6,7 +6,7 @@ import 'maplibre-gl/dist/maplibre-gl.css';
 import * as turf from '@turf/turf';
 import { fetchAllInatObservations, InatObservation } from '@/utils/inaturalist';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Calendar, User, ExternalLink, MapPin, Loader2, Info, Maximize, MousePointer2, Layers, Shield, Link as LinkIcon, Filter } from 'lucide-react';
+import { X, Calendar, User, ExternalLink, MapPin, Loader2, Info, Maximize, MousePointer2, Layers, Shield, Link as LinkIcon, Filter, Building2, Camera } from 'lucide-react';
 import Image from 'next/image';
 import { useLanguage } from '@/context/LanguageContext';
 import { useAuth } from '@/context/AuthContext';
@@ -161,7 +161,7 @@ const translations = {
     bgisTitle: 'BGIS/HKBIH',
     bgisTotal: '共',
     recordsUnit: '筆',
-    inatSectionTitle: '📷 iNaturalist 社群記錄',
+    inatSectionTitle: 'iNaturalist 研究級數據',
     datasetFilterLabel: '資料來源',
     filterInat: 'iNaturalist',
     filterBgis: 'BGIS / HKBIH',
@@ -198,7 +198,7 @@ const translations = {
     bgisTitle: 'BGIS/HKBIH',
     bgisTotal: 'Total',
     recordsUnit: 'obs',
-    inatSectionTitle: '📷 iNaturalist Community Records',
+    inatSectionTitle: 'iNaturalist Research Grade Data',
     datasetFilterLabel: 'Data Sources',
     filterInat: 'iNaturalist',
     filterBgis: 'BGIS / HKBIH',
@@ -222,6 +222,11 @@ export default function SpeciesMap({ taxonId, scientificName, chineseName }: Spe
   const { profile } = useAuth();
   const isAdmin = profile?.role === 'admin';
   const t = translations[language === 'zh' ? 'zh' : 'en'];
+
+  const getRecordUnit = (count: number) => {
+    if (language === 'zh') return '筆';
+    return count === 1 ? 'record' : 'records';
+  };
 
   const [observations, setObservations] = useState<InatObservation[]>([]);
   const [totalBgisCount, setTotalBgisCount] = useState<number>(0);
@@ -315,13 +320,20 @@ export default function SpeciesMap({ taxonId, scientificName, chineseName }: Spe
         console.log(`SpeciesMap: 成功抓取到 ${obs.length} 筆 iNat 紀錄, ${bgisList.length} 筆 BGIS 網格紀錄`);
         setObservations(obs);
 
-        // 將 BGIS list 建立網格編號對照物件
+        // 將 BGIS list 建立網格編號對照物件 (對 item.no 執行嚴格規格化轉碼)
         const bgisMap: Record<string, BgisGridRecord> = {};
+        let realBgisTotal = 0;
+
         bgisList.forEach(item => {
           if (item.no !== undefined && item.no !== null) {
-            bgisMap[String(item.no)] = item;
+            const rawNoStr = String(item.no);
+            const cleanNo = isNaN(Number(rawNoStr)) ? rawNoStr : String(parseFloat(rawNoStr));
+            bgisMap[cleanNo] = item;
+            realBgisTotal += (item.count || 0);
           }
         });
+
+        setTotalBgisCount(realBgisTotal);
 
         // 載入 Common_1km_grid GeoJSON
         const response = await fetch('/data/Common_1km_grid.geojson');
@@ -376,8 +388,7 @@ export default function SpeciesMap({ taxonId, scientificName, chineseName }: Spe
           feature.properties.totalCount = feature.properties.count + feature.properties.bgisCount;
         });
 
-        console.log(`SpeciesMap: 數據聚合完成 (iNat 匹配點: ${totalInatCounted}, BGIS 總紀錄: ${totalBgisCounted})`);
-        setTotalBgisCount(totalBgisCounted);
+        console.log(`SpeciesMap: 數據聚合完成 (iNat 匹配點: ${totalInatCounted}, BGIS 總紀錄: ${realBgisTotal}, 網格內匹配紀錄: ${totalBgisCounted})`);
         setAllProcessedFeatures(geojson.features);
       } catch (error) {
         console.error('SpeciesMap: 載入或聚合過程中發生錯誤:', error);
@@ -566,8 +577,8 @@ export default function SpeciesMap({ taxonId, scientificName, chineseName }: Spe
                 'fill-color': [
                   'interpolate',
                   ['linear'],
-                  ['get', 'count'],
-                  1, '#d1fae5', // emerald-100 (起始色稍微調深，確保與圖例一致)
+                  ['get', 'totalCount'],
+                  1, '#d1fae5', // emerald-100
                   5, '#10b981', // emerald-500
                   10, '#059669', // emerald-600
                   20, '#064e3b'  // emerald-900
@@ -638,92 +649,113 @@ export default function SpeciesMap({ taxonId, scientificName, chineseName }: Spe
         </div>
       </div>
 
-      {/* Selected Grid Popup Drawer */}
+      {/* Selected Grid Popup Drawer / Mobile Bottom Sheet */}
       <AnimatePresence>
         {selectedGrid && (
           <motion.div
-            initial={{ opacity: 0, x: 20, y: 0, scale: 0.95 }}
-            animate={{ opacity: 1, x: 0, y: 0, scale: 1 }}
-            exit={{ opacity: 0, x: 20, scale: 0.95 }}
-            transition={{ type: "spring", damping: 25, stiffness: 200 }}
-            className="absolute top-4 right-4 bottom-4 w-80 z-40 bg-white/90 backdrop-blur-xl border border-white/20 shadow-2xl rounded-3xl overflow-hidden flex flex-col"
+            initial={isMobile ? { y: '100%' } : { opacity: 0, x: 20, scale: 0.95 }}
+            animate={isMobile ? { y: 0 } : { opacity: 1, x: 0, scale: 1 }}
+            exit={isMobile ? { y: '100%' } : { opacity: 0, x: 20, scale: 0.95 }}
+            transition={{ type: "spring", damping: 25, stiffness: 220 }}
+            onWheel={(e) => e.stopPropagation()}
+            onTouchMove={(e) => e.stopPropagation()}
+            className={
+              isMobile
+                ? "fixed inset-x-0 bottom-0 max-h-[82vh] z-50 bg-white backdrop-blur-2xl rounded-t-[2.5rem] shadow-2xl border-t border-slate-200/80 flex flex-col pointer-events-auto overflow-hidden"
+                : "absolute top-4 right-4 bottom-4 w-85 z-40 bg-white backdrop-blur-2xl border border-slate-200/80 shadow-2xl rounded-3xl overflow-hidden flex flex-col pointer-events-auto"
+            }
           >
-            {/* Header */}
-            <div className="p-5 bg-gradient-to-r from-emerald-600 to-emerald-500 text-white flex items-center justify-between shadow-md">
-              <div>
-                <h4 className="font-black text-lg flex items-center gap-2">
-                  <MapPin className="w-4 h-4" />
-                  {t.gridId} {selectedGrid.grid_id}
-                  {isAdmin && (
-                    <span className="text-[10px] font-mono font-normal opacity-75">
-                      (ID: {selectedGrid.grid_id})
-                    </span>
-                  )}
-                </h4>
-                <p className="text-emerald-50 text-xs opacity-90 font-medium">
-                  iNat: {selectedGrid.count} {t.recordsUnit} | BGIS: {selectedGrid.bgisCount || 0} {t.recordsUnit}
-                </p>
+            {/* Seamless Solid Header Banner (Integrating Mobile Drag Indicator) */}
+            <div className="bg-emerald-800 text-white flex flex-col flex-shrink-0 shadow-sm rounded-t-[2.5rem] sm:rounded-t-3xl pt-2 px-4 pb-4 sm:px-5 sm:pb-4 sm:pt-4">
+              {/* Mobile Drag Indicator Handle */}
+              {isMobile && (
+                <div className="w-12 h-1 bg-white/35 rounded-full mx-auto mb-2 flex-shrink-0" />
+              )}
+
+              <div className="flex items-center justify-between">
+                <div>
+                  <h4 className="font-black text-base sm:text-lg flex items-center gap-2 tracking-tight">
+                    <MapPin className="w-4 h-4 text-emerald-300" />
+                    {isAdmin
+                      ? `${t.gridId} ${selectedGrid.grid_id}`
+                      : (language === 'zh' ? '網格觀測紀錄' : 'Grid Observations')}
+                    {isAdmin && (
+                      <span className="text-[10px] font-mono font-normal opacity-75 text-emerald-200">
+                        (ID: {selectedGrid.grid_id})
+                      </span>
+                    )}
+                  </h4>
+                  <p className="text-emerald-100 text-[11px] sm:text-xs opacity-90 font-medium pt-0.5">
+                    {[
+                      showInat && selectedGrid.count > 0 ? `iNat: ${selectedGrid.count} ${getRecordUnit(selectedGrid.count)}` : null,
+                      showBgis && (selectedGrid.bgisCount || 0) > 0 ? `BGIS: ${selectedGrid.bgisCount} ${getRecordUnit(selectedGrid.bgisCount || 0)}` : null
+                    ].filter(Boolean).join(' | ') || (language === 'zh' ? '無觀測記錄' : 'No Records')}
+                  </p>
+                </div>
+                <button
+                  onClick={() => setSelectedGrid(null)}
+                  className="p-2 hover:bg-white/20 rounded-full transition-colors cursor-pointer text-white/90 hover:text-white active:scale-95"
+                >
+                  <X className="w-5 h-5" />
+                </button>
               </div>
-              <button
-                onClick={() => setSelectedGrid(null)}
-                className="p-2 hover:bg-white/20 rounded-full transition-colors cursor-pointer"
-              >
-                <X className="w-5 h-5" />
-              </button>
             </div>
 
             {/* List Body */}
-            <div className="flex-1 overflow-y-auto p-4 space-y-4 custom-scrollbar">
+            <div className="flex-1 overflow-y-auto overscroll-contain p-4 space-y-4 custom-scrollbar">
               {/* BGIS Dataset Info Section */}
-              {selectedGrid.bgisDataset && selectedGrid.bgisDataset.length > 0 && (
-                <div className="bg-emerald-50/80 border border-emerald-100 rounded-2xl p-3 space-y-2">
-                  <div className="flex items-center justify-between text-xs font-bold text-emerald-800">
+              {showBgis && selectedGrid.bgisDataset && selectedGrid.bgisDataset.length > 0 && (selectedGrid.bgisCount || 0) > 0 && (
+                <div className="bg-slate-50/80 border border-slate-200/70 rounded-2xl p-3.5 space-y-2.5 shadow-xs">
+                  <div className="flex items-center justify-between text-xs font-bold text-slate-800 border-b border-slate-200/50 pb-2">
                     <div className="flex items-center gap-1.5">
-                      <span>🏛️ {t.bgisTitle}</span>
+                      <Building2 className="w-4 h-4 text-emerald-600" />
+                      <span>{t.bgisTitle}</span>
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
                           setIsBgisCreditOpen(true);
                         }}
-                        className="p-0.5 text-emerald-600 hover:text-emerald-800 hover:bg-emerald-200/50 rounded-full transition-colors cursor-pointer"
+                        className="p-0.5 text-emerald-600 hover:text-emerald-800 hover:bg-emerald-100/60 rounded-full transition-colors cursor-pointer ml-0.5"
                         title={t.creditTitle}
                       >
                         <Info className="w-3.5 h-3.5" />
                       </button>
                     </div>
-                    <span className="text-[10px] bg-emerald-200/60 text-emerald-900 px-2 py-0.5 rounded-full font-medium">
-                      {t.bgisTotal} {selectedGrid.bgisCount} {t.recordsUnit}
-                    </span>
                   </div>
-                  <div className="grid grid-cols-1 gap-1.5 pt-1">
-                    {selectedGrid.bgisDataset.map((ds, idx) => {
-                      const meta = BGIS_DATASETS[ds.datasetID];
-                      const dsName = meta ? meta[language === 'zh' ? 'zh' : 'en'] : `Dataset ${ds.datasetID}`;
-                      return (
-                        <div key={idx} className="flex items-center justify-between bg-white/90 px-3 py-2 rounded-xl text-[11px] text-slate-700 shadow-2xs border border-emerald-50">
-                          <div className="flex flex-col min-w-0 pr-2">
-                            <span className="font-bold text-slate-800 truncate">{dsName}</span>
-                            {isAdmin && (
-                              <span className="font-mono text-[9px] text-slate-400">ID: {ds.datasetID}</span>
-                            )}
+                  <div className="grid grid-cols-1 gap-2 pt-0.5">
+                    {selectedGrid.bgisDataset
+                      .filter(ds => ds.count > 0)
+                      .map((ds, idx) => {
+                        const meta = BGIS_DATASETS[ds.datasetID];
+                        const dsName = meta ? meta[language === 'zh' ? 'zh' : 'en'] : `Dataset ${ds.datasetID}`;
+                        return (
+                          <div key={idx} className="flex items-center justify-between bg-white px-3 py-2.5 rounded-xl text-[11px] text-slate-700 shadow-2xs border border-slate-100 hover:border-emerald-200 transition-colors">
+                            <div className="flex flex-col min-w-0 pr-2">
+                              <span className="font-bold text-slate-800 truncate">{dsName}</span>
+                              {isAdmin && (
+                                <span className="font-mono text-[9px] text-slate-400">ID: {ds.datasetID}</span>
+                              )}
+                            </div>
+                            <span className="font-extrabold text-emerald-600 flex-shrink-0 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-100">{ds.count} {getRecordUnit(ds.count)}</span>
                           </div>
-                          <span className="font-bold text-emerald-600 flex-shrink-0">{ds.count} {t.recordsUnit}</span>
-                        </div>
-                      );
-                    })}
+                        );
+                      })}
                   </div>
                 </div>
               )}
 
               {/* iNaturalist Observation List */}
-              {selectedGrid.observations && selectedGrid.observations.length > 0 && (
+              {showInat && selectedGrid.observations && selectedGrid.observations.length > 0 && (
                 <div className="space-y-3">
-                  <p className="text-xs font-bold text-slate-500 px-1">{t.inatSectionTitle}</p>
+                  <div className="flex items-center gap-1.5 px-1 text-xs font-bold text-slate-700">
+                    <Camera className="w-4 h-4 text-emerald-600" />
+                    <span>{t.inatSectionTitle}</span>
+                  </div>
                   {selectedGrid.observations.map((obs, idx) => (
-                    <div key={`${obs.id}-${idx}`} className="group/item bg-slate-50/50 hover:bg-emerald-50 rounded-2xl p-3 border border-slate-100 transition-all">
+                    <div key={`${obs.id}-${idx}`} className="group/item bg-white hover:bg-emerald-50/50 rounded-2xl p-3 border border-slate-200/80 hover:border-emerald-300/80 transition-all shadow-2xs">
                       <div className="flex gap-3">
                         {/* Square Image */}
-                        <div className="relative w-16 h-16 rounded-xl overflow-hidden flex-shrink-0 bg-slate-200">
+                        <div className="relative w-16 h-16 rounded-xl overflow-hidden flex-shrink-0 bg-slate-100 border border-slate-200/60">
                           {obs.photos?.[0] ? (
                             <Image
                               src={obs.photos[0].url.replace('square', 'medium')}
@@ -733,42 +765,53 @@ export default function SpeciesMap({ taxonId, scientificName, chineseName }: Spe
                               className="object-cover group-hover/item:scale-110 transition-transform duration-500"
                             />
                           ) : (
-                            <div className="w-full h-full flex items-center justify-center">
-                              <Info className="w-4 h-4 text-slate-400" />
+                            <div className="w-full h-full flex items-center justify-center text-slate-300">
+                              <Camera className="w-5 h-5" />
                             </div>
                           )}
                         </div>
 
                         {/* Obs Info */}
-                        <div className="flex-1 min-w-0">
-                          <p className="text-xs font-bold text-slate-800 truncate mb-1">
-                            {t.obsBy}: {obs.user.name || obs.user.login}
-                          </p>
-                          <div className="flex items-center gap-1.5 text-[10px] text-slate-500 mb-1">
-                            <Calendar className="w-3 h-3" />
-                            {obs.observed_on_details.date}
+                        <div className="flex-1 min-w-0 flex flex-col justify-between py-0.5">
+                          <div>
+                            <p className="text-xs font-extrabold text-slate-800 truncate mb-1">
+                              {t.obsBy}: {obs.user.name || obs.user.login}
+                            </p>
+                            <div className="flex items-center gap-1 text-[10px] font-medium text-slate-500">
+                              <Calendar className="w-3 h-3 text-slate-400" />
+                              <span>{obs.observed_on_details.date}</span>
+                            </div>
                           </div>
-                          <a
-                            href={obs.uri}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-600 hover:text-emerald-700 underline underline-offset-2"
-                          >
-                            <ExternalLink className="w-2.5 h-2.5" />
-                            {t.viewDetails}
-                          </a>
+                          <div className="pt-1">
+                            <a
+                              href={obs.uri}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-600 hover:text-emerald-700 hover:underline"
+                            >
+                              <ExternalLink className="w-2.5 h-2.5" />
+                              <span>{t.viewDetails}</span>
+                            </a>
+                          </div>
                         </div>
                       </div>
                     </div>
                   ))}
                 </div>
               )}
-            </div>
 
-            <div className="p-4 bg-slate-50 border-t border-slate-100 text-center">
-              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
-                {t.researchGrade}
-              </span>
+              {/* Empty state prompt if all selected filters are hidden or empty */}
+              {((!showInat && !showBgis) ||
+                (!showInat && showBgis && (!selectedGrid.bgisDataset || selectedGrid.bgisDataset.length === 0)) ||
+                (showInat && !showBgis && (!selectedGrid.observations || selectedGrid.observations.length === 0)) ||
+                (showInat && showBgis && (!selectedGrid.observations || selectedGrid.observations.length === 0) && (!selectedGrid.bgisDataset || selectedGrid.bgisDataset.length === 0))) && (
+                <div className="py-12 text-center text-slate-400 space-y-2">
+                  <Info className="w-8 h-8 mx-auto text-slate-300 opacity-60" />
+                  <p className="text-xs font-bold">
+                    {language === 'zh' ? '當前過濾條件下無相關觀測記錄' : 'No observation records under current filter'}
+                  </p>
+                </div>
+              )}
             </div>
           </motion.div>
         )}
@@ -906,23 +949,34 @@ export default function SpeciesMap({ taxonId, scientificName, chineseName }: Spe
             }}
             className="absolute z-50 pointer-events-none bg-slate-900/90 backdrop-blur-md text-white px-3.5 py-2 rounded-2xl shadow-xl border border-white/10 flex flex-col gap-1 min-w-[120px]"
           >
-            <div className="text-[10px] font-bold text-emerald-400 uppercase tracking-tight flex items-center gap-1 border-b border-white/10 pb-1">
-              <span>{t.gridId} {hoveredGrid.id}</span>
-              {isAdmin && (
+            {isAdmin && (
+              <div className="text-[10px] font-bold text-emerald-400 uppercase tracking-tight flex items-center gap-1 border-b border-white/10 pb-1">
+                <span>{t.gridId} {hoveredGrid.id}</span>
                 <span className="opacity-75 font-mono text-[9px] text-slate-300">
                   (ID: {hoveredGrid.id})
                 </span>
-              )}
-            </div>
+              </div>
+            )}
             <div className="text-xs font-bold space-y-0.5 pt-0.5">
-              <div className="flex items-center justify-between gap-3 text-emerald-300">
-                <span className="text-[10px] opacity-80">iNat:</span>
-                <span>{hoveredGrid.count} {t.recordsUnit}</span>
-              </div>
-              <div className="flex items-center justify-between gap-3 text-teal-200">
-                <span className="text-[10px] opacity-80">BGIS:</span>
-                <span>{hoveredGrid.bgisCount || 0} {t.recordsUnit}</span>
-              </div>
+              {showInat && hoveredGrid.count > 0 && (
+                <div className="flex items-center justify-between gap-3 text-emerald-300">
+                  <span className="text-[10px] opacity-80">iNat:</span>
+                  <span>{hoveredGrid.count} {getRecordUnit(hoveredGrid.count)}</span>
+                </div>
+              )}
+              {showBgis && (hoveredGrid.bgisCount || 0) > 0 && (
+                <div className="flex items-center justify-between gap-3 text-teal-200">
+                  <span className="text-[10px] opacity-80">BGIS:</span>
+                  <span>{hoveredGrid.bgisCount} {getRecordUnit(hoveredGrid.bgisCount || 0)}</span>
+                </div>
+              )}
+              {((!showInat || hoveredGrid.count === 0) && (!showBgis || (hoveredGrid.bgisCount || 0) === 0)) && (
+                <div className="text-[10px] text-slate-400 font-medium py-0.5">
+                  {!showInat && !showBgis
+                    ? (language === 'zh' ? '未勾選來源' : 'No Source Selected')
+                    : (language === 'zh' ? '無觀測記錄' : 'No Records')}
+                </div>
+              )}
             </div>
           </motion.div>
         )}
@@ -942,9 +996,8 @@ export default function SpeciesMap({ taxonId, scientificName, chineseName }: Spe
 
         {/* Density Scale Legend */}
         <div className="flex flex-col gap-1">
-          <div className="flex items-center justify-between text-[9px] font-bold text-slate-500">
+          <div className="text-[9px] font-bold text-slate-500">
             <span>{t.densityTitle}</span>
-            <span className="font-mono text-[9px] text-emerald-700 font-extrabold">1 — 20+</span>
           </div>
           <div className="w-full h-1.5 bg-gradient-to-r from-[#d1fae5] via-[#10b981] to-[#064e3b] rounded-full shadow-inner" />
         </div>
