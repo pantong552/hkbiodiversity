@@ -1,4 +1,5 @@
 import { supabase } from './supabase';
+import { unstable_cache } from 'next/cache';
 
 export interface HomeStats {
   faunaCount: number;
@@ -28,9 +29,9 @@ export interface LatestComment {
 }
 
 /**
- * 獲取首頁統計數據
+ * 獲取首頁統計數據（內部實作）
  */
-export async function getHomeStats(): Promise<HomeStats> {
+async function fetchHomeStats(): Promise<HomeStats> {
   const { count: faunaCount } = await supabase.from('species').select('*', { count: 'exact', head: true });
   const { count: floraCount } = await supabase.from('plant_species').select('*', { count: 'exact', head: true });
   
@@ -60,19 +61,21 @@ export async function getHomeStats(): Promise<HomeStats> {
 }
 
 /**
- * 獲取排行榜
+ * 獲取排行榜（內部實作）
+ * 限制只拉取最新 200 筆留言及照片計算統計，避免大數據庫全表掃描
  */
-export async function getLeaderboard(): Promise<LeaderboardUser[]> {
-  // 這裡使用一個複雜的查詢或 RPC 會更好。
-  // 暫時以兩次查詢並手動合併的方式實作。
-  
+async function fetchLeaderboard(): Promise<LeaderboardUser[]> {
   const { data: commentStats } = await supabase
     .from('comments')
-    .select('user_id, profiles(username, avatar_url)');
+    .select('user_id, profiles(username, avatar_url)')
+    .order('created_at', { ascending: false })
+    .limit(200);
 
   const { data: photoStats } = await supabase
     .from('species_community_photos')
-    .select('user_id, profiles:user_id(username, avatar_url)');
+    .select('user_id, profiles:user_id(username, avatar_url)')
+    .order('created_at', { ascending: false })
+    .limit(200);
 
   const userMap: Record<string, LeaderboardUser> = {};
 
@@ -115,9 +118,9 @@ export async function getLeaderboard(): Promise<LeaderboardUser[]> {
 }
 
 /**
- * 獲取最新留言
+ * 獲取最新留言（內部實作）
  */
-export async function getLatestComments(): Promise<LatestComment[]> {
+async function fetchLatestComments(): Promise<LatestComment[]> {
   const { data } = await supabase
     .from('comments')
     .select('id, content, created_at, taxa_id, profiles(username, avatar_url)')
@@ -128,9 +131,9 @@ export async function getLatestComments(): Promise<LatestComment[]> {
 }
 
 /**
- * 獲取最新物種 (新聞區塊用)
+ * 獲取最新物種（內部實作）
  */
-export async function getLatestSpecies() {
+async function fetchLatestSpecies() {
   const { data: fauna } = await supabase
     .from('species')
     .select('id, taxa_id, common_name_chi, common_name_eng, scientific_name, created_at')
@@ -152,9 +155,9 @@ export async function getLatestSpecies() {
 }
 
 /**
- * 獲取最新公告
+ * 獲取最新公告（內部實作）
  */
-export async function getLatestNews() {
+async function fetchLatestNews() {
   const { data } = await supabase
     .from('site_news')
     .select('*')
@@ -163,6 +166,13 @@ export async function getLatestNews() {
 
   return data || [];
 }
+
+// 匯出附帶 Next.js unstable_cache 快取的對外函數，減少對資料庫的頻繁請求
+export const getHomeStats = unstable_cache(fetchHomeStats, ['home-stats'], { revalidate: 600 });
+export const getLeaderboard = unstable_cache(fetchLeaderboard, ['home-leaderboard'], { revalidate: 600 });
+export const getLatestComments = unstable_cache(fetchLatestComments, ['home-latest-comments'], { revalidate: 60 });
+export const getLatestSpecies = unstable_cache(fetchLatestSpecies, ['home-latest-species'], { revalidate: 300 });
+export const getLatestNews = unstable_cache(fetchLatestNews, ['home-latest-news'], { revalidate: 300 });
 
 /**
  * 獲取所有公告

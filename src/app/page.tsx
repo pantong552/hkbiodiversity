@@ -9,8 +9,7 @@ import { getHomeStats, getLeaderboard, getLatestComments, getLatestSpecies, getL
 import Link from 'next/link';
 import { Globe, Mail, ExternalLink, Shield, BookOpen, Users } from 'lucide-react';
 
-export const dynamic = 'force-dynamic';
-export const revalidate = 3600; // 每小時重新驗證一次
+export const revalidate = 600; // 每 10 分鐘重新驗證快取一次 (ISR)
 
 export const metadata: Metadata = {
   title: 'Hong Kong Biodiversity Collective | 香港自然生態匯誌',
