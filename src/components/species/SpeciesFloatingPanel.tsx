@@ -498,7 +498,7 @@ export default function SpeciesFloatingPanel() {
     <motion.div 
       initial={false}
       animate={{ 
-        height: isExpanded ? '100dvh' : '82px',
+        height: isExpanded ? '100dvh' : '64px',
         opacity: 1,
         y: 0
       }}
@@ -604,11 +604,11 @@ export default function SpeciesFloatingPanel() {
           />
         ))}
 
-        <div className="w-full bg-white/80 backdrop-blur-3xl border-t border-slate-200 shadow-[0_-10px_50px_rgba(0,0,0,0.1)] px-4 md:px-8 py-2 md:py-2.5 flex items-center justify-between">
+        <div className="w-full bg-white/80 backdrop-blur-3xl border-t border-slate-200 shadow-[0_-10px_50px_rgba(0,0,0,0.1)] px-4 md:px-6 py-2 md:py-1.5 flex items-center justify-between">
           <div className="flex-1 min-w-0 overflow-hidden relative">
             <div 
               ref={tabsRef}
-              className="flex items-center gap-2 overflow-x-auto no-scrollbar py-1 scroll-smooth"
+              className="flex items-center gap-2 overflow-x-auto no-scrollbar py-0.5 md:py-1 scroll-smooth"
             >
             {openSpeciesIds.map((id) => {
               const species = speciesData[id];
@@ -635,7 +635,7 @@ export default function SpeciesFloatingPanel() {
                   onMouseLeave={() => setHoveredTabId(null)}
                   data-active={isActive}
                   className={`
-                    group relative flex items-center gap-2.5 px-4 py-2.5 rounded-2xl border transition-colors cursor-pointer whitespace-nowrap min-h-[44px] z-10
+                    group relative flex items-center gap-2.5 px-3 md:px-3.5 py-1.5 md:py-1.5 rounded-xl md:rounded-2xl border transition-colors cursor-pointer whitespace-nowrap min-h-[36px] md:min-h-[38px] z-10
                     ${isActive 
                       ? 'border-slate-800 text-white' 
                       : 'bg-white/50 border-slate-100 text-slate-500 hover:bg-white hover:border-emerald-200'}
@@ -645,7 +645,7 @@ export default function SpeciesFloatingPanel() {
                   {isActive && (
                     <motion.div
                       layoutId="active-tab-highlight"
-                      className="absolute inset-0 bg-slate-900 rounded-2xl -z-10 shadow-xl shadow-slate-200"
+                      className="absolute inset-0 bg-slate-900 rounded-xl md:rounded-2xl -z-10 shadow-xl shadow-slate-200"
                       transition={{ type: 'spring', stiffness: 350, damping: 30 }}
                     />
                   )}
@@ -672,7 +672,7 @@ export default function SpeciesFloatingPanel() {
                       removeSpecies(id);
                     }}
                     className={`
-                      p-1.5 rounded-lg transition-colors ml-1
+                      p-1 rounded-lg transition-colors ml-0.5
                       ${isActive ? 'hover:bg-white/20 text-white' : 'hover:bg-red-50 text-slate-300 hover:text-red-500'}
                     `}
                   >
@@ -696,7 +696,7 @@ export default function SpeciesFloatingPanel() {
           </div>
 
           {/* Action Buttons - Fixed on the right */}
-          <div className="flex items-center gap-2 md:gap-2.5 shrink-0 ml-2 md:ml-4 relative">
+          <div className="flex items-center gap-1.5 md:gap-2 shrink-0 ml-2 md:ml-4 relative">
             <AnimatePresence>
               {isCopied && (
                 <motion.div 
@@ -720,10 +720,10 @@ export default function SpeciesFloatingPanel() {
               <button 
                 onClick={() => setIsEditModalOpen(true)}
                 title={language === 'zh' ? '編輯物種詳情' : 'Edit species detail'}
-                className="px-4 py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-black rounded-2xl shadow-lg shadow-emerald-600/20 hover:scale-105 active:scale-95 transition-all duration-300 border border-emerald-500 flex items-center gap-2 shrink-0"
+                className="px-3 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-black rounded-xl shadow-md shadow-emerald-600/20 hover:scale-105 active:scale-95 transition-all duration-300 border border-emerald-500 flex items-center gap-1.5 shrink-0"
               >
-                <Sliders className="w-4 h-4" />
-                <span className="hidden md:inline text-xs uppercase tracking-wider">{language === 'zh' ? '編輯物種詳情' : 'EDIT SPECIES DETAIL'}</span>
+                <Sliders className="w-3.5 h-3.5" />
+                <span className="hidden md:inline text-[11px] uppercase tracking-wider">{language === 'zh' ? '編輯物種詳情' : 'EDIT SPECIES DETAIL'}</span>
               </button>
             )}
 
@@ -732,19 +732,19 @@ export default function SpeciesFloatingPanel() {
               onClick={handleShare}
               title={language === 'zh' ? '分享此物種' : 'Share species'}
               className={`
-                p-3 rounded-2xl transition-all duration-300 flex items-center justify-center border
+                p-2 md:p-2 rounded-xl transition-all duration-300 flex items-center justify-center border
                 ${activeSpeciesId 
                   ? 'bg-white border-slate-100 text-slate-600 shadow-sm hover:border-emerald-200 hover:text-emerald-600 hover:-translate-y-0.5 active:scale-95' 
                   : 'bg-slate-50 border-slate-100 text-slate-300 cursor-not-allowed opacity-50'}
               `}
             >
-              <Share2 className="w-5 h-5" />
+              <Share2 className="w-4 h-4 md:w-4 md:h-4" />
             </button>
 
             {/* Expand/Collapse Toggle */}
             <button 
               onClick={() => toggleExpand()}
-              className="p-3 bg-emerald-600 text-white rounded-2xl shadow-lg shadow-emerald-600/20 hover:bg-emerald-700 hover:scale-105 transition-all active:scale-95 border border-emerald-500 flex items-center gap-1 group overflow-hidden"
+              className="p-2 md:p-2 bg-emerald-600 text-white rounded-xl shadow-md shadow-emerald-600/20 hover:bg-emerald-700 hover:scale-105 transition-all active:scale-95 border border-emerald-500 flex items-center gap-1 group overflow-hidden"
             >
               <motion.div
                 initial={false}
@@ -752,7 +752,7 @@ export default function SpeciesFloatingPanel() {
                 transition={{ type: 'spring', stiffness: 300, damping: 20 }}
                 className="flex items-center justify-center"
               >
-                <ChevronUp className="w-5 h-5" />
+                <ChevronUp className="w-4 h-4 md:w-4 md:h-4" />
               </motion.div>
               
               <AnimatePresence mode="wait" initial={false}>
@@ -762,7 +762,7 @@ export default function SpeciesFloatingPanel() {
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: -10 }}
                   transition={{ duration: 0.15 }}
-                  className="hidden md:inline-block w-12 text-center text-[10px] font-black uppercase tracking-widest"
+                  className="hidden md:inline-block w-10 text-center text-[10px] font-black uppercase tracking-widest"
                 >
                   {isExpanded ? 'Hide' : 'View'}
                 </motion.span>

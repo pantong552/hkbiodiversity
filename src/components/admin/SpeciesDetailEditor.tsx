@@ -575,7 +575,6 @@ const faunaFieldGroups = (t: any): FieldGroup[] => [
       {key: 'global_distribution_eng', labelChi: '全球分布 (英)', labelEng: 'Global Distribution (Eng)', type: 'textarea'},
       {key: 'remarks_chi', labelChi: '備註 (中)', labelEng: 'Remarks (Chi)', type: 'textarea'},
       {key: 'remarks_eng', labelChi: '備註 (英)', labelEng: 'Remarks (Eng)', type: 'textarea'},
-      {key: 'reference_codes', labelChi: '參考文獻 (APA 7th)', labelEng: 'References (APA 7th)', type: 'text'},
     ]
   }
 ];
@@ -646,7 +645,6 @@ const floraFieldGroups = (t: any): FieldGroup[] => [
       { key: 'remark_eng', labelChi: '備註 (英)', labelEng: 'Remarks (Eng)', type: 'textarea' },
       { key: 'flowering_period', labelChi: '花期 (文字描述)', labelEng: 'Flowering Period', type: 'text' },
       { key: 'fruiting_period', labelChi: '果期 (文字描述)', labelEng: 'Fruiting Period', type: 'text' },
-      { key: 'reference_codes', labelChi: '參考文獻 (APA 7th)', labelEng: 'References (APA 7th)', type: 'text' },
     ]
   }
 ];
@@ -680,7 +678,7 @@ export default function SpeciesDetailEditor({ table, data, originalData, onSave,
     } else if (data) {
       setOriginalValues({ ...data });
     }
-  }, [originalData]);
+  }, [originalData, data]);
 
   // 2. 獲取當前資料表預定義的分組
   const baseGroups = useMemo(() => {
@@ -1138,10 +1136,9 @@ export default function SpeciesDetailEditor({ table, data, originalData, onSave,
                       )}
                     </div>
                   )}
-                  {/* 正本發布內容與修訂內容對比小列 */}
-                  {isFieldDirty && (publishedOriginal || originalValues) && (() => {
-                    const compBase = publishedOriginal || originalValues;
-                    const origVal = compBase?.[field.key];
+                  {/* 正本發布內容與修訂內容對比小列 (僅在草稿審核模式時呈現) */}
+                  {isFieldDirty && publishedOriginal && (() => {
+                    const origVal = publishedOriginal?.[field.key];
                     return (
                       <div className="text-[10px] text-amber-900 bg-amber-50/90 border border-amber-200/80 rounded-xl px-3 py-1.5 font-sans leading-relaxed mt-1 flex items-start gap-1.5 shadow-xs">
                         <span className="font-black shrink-0 text-amber-700">
