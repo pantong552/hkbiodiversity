@@ -345,16 +345,7 @@ export default function SpeciesFloatingPanel() {
     }
   }, [isExpanded, pathname]);
 
-  // Auto-collapse panel when navigating to any new page (including /database)
-  const prevPathnameRef = useRef(pathname);
-  useEffect(() => {
-    if (prevPathnameRef.current !== pathname) {
-      if (isExpanded) {
-        toggleExpand(false);
-      }
-      prevPathnameRef.current = pathname;
-    }
-  }, [pathname, isExpanded, toggleExpand]);
+
 
   // --- Auto-scroll to active tab ---
   useEffect(() => {

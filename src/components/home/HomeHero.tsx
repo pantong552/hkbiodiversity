@@ -10,7 +10,7 @@ import { useInaturalistPhoto } from '@/hooks/useInaturalistPhoto';
 import { useSpeciesPanel } from '@/context/SpeciesPanelContext';
 
 // 關鍵字高亮渲染組件
-function HighlightText({ text, query }: { text: string; query: string }) {
+function HighlightText({ text, query, isSelected }: { text: string; query: string; isSelected?: boolean }) {
   if (!query || !text) return <>{text}</>;
   
   const regex = new RegExp(`(${query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi');
@@ -20,7 +20,14 @@ function HighlightText({ text, query }: { text: string; query: string }) {
     <>
       {parts.map((part, i) => (
         regex.test(part) ? (
-          <span key={i} className="text-emerald-600 font-extrabold bg-emerald-500/10 px-0.5 rounded">
+          <span 
+            key={i} 
+            className={
+              isSelected 
+                ? "text-yellow-300 font-extrabold bg-white/20 px-0.5 rounded" 
+                : "text-emerald-600 font-extrabold bg-emerald-500/10 px-0.5 rounded"
+            }
+          >
             {part}
           </span>
         ) : (
@@ -451,7 +458,7 @@ export default function HomeHero() {
                               <div className="flex flex-col min-w-0 flex-1">
                                 <div className="flex items-center gap-2">
                                   <span className={`font-black text-sm md:text-base truncate ${isSelected ? 'text-white' : 'text-slate-800'}`}>
-                                    <HighlightText text={mainName} query={searchQuery} />
+                                    <HighlightText text={mainName} query={searchQuery} isSelected={isSelected} />
                                   </span>
                                   
                                   {/* Badge */}
@@ -465,7 +472,7 @@ export default function HomeHero() {
                                 </div>
 
                                 <span className={`text-xs truncate italic ${isSelected ? 'text-emerald-100/90' : 'text-slate-400'}`}>
-                                  <HighlightText text={subName} query={searchQuery} />
+                                  <HighlightText text={subName} query={searchQuery} isSelected={isSelected} />
                                 </span>
                               </div>
                             </div>
