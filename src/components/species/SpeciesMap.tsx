@@ -6,7 +6,7 @@ import 'maplibre-gl/dist/maplibre-gl.css';
 import * as turf from '@turf/turf';
 import { fetchAllInatObservations, InatObservation } from '@/utils/inaturalist';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Calendar, User, ExternalLink, MapPin, Loader2, Info, Maximize, MousePointer2, Layers, Shield, Link as LinkIcon, Filter, Building2, Camera } from 'lucide-react';
+import { X, Calendar, User, ExternalLink, MapPin, Loader2, Info, Maximize, MousePointer2, Layers, Shield, Link as LinkIcon, Filter, Building2, Camera, ChevronDown, Check } from 'lucide-react';
 import Image from 'next/image';
 import { useLanguage } from '@/context/LanguageContext';
 import { useAuth } from '@/context/AuthContext';
@@ -232,6 +232,8 @@ export default function SpeciesMap({ taxonId, scientificName, chineseName }: Spe
   const [totalBgisCount, setTotalBgisCount] = useState<number>(0);
   const [showInat, setShowInat] = useState(true);
   const [showBgis, setShowBgis] = useState(true);
+  const [isFilterDropdownOpen, setIsFilterDropdownOpen] = useState(false);
+  const filterRef = useRef<HTMLDivElement>(null);
   const [allProcessedFeatures, setAllProcessedFeatures] = useState<any[]>([]);
   const [gridData, setGridData] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -253,6 +255,19 @@ export default function SpeciesMap({ taxonId, scientificName, chineseName }: Spe
     window.addEventListener('resize', checkMobile);
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
+
+  // 點擊外部隱藏 Filter 下拉選單
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (filterRef.current && !filterRef.current.contains(event.target as Node)) {
+        setIsFilterDropdownOpen(false);
+      }
+    };
+    if (isFilterDropdownOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [isFilterDropdownOpen]);
 
   // 點擊外部隱藏版權資訊
   useEffect(() => {
@@ -501,12 +516,13 @@ export default function SpeciesMap({ taxonId, scientificName, chineseName }: Spe
 
       {/* Top Left Dataset Filter Control */}
       {!isLoading && (
-        <div className="absolute top-4 left-4 z-30 flex items-center">
-          <div className="bg-white/95 backdrop-blur-md border border-slate-200/80 shadow-lg rounded-2xl p-1.5 flex items-center gap-1.5">
+        <div ref={filterRef} className="absolute top-4 left-4 z-30 flex items-center">
+          {/* Desktop Filter Bar (sm:flex) */}
+          <div className="hidden sm:flex bg-white/95 backdrop-blur-md border border-slate-200/80 shadow-lg rounded-2xl p-1.5 items-center gap-1.5">
             {/* Filter Label */}
             <div className="px-2 py-1 flex items-center gap-1.5 text-xs font-bold text-slate-700 border-r border-slate-200/60 pr-2.5">
               <Filter className="w-3.5 h-3.5 text-emerald-600" />
-              <span className="hidden sm:inline">{t.datasetFilterLabel}</span>
+              <span>{t.datasetFilterLabel}</span>
             </div>
 
             {/* iNaturalist Button */}
@@ -534,6 +550,62 @@ export default function SpeciesMap({ taxonId, scientificName, chineseName }: Spe
               <span className={`w-2 h-2 rounded-full ${showBgis ? 'bg-white animate-pulse' : 'bg-slate-300'}`} />
               {t.filterBgis}
             </button>
+          </div>
+
+          {/* Mobile Dropdown Control (sm:hidden) */}
+          <div className="sm:hidden relative">
+            <button
+              onClick={() => setIsFilterDropdownOpen(!isFilterDropdownOpen)}
+              className="bg-white/95 backdrop-blur-md border border-slate-200/90 shadow-md rounded-2xl px-3 py-1.5 flex items-center gap-2 text-xs font-bold text-slate-800 cursor-pointer active:scale-95 transition-all"
+            >
+              <Filter className="w-3.5 h-3.5 text-emerald-600" />
+              <span className="text-[11px]">
+                {[showInat ? 'iNat' : null, showBgis ? 'BGIS' : null].filter(Boolean).join(' + ') || (language === 'zh' ? '無選擇' : 'None')}
+              </span>
+              <ChevronDown className={`w-3.5 h-3.5 text-slate-400 transition-transform duration-200 ${isFilterDropdownOpen ? 'rotate-180' : ''}`} />
+            </button>
+
+            <AnimatePresence>
+              {isFilterDropdownOpen && (
+                <motion.div
+                  initial={{ opacity: 0, y: -8, scale: 0.95 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  exit={{ opacity: 0, y: -8, scale: 0.95 }}
+                  transition={{ duration: 0.15 }}
+                  className="absolute top-10 left-0 w-44 bg-white/95 backdrop-blur-xl border border-slate-200 shadow-2xl rounded-2xl p-1.5 flex flex-col gap-1 z-50"
+                >
+                  <button
+                    onClick={() => {
+                      setShowInat(!showInat);
+                    }}
+                    className={`flex items-center justify-between px-3 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                      showInat ? 'bg-emerald-50 text-emerald-800' : 'text-slate-500 hover:bg-slate-50'
+                    }`}
+                  >
+                    <div className="flex items-center gap-2">
+                      <span className={`w-2 h-2 rounded-full ${showInat ? 'bg-emerald-500 animate-pulse' : 'bg-slate-300'}`} />
+                      <span>{t.filterInat}</span>
+                    </div>
+                    {showInat && <Check className="w-3.5 h-3.5 text-emerald-600" />}
+                  </button>
+
+                  <button
+                    onClick={() => {
+                      setShowBgis(!showBgis);
+                    }}
+                    className={`flex items-center justify-between px-3 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                      showBgis ? 'bg-teal-50 text-teal-800' : 'text-slate-500 hover:bg-slate-50'
+                    }`}
+                  >
+                    <div className="flex items-center gap-2">
+                      <span className={`w-2 h-2 rounded-full ${showBgis ? 'bg-teal-500 animate-pulse' : 'bg-slate-300'}`} />
+                      <span>{t.filterBgis}</span>
+                    </div>
+                    {showBgis && <Check className="w-3.5 h-3.5 text-teal-600" />}
+                  </button>
+                </motion.div>
+              )}
+            </AnimatePresence>
           </div>
         </div>
       )}
@@ -657,8 +729,15 @@ export default function SpeciesMap({ taxonId, scientificName, chineseName }: Spe
             animate={isMobile ? { y: 0 } : { opacity: 1, x: 0, scale: 1 }}
             exit={isMobile ? { y: '100%' } : { opacity: 0, x: 20, scale: 0.95 }}
             transition={{ type: "spring", damping: 25, stiffness: 220 }}
+            drag={isMobile ? "y" : false}
+            dragConstraints={{ top: 0, bottom: 0 }}
+            dragElastic={{ top: 0.05, bottom: 0.8 }}
+            onDragEnd={(_e, info) => {
+              if (info.offset.y > 80 || info.velocity.y > 250) {
+                setSelectedGrid(null);
+              }
+            }}
             onWheel={(e) => e.stopPropagation()}
-            onTouchMove={(e) => e.stopPropagation()}
             className={
               isMobile
                 ? "fixed inset-x-0 bottom-0 max-h-[82vh] z-50 bg-white backdrop-blur-2xl rounded-t-[2.5rem] shadow-2xl border-t border-slate-200/80 flex flex-col pointer-events-auto overflow-hidden"
@@ -666,10 +745,10 @@ export default function SpeciesMap({ taxonId, scientificName, chineseName }: Spe
             }
           >
             {/* Seamless Solid Header Banner (Integrating Mobile Drag Indicator) */}
-            <div className="bg-emerald-800 text-white flex flex-col flex-shrink-0 shadow-sm rounded-t-[2.5rem] sm:rounded-t-3xl pt-2 px-4 pb-4 sm:px-5 sm:pb-4 sm:pt-4">
+            <div className="bg-emerald-800 text-white flex flex-col flex-shrink-0 shadow-sm rounded-t-[2.5rem] sm:rounded-t-3xl pt-2 px-4 pb-4 sm:px-5 sm:pb-4 sm:pt-4 cursor-grab active:cursor-grabbing">
               {/* Mobile Drag Indicator Handle */}
               {isMobile && (
-                <div className="w-12 h-1 bg-white/35 rounded-full mx-auto mb-2 flex-shrink-0" />
+                <div className="w-12 h-1.5 bg-white/40 hover:bg-white/60 rounded-full mx-auto mb-2 flex-shrink-0 transition-colors" />
               )}
 
               <div className="flex items-center justify-between">
