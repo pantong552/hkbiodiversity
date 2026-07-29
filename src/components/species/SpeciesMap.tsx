@@ -6,7 +6,7 @@ import 'maplibre-gl/dist/maplibre-gl.css';
 import * as turf from '@turf/turf';
 import { fetchAllInatObservations, InatObservation } from '@/utils/inaturalist';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Calendar, User, ExternalLink, MapPin, Loader2, Info, Maximize, MousePointer2, Layers, Shield, Link as LinkIcon, Filter, Building2, Camera, ChevronDown, Check } from 'lucide-react';
+import { X, Calendar, User, ExternalLink, MapPin, Loader2, Info, Bird, Maximize, MousePointer2, Layers, Shield, Link as LinkIcon, Filter, Building2, Camera, ChevronDown, Check } from 'lucide-react';
 import Image from 'next/image';
 import { useLanguage } from '@/context/LanguageContext';
 import { useAuth } from '@/context/AuthContext';
@@ -269,6 +269,8 @@ export default function SpeciesMap({ taxonId, scientificName, chineseName, taxaG
   const [isLoadingEbirdDetail, setIsLoadingEbirdDetail] = useState(false);
   const [showEbirdDetail, setShowEbirdDetail] = useState(false);
   const [ebirdDetailError, setEbirdDetailError] = useState<string | null>(null);
+  const [showEbirdCitation, setShowEbirdCitation] = useState(false);
+  const [isHoveringEbirdCitation, setIsHoveringEbirdCitation] = useState(false);
 
   useEffect(() => {
     const checkMobile = () => setIsMobile(window.innerWidth < 1024);
@@ -883,13 +885,55 @@ export default function SpeciesMap({ taxonId, scientificName, chineseName, taxaG
                   {/* Header row */}
                   <div className="flex items-center justify-between text-xs font-bold text-amber-900 border-b border-amber-200/60 pb-2">
                     <div className="flex items-center gap-1.5">
-                      <span className="w-2.5 h-2.5 rounded-full bg-amber-500 animate-pulse" />
+                      <Bird className="w-4 h-4 text-amber-600 shrink-0" />
                       <span>{t.ebirdSectionTitle}</span>
+
+                      {/* Info Icon */}
+                      <button
+                        type="button"
+                        onMouseEnter={() => setIsHoveringEbirdCitation(true)}
+                        onMouseLeave={() => setIsHoveringEbirdCitation(false)}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setShowEbirdCitation((prev) => !prev);
+                        }}
+                        className="p-0.5 text-amber-600 hover:text-amber-800 cursor-pointer rounded transition-colors focus:outline-none"
+                        title={language === 'zh' ? '參考引用來源' : 'Reference Citation'}
+                      >
+                        <Info className="w-3.5 h-3.5" />
+                      </button>
                     </div>
                     <span className="font-extrabold text-amber-700 bg-amber-100/80 px-2 py-0.5 rounded-md border border-amber-200">
                       {selectedGrid.ebirdCount} {language === 'zh' ? '個觀測點' : `${(selectedGrid.ebirdCount || 0) === 1 ? 'location' : 'locations'}`}
                     </span>
                   </div>
+
+                  {/* Citation Box (Shows on hover on Info Icon OR click to toggle) */}
+                  {(isHoveringEbirdCitation || showEbirdCitation) && (
+                    <div
+                      onMouseEnter={() => setIsHoveringEbirdCitation(true)}
+                      onMouseLeave={() => setIsHoveringEbirdCitation(false)}
+                      className="p-3 bg-slate-900/95 text-slate-100 text-[11px] leading-relaxed rounded-xl shadow-md border border-slate-700/60 backdrop-blur-xs w-full max-w-full break-words relative animate-in fade-in zoom-in-95 duration-150"
+                    >
+                      <div className="font-semibold text-amber-400 mb-1 flex items-center justify-between">
+                        <span>{language === 'zh' ? '參考引用來源 (Citation)' : 'Reference Citation'}</span>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setShowEbirdCitation(false);
+                            setIsHoveringEbirdCitation(false);
+                          }}
+                          className="text-slate-400 hover:text-white text-xs cursor-pointer px-1"
+                        >
+                          ✕
+                        </button>
+                      </div>
+                      <p className="text-slate-200 font-normal break-words selection:bg-amber-500 selection:text-slate-900 leading-snug">
+                        eBird. 2021. eBird: An online database of bird distribution and abundance [web application]. eBird, Cornell Lab of Ornithology, Ithaca, New York. Available: <a href="http://www.ebird.org" target="_blank" rel="noopener noreferrer" className="text-amber-400 underline hover:text-amber-300">http://www.ebird.org</a>. (Accessed: {new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}).
+                      </p>
+                    </div>
+                  )}
 
                   <div className="text-[11px] text-amber-800 leading-relaxed font-medium">
                     {language === 'zh'
