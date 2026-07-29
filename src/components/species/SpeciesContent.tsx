@@ -387,11 +387,13 @@ export default function SpeciesContent({ species, showBreadcrumb = true, refresh
                 {language === 'zh' ? '地理分布' : 'Distribution'}
               </h2>
               
-              {species.inat_id || species.scientific_name ? (
+              {species.inat_id || species.scientific_name || species.ebird_species_code ? (
                 <SpeciesMap
                   taxonId={species.inat_id ?? 0}
                   scientificName={species.scientific_name}
                   chineseName={species.common_name_chi}
+                  taxaGroup={species.taxa_group}
+                  ebirdSpeciesCode={species.ebird_species_code}
                 />
               ) : (
                 <div className="w-full h-[300px] bg-slate-200 rounded-[2.5rem] flex items-center justify-center text-slate-500">

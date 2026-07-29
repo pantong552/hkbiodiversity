@@ -13,11 +13,14 @@ import { useAuth } from '@/context/AuthContext';
 import { FullscreenControl, NavigationControl as MapNavControl, Popup } from 'react-map-gl/maplibre';
 
 import { fetchBgisSpeciesList, BgisGridRecord, BgisDatasetItem, BGIS_DATASETS } from '@/utils/bgis';
+import { fetchEbirdMapPoints, EbirdRecord, fetchEbirdLocInfo, EbirdLocInfo, getEbirdEvidenceLabel } from '@/utils/ebird';
 
 interface SpeciesMapProps {
   taxonId?: number;
   scientificName?: string;
   chineseName?: string;
+  taxaGroup?: string;
+  ebirdSpeciesCode?: string;
 }
 
 interface GridFeatureProperties {
@@ -27,6 +30,8 @@ interface GridFeatureProperties {
   observations: InatObservation[];
   bgisCount?: number;
   bgisDataset?: BgisDatasetItem[];
+  ebirdCount?: number;
+  ebirdRecords?: EbirdRecord[];
 }
 
 const MAP_SOURCES = {
@@ -165,6 +170,9 @@ const translations = {
     datasetFilterLabel: '資料來源',
     filterInat: 'iNaturalist',
     filterBgis: 'BGIS / HKBIH',
+    filterEbird: 'eBird (HK)',
+    ebirdSectionTitle: 'eBird 觀察記錄數據',
+    ebirdLocationUnit: '個觀測點',
     creditTitle: 'BGIS / HKBIH 資料來源與條款聲明',
     dataSourceLabel: '資料來源：',
     dataSourceText: '香港特別行政區政府漁農自然護理署；香港生物多樣性資訊站 - 生物多樣性地理信息系統',
@@ -202,6 +210,9 @@ const translations = {
     datasetFilterLabel: 'Data Sources',
     filterInat: 'iNaturalist',
     filterBgis: 'BGIS / HKBIH',
+    filterEbird: 'eBird (HK)',
+    ebirdSectionTitle: 'eBird Observation Data',
+    ebirdLocationUnit: 'location',
     creditTitle: 'BGIS / HKBIH Data Attribution & Terms',
     dataSourceLabel: 'Data Source:',
     dataSourceText: 'Agriculture, Fisheries and Conservation Department, The Government of the Hong Kong Special Administrative Region; Hong Kong Biodiversity Information Hub - Biodiversity Geographic Information System',
@@ -217,11 +228,13 @@ const translations = {
   }
 };
 
-export default function SpeciesMap({ taxonId, scientificName, chineseName }: SpeciesMapProps) {
+export default function SpeciesMap({ taxonId, scientificName, chineseName, taxaGroup, ebirdSpeciesCode }: SpeciesMapProps) {
   const { language } = useLanguage();
   const { profile } = useAuth();
   const isAdmin = profile?.role === 'admin';
   const t = translations[language === 'zh' ? 'zh' : 'en'];
+
+  const isBirdGroup = String(taxaGroup || '').trim().toUpperCase() === 'BIRD';
 
   const getRecordUnit = (count: number) => {
     if (language === 'zh') return '筆';
@@ -230,8 +243,10 @@ export default function SpeciesMap({ taxonId, scientificName, chineseName }: Spe
 
   const [observations, setObservations] = useState<InatObservation[]>([]);
   const [totalBgisCount, setTotalBgisCount] = useState<number>(0);
+  const [ebirdRecords, setEbirdRecords] = useState<EbirdRecord[]>([]);
   const [showInat, setShowInat] = useState(true);
   const [showBgis, setShowBgis] = useState(true);
+  const [showEbird, setShowEbird] = useState(true);
   const [isFilterDropdownOpen, setIsFilterDropdownOpen] = useState(false);
   const filterRef = useRef<HTMLDivElement>(null);
   const [allProcessedFeatures, setAllProcessedFeatures] = useState<any[]>([]);
@@ -239,7 +254,7 @@ export default function SpeciesMap({ taxonId, scientificName, chineseName }: Spe
   const [isLoading, setIsLoading] = useState(true);
   const [progress, setProgress] = useState({ current: 0, total: 0 });
   const [selectedGrid, setSelectedGrid] = useState<GridFeatureProperties | null>(null);
-  const [hoveredGrid, setHoveredGrid] = useState<{ id: string, count: number, bgisCount?: number, x: number, y: number } | null>(null);
+  const [hoveredGrid, setHoveredGrid] = useState<{ id: string, count: number, bgisCount?: number, ebirdCount?: number, x: number, y: number } | null>(null);
   const [mapLoaded, setMapLoaded] = useState(false);
   const [cursorStyle, setCursorStyle] = useState<string>('auto');
   const [currentStyleId, setCurrentStyleId] = useState('carto-light');
@@ -248,6 +263,12 @@ export default function SpeciesMap({ taxonId, scientificName, chineseName }: Spe
   const [showAttribution, setShowAttribution] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
   const attributionRef = useRef<HTMLDivElement>(null);
+
+  // eBird 位置詳情狀態
+  const [ebirdLocDetails, setEbirdLocDetails] = useState<EbirdLocInfo[]>([]);
+  const [isLoadingEbirdDetail, setIsLoadingEbirdDetail] = useState(false);
+  const [showEbirdDetail, setShowEbirdDetail] = useState(false);
+  const [ebirdDetailError, setEbirdDetailError] = useState<string | null>(null);
 
   useEffect(() => {
     const checkMobile = () => setIsMobile(window.innerWidth < 1024);
@@ -288,6 +309,7 @@ export default function SpeciesMap({ taxonId, scientificName, chineseName }: Spe
   const currentStyle = BASEMAPS.find(m => m.id === currentStyleId)?.style || BASEMAPS[0].style;
 
   // 動態根據選取的 Dataset Filter (iNaturalist / BGIS) 實時更新地圖 GeoJSON 網格資料
+  // 動態根據選取的 Dataset Filter (iNaturalist / BGIS / eBird) 實時更新地圖 GeoJSON 網格資料
   useEffect(() => {
     if (allProcessedFeatures.length === 0) return;
 
@@ -295,7 +317,8 @@ export default function SpeciesMap({ taxonId, scientificName, chineseName }: Spe
       .map(f => {
         const inatCount = showInat ? (f.properties.count || 0) : 0;
         const bgisCount = showBgis ? (f.properties.bgisCount || 0) : 0;
-        const activeTotal = inatCount + bgisCount;
+        const ebirdCount = (isBirdGroup && showEbird) ? (f.properties.ebirdCount || 0) : 0;
+        const activeTotal = inatCount + bgisCount + ebirdCount;
 
         return {
           ...f,
@@ -311,17 +334,17 @@ export default function SpeciesMap({ taxonId, scientificName, chineseName }: Spe
       type: 'FeatureCollection',
       features: filteredFeatures
     });
-  }, [allProcessedFeatures, showInat, showBgis]);
+  }, [allProcessedFeatures, showInat, showBgis, showEbird, isBirdGroup]);
 
   // Initial Data Loading
   useEffect(() => {
     async function loadData() {
       setIsLoading(true);
-      console.log('SpeciesMap: 正在啟動載入程序...', { taxonId, scientificName, chineseName });
+      console.log('SpeciesMap: 正在啟動載入程序...', { taxonId, scientificName, chineseName, ebirdSpeciesCode });
 
       try {
-        // 並行獲取 iNaturalist 觀測 與 BGIS 網格數據
-        const [obs, bgisList] = await Promise.all([
+        // 並行獲取 iNaturalist 觀測、BGIS 網格數據 以及 eBird 地圖點位數據
+        const [obs, bgisList, ebirdPts] = await Promise.all([
           taxonId && taxonId > 0
             ? fetchAllInatObservations(taxonId, (current, total) => {
                 setProgress({ current, total });
@@ -329,11 +352,15 @@ export default function SpeciesMap({ taxonId, scientificName, chineseName }: Spe
             : Promise.resolve([]),
           (scientificName || chineseName)
             ? fetchBgisSpeciesList(scientificName || '', chineseName)
+            : Promise.resolve([]),
+          (isBirdGroup && ebirdSpeciesCode)
+            ? fetchEbirdMapPoints(ebirdSpeciesCode)
             : Promise.resolve([])
         ]);
 
-        console.log(`SpeciesMap: 成功抓取到 ${obs.length} 筆 iNat 紀錄, ${bgisList.length} 筆 BGIS 網格紀錄`);
+        console.log(`SpeciesMap: 成功抓取到 ${obs.length} 筆 iNat 紀錄, ${bgisList.length} 筆 BGIS 網格紀錄, ${ebirdPts.length} 筆 eBird 紀錄`);
         setObservations(obs);
+        setEbirdRecords(ebirdPts);
 
         // 將 BGIS list 建立網格編號對照物件 (對 item.no 執行嚴格規格化轉碼)
         const bgisMap: Record<string, BgisGridRecord> = {};
@@ -360,6 +387,7 @@ export default function SpeciesMap({ taxonId, scientificName, chineseName }: Spe
 
         let totalInatCounted = 0;
         let totalBgisCounted = 0;
+        let totalEbirdCounted = 0;
 
         // 建構 iNat 點位
         const obsPoints = obs.map((o, idx) => {
@@ -370,7 +398,13 @@ export default function SpeciesMap({ taxonId, scientificName, chineseName }: Spe
           return turf.point([lng, lat], { ...o });
         }).filter(Boolean) as any;
 
-        // 遍歷所有網格並匹配兩者數據
+        // 建構 eBird 點位
+        const ebirdTurfPoints = ebirdPts.map((eb) => {
+          if (eb.x === undefined || eb.y === undefined) return null;
+          return turf.point([eb.x, eb.y], { ...eb });
+        }).filter(Boolean) as any;
+
+        // 遍歷所有網格並匹配兩者與 eBird 數據
         geojson.features.forEach((feature: any, idx: number) => {
           const rawId = feature.properties?.grid_no ?? feature.properties?.grid_id;
           const cleanId = rawId !== undefined && rawId !== null 
@@ -399,11 +433,19 @@ export default function SpeciesMap({ taxonId, scientificName, chineseName }: Spe
             feature.properties.bgisDataset = [];
           }
 
+          // 3. eBird 點位匹配
+          const ebirdPtsInPoly = ebirdTurfPoints.filter((pt: any) =>
+            turf.booleanPointInPolygon(pt, feature)
+          );
+          feature.properties.ebirdCount = ebirdPtsInPoly.length;
+          feature.properties.ebirdRecords = ebirdPtsInPoly.map((p: any) => p.properties);
+          totalEbirdCounted += ebirdPtsInPoly.length;
+
           // 綜合計數
-          feature.properties.totalCount = feature.properties.count + feature.properties.bgisCount;
+          feature.properties.totalCount = feature.properties.count + feature.properties.bgisCount + feature.properties.ebirdCount;
         });
 
-        console.log(`SpeciesMap: 數據聚合完成 (iNat 匹配點: ${totalInatCounted}, BGIS 總紀錄: ${realBgisTotal}, 網格內匹配紀錄: ${totalBgisCounted})`);
+        console.log(`SpeciesMap: 數據聚合完成 (iNat 匹配點: ${totalInatCounted}, BGIS 總紀錄: ${realBgisTotal}, eBird 匹配紀錄: ${totalEbirdCounted})`);
         setAllProcessedFeatures(geojson.features);
       } catch (error) {
         console.error('SpeciesMap: 載入或聚合過程中發生錯誤:', error);
@@ -412,10 +454,10 @@ export default function SpeciesMap({ taxonId, scientificName, chineseName }: Spe
       }
     }
 
-    if (taxonId || scientificName || chineseName) {
+    if (taxonId || scientificName || chineseName || ebirdSpeciesCode) {
       loadData();
     }
-  }, [taxonId, scientificName, chineseName]);
+  }, [taxonId, scientificName, chineseName, isBirdGroup, ebirdSpeciesCode]);
 
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -431,6 +473,10 @@ export default function SpeciesMap({ taxonId, scientificName, chineseName }: Spe
         ? JSON.parse(props.bgisDataset)
         : (props.bgisDataset || []);
 
+      const ebirdRecordList = typeof props.ebirdRecords === 'string'
+        ? JSON.parse(props.ebirdRecords)
+        : (props.ebirdRecords || []);
+
       const rawId = props.grid_no ?? props.grid_id;
       const cleanId = rawId !== undefined && rawId !== null
         ? (isNaN(Number(rawId)) ? String(rawId) : String(parseFloat(String(rawId))))
@@ -438,18 +484,28 @@ export default function SpeciesMap({ taxonId, scientificName, chineseName }: Spe
 
       const count = Number(props.count || 0);
       const bgisCount = Number(props.bgisCount || 0);
+      const ebirdCount = Number(props.ebirdCount || 0);
 
-      if (count > 0 || bgisCount > 0) {
+      if (count > 0 || bgisCount > 0 || ebirdCount > 0) {
+        // 切換網格時重置 eBird 詳情
+        setShowEbirdDetail(false);
+        setEbirdLocDetails([]);
+        setEbirdDetailError(null);
         setSelectedGrid({
           grid_id: cleanId,
           grid_no: cleanId,
           count: count,
           observations: obsList,
           bgisCount: bgisCount,
-          bgisDataset: bgisDatasetList
+          bgisDataset: bgisDatasetList,
+          ebirdCount: ebirdCount,
+          ebirdRecords: ebirdRecordList
         });
       }
     } else {
+      setShowEbirdDetail(false);
+      setEbirdLocDetails([]);
+      setEbirdDetailError(null);
       setSelectedGrid(null);
     }
   };
@@ -466,6 +522,7 @@ export default function SpeciesMap({ taxonId, scientificName, chineseName }: Spe
         id: cleanId,
         count: Number(feature.properties?.count || 0),
         bgisCount: Number(feature.properties?.bgisCount || 0),
+        ebirdCount: Number(feature.properties?.ebirdCount || 0),
         x: event.point.x,
         y: event.point.y
       });
@@ -550,6 +607,21 @@ export default function SpeciesMap({ taxonId, scientificName, chineseName }: Spe
               <span className={`w-2 h-2 rounded-full ${showBgis ? 'bg-white animate-pulse' : 'bg-slate-300'}`} />
               {t.filterBgis}
             </button>
+
+            {/* eBird Button (Bird Only) */}
+            {isBirdGroup && (
+              <button
+                onClick={() => setShowEbird(!showEbird)}
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+                  showEbird
+                    ? 'bg-amber-600 text-white shadow-sm ring-2 ring-amber-500/20'
+                    : 'bg-slate-100 text-slate-400 hover:bg-slate-200/70 hover:text-slate-600'
+                }`}
+              >
+                <span className={`w-2 h-2 rounded-full ${showEbird ? 'bg-white animate-pulse' : 'bg-slate-300'}`} />
+                {t.filterEbird}
+              </button>
+            )}
           </div>
 
           {/* Mobile Dropdown Control (sm:hidden) */}
@@ -560,7 +632,7 @@ export default function SpeciesMap({ taxonId, scientificName, chineseName }: Spe
             >
               <Filter className="w-3.5 h-3.5 text-emerald-600" />
               <span className="text-[11px]">
-                {[showInat ? 'iNat' : null, showBgis ? 'BGIS' : null].filter(Boolean).join(' + ') || (language === 'zh' ? '無選擇' : 'None')}
+                {[showInat ? 'iNat' : null, showBgis ? 'BGIS' : null, (isBirdGroup && showEbird) ? 'eBird' : null].filter(Boolean).join(' + ') || (language === 'zh' ? '無選擇' : 'None')}
               </span>
               <ChevronDown className={`w-3.5 h-3.5 text-slate-400 transition-transform duration-200 ${isFilterDropdownOpen ? 'rotate-180' : ''}`} />
             </button>
@@ -603,6 +675,23 @@ export default function SpeciesMap({ taxonId, scientificName, chineseName }: Spe
                     </div>
                     {showBgis && <Check className="w-3.5 h-3.5 text-teal-600" />}
                   </button>
+
+                  {isBirdGroup && (
+                    <button
+                      onClick={() => {
+                        setShowEbird(!showEbird);
+                      }}
+                      className={`flex items-center justify-between px-3 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                        showEbird ? 'bg-amber-50 text-amber-800' : 'text-slate-500 hover:bg-slate-50'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2">
+                        <span className={`w-2 h-2 rounded-full ${showEbird ? 'bg-amber-500 animate-pulse' : 'bg-slate-300'}`} />
+                        <span>{t.filterEbird}</span>
+                      </div>
+                      {showEbird && <Check className="w-3.5 h-3.5 text-amber-600" />}
+                    </button>
+                  )}
                 </motion.div>
               )}
             </AnimatePresence>
@@ -741,7 +830,7 @@ export default function SpeciesMap({ taxonId, scientificName, chineseName }: Spe
             className={
               isMobile
                 ? "fixed inset-x-0 bottom-0 max-h-[82vh] z-50 bg-white backdrop-blur-2xl rounded-t-[2.5rem] shadow-2xl border-t border-slate-200/80 flex flex-col pointer-events-auto overflow-hidden"
-                : "absolute top-4 right-4 bottom-4 w-85 z-40 bg-white backdrop-blur-2xl border border-slate-200/80 shadow-2xl rounded-3xl overflow-hidden flex flex-col pointer-events-auto"
+                : "absolute top-4 right-4 bottom-4 w-85 z-40 bg-white backdrop-blur-2xl border border-slate-200 shadow-2xl rounded-2xl flex flex-col pointer-events-auto overflow-hidden"
             }
           >
             {/* Seamless Solid Header Banner (Integrating Mobile Drag Indicator) */}
@@ -767,7 +856,13 @@ export default function SpeciesMap({ taxonId, scientificName, chineseName }: Spe
                   <p className="text-emerald-100 text-[11px] sm:text-xs opacity-90 font-medium pt-0.5">
                     {[
                       showInat && selectedGrid.count > 0 ? `iNat: ${selectedGrid.count} ${getRecordUnit(selectedGrid.count)}` : null,
-                      showBgis && (selectedGrid.bgisCount || 0) > 0 ? `BGIS: ${selectedGrid.bgisCount} ${getRecordUnit(selectedGrid.bgisCount || 0)}` : null
+                      showBgis && (selectedGrid.bgisCount || 0) > 0 ? `BGIS: ${selectedGrid.bgisCount} ${getRecordUnit(selectedGrid.bgisCount || 0)}` : null,
+                      (isBirdGroup && showEbird && (selectedGrid.ebirdCount || 0) > 0)
+                         ? `eBird: ${selectedGrid.ebirdCount} ${
+                             language === 'zh'
+                               ? `個觀測點`
+                               : `${selectedGrid.ebirdCount === 1 ? 'location' : 'locations'}`
+                           }` : null
                     ].filter(Boolean).join(' | ') || (language === 'zh' ? '無觀測記錄' : 'No Records')}
                   </p>
                 </div>
@@ -782,6 +877,159 @@ export default function SpeciesMap({ taxonId, scientificName, chineseName }: Spe
 
             {/* List Body */}
             <div className="flex-1 overflow-y-auto overscroll-contain p-4 space-y-4 custom-scrollbar">
+              {/* eBird Section */}
+              {isBirdGroup && showEbird && (selectedGrid.ebirdCount || 0) > 0 && (
+                <div className="bg-amber-50/70 border border-amber-200/70 rounded-2xl p-3.5 space-y-2.5 shadow-xs">
+                  {/* Header row */}
+                  <div className="flex items-center justify-between text-xs font-bold text-amber-900 border-b border-amber-200/60 pb-2">
+                    <div className="flex items-center gap-1.5">
+                      <span className="w-2.5 h-2.5 rounded-full bg-amber-500 animate-pulse" />
+                      <span>{t.ebirdSectionTitle}</span>
+                    </div>
+                    <span className="font-extrabold text-amber-700 bg-amber-100/80 px-2 py-0.5 rounded-md border border-amber-200">
+                      {selectedGrid.ebirdCount} {language === 'zh' ? '個觀測點' : `${(selectedGrid.ebirdCount || 0) === 1 ? 'location' : 'locations'}`}
+                    </span>
+                  </div>
+
+                  <div className="text-[11px] text-amber-800 leading-relaxed font-medium">
+                    {language === 'zh'
+                      ? '在目前網格區域內記錄到 eBird 觀測數據點。'
+                      : 'eBird observation points recorded within this grid area.'}
+                  </div>
+
+                  {/* Action buttons row */}
+                  <div className="flex items-center flex-wrap gap-2 pt-0.5">
+                    {/* Show Detail Button */}
+                    <button
+                      onClick={async () => {
+                        if (showEbirdDetail) {
+                          setShowEbirdDetail(false);
+                          return;
+                        }
+                        if (!ebirdSpeciesCode || !selectedGrid.ebirdRecords) return;
+                        setIsLoadingEbirdDetail(true);
+                        setEbirdDetailError(null);
+                        setEbirdLocDetails([]);
+                        try {
+                          // 逐一對每個 eBird 位置 ID 查詢 locinfo
+                          const locIDs = [...new Set(
+                            (selectedGrid.ebirdRecords || []).map(r => r.n).filter(Boolean)
+                          )];
+                          const allInfoList: EbirdLocInfo[] = [];
+                          for (const locID of locIDs) {
+                            const result = await fetchEbirdLocInfo(locID, ebirdSpeciesCode);
+                            if (result?.infoList) {
+                              allInfoList.push(...result.infoList);
+                            }
+                          }
+                          // 按日期降序排列
+                          allInfoList.sort((a, b) => b.obsDt.localeCompare(a.obsDt));
+                          setEbirdLocDetails(allInfoList);
+                          setShowEbirdDetail(true);
+                        } catch (err) {
+                          setEbirdDetailError(language === 'zh' ? '載入詳細記錄失敗' : 'Failed to load details');
+                        } finally {
+                          setIsLoadingEbirdDetail(false);
+                        }
+                      }}
+                      disabled={isLoadingEbirdDetail}
+                      className="inline-flex items-center gap-1.5 px-2.5 py-1.5 bg-amber-500 hover:bg-amber-600 disabled:opacity-60 text-white rounded-xl font-bold text-[11px] transition-all cursor-pointer shadow-sm active:scale-95"
+                    >
+                      {isLoadingEbirdDetail ? (
+                        <Loader2 className="w-3 h-3 animate-spin" />
+                      ) : (
+                        <ChevronDown className={`w-3 h-3 transition-transform ${showEbirdDetail ? 'rotate-180' : ''}`} />
+                      )}
+                      <span>
+                        {isLoadingEbirdDetail
+                          ? (language === 'zh' ? '載入中...' : 'Loading...')
+                          : showEbirdDetail
+                            ? (language === 'zh' ? '收起詳情' : 'Collapse')
+                            : (language === 'zh' ? '顯示詳情' : 'Show Details')}
+                      </span>
+                    </button>
+
+                    {ebirdSpeciesCode && (
+                      <a
+                        href={`https://ebird.org/species/${ebirdSpeciesCode}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1 text-[11px] font-bold text-amber-700 hover:text-amber-900 hover:underline"
+                      >
+                        <ExternalLink className="w-3 h-3" />
+                        <span>{language === 'zh' ? 'eBird 物種頁面' : 'Species on eBird'}</span>
+                      </a>
+                    )}
+                  </div>
+
+                  {/* Error */}
+                  {ebirdDetailError && (
+                    <div className="text-[11px] text-red-600 font-medium">{ebirdDetailError}</div>
+                  )}
+
+                  {/* Detail List */}
+                  {showEbirdDetail && !isLoadingEbirdDetail && ebirdLocDetails.length > 0 && (
+                    <div className="space-y-2 pt-1">
+                      <div className="text-[10px] font-extrabold text-amber-700 uppercase tracking-wider">
+                        {language === 'zh' ? `共 ${ebirdLocDetails.length} 筆觀察記錄` : `${ebirdLocDetails.length} Observation Records`}
+                      </div>
+                      {ebirdLocDetails.map((info, idx) => (
+                        <div
+                          key={`${info.subID}-${idx}`}
+                          className="bg-white border border-amber-100 rounded-xl p-2.5 space-y-1.5 shadow-2xs hover:border-amber-300 transition-colors"
+                        >
+                          {/* Date + Count row */}
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-1.5 text-[11px] font-bold text-slate-800">
+                              <Calendar className="w-3 h-3 text-amber-500" />
+                              <span>{info.obsDt}</span>
+                            </div>
+                            <span className="text-[11px] font-extrabold text-amber-700 bg-amber-50 px-2 py-0.5 rounded-lg border border-amber-200">
+                              ×{info.howMany}
+                            </span>
+                          </div>
+
+                          {/* Observer */}
+                          <div className="flex items-center gap-1.5 text-[10px] text-slate-600">
+                            <User className="w-3 h-3 text-slate-400" />
+                            <span className="font-medium">{info.userDisplayName}</span>
+                          </div>
+
+                          {/* Evidence badge */}
+                          <div className="flex items-center gap-1.5">
+                            <span className={`inline-flex items-center px-1.5 py-0.5 rounded-md text-[9px] font-extrabold uppercase tracking-wide border ${
+                              info.evidence === 'P'
+                                ? 'bg-blue-50 text-blue-700 border-blue-200'
+                                : info.evidence === 'A'
+                                  ? 'bg-purple-50 text-purple-700 border-purple-200'
+                                  : info.evidence === 'V'
+                                    ? 'bg-rose-50 text-rose-700 border-rose-200'
+                                    : 'bg-slate-100 text-slate-600 border-slate-200'
+                            }`}>
+                              {getEbirdEvidenceLabel(info.evidence, language === 'zh' ? 'zh' : 'en')}
+                            </span>
+                            <a
+                              href={`https://ebird.org/checklist/${info.subID}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-[10px] text-amber-600 hover:underline font-mono"
+                            >
+                              {info.subID}
+                            </a>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {showEbirdDetail && !isLoadingEbirdDetail && ebirdLocDetails.length === 0 && (
+                    <div className="text-[11px] text-amber-700 font-medium py-1">
+                      {language === 'zh' ? '此網格內無法取得詳細記錄。' : 'No detail records available for this grid.'}
+                    </div>
+                  )}
+                </div>
+              )}
+
               {/* BGIS Dataset Info Section */}
               {showBgis && selectedGrid.bgisDataset && selectedGrid.bgisDataset.length > 0 && (selectedGrid.bgisCount || 0) > 0 && (
                 <div className="bg-slate-50/80 border border-slate-200/70 rounded-2xl p-3.5 space-y-2.5 shadow-xs">
@@ -880,10 +1128,10 @@ export default function SpeciesMap({ taxonId, scientificName, chineseName }: Spe
               )}
 
               {/* Empty state prompt if all selected filters are hidden or empty */}
-              {((!showInat && !showBgis) ||
-                (!showInat && showBgis && (!selectedGrid.bgisDataset || selectedGrid.bgisDataset.length === 0)) ||
-                (showInat && !showBgis && (!selectedGrid.observations || selectedGrid.observations.length === 0)) ||
-                (showInat && showBgis && (!selectedGrid.observations || selectedGrid.observations.length === 0) && (!selectedGrid.bgisDataset || selectedGrid.bgisDataset.length === 0))) && (
+              {((!showInat && !showBgis && (!isBirdGroup || !showEbird)) ||
+                (showInat && (!selectedGrid.observations || selectedGrid.observations.length === 0) &&
+                 (!showBgis || (!selectedGrid.bgisDataset || selectedGrid.bgisDataset.length === 0)) &&
+                 (!isBirdGroup || !showEbird || (!selectedGrid.ebirdCount)))) && (
                 <div className="py-12 text-center text-slate-400 space-y-2">
                   <Info className="w-8 h-8 mx-auto text-slate-300 opacity-60" />
                   <p className="text-xs font-bold">
@@ -1049,9 +1297,17 @@ export default function SpeciesMap({ taxonId, scientificName, chineseName }: Spe
                   <span>{hoveredGrid.bgisCount} {getRecordUnit(hoveredGrid.bgisCount || 0)}</span>
                 </div>
               )}
-              {((!showInat || hoveredGrid.count === 0) && (!showBgis || (hoveredGrid.bgisCount || 0) === 0)) && (
+              {isBirdGroup && showEbird && (hoveredGrid.ebirdCount || 0) > 0 && (
+                <div className="flex items-center justify-between gap-3 text-amber-300">
+                  <span className="text-[10px] opacity-80">eBird:</span>
+                  <span>{hoveredGrid.ebirdCount} {language === 'zh' ? '個觀測點' : `${(hoveredGrid.ebirdCount || 0) === 1 ? 'loc' : 'locs'}`}</span>
+                </div>
+              )}
+              {((!showInat || hoveredGrid.count === 0) &&
+                (!showBgis || (hoveredGrid.bgisCount || 0) === 0) &&
+                (!isBirdGroup || !showEbird || (hoveredGrid.ebirdCount || 0) === 0)) && (
                 <div className="text-[10px] text-slate-400 font-medium py-0.5">
-                  {!showInat && !showBgis
+                  {!showInat && !showBgis && (!isBirdGroup || !showEbird)
                     ? (language === 'zh' ? '未勾選來源' : 'No Source Selected')
                     : (language === 'zh' ? '無觀測記錄' : 'No Records')}
                 </div>
@@ -1068,8 +1324,8 @@ export default function SpeciesMap({ taxonId, scientificName, chineseName }: Spe
           <span className="w-2 h-2 rounded-full bg-emerald-500 shadow-glow animate-pulse flex-shrink-0" />
           <span className="text-[11px] font-extrabold text-slate-700 truncate">
             {language === 'zh'
-              ? `已載入 ${(showInat ? observations.length : 0) + (showBgis ? totalBgisCount : 0)} 筆記錄`
-              : `Loaded ${(showInat ? observations.length : 0) + (showBgis ? totalBgisCount : 0)} Records`}
+              ? `已載入 ${(showInat ? observations.length : 0) + (showBgis ? totalBgisCount : 0) + ((isBirdGroup && showEbird) ? ebirdRecords.length : 0)} 筆記錄`
+              : `Loaded ${(showInat ? observations.length : 0) + (showBgis ? totalBgisCount : 0) + ((isBirdGroup && showEbird) ? ebirdRecords.length : 0)} Records`}
           </span>
         </div>
 

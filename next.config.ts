@@ -7,6 +7,10 @@ const nextConfig: NextConfig = {
         source: '/bgis-api/:path*',
         destination: 'https://bih.gov.hk/BGIS/API/:path*',
       },
+      {
+        source: '/ebird-api/:path*',
+        destination: 'https://ebird.org/:path*',
+      },
     ];
   },
   images: {
