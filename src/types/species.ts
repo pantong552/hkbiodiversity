@@ -2,6 +2,8 @@ export interface Species {
   id: number;
   taxa_id?: string;
   inat_id: number;
+  col_usage_id?: string;
+  ebird_species_code?: string;
   taxa_group: string;
   
   // Names

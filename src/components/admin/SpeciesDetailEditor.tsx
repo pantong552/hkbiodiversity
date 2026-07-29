@@ -503,6 +503,7 @@ const faunaFieldGroups = (t: any): FieldGroup[] => [
       { key: 'taxa_id', labelChi: '物種 ID', labelEng: 'Taxa ID', type: 'text', readOnly: true },
       { key: 'inat_id', labelChi: 'iNaturalist ID', labelEng: 'iNaturalist ID', type: 'number' },
       { key: 'col_usage_id', labelChi: 'Catalogue of Life ID', labelEng: 'Catalogue of Life ID', type: 'text' },
+      { key: 'ebird_species_code', labelChi: 'eBird Species Code', labelEng: 'eBird Species Code', type: 'text' },
       { key: 'taxa_group', labelChi: '物種分類群', labelEng: 'Taxa Group', type: 'text' },
       { key: 'informal_group_eng', labelChi: '非正式群組 (英)', labelEng: 'Informal Group (Eng)', type: 'text' },
       { key: 'informal_group_chi', labelChi: '非正式群組 (中)', labelEng: 'Informal Group (Chi)', type: 'text', readOnly: true },
@@ -591,6 +592,7 @@ const floraFieldGroups = (t: any): FieldGroup[] => [
       { key: 'oid', labelChi: 'OID', labelEng: 'OID', type: 'number', readOnly: true },
       { key: 'inat_id', labelChi: 'iNaturalist ID', labelEng: 'iNaturalist ID', type: 'number' },
       { key: 'col_usage_id', labelChi: 'Catalogue of Life ID', labelEng: 'Catalogue of Life ID', type: 'text' },
+      { key: 'ebird_species_code', labelChi: 'eBird Species Code', labelEng: 'eBird Species Code', type: 'text' },
       { key: 'category_chi', labelChi: '植物類別 (中)', labelEng: 'Category (Chi)', type: 'text', readOnly: true },
       { key: 'category_eng', labelChi: '植物類別 (英)', labelEng: 'Category (Eng)', type: 'text' },
       { key: 'common_name_chi', labelChi: '中文俗名', labelEng: 'Common Name (Chi)', type: 'text' },
@@ -1018,7 +1020,9 @@ export default function SpeciesDetailEditor({ table, data, originalData, onSave,
                 }
               }
 
-              const isReadOnly = field.readOnly;
+              const currentTaxaGroup = String(data?.taxa_group || '').trim().toUpperCase();
+              const isBirdOnlyFieldDisabled = field.key === 'ebird_species_code' && currentTaxaGroup !== 'BIRD';
+              const isReadOnly = field.readOnly || isBirdOnlyFieldDisabled;
               const isTextarea = field.type === 'textarea';
               const label = language === 'zh' ? field.labelChi : field.labelEng;
               const isFieldDirty = checkIsDirty(field.key);
@@ -1058,10 +1062,19 @@ export default function SpeciesDetailEditor({ table, data, originalData, onSave,
                       className={`border rounded-xl px-4 py-2.5 text-xs font-semibold select-none flex items-center justify-between cursor-not-allowed group/readonly ${
                         isFieldDirty ? 'bg-emerald-100/50 border-emerald-300 text-emerald-900 font-bold' : 'bg-slate-50/80 border-slate-100 text-slate-400'
                       }`}
-                      title={language === 'zh' ? '此為系統唯讀欄位' : 'This field is read-only'}
+                      title={isBirdOnlyFieldDisabled ? 'Bird only' : (language === 'zh' ? '此為系統唯讀欄位' : 'This field is read-only')}
                     >
-                      <span className="font-mono opacity-80">{String(val)}</span>
-                      <Lock className="w-3.5 h-3.5 text-slate-300 group-hover/readonly:text-slate-400 transition-colors" />
+                      <span className="font-mono opacity-80">
+                        {isBirdOnlyFieldDisabled && (!val || String(val).trim() === '') ? 'Bird only' : String(val)}
+                      </span>
+                      <div className="flex items-center gap-1.5">
+                        {isBirdOnlyFieldDisabled && (
+                          <span className="text-[10px] text-amber-600 bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded font-sans font-bold">
+                            Bird only
+                          </span>
+                        )}
+                        <Lock className="w-3.5 h-3.5 text-slate-300 group-hover/readonly:text-slate-400 transition-colors" />
+                      </div>
                     </div>
                   ) : isTextarea ? (
                     <div className="relative">
@@ -1110,12 +1123,14 @@ export default function SpeciesDetailEditor({ table, data, originalData, onSave,
                         }`}
                         placeholder={language === 'zh' ? `請輸入 ${label}...` : `Enter ${label}...`}
                       />
-                      {(field.key === 'col_usage_id' || field.key === 'inat_id') && (
+                      {(field.key === 'col_usage_id' || field.key === 'inat_id' || field.key === 'ebird_species_code') && (
                         <a
                           href={
                             val 
                               ? (field.key === 'col_usage_id'
                                   ? `https://www.catalogueoflife.org/data/taxon/${val}`
+                                  : field.key === 'ebird_species_code'
+                                  ? `https://ebird.org/species/${val}`
                                   : `https://www.inaturalist.org/taxa/${val}`)
                               : undefined
                           }
@@ -1129,7 +1144,7 @@ export default function SpeciesDetailEditor({ table, data, originalData, onSave,
                           onClick={(e) => {
                             if (!val) e.preventDefault();
                           }}
-                          title={val ? (language === 'zh' ? '開啟外部連結' : 'Open external link') : (language === 'zh' ? '請先輸入 ID' : 'Please enter ID first')}
+                          title={val ? (language === 'zh' ? '開啟外部連結' : 'Open external link') : (language === 'zh' ? '請先輸入 Code / ID' : 'Please enter Code / ID first')}
                         >
                           <ExternalLink className="w-4 h-4" />
                         </a>

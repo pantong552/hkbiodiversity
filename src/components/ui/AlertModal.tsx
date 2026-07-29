@@ -95,7 +95,7 @@ export default function AlertModal({
             initial={{ opacity: 0, scale: 0.96, y: 10 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.96, y: 10 }}
-            className="relative w-full max-w-[300px] bg-white rounded-[2.2rem] shadow-[0_20px_50px_-12px_rgba(0,0,0,0.25)] overflow-hidden"
+            className="relative w-full max-w-[340px] bg-white rounded-[2.2rem] shadow-[0_20px_50px_-12px_rgba(0,0,0,0.25)] overflow-hidden"
           >
             <div className="pt-8 pb-5 px-6 text-center">
               <div className={`w-14 h-14 ${getIconBg()} rounded-[1.2rem] flex items-center justify-center mb-4 mx-auto`}>
@@ -111,23 +111,25 @@ export default function AlertModal({
             </div>
 
             {/* Compact Grid Buttons */}
-            <div className="grid grid-cols-2 border-t border-slate-50 relative">
+            <div className="grid grid-cols-2 border-t border-slate-100 relative">
               <button
+                type="button"
                 onClick={onClose}
-                className="py-4 text-[13px] font-black text-slate-400 hover:bg-slate-50 transition-all active:bg-slate-100 uppercase tracking-widest"
+                className="py-3.5 px-2 text-[11px] font-black text-slate-400 hover:bg-slate-50 hover:text-slate-600 transition-all active:bg-slate-100 tracking-wider uppercase truncate"
               >
                 {cancelLabel || (language === 'zh' ? '取消' : 'Cancel')}
               </button>
               
               {/* Thin Divider */}
-              <div className="absolute left-1/2 top-0 bottom-0 w-[0.5px] bg-slate-100" />
+              <div className="absolute left-1/2 top-0 bottom-0 w-[1px] bg-slate-100 pointer-events-none" />
               
               <button
+                type="button"
                 onClick={() => {
                   onConfirm();
                   onClose();
                 }}
-                className={`py-4 text-[13px] font-black transition-all active:bg-slate-100 uppercase tracking-widest hover:bg-slate-50 ${getConfirmTextColor()}`}
+                className={`py-3.5 px-2 text-[11px] font-black transition-all active:bg-slate-100 tracking-wider uppercase hover:bg-slate-50 truncate ${getConfirmTextColor()}`}
               >
                 {confirmLabel || (language === 'zh' ? '確認' : 'Confirm')}
               </button>
