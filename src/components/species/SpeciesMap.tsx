@@ -228,6 +228,134 @@ const translations = {
   }
 };
 
+// Component for rendering eBird observations grouped by Year with collapsible sections
+function EbirdYearGroupList({
+  sortedYears,
+  groupsByYear,
+  language
+}: {
+  sortedYears: string[];
+  groupsByYear: Record<string, EbirdLocInfo[]>;
+  language: string;
+}) {
+  // Store open/close status of each year. Default open the latest (first) year.
+  const [openYears, setOpenYears] = useState<Record<string, boolean>>(() => {
+    const initialState: Record<string, boolean> = {};
+    sortedYears.forEach((yr, idx) => {
+      initialState[yr] = idx === 0; // 最新 (第0項) 設為 true (open), 其餘 false (collapse)
+    });
+    return initialState;
+  });
+
+  const toggleYear = (year: string) => {
+    setOpenYears(prev => ({
+      ...prev,
+      [year]: !prev[year]
+    }));
+  };
+
+  return (
+    <div className="space-y-2 pt-1">
+      {sortedYears.map((year) => {
+        const records = groupsByYear[year];
+        const isOpen = !!openYears[year];
+
+        return (
+          <div
+            key={year}
+            className="border border-emerald-200/80 rounded-2xl overflow-hidden bg-white/90 shadow-2xs transition-all"
+          >
+            {/* Year Collapsible Header */}
+            <button
+              type="button"
+              onClick={() => toggleYear(year)}
+              className="w-full flex items-center justify-between px-3 py-2 bg-emerald-50/80 hover:bg-emerald-100/80 text-emerald-950 transition-colors cursor-pointer text-left"
+            >
+              <div className="flex items-center gap-2">
+                <span className="font-black text-xs text-emerald-950 tracking-tight">
+                  {year} {language === 'zh' ? '年' : ''}
+                </span>
+                <span className="text-[10px] font-bold text-emerald-700 bg-emerald-100/90 px-2 py-0.5 rounded-full border border-emerald-200">
+                  {records.length} {language === 'zh' ? '筆記錄' : (records.length === 1 ? 'record' : 'records')}
+                </span>
+              </div>
+
+              <div className="flex items-center gap-1 text-[10px] font-extrabold text-emerald-700">
+                <span>{isOpen ? (language === 'zh' ? '收起' : 'Collapse') : (language === 'zh' ? '展開' : 'Expand')}</span>
+                <ChevronDown className={`w-3.5 h-3.5 text-emerald-700 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`} />
+              </div>
+            </button>
+
+            {/* Collapsible Content */}
+            <AnimatePresence initial={false}>
+              {isOpen && (
+                <motion.div
+                  initial={{ height: 0, opacity: 0 }}
+                  animate={{ height: 'auto', opacity: 1 }}
+                  exit={{ height: 0, opacity: 0 }}
+                  transition={{ duration: 0.2 }}
+                  className="overflow-hidden"
+                >
+                  <div className="p-2 space-y-2 bg-slate-50/50">
+                    {records.map((info, idx) => (
+                      <div
+                        key={`${info.subID}-${idx}`}
+                        className="bg-white border border-emerald-100/80 rounded-xl p-2.5 space-y-1.5 shadow-2xs hover:border-emerald-300 transition-colors"
+                      >
+                        {/* Date + Count row */}
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-1.5 text-[11px] font-bold text-slate-800">
+                            <Calendar className="w-3 h-3 text-emerald-600" />
+                            <span>{info.obsDt}</span>
+                          </div>
+                          <span className="text-[11px] font-extrabold text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded-lg border border-emerald-200">
+                            ×{info.howMany}
+                          </span>
+                        </div>
+
+                        {/* Observer */}
+                        <div className="flex items-center gap-1.5 text-[10px] text-slate-600">
+                          <User className="w-3 h-3 text-slate-400" />
+                          <span className="font-medium">{info.userDisplayName}</span>
+                        </div>
+
+                        {/* Evidence badge */}
+                        <div className="flex items-center gap-1.5">
+                          <span
+                            className={`inline-flex items-center px-1.5 py-0.5 rounded-md text-[9px] font-extrabold uppercase tracking-wide border ${
+                              info.evidence === 'P'
+                                ? 'bg-blue-50 text-blue-700 border-blue-200'
+                                : info.evidence === 'A'
+                                  ? 'bg-purple-50 text-purple-700 border-purple-200'
+                                  : info.evidence === 'V'
+                                    ? 'bg-rose-50 text-rose-700 border-rose-200'
+                                    : 'bg-slate-100 text-slate-600 border-slate-200'
+                            }`}
+                          >
+                            {getEbirdEvidenceLabel(info.evidence, language === 'zh' ? 'zh' : 'en')}
+                          </span>
+                          <a
+                            href={`https://ebird.org/checklist/${info.subID}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-[10px] text-emerald-700 hover:underline font-mono"
+                          >
+                            {info.subID}
+                          </a>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 export default function SpeciesMap({ taxonId, scientificName, chineseName, taxaGroup, ebirdSpeciesCode }: SpeciesMapProps) {
   const { language } = useLanguage();
   const { profile } = useAuth();
@@ -271,6 +399,14 @@ export default function SpeciesMap({ taxonId, scientificName, chineseName, taxaG
   const [ebirdDetailError, setEbirdDetailError] = useState<string | null>(null);
   const [showEbirdCitation, setShowEbirdCitation] = useState(false);
   const [isHoveringEbirdCitation, setIsHoveringEbirdCitation] = useState(false);
+
+  // Cache fetched eBird location details per grid ID: { [grid_id]: EbirdLocInfo[] }
+  const ebirdLocCacheRef = useRef<Record<string, EbirdLocInfo[]>>({});
+
+  // When species changes (or component unmounts), reset cache
+  useEffect(() => {
+    ebirdLocCacheRef.current = {};
+  }, [taxonId, scientificName, chineseName, ebirdSpeciesCode]);
 
   useEffect(() => {
     const checkMobile = () => setIsMobile(window.innerWidth < 1024);
@@ -489,9 +625,15 @@ export default function SpeciesMap({ taxonId, scientificName, chineseName, taxaG
       const ebirdCount = Number(props.ebirdCount || 0);
 
       if (count > 0 || bgisCount > 0 || ebirdCount > 0) {
-        // 切換網格時重置 eBird 詳情
-        setShowEbirdDetail(false);
-        setEbirdLocDetails([]);
+        // 檢查快取是否有該網格的 eBird 詳情
+        const cached = ebirdLocCacheRef.current[cleanId];
+        if (cached && cached.length > 0) {
+          setEbirdLocDetails(cached);
+          setShowEbirdDetail(true);
+        } else {
+          setShowEbirdDetail(false);
+          setEbirdLocDetails([]);
+        }
         setEbirdDetailError(null);
         setSelectedGrid({
           grid_id: cleanId,
@@ -616,7 +758,7 @@ export default function SpeciesMap({ taxonId, scientificName, chineseName, taxaG
                 onClick={() => setShowEbird(!showEbird)}
                 className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
                   showEbird
-                    ? 'bg-amber-600 text-white shadow-sm ring-2 ring-amber-500/20'
+                    ? 'bg-sky-600 text-white shadow-sm ring-2 ring-sky-500/20'
                     : 'bg-slate-100 text-slate-400 hover:bg-slate-200/70 hover:text-slate-600'
                 }`}
               >
@@ -684,14 +826,14 @@ export default function SpeciesMap({ taxonId, scientificName, chineseName, taxaG
                         setShowEbird(!showEbird);
                       }}
                       className={`flex items-center justify-between px-3 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                        showEbird ? 'bg-amber-50 text-amber-800' : 'text-slate-500 hover:bg-slate-50'
+                        showEbird ? 'bg-sky-50 text-sky-800' : 'text-slate-500 hover:bg-slate-50'
                       }`}
                     >
                       <div className="flex items-center gap-2">
-                        <span className={`w-2 h-2 rounded-full ${showEbird ? 'bg-amber-500 animate-pulse' : 'bg-slate-300'}`} />
+                        <span className={`w-2 h-2 rounded-full ${showEbird ? 'bg-sky-500 animate-pulse' : 'bg-slate-300'}`} />
                         <span>{t.filterEbird}</span>
                       </div>
-                      {showEbird && <Check className="w-3.5 h-3.5 text-amber-600" />}
+                      {showEbird && <Check className="w-3.5 h-3.5 text-sky-600" />}
                     </button>
                   )}
                 </motion.div>
@@ -881,11 +1023,11 @@ export default function SpeciesMap({ taxonId, scientificName, chineseName, taxaG
             <div className="flex-1 overflow-y-auto overscroll-contain p-4 space-y-4 custom-scrollbar">
               {/* eBird Section */}
               {isBirdGroup && showEbird && (selectedGrid.ebirdCount || 0) > 0 && (
-                <div className="bg-amber-50/70 border border-amber-200/70 rounded-2xl p-3.5 space-y-2.5 shadow-xs">
+                <div className="bg-emerald-50/60 border border-emerald-200/70 rounded-2xl p-3.5 space-y-2.5 shadow-xs">
                   {/* Header row */}
-                  <div className="flex items-center justify-between text-xs font-bold text-amber-900 border-b border-amber-200/60 pb-2">
+                  <div className="flex items-center justify-between text-xs font-bold text-emerald-950 border-b border-emerald-200/60 pb-2">
                     <div className="flex items-center gap-1.5">
-                      <Bird className="w-4 h-4 text-amber-600 shrink-0" />
+                      <Bird className="w-4 h-4 text-emerald-600 shrink-0" />
                       <span>{t.ebirdSectionTitle}</span>
 
                       {/* Info Icon */}
@@ -897,13 +1039,13 @@ export default function SpeciesMap({ taxonId, scientificName, chineseName, taxaG
                           e.stopPropagation();
                           setShowEbirdCitation((prev) => !prev);
                         }}
-                        className="p-0.5 text-amber-600 hover:text-amber-800 cursor-pointer rounded transition-colors focus:outline-none"
+                        className="p-0.5 text-emerald-600 hover:text-emerald-800 cursor-pointer rounded transition-colors focus:outline-none"
                         title={language === 'zh' ? '參考引用來源' : 'Reference Citation'}
                       >
                         <Info className="w-3.5 h-3.5" />
                       </button>
                     </div>
-                    <span className="font-extrabold text-amber-700 bg-amber-100/80 px-2 py-0.5 rounded-md border border-amber-200">
+                    <span className="font-extrabold text-emerald-600 text-[11px] bg-emerald-100/90 px-2 py-0.5 rounded-md border border-emerald-200">
                       {selectedGrid.ebirdCount} {language === 'zh' ? '個觀測點' : `${(selectedGrid.ebirdCount || 0) === 1 ? 'location' : 'locations'}`}
                     </span>
                   </div>
@@ -915,7 +1057,7 @@ export default function SpeciesMap({ taxonId, scientificName, chineseName, taxaG
                       onMouseLeave={() => setIsHoveringEbirdCitation(false)}
                       className="p-3 bg-slate-900/95 text-slate-100 text-[11px] leading-relaxed rounded-xl shadow-md border border-slate-700/60 backdrop-blur-xs w-full max-w-full break-words relative animate-in fade-in zoom-in-95 duration-150"
                     >
-                      <div className="font-semibold text-amber-400 mb-1 flex items-center justify-between">
+                      <div className="font-semibold text-emerald-400 mb-1 flex items-center justify-between">
                         <span>{language === 'zh' ? '參考引用來源 (Citation)' : 'Reference Citation'}</span>
                         <button
                           type="button"
@@ -929,16 +1071,16 @@ export default function SpeciesMap({ taxonId, scientificName, chineseName, taxaG
                           ✕
                         </button>
                       </div>
-                      <p className="text-slate-200 font-normal break-words selection:bg-amber-500 selection:text-slate-900 leading-snug">
-                        eBird. 2021. eBird: An online database of bird distribution and abundance [web application]. eBird, Cornell Lab of Ornithology, Ithaca, New York. Available: <a href="http://www.ebird.org" target="_blank" rel="noopener noreferrer" className="text-amber-400 underline hover:text-amber-300">http://www.ebird.org</a>. (Accessed: {new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}).
+                      <p className="text-slate-200 font-normal break-words selection:bg-emerald-500 selection:text-slate-900 leading-snug">
+                        eBird. 2021. eBird: An online database of bird distribution and abundance [web application]. eBird, Cornell Lab of Ornithology, Ithaca, New York. Available: <a href="http://www.ebird.org" target="_blank" rel="noopener noreferrer" className="text-emerald-400 underline hover:text-emerald-300">http://www.ebird.org</a>. (Accessed: {new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}).
                       </p>
                     </div>
                   )}
 
-                  <div className="text-[11px] text-amber-800 leading-relaxed font-medium">
+                  <div className="text-[11px] text-emerald-900/80 leading-relaxed font-medium">
                     {language === 'zh'
-                      ? '在目前網格區域內記錄到 eBird 觀測數據點。'
-                      : 'eBird observation points recorded within this grid area.'}
+                      ? '在目前網格內記錄到觀測地點。'
+                      : 'Observation location points recorded within this grid.'}
                   </div>
 
                   {/* Action buttons row */}
@@ -950,10 +1092,18 @@ export default function SpeciesMap({ taxonId, scientificName, chineseName, taxaG
                           setShowEbirdDetail(false);
                           return;
                         }
+
+                        const gridKey = String(selectedGrid.grid_id);
+                        // Check if we already fetched and cached data for this grid
+                        if (ebirdLocCacheRef.current[gridKey] && ebirdLocCacheRef.current[gridKey].length > 0) {
+                          setEbirdLocDetails(ebirdLocCacheRef.current[gridKey]);
+                          setShowEbirdDetail(true);
+                          return;
+                        }
+
                         if (!ebirdSpeciesCode || !selectedGrid.ebirdRecords) return;
                         setIsLoadingEbirdDetail(true);
                         setEbirdDetailError(null);
-                        setEbirdLocDetails([]);
                         try {
                           // 逐一對每個 eBird 位置 ID 查詢 locinfo
                           const locIDs = [...new Set(
@@ -968,6 +1118,9 @@ export default function SpeciesMap({ taxonId, scientificName, chineseName, taxaG
                           }
                           // 按日期降序排列
                           allInfoList.sort((a, b) => b.obsDt.localeCompare(a.obsDt));
+
+                          // 保存至 Cache
+                          ebirdLocCacheRef.current[gridKey] = allInfoList;
                           setEbirdLocDetails(allInfoList);
                           setShowEbirdDetail(true);
                         } catch (err) {
@@ -977,7 +1130,7 @@ export default function SpeciesMap({ taxonId, scientificName, chineseName, taxaG
                         }
                       }}
                       disabled={isLoadingEbirdDetail}
-                      className="inline-flex items-center gap-1.5 px-2.5 py-1.5 bg-amber-500 hover:bg-amber-600 disabled:opacity-60 text-white rounded-xl font-bold text-[11px] transition-all cursor-pointer shadow-sm active:scale-95"
+                      className="inline-flex items-center gap-1.5 px-2.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-60 text-white rounded-xl font-bold text-[11px] transition-all cursor-pointer shadow-sm active:scale-95"
                     >
                       {isLoadingEbirdDetail ? (
                         <Loader2 className="w-3 h-3 animate-spin" />
@@ -998,7 +1151,7 @@ export default function SpeciesMap({ taxonId, scientificName, chineseName, taxaG
                         href={`https://ebird.org/species/${ebirdSpeciesCode}`}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="inline-flex items-center gap-1 text-[11px] font-bold text-amber-700 hover:text-amber-900 hover:underline"
+                        className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-700 hover:text-emerald-900 hover:underline"
                       >
                         <ExternalLink className="w-3 h-3" />
                         <span>{language === 'zh' ? 'eBird 物種頁面' : 'Species on eBird'}</span>
@@ -1011,60 +1164,27 @@ export default function SpeciesMap({ taxonId, scientificName, chineseName, taxaG
                     <div className="text-[11px] text-red-600 font-medium">{ebirdDetailError}</div>
                   )}
 
-                  {/* Detail List */}
-                  {showEbirdDetail && !isLoadingEbirdDetail && ebirdLocDetails.length > 0 && (
-                    <div className="space-y-2 pt-1">
-                      <div className="text-[10px] font-extrabold text-amber-700 uppercase tracking-wider">
-                        {language === 'zh' ? `共 ${ebirdLocDetails.length} 筆觀察記錄` : `${ebirdLocDetails.length} Observation Records`}
-                      </div>
-                      {ebirdLocDetails.map((info, idx) => (
-                        <div
-                          key={`${info.subID}-${idx}`}
-                          className="bg-white border border-amber-100 rounded-xl p-2.5 space-y-1.5 shadow-2xs hover:border-amber-300 transition-colors"
-                        >
-                          {/* Date + Count row */}
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-1.5 text-[11px] font-bold text-slate-800">
-                              <Calendar className="w-3 h-3 text-amber-500" />
-                              <span>{info.obsDt}</span>
-                            </div>
-                            <span className="text-[11px] font-extrabold text-amber-700 bg-amber-50 px-2 py-0.5 rounded-lg border border-amber-200">
-                              ×{info.howMany}
-                            </span>
-                          </div>
+                  {/* Detail List grouped by Year */}
+                  {showEbirdDetail && !isLoadingEbirdDetail && ebirdLocDetails.length > 0 && (() => {
+                    // Group eBird records by Year (extracted from obsDt "YYYY-MM-DD" or similar format)
+                    const groupsByYear = ebirdLocDetails.reduce<Record<string, EbirdLocInfo[]>>((acc, item) => {
+                      const yearStr = item.obsDt ? item.obsDt.slice(0, 4) : (language === 'zh' ? '未知年份' : 'Unknown');
+                      if (!acc[yearStr]) acc[yearStr] = [];
+                      acc[yearStr].push(item);
+                      return acc;
+                    }, {});
 
-                          {/* Observer */}
-                          <div className="flex items-center gap-1.5 text-[10px] text-slate-600">
-                            <User className="w-3 h-3 text-slate-400" />
-                            <span className="font-medium">{info.userDisplayName}</span>
-                          </div>
+                    // Sort years descending (e.g. 2024, 2023, 2022)
+                    const sortedYears = Object.keys(groupsByYear).sort((a, b) => b.localeCompare(a));
 
-                          {/* Evidence badge */}
-                          <div className="flex items-center gap-1.5">
-                            <span className={`inline-flex items-center px-1.5 py-0.5 rounded-md text-[9px] font-extrabold uppercase tracking-wide border ${
-                              info.evidence === 'P'
-                                ? 'bg-blue-50 text-blue-700 border-blue-200'
-                                : info.evidence === 'A'
-                                  ? 'bg-purple-50 text-purple-700 border-purple-200'
-                                  : info.evidence === 'V'
-                                    ? 'bg-rose-50 text-rose-700 border-rose-200'
-                                    : 'bg-slate-100 text-slate-600 border-slate-200'
-                            }`}>
-                              {getEbirdEvidenceLabel(info.evidence, language === 'zh' ? 'zh' : 'en')}
-                            </span>
-                            <a
-                              href={`https://ebird.org/checklist/${info.subID}`}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="text-[10px] text-amber-600 hover:underline font-mono"
-                            >
-                              {info.subID}
-                            </a>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
+                    return (
+                      <EbirdYearGroupList
+                        sortedYears={sortedYears}
+                        groupsByYear={groupsByYear}
+                        language={language}
+                      />
+                    );
+                  })()}
 
                   {showEbirdDetail && !isLoadingEbirdDetail && ebirdLocDetails.length === 0 && (
                     <div className="text-[11px] text-amber-700 font-medium py-1">
@@ -1342,7 +1462,7 @@ export default function SpeciesMap({ taxonId, scientificName, chineseName, taxaG
                 </div>
               )}
               {isBirdGroup && showEbird && (hoveredGrid.ebirdCount || 0) > 0 && (
-                <div className="flex items-center justify-between gap-3 text-amber-300">
+                <div className="flex items-center justify-between gap-3 text-sky-300">
                   <span className="text-[10px] opacity-80">eBird:</span>
                   <span>{hoveredGrid.ebirdCount} {language === 'zh' ? '個觀測點' : `${(hoveredGrid.ebirdCount || 0) === 1 ? 'loc' : 'locs'}`}</span>
                 </div>
