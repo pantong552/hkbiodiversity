@@ -647,12 +647,12 @@ export default function SpeciesManager() {
         <>
           <div 
             ref={splitContainerRef}
-            className={`flex-1 min-h-0 flex ${isDetailEditMode ? 'flex-row gap-1' : 'flex-col gap-6'}`}
+            className={`flex-1 min-h-0 flex ${isDetailEditMode ? 'flex-row gap-1' : 'flex-col gap-6'} ${isResizing ? 'cursor-col-resize select-none' : ''}`}
           >
             {/* Table Container */}
             <motion.div 
               layout
-              transition={{ type: "spring", stiffness: 300, damping: 30 }}
+              transition={isResizing ? { duration: 0 } : { type: "spring", stiffness: 300, damping: 30 }}
               style={{ width: isDetailEditMode ? `${leftWidth}%` : '100%' }}
               className={`overflow-auto rounded-[1.5rem] border border-white bg-white/30 backdrop-blur-xl shadow-sm custom-scrollbar ${isDetailEditMode ? '' : 'flex-1'}`}
             >
@@ -867,7 +867,7 @@ export default function SpeciesManager() {
                   initial={{ opacity: 0, x: 80, scale: 0.95 }}
                   animate={{ opacity: 1, x: 0, scale: 1 }}
                   exit={{ opacity: 0, x: 80, scale: 0.95 }}
-                  transition={{ type: "spring", stiffness: 300, damping: 30 }}
+                  transition={isResizing ? { duration: 0 } : { type: "spring", stiffness: 300, damping: 30 }}
                   style={{ width: `${100 - leftWidth}%` }}
                   className="min-h-0 bg-white shadow-xl shadow-slate-200/50 rounded-3xl border border-slate-100/60 overflow-hidden flex-shrink-0"
                 >

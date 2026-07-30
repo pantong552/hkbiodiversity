@@ -18,7 +18,9 @@ import {
   Plus,
   ExternalLink,
   Search,
-  BookOpen
+  BookOpen,
+  ChevronDown,
+  Check
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -232,6 +234,106 @@ function SimilarSpeciesPicker({ value, onChange, table, supabase, language }: Si
           </div>
         )}
       </div>
+    </div>
+  );
+}
+
+interface CustomSelectProps {
+  value: string;
+  onChange: (val: string) => void;
+  options: string[];
+  isFieldDirty: boolean;
+  language: string;
+}
+
+function CustomSelect({ value, onChange, options, isFieldDirty, language }: CustomSelectProps) {
+  const [isOpen, setIsOpen] = useState(false);
+  const containerRef = React.useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
+        setIsOpen(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const selectedLabel = value
+    ? value
+    : (language === 'zh' ? '-- 空白 / 未設定 --' : '-- Blank / Not set --');
+
+  return (
+    <div ref={containerRef} className="relative w-full">
+      {/* Trigger Button */}
+      <button
+        type="button"
+        onClick={() => setIsOpen(!isOpen)}
+        className={`w-full flex items-center justify-between px-4 py-2.5 rounded-xl text-xs font-semibold transition-all duration-200 outline-none border cursor-pointer ${
+          isFieldDirty
+            ? 'border-emerald-400 font-bold bg-white text-emerald-950 shadow-xs ring-1 ring-emerald-500/20'
+            : 'bg-slate-50/50 hover:bg-slate-50 border-slate-100 hover:border-slate-200 text-slate-700'
+        } ${isOpen ? 'ring-2 ring-emerald-500/20 border-emerald-500 bg-white' : ''}`}
+      >
+        <span className={!value ? 'text-slate-400 font-normal italic' : ''}>
+          {selectedLabel}
+        </span>
+        <ChevronDown className={`w-3.5 h-3.5 text-slate-400 transition-transform duration-200 ${isOpen ? 'rotate-180 text-emerald-600' : ''}`} />
+      </button>
+
+      {/* Custom Dropdown Menu */}
+      <AnimatePresence>
+        {isOpen && (
+          <motion.div
+            initial={{ opacity: 0, y: -4, scale: 0.98 }}
+            animate={{ opacity: 1, y: 4, scale: 1 }}
+            exit={{ opacity: 0, y: -4, scale: 0.98 }}
+            transition={{ duration: 0.15 }}
+            className="absolute z-50 left-0 right-0 bg-white/95 backdrop-blur-xl border border-slate-200/90 shadow-2xl rounded-2xl p-1.5 flex flex-col gap-0.5 max-h-56 overflow-y-auto custom-scrollbar"
+          >
+            {/* Blank Option */}
+            <button
+              type="button"
+              onClick={() => {
+                onChange('');
+                setIsOpen(false);
+              }}
+              className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-medium transition-colors cursor-pointer ${
+                !value
+                  ? 'bg-emerald-50 text-emerald-800 font-bold'
+                  : 'text-slate-400 hover:bg-slate-50 hover:text-slate-600'
+              }`}
+            >
+              <span className="italic">{language === 'zh' ? '-- 空白 / 未設定 --' : '-- Blank / Not set --'}</span>
+              {!value && <Check className="w-3.5 h-3.5 text-emerald-600" />}
+            </button>
+
+            {/* Value Options */}
+            {options.map((opt) => {
+              const isSelected = value === opt;
+              return (
+                <button
+                  key={opt}
+                  type="button"
+                  onClick={() => {
+                    onChange(opt);
+                    setIsOpen(false);
+                  }}
+                  className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-bold transition-colors cursor-pointer ${
+                    isSelected
+                      ? 'bg-emerald-50 text-emerald-900 shadow-2xs'
+                      : 'text-slate-700 hover:bg-slate-50 hover:text-emerald-700'
+                  }`}
+                >
+                  <span>{opt}</span>
+                  {isSelected && <Check className="w-3.5 h-3.5 text-emerald-600" />}
+                </button>
+              );
+            })}
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
@@ -467,8 +569,9 @@ interface FieldConfig {
   key: string;
   labelChi: string;
   labelEng: string;
-  type: 'text' | 'number' | 'textarea';
+  type: 'text' | 'number' | 'textarea' | 'select';
   readOnly?: boolean;
+  options?: string[];
 }
 
 interface FieldGroup {
@@ -542,15 +645,15 @@ const faunaFieldGroups = (t: any): FieldGroup[] => [
     nameEng: 'Conservation',
     icon: <ShieldAlert className="w-4 h-4" />,
     fields: [
-      {key: 'iucn', labelChi: 'IUCN 評級', labelEng: 'IUCN Status', type: 'text'},
+      {key: 'iucn', labelChi: 'IUCN 評級', labelEng: 'IUCN Status', type: 'select', options: ['LC', 'NT', 'VU', 'EN', 'CR', 'DD']},
       {key: 'cites', labelChi: 'CITES 評級', labelEng: 'CITES Status', type: 'text'},
       {key: 'afcd', labelChi: 'AFCD 評級', labelEng: 'AFCD Rating', type: 'text'},
-      {key: 'hkbws_cat', labelChi: '鳥種類別 (HKBWS)', labelEng: 'HKBWS Category', type: 'text'},
+      {key: 'hkbws_cat', labelChi: '鳥種類別 (HKBWS)', labelEng: 'HKBWS Category', type: 'select', options: ['I', 'IIA', 'IIB', 'IIC', 'III']},
       {key: 'china_red_list', labelChi: '中國紅皮書', labelEng: 'China Red List', type: 'text'},
-      {key: 'china_vertebrates_red_list', labelChi: '中國脊椎動物紅皮書', labelEng: 'China Vertebrates Red List', type: 'text'},
+      {key: 'china_vertebrates_red_list', labelChi: '中國脊椎動物紅皮書', labelEng: 'China Vertebrates Red List', type: 'select', options: ['Least Concern', 'Near Threatened', 'Vulnerable', 'Endangered', 'Critically Endangered', 'Data Deficient']},
       {key: 'hk_protection', labelChi: '香港保護法例', labelEng: 'HK Protection', type: 'text'},
       {key: 'endemic', labelChi: '特有種', labelEng: 'Endemicity', type: 'text'},
-      {key: 'native_status', labelChi: '原生概況', labelEng: 'Native Status', type: 'text'},
+      {key: 'native_status', labelChi: '原生概況', labelEng: 'Native Status', type: 'select', options: ['Native', 'Exotic', 'Vagrant', 'Reintroduced', 'Uncertain']},
       {key: 'restrictedness', labelChi: '受限度/稀有度', labelEng: 'Restrictedness', type: 'text'},
     ]
   },
@@ -1021,9 +1124,10 @@ export default function SpeciesDetailEditor({ table, data, originalData, onSave,
               }
 
               const currentTaxaGroup = String(data?.taxa_group || '').trim().toUpperCase();
-              const isBirdOnlyFieldDisabled = field.key === 'ebird_species_code' && currentTaxaGroup !== 'BIRD';
+              const isBirdOnlyFieldDisabled = (field.key === 'ebird_species_code' || field.key === 'hkbws_cat') && currentTaxaGroup !== 'BIRD';
               const isReadOnly = field.readOnly || isBirdOnlyFieldDisabled;
               const isTextarea = field.type === 'textarea';
+              const isSelect = field.type === 'select';
               const label = language === 'zh' ? field.labelChi : field.labelEng;
               const isFieldDirty = checkIsDirty(field.key);
               const isBilingualField = field.key.endsWith('_chi') || field.key.endsWith('_eng');
@@ -1065,7 +1169,7 @@ export default function SpeciesDetailEditor({ table, data, originalData, onSave,
                       title={isBirdOnlyFieldDisabled ? 'Bird only' : (language === 'zh' ? '此為系統唯讀欄位' : 'This field is read-only')}
                     >
                       <span className="font-mono opacity-80">
-                        {isBirdOnlyFieldDisabled && (!val || String(val).trim() === '') ? 'Bird only' : String(val)}
+                        {val !== null && val !== undefined ? String(val) : ''}
                       </span>
                       <div className="flex items-center gap-1.5">
                         {isBirdOnlyFieldDisabled && (
@@ -1076,6 +1180,14 @@ export default function SpeciesDetailEditor({ table, data, originalData, onSave,
                         <Lock className="w-3.5 h-3.5 text-slate-300 group-hover/readonly:text-slate-400 transition-colors" />
                       </div>
                     </div>
+                  ) : isSelect ? (
+                    <CustomSelect
+                      value={String(val ?? '')}
+                      onChange={(newVal) => handleFieldChange(field.key, newVal, field.type)}
+                      options={field.options || []}
+                      isFieldDirty={isFieldDirty}
+                      language={language}
+                    />
                   ) : isTextarea ? (
                     <div className="relative">
                       <textarea
