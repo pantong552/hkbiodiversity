@@ -91,7 +91,7 @@ function SpeciesTabPreview({
                 
                 // 提升尺寸至 medium 以解決模糊問題
                 const displayImage = getSpeciesImageUrl(effectiveSpecies, 'medium');
-                if (isLoading || (species?.inat_id && !displayImage && !imageUrl)) {
+                if (isLoading) {
                   return (
                     <div className="absolute inset-0 flex items-center justify-center">
                       <Loader2 className="w-6 h-6 text-emerald-500 animate-spin" />
@@ -105,6 +105,10 @@ function SpeciesTabPreview({
                       src={finalImage} 
                       alt={species?.common_name_chi || 'Species'} 
                       className="w-full h-full object-cover"
+                      onError={(e) => {
+                        // 當圖片代理或載入失敗時降級為預設圖片
+                        (e.target as HTMLImageElement).src = '/images/placeholder/no-species-image.svg';
+                      }}
                     />
                   );
                 }

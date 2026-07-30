@@ -6,7 +6,7 @@ import 'maplibre-gl/dist/maplibre-gl.css';
 import * as turf from '@turf/turf';
 import { fetchAllInatObservations, InatObservation } from '@/utils/inaturalist';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Calendar, User, ExternalLink, MapPin, Loader2, Info, Bird, Maximize, MousePointer2, Layers, Shield, Link as LinkIcon, Filter, Building2, Camera, ChevronDown, Check } from 'lucide-react';
+import { X, Calendar, User, ExternalLink, MapPin, Loader2, Info, Bird, Maximize, MousePointer2, Layers, Shield, Link as LinkIcon, Filter, Building2, Camera, ChevronDown, Check, CheckCircle2, Database, Sparkles } from 'lucide-react';
 import Image from 'next/image';
 import { useLanguage } from '@/context/LanguageContext';
 import { useAuth } from '@/context/AuthContext';
@@ -148,7 +148,15 @@ const BASEMAPS = [
 const translations = {
   zh: {
     loadingTitle: '正在獲取分布數據',
-    loadingDesc: '正在獲取分佈紀錄與網格數據...',
+    loadingDesc: '按數據源分步下載與處理數據...',
+    stageInat: 'iNaturalist 研究級數據',
+    stageBgis: 'BGIS / HKBIH 地理資訊',
+    stageEbird: 'eBird 觀察記錄',
+    stageGrid: '空間網格對齊與整合',
+    statusPending: '等待中',
+    statusLoading: '載入中...',
+    statusDone: '已完成',
+    statusSkipped: '未適用',
     obsLoaded: '已載入',
     obsUnit: '筆觀測記錄',
     densityTitle: '觀測密度 (Grid)',
@@ -188,7 +196,15 @@ const translations = {
   },
   en: {
     loadingTitle: 'Fetching Distribution Data',
-    loadingDesc: 'Fetching observation records and grid data...',
+    loadingDesc: 'Fetching data step-by-step from sources...',
+    stageInat: 'iNaturalist Research Grade Data',
+    stageBgis: 'BGIS / HKBIH Geographic Information',
+    stageEbird: 'eBird Observation Records',
+    stageGrid: 'Spatial Grid Alignment & Aggregation',
+    statusPending: 'Pending',
+    statusLoading: 'Loading...',
+    statusDone: 'Completed',
+    statusSkipped: 'N/A',
     obsLoaded: 'Loaded',
     obsUnit: 'observations',
     densityTitle: 'Observation Density',
@@ -369,6 +385,8 @@ export default function SpeciesMap({ taxonId, scientificName, chineseName, taxaG
     return count === 1 ? 'record' : 'records';
   };
 
+  type StepStatus = 'idle' | 'loading' | 'done' | 'skipped';
+
   const [observations, setObservations] = useState<InatObservation[]>([]);
   const [totalBgisCount, setTotalBgisCount] = useState<number>(0);
   const [ebirdRecords, setEbirdRecords] = useState<EbirdRecord[]>([]);
@@ -381,6 +399,13 @@ export default function SpeciesMap({ taxonId, scientificName, chineseName, taxaG
   const [gridData, setGridData] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [progress, setProgress] = useState({ current: 0, total: 0 });
+
+  const [inatStatus, setInatStatus] = useState<StepStatus>('idle');
+  const [bgisStatus, setBgisStatus] = useState<StepStatus>('idle');
+  const [ebirdStatus, setEbirdStatus] = useState<StepStatus>('idle');
+  const [gridStatus, setGridStatus] = useState<StepStatus>('idle');
+  const [stageCounts, setStageCounts] = useState<{ inat: number; bgis: number; ebird: number }>({ inat: 0, bgis: 0, ebird: 0 });
+
   const [selectedGrid, setSelectedGrid] = useState<GridFeatureProperties | null>(null);
   const [hoveredGrid, setHoveredGrid] = useState<{ id: string, count: number, bgisCount?: number, ebirdCount?: number, x: number, y: number } | null>(null);
   const [mapLoaded, setMapLoaded] = useState(false);
@@ -446,7 +471,6 @@ export default function SpeciesMap({ taxonId, scientificName, chineseName, taxaG
 
   const currentStyle = BASEMAPS.find(m => m.id === currentStyleId)?.style || BASEMAPS[0].style;
 
-  // 動態根據選取的 Dataset Filter (iNaturalist / BGIS) 實時更新地圖 GeoJSON 網格資料
   // 動態根據選取的 Dataset Filter (iNaturalist / BGIS / eBird) 實時更新地圖 GeoJSON 網格資料
   useEffect(() => {
     if (allProcessedFeatures.length === 0) return;
@@ -474,51 +498,76 @@ export default function SpeciesMap({ taxonId, scientificName, chineseName, taxaG
     });
   }, [allProcessedFeatures, showInat, showBgis, showEbird, isBirdGroup]);
 
-  // Initial Data Loading
+  // Initial Data Loading (Sequential iNaturalist -> BGIS -> eBird -> GeoJSON Grid Spatial Join)
   useEffect(() => {
     async function loadData() {
       setIsLoading(true);
-      console.log('SpeciesMap: 正在啟動載入程序...', { taxonId, scientificName, chineseName, ebirdSpeciesCode });
+      setInatStatus('idle');
+      setBgisStatus('idle');
+      setEbirdStatus('idle');
+      setGridStatus('idle');
+      setStageCounts({ inat: 0, bgis: 0, ebird: 0 });
+      setProgress({ current: 0, total: 0 });
+
+      console.log('SpeciesMap: 啟動分步載入程序...', { taxonId, scientificName, chineseName, ebirdSpeciesCode, isBirdGroup });
 
       try {
-        // 並行獲取 iNaturalist 觀測、BGIS 網格數據 以及 eBird 地圖點位數據
-        const [obs, bgisList, ebirdPts] = await Promise.all([
-          taxonId && taxonId > 0
-            ? fetchAllInatObservations(taxonId, (current, total) => {
-                setProgress({ current, total });
-              })
-            : Promise.resolve([]),
-          (scientificName || chineseName)
-            ? fetchBgisSpeciesList(scientificName || '', chineseName)
-            : Promise.resolve([]),
-          (isBirdGroup && ebirdSpeciesCode)
-            ? fetchEbirdMapPoints(ebirdSpeciesCode)
-            : Promise.resolve([])
-        ]);
+        // Step 1: iNaturalist fetch
+        let obs: InatObservation[] = [];
+        if (taxonId && taxonId > 0) {
+          setInatStatus('loading');
+          obs = await fetchAllInatObservations(taxonId, (current, total) => {
+            setProgress({ current, total });
+          });
+          setInatStatus('done');
+          setObservations(obs);
+          setStageCounts(prev => ({ ...prev, inat: obs.length }));
+        } else {
+          setInatStatus('skipped');
+        }
 
-        console.log(`SpeciesMap: 成功抓取到 ${obs.length} 筆 iNat 紀錄, ${bgisList.length} 筆 BGIS 網格紀錄, ${ebirdPts.length} 筆 eBird 紀錄`);
-        setObservations(obs);
-        setEbirdRecords(ebirdPts);
-
-        // 將 BGIS list 建立網格編號對照物件 (對 item.no 執行嚴格規格化轉碼)
+        // Step 2: BGIS fetch (按需求在 inat 完結後觸發)
+        let bgisList: BgisGridRecord[] = [];
         const bgisMap: Record<string, BgisGridRecord> = {};
         let realBgisTotal = 0;
 
-        bgisList.forEach(item => {
-          if (item.no !== undefined && item.no !== null) {
-            const rawNoStr = String(item.no);
-            const cleanNo = isNaN(Number(rawNoStr)) ? rawNoStr : String(parseFloat(rawNoStr));
-            bgisMap[cleanNo] = item;
-            realBgisTotal += (item.count || 0);
-          }
-        });
+        if (scientificName || chineseName) {
+          setBgisStatus('loading');
+          bgisList = await fetchBgisSpeciesList(scientificName || '', chineseName);
+          setBgisStatus('done');
 
-        setTotalBgisCount(realBgisTotal);
+          bgisList.forEach(item => {
+            if (item.no !== undefined && item.no !== null) {
+              const rawNoStr = String(item.no);
+              const cleanNo = isNaN(Number(rawNoStr)) ? rawNoStr : String(parseFloat(rawNoStr));
+              bgisMap[cleanNo] = item;
+              realBgisTotal += (item.count || 0);
+            }
+          });
+          setTotalBgisCount(realBgisTotal);
+          setStageCounts(prev => ({ ...prev, bgis: realBgisTotal }));
+        } else {
+          setBgisStatus('skipped');
+        }
 
-        // 載入 Common_1km_grid GeoJSON
+        // Step 3: eBird fetch (按鳥類類群與 ebirdSpeciesCode 需求在 bgis 完結後觸發)
+        let ebirdPts: EbirdRecord[] = [];
+        if (isBirdGroup && ebirdSpeciesCode) {
+          setEbirdStatus('loading');
+          ebirdPts = await fetchEbirdMapPoints(ebirdSpeciesCode);
+          setEbirdStatus('done');
+          setEbirdRecords(ebirdPts);
+          setStageCounts(prev => ({ ...prev, ebird: ebirdPts.length }));
+        } else {
+          setEbirdStatus('skipped');
+        }
+
+        // Step 4: GeoJSON & Turf 網格空間匹配
+        setGridStatus('loading');
         const response = await fetch('/data/Common_1km_grid.geojson');
         if (!response.ok) {
           console.error('SpeciesMap: 無法下載 GeoJSON:', response.status, response.statusText);
+          setGridStatus('done');
           return;
         }
         const geojson = await response.json();
@@ -528,7 +577,7 @@ export default function SpeciesMap({ taxonId, scientificName, chineseName, taxaG
         let totalEbirdCounted = 0;
 
         // 建構 iNat 點位
-        const obsPoints = obs.map((o, idx) => {
+        const obsPoints = obs.map((o) => {
           if (!o.location) return null;
           const parts = o.location.split(',').map(Number);
           if (parts.length < 2) return null;
@@ -585,6 +634,7 @@ export default function SpeciesMap({ taxonId, scientificName, chineseName, taxaG
 
         console.log(`SpeciesMap: 數據聚合完成 (iNat 匹配點: ${totalInatCounted}, BGIS 總紀錄: ${realBgisTotal}, eBird 匹配紀錄: ${totalEbirdCounted})`);
         setAllProcessedFeatures(geojson.features);
+        setGridStatus('done');
       } catch (error) {
         console.error('SpeciesMap: 載入或聚合過程中發生錯誤:', error);
       } finally {
@@ -695,22 +745,197 @@ export default function SpeciesMap({ taxonId, scientificName, chineseName, taxaG
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="absolute inset-0 z-50 bg-white/80 backdrop-blur-md flex flex-col items-center justify-center p-6 text-center"
+            className="absolute inset-0 z-50 bg-slate-900/40 backdrop-blur-md flex flex-col items-center justify-center p-4 text-center select-none"
           >
-            <div className="relative w-20 h-20 mb-6">
-              <Loader2 className="w-20 h-20 text-emerald-500 animate-spin absolute inset-0" />
-              <div className="absolute inset-0 flex items-center justify-center font-black text-emerald-600 text-xs">
-                {progress.total > 0 ? Math.round((progress.current / progress.total) * 100) : 0}%
+            <motion.div
+              initial={{ scale: 0.92, opacity: 0, y: 12 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.95, opacity: 0, y: -8 }}
+              transition={{ type: 'spring', damping: 25, stiffness: 300 }}
+              className="w-full max-w-md bg-white/95 backdrop-blur-2xl border border-slate-200/90 shadow-2xl rounded-3xl p-5 sm:p-6 text-left space-y-4"
+            >
+              {/* Header */}
+              <div className="flex items-center gap-3 pb-3 border-b border-slate-100">
+                <div className="p-2.5 bg-emerald-500/10 rounded-2xl border border-emerald-500/20 text-emerald-600">
+                  <Sparkles className="w-5 h-5 animate-pulse text-emerald-600" />
+                </div>
+                <div>
+                  <h3 className="text-base font-black text-slate-900 tracking-tight">{t.loadingTitle}</h3>
+                  <p className="text-xs font-semibold text-slate-500">{t.loadingDesc}</p>
+                </div>
               </div>
-            </div>
-            <h3 className="text-xl font-black text-slate-800 mb-2">{t.loadingTitle}</h3>
-            <p className="text-slate-500 text-sm max-w-xs">
-              {t.loadingDesc}
-              <br />
-              <span className="mt-2 inline-block px-3 py-1 bg-emerald-100 text-emerald-700 rounded-full font-bold text-[10px]">
-                {progress.current} / {progress.total}
-              </span>
-            </p>
+
+              {/* Steps List */}
+              <div className="space-y-2">
+                {/* Step 1: iNaturalist */}
+                <div className={`p-2.5 sm:p-3 rounded-2xl border transition-all flex items-center justify-between ${
+                  inatStatus === 'loading'
+                    ? 'bg-emerald-50/90 border-emerald-300 ring-2 ring-emerald-400/20 shadow-xs'
+                    : inatStatus === 'done'
+                    ? 'bg-emerald-50/40 border-emerald-200/60'
+                    : inatStatus === 'skipped'
+                    ? 'bg-slate-50 border-slate-100 opacity-50'
+                    : 'bg-slate-50/60 border-slate-100 text-slate-400'
+                }`}>
+                  <div className="flex items-center gap-3">
+                    <div className={`p-2 rounded-xl text-xs transition-colors ${
+                      inatStatus === 'loading' ? 'bg-emerald-600 text-white shadow-xs' :
+                      inatStatus === 'done' ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-200/80 text-slate-500'
+                    }`}>
+                      <Camera className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <div className="text-xs font-black text-slate-800">
+                        {t.stageInat}
+                      </div>
+                      {inatStatus === 'loading' && (
+                        <div className="text-[11px] text-emerald-700 font-bold mt-0.5 flex items-center gap-1.5">
+                          <span>{progress.current} / {progress.total}</span>
+                          {progress.total > 0 && (
+                            <span className="text-[10px] bg-emerald-200/80 text-emerald-900 px-1.5 py-0.2 rounded-full font-black">
+                              {Math.round((progress.current / progress.total) * 100)}%
+                            </span>
+                          )}
+                        </div>
+                      )}
+                      {inatStatus === 'done' && (
+                        <div className="text-[10px] text-emerald-800 font-extrabold mt-0.5">
+                          {stageCounts.inat} {getRecordUnit(stageCounts.inat)}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                  <div>
+                    {inatStatus === 'loading' && <Loader2 className="w-4 h-4 text-emerald-600 animate-spin" />}
+                    {inatStatus === 'done' && <CheckCircle2 className="w-4.5 h-4.5 text-emerald-600" />}
+                    {inatStatus === 'skipped' && <span className="text-[10px] font-bold text-slate-400">{t.statusSkipped}</span>}
+                    {inatStatus === 'idle' && <span className="text-[10px] font-bold text-slate-400">{t.statusPending}</span>}
+                  </div>
+                </div>
+
+                {/* Step 2: BGIS */}
+                <div className={`p-2.5 sm:p-3 rounded-2xl border transition-all flex items-center justify-between ${
+                  bgisStatus === 'loading'
+                    ? 'bg-teal-50/90 border-teal-300 ring-2 ring-teal-400/20 shadow-xs'
+                    : bgisStatus === 'done'
+                    ? 'bg-teal-50/40 border-teal-200/60'
+                    : bgisStatus === 'skipped'
+                    ? 'bg-slate-50 border-slate-100 opacity-50'
+                    : 'bg-slate-50/60 border-slate-100 text-slate-400'
+                }`}>
+                  <div className="flex items-center gap-3">
+                    <div className={`p-2 rounded-xl text-xs transition-colors ${
+                      bgisStatus === 'loading' ? 'bg-teal-600 text-white shadow-xs' :
+                      bgisStatus === 'done' ? 'bg-teal-100 text-teal-700' : 'bg-slate-200/80 text-slate-500'
+                    }`}>
+                      <Building2 className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <div className="text-xs font-black text-slate-800">
+                        {t.stageBgis}
+                      </div>
+                      {bgisStatus === 'loading' && (
+                        <div className="text-[11px] text-teal-700 font-bold mt-0.5">
+                          {t.statusLoading}
+                        </div>
+                      )}
+                      {bgisStatus === 'done' && (
+                        <div className="text-[10px] text-teal-800 font-extrabold mt-0.5">
+                          {stageCounts.bgis} {getRecordUnit(stageCounts.bgis)}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                  <div>
+                    {bgisStatus === 'loading' && <Loader2 className="w-4 h-4 text-teal-600 animate-spin" />}
+                    {bgisStatus === 'done' && <CheckCircle2 className="w-4.5 h-4.5 text-teal-600" />}
+                    {bgisStatus === 'skipped' && <span className="text-[10px] font-bold text-slate-400">{t.statusSkipped}</span>}
+                    {bgisStatus === 'idle' && <span className="text-[10px] font-bold text-slate-400">{t.statusPending}</span>}
+                  </div>
+                </div>
+
+                {/* Step 3: eBird (Bird group only) */}
+                {isBirdGroup && (
+                  <div className={`p-2.5 sm:p-3 rounded-2xl border transition-all flex items-center justify-between ${
+                    ebirdStatus === 'loading'
+                      ? 'bg-sky-50/90 border-sky-300 ring-2 ring-sky-400/20 shadow-xs'
+                      : ebirdStatus === 'done'
+                      ? 'bg-sky-50/40 border-sky-200/60'
+                      : ebirdStatus === 'skipped'
+                      ? 'bg-slate-50 border-slate-100 opacity-50'
+                      : 'bg-slate-50/60 border-slate-100 text-slate-400'
+                  }`}>
+                    <div className="flex items-center gap-3">
+                      <div className={`p-2 rounded-xl text-xs transition-colors ${
+                        ebirdStatus === 'loading' ? 'bg-sky-600 text-white shadow-xs' :
+                        ebirdStatus === 'done' ? 'bg-sky-100 text-sky-700' : 'bg-slate-200/80 text-slate-500'
+                      }`}>
+                        <Bird className="w-4 h-4" />
+                      </div>
+                      <div>
+                        <div className="text-xs font-black text-slate-800">
+                          {t.stageEbird}
+                        </div>
+                        {ebirdStatus === 'loading' && (
+                          <div className="text-[11px] text-sky-700 font-bold mt-0.5">
+                            {t.statusLoading}
+                          </div>
+                        )}
+                        {ebirdStatus === 'done' && (
+                          <div className="text-[10px] text-sky-800 font-extrabold mt-0.5">
+                            {stageCounts.ebird} {getRecordUnit(stageCounts.ebird)}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                    <div>
+                      {ebirdStatus === 'loading' && <Loader2 className="w-4 h-4 text-sky-600 animate-spin" />}
+                      {ebirdStatus === 'done' && <CheckCircle2 className="w-4.5 h-4.5 text-sky-600" />}
+                      {ebirdStatus === 'skipped' && <span className="text-[10px] font-bold text-slate-400">{t.statusSkipped}</span>}
+                      {ebirdStatus === 'idle' && <span className="text-[10px] font-bold text-slate-400">{t.statusPending}</span>}
+                    </div>
+                  </div>
+                )}
+
+                {/* Step 4: Spatial Grid Alignment */}
+                <div className={`p-2.5 sm:p-3 rounded-2xl border transition-all flex items-center justify-between ${
+                  gridStatus === 'loading'
+                    ? 'bg-indigo-50/90 border-indigo-300 ring-2 ring-indigo-400/20 shadow-xs'
+                    : gridStatus === 'done'
+                    ? 'bg-indigo-50/40 border-indigo-200/60'
+                    : 'bg-slate-50/60 border-slate-100 text-slate-400'
+                }`}>
+                  <div className="flex items-center gap-3">
+                    <div className={`p-2 rounded-xl text-xs transition-colors ${
+                      gridStatus === 'loading' ? 'bg-indigo-600 text-white shadow-xs' :
+                      gridStatus === 'done' ? 'bg-indigo-100 text-indigo-700' : 'bg-slate-200/80 text-slate-500'
+                    }`}>
+                      <Layers className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <div className="text-xs font-black text-slate-800">
+                        {t.stageGrid}
+                      </div>
+                      {gridStatus === 'loading' && (
+                        <div className="text-[11px] text-indigo-700 font-bold mt-0.5">
+                          {t.statusLoading}
+                        </div>
+                      )}
+                      {gridStatus === 'done' && (
+                        <div className="text-[10px] text-indigo-800 font-extrabold mt-0.5">
+                          {t.statusDone}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                  <div>
+                    {gridStatus === 'loading' && <Loader2 className="w-4 h-4 text-indigo-600 animate-spin" />}
+                    {gridStatus === 'done' && <CheckCircle2 className="w-4.5 h-4.5 text-indigo-600" />}
+                    {gridStatus === 'idle' && <span className="text-[10px] font-bold text-slate-400">{t.statusPending}</span>}
+                  </div>
+                </div>
+              </div>
+            </motion.div>
           </motion.div>
         )}
       </AnimatePresence>

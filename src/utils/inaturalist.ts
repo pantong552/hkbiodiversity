@@ -49,6 +49,8 @@ export async function fetchAllInatObservations(
       place_id: '7613',
       quality_grade: 'research',
       geoprivacy: 'open',
+      threatened: 'false',
+      obscuration: 'none',
       acc_below_or_equal: '1000',
       per_page: perPage.toString(),
       fields: '(id:!t,uri:!t,observed_on_details:(date:!t,hour:!t,minute:!t),time_observed_at:!t,place_guess:!t,location:!t,photos:(url:!t),user:(login:!t,name:!t),quality_grade:!t)',
@@ -58,7 +60,7 @@ export async function fetchAllInatObservations(
 
     while (true) {
       const response = await fetch(`${baseUrl}?${baseParams.toString()}&page=${page}`);
-      
+
       if (!response.ok) {
         throw new Error(`iNaturalist API error: ${response.statusText}`);
       }
@@ -66,7 +68,7 @@ export async function fetchAllInatObservations(
       const data = await response.json();
       const results = data.results || [];
       // v2 API total_results is usually outside results
-      totalResults = data.total_results || totalResults; 
+      totalResults = data.total_results || totalResults;
 
       allObservations.push(...results);
 
@@ -80,9 +82,9 @@ export async function fetchAllInatObservations(
       }
 
       page++;
-      
+
       // Safety limit to avoid infinite loops
-      if (page > 50) break; 
+      if (page > 50) break;
 
       // Small delay to be nice to the API
       await new Promise(resolve => setTimeout(resolve, 300));
