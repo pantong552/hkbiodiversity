@@ -645,10 +645,10 @@ const faunaFieldGroups = (t: any): FieldGroup[] => [
     nameEng: 'Conservation',
     icon: <ShieldAlert className="w-4 h-4" />,
     fields: [
-      {key: 'iucn', labelChi: 'IUCN 評級', labelEng: 'IUCN Status', type: 'select', options: ['LC', 'NT', 'VU', 'EN', 'CR', 'DD']},
+      {key: 'iucn', labelChi: 'IUCN 評級', labelEng: 'IUCN Status', type: 'select', options: ['LC', 'NT', 'VU', 'EN', 'CR', 'EW', 'EX','DD']},
       {key: 'cites', labelChi: 'CITES 評級', labelEng: 'CITES Status', type: 'text'},
       {key: 'afcd', labelChi: 'AFCD 評級', labelEng: 'AFCD Rating', type: 'text'},
-      {key: 'hkbws_cat', labelChi: '鳥種類別 (HKBWS)', labelEng: 'HKBWS Category', type: 'select', options: ['I', 'IIA', 'IIB', 'IIC', 'III']},
+      {key: 'hkbws_cat', labelChi: 'HKBWS 鳥種類別', labelEng: 'HKBWS Category', type: 'select', options: ['I', 'IIA', 'IIB', 'IIC', 'III']},
       {key: 'china_red_list', labelChi: '中國紅皮書', labelEng: 'China Red List', type: 'text'},
       {key: 'china_vertebrates_red_list', labelChi: '中國脊椎動物紅皮書', labelEng: 'China Vertebrates Red List', type: 'select', options: ['Least Concern', 'Near Threatened', 'Vulnerable', 'Endangered', 'Critically Endangered', 'Data Deficient']},
       {key: 'hk_protection', labelChi: '香港保護法例', labelEng: 'HK Protection', type: 'text'},
@@ -659,7 +659,7 @@ const faunaFieldGroups = (t: any): FieldGroup[] => [
   },
   {
     id: 'descriptions',
-    nameChi: '描述與分佈',
+    nameChi: '描述與分布',
     nameEng: 'Descriptions',
     icon: <MapPin className="w-4 h-4" />,
     fields: [
