@@ -1151,21 +1151,27 @@ export default function SpeciesDetailEditor({ table, data, originalData, onSave,
                       )}
                     </div>
                   )}
-                  {/* 正本發布內容與修訂內容對比小列 (僅在草稿審核模式時呈現) */}
-                  {isFieldDirty && publishedOriginal && (() => {
-                    const origVal = publishedOriginal?.[field.key];
+                  {/* 8. 當欄位被修改 (isFieldDirty) 時，下方顯示標準 Publish Data 參考卡片 */}
+                  {isFieldDirty && (() => {
+                    const pubVal = publishedOriginal ? publishedOriginal[field.key] : originalValues[field.key];
+                    const pubDisplayVal = pubVal === null || pubVal === undefined || String(pubVal).trim() === ''
+                      ? (language === 'zh' ? '（原本為空 / 未設定）' : '(Empty / Not set originally)')
+                      : String(pubVal);
+
                     return (
-                      <div className="text-[10px] text-amber-900 bg-amber-50/90 border border-amber-200/80 rounded-xl px-3 py-1.5 font-sans leading-relaxed mt-1 flex items-start gap-1.5 shadow-xs">
-                        <span className="font-black shrink-0 text-amber-700">
-                          {language === 'zh' ? '正本發布內容 (Publish Data)：' : 'Publish Data: '}
-                        </span>
-                        <span className="font-mono text-amber-950 break-all font-semibold">
-                          {origVal === null || origVal === undefined || String(origVal).trim() === ''
-                            ? (language === 'zh' ? '(正本尚無內容 / Empty)' : '(Empty in publish data)')
-                            : String(origVal)
-                          }
-                        </span>
-                      </div>
+                      <motion.div
+                        initial={{ opacity: 0, y: -4 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        className="mt-1.5 p-3 bg-amber-50/70 border border-amber-200/80 rounded-xl text-xs space-y-1 shadow-2xs"
+                      >
+                        <div className="flex items-center gap-1.5 font-bold text-amber-900">
+                          <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
+                          <span>{language === 'zh' ? 'Publish Data (發布正本參考)：' : 'Publish Data (Current Version):'}</span>
+                        </div>
+                        <div className="text-amber-950 font-medium whitespace-pre-wrap break-words leading-relaxed pl-2.5 font-sans selection:bg-amber-200">
+                          {pubDisplayVal}
+                        </div>
+                      </motion.div>
                     );
                   })()}
                 </div>

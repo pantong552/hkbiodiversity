@@ -568,6 +568,7 @@ export default function SpeciesEditModal({
               table={tableName}
               data={editorData}
               originalData={publishedSpecies || species}
+              publishedOriginal={publishedSpecies || species}
               onSave={handleSave}
               onCancel={onClose}
               hideHeader={true}
