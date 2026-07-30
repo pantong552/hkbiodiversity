@@ -586,6 +586,7 @@ interface SpeciesDetailEditorProps {
   table: string;
   data: any;
   originalData?: any;
+  publishedOriginal?: any;
   onSave: (updatedItem: any, affectedUpdates?: Record<string, string>) => void;
   onCancel: () => void;
   onDirtyChange?: (isDirty: boolean) => void;
@@ -754,7 +755,7 @@ const floraFieldGroups = (t: any): FieldGroup[] => [
   }
 ];
 
-export default function SpeciesDetailEditor({ table, data, originalData, onSave, onCancel, onDirtyChange, saveButtonLabel, hideHeader, onRegisterSave, disableDirectDatabaseUpdate }: SpeciesDetailEditorProps) {
+export default function SpeciesDetailEditor({ table, data, originalData, publishedOriginal: propPublishedOriginal, onSave, onCancel, onDirtyChange, saveButtonLabel, hideHeader, onRegisterSave, disableDirectDatabaseUpdate }: SpeciesDetailEditorProps) {
   const { language, t } = useLanguage();
   const { profile } = useAuth();
   const { getTaxonomyChi } = useTaxonomy();
@@ -772,10 +773,11 @@ export default function SpeciesDetailEditor({ table, data, originalData, onSave,
     }
   }, [data]);
 
-  // 使用 useMemo 確保正本發布資料 (originalData) 不會因為 state 異步落後或被改動
+  // 使用 useMemo 確保正本發布資料 (propPublishedOriginal / originalData) 不會因為 state 異步落後或被改動
   const publishedOriginal = useMemo(() => {
-    return originalData ? { ...originalData } : null;
-  }, [originalData]);
+    const base = propPublishedOriginal || originalData;
+    return base ? { ...base } : null;
+  }, [propPublishedOriginal, originalData]);
 
   useEffect(() => {
     if (originalData) {
@@ -853,7 +855,7 @@ export default function SpeciesDetailEditor({ table, data, originalData, onSave,
   }, [isDirty, onDirtyChange]);
 
   // 5. 處理欄位異動
-  const handleFieldChange = (key: string, val: any, type: 'text' | 'number' | 'textarea') => {
+  const handleFieldChange = (key: string, val: any, type: 'text' | 'number' | 'textarea' | 'select') => {
     let finalVal = val;
     if (type === 'number') {
       finalVal = val === '' ? null : Number(val);
