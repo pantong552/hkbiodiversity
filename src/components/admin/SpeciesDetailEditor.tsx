@@ -650,7 +650,6 @@ const faunaFieldGroups = (t: any): FieldGroup[] => [
       {key: 'cites', labelChi: 'CITES 評級', labelEng: 'CITES Status', type: 'text'},
       {key: 'afcd', labelChi: 'AFCD 評級', labelEng: 'AFCD Rating', type: 'text'},
       {key: 'hkbws_cat', labelChi: 'HKBWS 鳥種類別', labelEng: 'HKBWS Category', type: 'select', options: ['I', 'IIA', 'IIB', 'IIC', 'III']},
-      {key: 'china_red_list', labelChi: '中國紅皮書', labelEng: 'China Red List', type: 'text'},
       {key: 'china_vertebrates_red_list', labelChi: '中國脊椎動物紅皮書', labelEng: 'China Vertebrates Red List', type: 'select', options: ['Least Concern', 'Near Threatened', 'Vulnerable', 'Endangered', 'Critically Endangered', 'Data Deficient']},
       {key: 'hk_protection', labelChi: '香港保護法例', labelEng: 'HK Protection', type: 'text'},
       {key: 'endemic', labelChi: '特有種', labelEng: 'Endemicity', type: 'text'},

@@ -48,11 +48,6 @@ export default function ConservationStatus({ species }: ConservationStatusProps)
       value: species.iucn 
     },
     { 
-      labelChi: '中國紅皮書', 
-      labelEng: 'China Red List', 
-      value: species.china_red_list 
-    },
-    { 
       labelChi: '中國脊椎動物紅皮書', 
       labelEng: 'China Vertebrates Red List', 
       value: species.china_vertebrates_red_list 
