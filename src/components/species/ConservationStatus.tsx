@@ -75,20 +75,20 @@ export default function ConservationStatus({ species }: ConservationStatusProps)
   ];
 
   return (
-    <div className="bg-white p-8 rounded-[2.5rem] shadow-sm border border-slate-100 w-full mb-12">
-      <h2 className="text-2xl font-black text-slate-800 mb-8 flex items-center gap-3">
-        <Shield className="w-6 h-6 text-emerald-500" />
-        {language === 'zh' ? '保育與生存狀態' : 'Conservation & Survival Status'}
+    <div className="bg-white p-5 sm:p-8 rounded-[2rem] sm:rounded-[2.5rem] shadow-sm border border-slate-100 w-full mb-6 sm:mb-12">
+      <h2 className="text-xl sm:text-2xl font-black text-slate-800 mb-4 sm:mb-8 flex items-center gap-2.5 sm:gap-3">
+        <Shield className="w-5 h-5 sm:w-6 sm:h-6 text-emerald-500" />
+        {language === 'zh' ? '保育與現況' : 'Conservation Status'}
       </h2>
       
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-6">
         {statuses.map((status, idx) => (
           <div key={idx} className="flex flex-col group h-full">
-            <span className="text-xs font-bold text-slate-500 tracking-tight mb-3 transition-colors group-hover:text-emerald-600 min-h-[32px] flex items-end">
+            <span className="text-[11px] sm:text-xs font-bold text-slate-500 tracking-tight mb-1.5 sm:mb-3 transition-colors group-hover:text-emerald-600 sm:min-h-[32px] flex items-end">
               {language === 'zh' ? status.labelChi : status.labelEng}
             </span>
             <div className={`
-              text-base font-black px-5 py-3.5 rounded-2xl transition-all flex items-center justify-center text-center
+              text-xs sm:text-base font-bold sm:font-black px-3 sm:px-5 py-2 sm:py-3.5 rounded-xl sm:rounded-2xl transition-all flex items-center justify-center text-center leading-tight
               ${status.value && status.value !== '-' 
                 ? 'bg-emerald-50 text-emerald-700 border border-emerald-200 group-hover:bg-emerald-100 group-hover:border-emerald-300 shadow-sm' 
                 : 'bg-slate-50 text-slate-400 border border-slate-100'}
@@ -100,26 +100,26 @@ export default function ConservationStatus({ species }: ConservationStatusProps)
         
         {/* Additional information if present */}
         {(species.endemic || species.cites) && (
-          <div className="lg:col-span-3 grid grid-cols-1 md:grid-cols-2 gap-6 pt-4 border-t border-slate-50 mt-2">
+          <div className="col-span-2 lg:col-span-3 grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-6 pt-3 sm:pt-4 border-t border-slate-50 mt-1 sm:mt-2">
             {species.endemic && (
               <div className="group">
-                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2 block">
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1 sm:mb-2 block">
                   {language === 'zh' ? '特有種' : 'Endemicity'}
                 </span>
-                <div className="flex justify-between items-center px-5 py-4 bg-amber-50 rounded-2xl border border-amber-100 group-hover:bg-amber-100 transition-colors">
-                  <span className="text-sm font-black text-amber-900">{species.endemic}</span>
-                  <Info className="w-4 h-4 text-amber-400" />
+                <div className="flex justify-between items-center px-3.5 sm:px-5 py-2.5 sm:py-4 bg-amber-50 rounded-xl sm:rounded-2xl border border-amber-100 group-hover:bg-amber-100 transition-colors">
+                  <span className="text-xs sm:text-sm font-bold sm:font-black text-amber-900">{species.endemic}</span>
+                  <Info className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-amber-400" />
                 </div>
               </div>
             )}
             {species.cites && (
               <div className="group">
-                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2 block">
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1 sm:mb-2 block">
                   CITES
                 </span>
-                <div className="flex justify-between items-center px-5 py-4 bg-blue-50 rounded-2xl border border-blue-100 group-hover:bg-blue-100 transition-colors">
-                  <span className="text-sm font-black text-blue-900">{species.cites}</span>
-                  <Info className="w-4 h-4 text-blue-400" />
+                <div className="flex justify-between items-center px-3.5 sm:px-5 py-2.5 sm:py-4 bg-blue-50 rounded-xl sm:rounded-2xl border border-blue-100 group-hover:bg-blue-100 transition-colors">
+                  <span className="text-xs sm:text-sm font-bold sm:font-black text-blue-900">{species.cites}</span>
+                  <Info className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-blue-400" />
                 </div>
               </div>
             )}

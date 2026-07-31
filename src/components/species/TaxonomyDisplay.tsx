@@ -24,7 +24,7 @@ export default function TaxonomyDisplay({ species }: TaxonomyDisplayProps) {
   const { getTaxonomyChi } = useTaxonomy();
   const router = useRouter();
   const { toggleExpand, setPendingTaxonomyFilter } = useSpeciesPanel();
-  
+
   const [isExpanded, setIsExpanded] = useState(false);
   const [fullData, setFullData] = useState<FullTaxonomyData | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -35,48 +35,48 @@ export default function TaxonomyDisplay({ species }: TaxonomyDisplayProps) {
   const taxaType = isPlant ? 'flora' : 'fauna';
 
   const levels = isPlant ? [
-    { 
+    {
       id: 'categories', labelChi: '類別', labelEng: 'Category',
-      chi: getTaxonomyChi('category', taxaType, (species as any).category_eng), eng: (species as any).category_eng 
+      chi: getTaxonomyChi('category', taxaType, (species as any).category_eng), eng: (species as any).category_eng
     },
-    { 
+    {
       id: 'families', labelChi: '科', labelEng: 'Family',
-      chi: getTaxonomyChi('family', taxaType, (species as any).family_eng), eng: (species as any).family_eng 
+      chi: getTaxonomyChi('family', taxaType, (species as any).family_eng), eng: (species as any).family_eng
     },
-    { 
+    {
       id: 'genuses', labelChi: '屬', labelEng: 'Genus',
       chi: getTaxonomyChi('genus', taxaType, (species as any).genus_eng), eng: (species as any).genus_eng,
       isScientific: true
     },
-    { 
+    {
       id: 'species', labelChi: '種', labelEng: 'Species',
       chi: species.scientific_name, eng: species.species_eng,
       isScientific: true,
       isCurrent: true
     },
   ] : [
-    { 
+    {
       id: 'phylum_eng', labelChi: '門', labelEng: 'Phylum',
-      chi: getTaxonomyChi('phylum', taxaType, species.phylum_eng), eng: species.phylum_eng 
+      chi: getTaxonomyChi('phylum', taxaType, species.phylum_eng), eng: species.phylum_eng
     },
-    { 
+    {
       id: 'class_eng', labelChi: '綱', labelEng: 'Class',
-      chi: getTaxonomyChi('class', taxaType, species.class_eng), eng: species.class_eng 
+      chi: getTaxonomyChi('class', taxaType, species.class_eng), eng: species.class_eng
     },
-    { 
+    {
       id: 'order_eng', labelChi: '目', labelEng: 'Order',
-      chi: getTaxonomyChi('order', taxaType, species.order_eng), eng: species.order_eng 
+      chi: getTaxonomyChi('order', taxaType, species.order_eng), eng: species.order_eng
     },
-    { 
+    {
       id: 'family_eng', labelChi: '科', labelEng: 'Family',
-      chi: getTaxonomyChi('family', taxaType, species.family_eng), eng: species.family_eng 
+      chi: getTaxonomyChi('family', taxaType, species.family_eng), eng: species.family_eng
     },
-    { 
+    {
       id: 'genus_eng', labelChi: '屬', labelEng: 'Genus',
       chi: getTaxonomyChi('genus', taxaType, species.genus_eng), eng: species.genus_eng,
       isScientific: true
     },
-    { 
+    {
       id: 'species', labelChi: '種', labelEng: 'Species',
       chi: species.scientific_name, eng: species.species_eng,
       isScientific: true,
@@ -87,7 +87,7 @@ export default function TaxonomyDisplay({ species }: TaxonomyDisplayProps) {
   const handleTaxonomyClick = (levelId: string, value: string, chiValue?: string) => {
     const searchValue = isPlant ? (chiValue || value) : value;
     if (!searchValue || levelId === 'species') return;
-    
+
     setPendingTaxonomyFilter({ level: levelId, value: searchValue });
     toggleExpand(false);
     router.push('/');
@@ -118,39 +118,39 @@ export default function TaxonomyDisplay({ species }: TaxonomyDisplayProps) {
 
   return (
     <div className="flex flex-col">
-      <div className="flex items-center justify-between gap-4 mb-8">
-        <h2 className="text-2xl font-black text-slate-800 flex items-center justify-between flex-1">
-          <div className="flex items-center gap-3">
-            <div className="p-2 bg-emerald-100 rounded-xl">
-              <Layers className="w-6 h-6 text-emerald-600" />
+      <div className="flex items-center justify-between gap-2 sm:gap-4 mb-4 sm:mb-8">
+        <h2 className="text-xl sm:text-2xl font-black text-slate-800 flex items-center justify-between flex-1 truncate">
+          <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+            <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl sm:rounded-2xl bg-emerald-50 flex items-center justify-center shrink-0">
+              <Layers className="w-4 h-4 sm:w-5 sm:h-5 text-emerald-500" />
             </div>
-            {language === 'zh' ? '分類階層' : 'Classification'}
+            <span className="truncate">{language === 'zh' ? '分類階層' : 'Taxonomy'}</span>
           </div>
 
-          <div className="sm:hidden">
-            <a 
+          <div className="sm:hidden shrink-0">
+            <a
               href={`https://www.inaturalist.org/taxa/${species.inat_id}`}
               target="_blank"
               rel="noopener noreferrer"
-              className="w-10 h-10 flex items-center justify-center bg-white border border-slate-200 rounded-xl shadow-sm active:bg-slate-50 transition-colors"
+              className="w-8 h-8 flex items-center justify-center bg-white border border-slate-200 rounded-xl shadow-sm active:bg-slate-50 transition-colors"
             >
-              <img src="/INaturalist_logo.svg" alt="iNaturalist" className="w-5 h-5 object-contain" />
+              <img src="/INaturalist_logo.svg" alt="iNaturalist" className="w-4 h-4 object-contain" />
             </a>
           </div>
         </h2>
-        
-        <div className="hidden sm:block">
-          <a 
+
+        <div className="hidden sm:block shrink-0">
+          <a
             href={`https://www.inaturalist.org/taxa/${species.inat_id}`}
             target="_blank"
             rel="noopener noreferrer"
             className="flex items-center gap-3 px-4 py-2 bg-white hover:bg-emerald-50 border border-slate-200 hover:border-emerald-200 rounded-xl transition-all duration-300 shadow-sm hover:shadow-md group overflow-hidden"
           >
             <div className="relative w-5 h-5 flex items-center justify-center">
-              <img 
-                src="/INaturalist_logo.svg" 
-                alt="iNaturalist" 
-                className="w-full h-full object-contain group-hover:scale-110 transition-transform duration-300" 
+              <img
+                src="/INaturalist_logo.svg"
+                alt="iNaturalist"
+                className="w-full h-full object-contain group-hover:scale-110 transition-transform duration-300"
               />
             </div>
             <span className="text-[10px] font-black text-slate-500 group-hover:text-emerald-700 uppercase tracking-[0.2em] transition-colors">
@@ -160,7 +160,7 @@ export default function TaxonomyDisplay({ species }: TaxonomyDisplayProps) {
           </a>
         </div>
       </div>
-      
+
       {/* Mobile Path */}
       <div className="lg:hidden flex flex-col space-y-1.5 relative pl-1.5">
         <div className="absolute left-[7px] top-6 bottom-6 w-[1px] bg-slate-200/50 rounded-full" />
@@ -173,34 +173,31 @@ export default function TaxonomyDisplay({ species }: TaxonomyDisplayProps) {
               {level.isCurrent && (
                 <div className="absolute left-[-2px] top-1/2 -translate-y-1/2 w-[3px] h-[18px] bg-emerald-500 rounded-full z-20" />
               )}
-              <div 
+              <div
                 onClick={() => isClickable && handleTaxonomyClick(level.id, level.eng, level.chi)}
-                className={`flex-1 ml-6 py-2.5 px-3.5 rounded-xl border transition-all ${
-                  level.isCurrent ? 'bg-emerald-50 border-emerald-100 shadow-sm' : 'bg-white border-slate-100'
-                }`}
+                className={`flex-1 ml-6 py-2.5 px-3.5 rounded-xl border transition-all ${level.isCurrent ? 'bg-emerald-50 border-emerald-100 shadow-sm' : 'bg-white border-slate-100'
+                  }`}
               >
-                <div className="flex items-center justify-between gap-3">
-                  <div className="flex items-center gap-3 flex-1 min-w-0">
-                    <div className="shrink-0">
-                      <div className={`flex items-center justify-center min-w-[32px] h-[18px] px-1.5 rounded-md border text-center ${level.isCurrent ? 'bg-emerald-600 border-emerald-500' : 'bg-slate-100 border-slate-200'}`}>
-                        <span className={`text-[9px] font-black uppercase tracking-widest ${level.isCurrent ? 'text-white' : 'text-slate-500'}`}>
-                          {language === 'zh' ? level.labelChi : level.labelEng}
-                        </span>
-                      </div>
-                    </div>
-                    <div className="flex flex-col min-w-0">
-                      <span className={`text-[13px] font-bold truncate leading-tight ${level.isCurrent ? 'text-emerald-900' : 'text-slate-800'}`}>
-                        {level.id === 'species' 
-                          ? formatScientificName(level.chi) 
-                          : (language === 'zh' ? (level.chi || level.eng) : level.eng)
-                        }
+                <div className="flex items-center gap-3">
+                  <div className={`shrink-0 ${language === 'zh' ? 'w-6' : 'w-[68px]'} flex items-center justify-start`}>
+                    <div className={`flex items-center justify-center ${language === 'zh' ? 'w-6 h-6 rounded-lg' : 'w-full h-[18px] px-1.5 rounded-md'} border text-center ${level.isCurrent ? 'bg-emerald-600 border-emerald-500' : 'bg-slate-100 border-slate-200'}`}>
+                      <span className={`${language === 'zh' ? 'text-[13px] font-bold' : 'text-[9px] font-black uppercase tracking-widest'} ${level.isCurrent ? 'text-white' : 'text-slate-600'}`}>
+                        {language === 'zh' ? level.labelChi : level.labelEng}
                       </span>
-                      {language === 'zh' && level.eng && level.id !== 'species' && (
-                        <span className={`text-[10px] font-medium text-slate-400 leading-tight mt-0.5 ${level.isScientific ? 'italic font-serif' : ''}`}>
-                          {level.eng}
-                        </span>
-                      )}
                     </div>
+                  </div>
+                  <div className="flex flex-col min-w-0 flex-1">
+                    <span className={`text-[13px] font-bold truncate leading-tight ${level.isCurrent ? 'text-emerald-900' : 'text-slate-800'}`}>
+                      {level.id === 'species'
+                        ? formatScientificName(level.chi)
+                        : (language === 'zh' ? (level.chi || level.eng) : level.eng)
+                      }
+                    </span>
+                    {language === 'zh' && level.eng && level.id !== 'species' && (
+                      <span className={`text-[10px] font-medium text-slate-400 leading-tight mt-0.5 ${level.isScientific ? 'italic font-serif' : ''}`}>
+                        {level.eng}
+                      </span>
+                    )}
                   </div>
                 </div>
               </div>
@@ -219,7 +216,7 @@ export default function TaxonomyDisplay({ species }: TaxonomyDisplayProps) {
               return (
                 <div key={idx} className="flex items-center group relative h-10" style={{ marginLeft: `${idx * 24}px` }}>
                   {idx > 0 && <div className="absolute -left-4 top-[-24px] w-4 h-8 border-l-2 border-b-2 border-slate-100 rounded-bl-xl pointer-events-none" />}
-                  <div 
+                  <div
                     onClick={() => isClickable && handleTaxonomyClick(level.id, level.eng, level.chi)}
                     className={`flex items-center gap-4 px-5 py-2.5 rounded-2xl transition-all duration-300 ${isClickable ? 'hover:bg-emerald-50 hover:shadow-sm cursor-pointer' : ''} ${level.isCurrent ? 'bg-emerald-50/50 border border-emerald-100 shadow-sm' : ''}`}
                   >
@@ -233,12 +230,12 @@ export default function TaxonomyDisplay({ species }: TaxonomyDisplayProps) {
                     <div className="flex items-center gap-3">
                       <span className={`text-[15px] font-bold ${level.isCurrent ? 'text-emerald-900' : 'text-slate-700'} 
                         ${(level.id === 'species' || (level.isScientific && language !== 'zh')) ? 'italic font-serif' : ''}`}>
-                        {level.id === 'species' 
-                          ? formatScientificName(level.chi) 
+                        {level.id === 'species'
+                          ? formatScientificName(level.chi)
                           : (language === 'zh' ? (level.chi || level.eng) : level.eng)
                         }
                       </span>
-                      
+
                       {language === 'zh' && level.eng && level.id !== 'species' && (
                         <span className={`text-[11px] font-medium text-slate-400 group-hover:text-emerald-400 transition-colors ${level.isScientific ? 'italic font-serif' : ''}`}>
                           {level.eng}
@@ -252,7 +249,7 @@ export default function TaxonomyDisplay({ species }: TaxonomyDisplayProps) {
           </div>
           <div className="col-span-2 border-l border-slate-100 pl-10 flex flex-col justify-center relative">
             <div className="absolute inset-0 flex items-center justify-center opacity-[0.03] pointer-events-none">
-               <Dna className="w-64 h-64 text-slate-950 rotate-[-15deg]" />
+              <Dna className="w-64 h-64 text-slate-950 rotate-[-15deg]" />
             </div>
             <div className="relative z-10 space-y-8">
               <div className="space-y-4">
@@ -273,7 +270,7 @@ export default function TaxonomyDisplay({ species }: TaxonomyDisplayProps) {
               </div>
 
               <div className="pt-2 flex justify-end">
-                <button 
+                <button
                   onClick={() => {
                     const commentSection = document.getElementById('comment-section');
                     if (commentSection) {
@@ -296,10 +293,10 @@ export default function TaxonomyDisplay({ species }: TaxonomyDisplayProps) {
       </div>
 
       {/* Expandable Area */}
-      <div className="mt-10 pt-6 border-t border-slate-100">
+      <div className="mt-4 sm:mt-8 pt-0">
         <button
           onClick={toggleFullTaxonomy}
-          className={`w-full flex items-center justify-between px-6 py-4 rounded-2xl transition-all duration-500 group ${isExpanded ? 'bg-slate-900 text-white shadow-xl ring-4 ring-slate-100' : 'bg-slate-50 text-slate-600 hover:bg-emerald-50'}`}
+          className={`w-full flex items-center justify-between px-4 sm:px-6 py-3 sm:py-4 rounded-xl sm:rounded-2xl transition-all duration-500 group ${isExpanded ? 'bg-slate-900 text-white shadow-xl ring-4 ring-slate-100' : 'bg-slate-50 text-slate-600 hover:bg-emerald-50'}`}
         >
           <div className="flex items-center gap-4">
             <div className={`p-2 rounded-xl transition-colors ${isExpanded ? 'bg-white/10 text-emerald-400' : 'bg-white text-slate-400 shadow-sm'}`}>
@@ -372,7 +369,7 @@ export default function TaxonomyDisplay({ species }: TaxonomyDisplayProps) {
                                 )}
                                 <span className="text-[8px] font-black text-slate-300 uppercase tracking-widest block leading-tight">{item.rank}</span>
                               </div>
-                              
+
                               {/* Modern Step Connector */}
                               <div className="relative flex justify-center h-full items-center">
                                 {/* Vertical segments for tree continuity */}
@@ -431,9 +428,9 @@ export default function TaxonomyDisplay({ species }: TaxonomyDisplayProps) {
                   </div>
                 )}
                 <div className="flex justify-center pb-4">
-                   <p className="text-[10px] font-medium text-slate-400 flex items-center gap-2">
-                     Source: Catalogue of Life (COL) • Usage ID: <code className="bg-slate-100 px-1.5 py-0.5 rounded text-emerald-600 font-mono">{fullData?.usageId}</code>
-                   </p>
+                  <p className="text-[10px] font-medium text-slate-400 flex items-center gap-2">
+                    Source: Catalogue of Life (COL) • Usage ID: <code className="bg-slate-100 px-1.5 py-0.5 rounded text-emerald-600 font-mono">{fullData?.usageId}</code>
+                  </p>
                 </div>
               </div>
             </motion.div>

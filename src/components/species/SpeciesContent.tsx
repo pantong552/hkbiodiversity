@@ -287,7 +287,7 @@ export default function SpeciesContent({ species, showBreadcrumb = true, refresh
             
 
             {/* Taxonomy Section - Always Card Style now */}
-            <section className="bg-white p-8 rounded-[2.5rem] shadow-sm border border-slate-100">
+            <section className="bg-white p-5 sm:p-8 rounded-[2rem] sm:rounded-[2.5rem] shadow-sm border border-slate-100">
               <TaxonomyDisplay species={species} />
             </section>
 
