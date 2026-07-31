@@ -19,7 +19,8 @@ export default function Header() {
   const [isVisible, setIsVisible] = useState(true);
 
   const { openSpeciesIds, isExpanded, isGalleryOpen, isUploadModalOpen, isFilterOpen, isEditModalOpen, toggleExpand, setIsAccountOpen, isAccountOpen } = useSpeciesPanel();
-  const isHomePage = pathname === '/';
+  // 相容 SSR 與 Hydration 的路徑正規化判斷
+  const isHomePage = pathname === '/' || pathname === '' || pathname.startsWith('/?');
   const hasSpeciesOpen = openSpeciesIds.length > 0;
   const isHeaderTransparent = isHomePage && !isScrolled && !hasSpeciesOpen;
   const lastScrollYRef = useRef(0);
@@ -27,13 +28,16 @@ export default function Header() {
   const menuToggleRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
+    // 禁用瀏覽器自動恢復捲動位置
+    if ('scrollRestoration' in history) {
+      history.scrollRestoration = 'manual';
+    }
+
     const handleScroll = (e?: Event) => {
-      // 僅在真正的捲動事件觸發且選單開啟時才關閉，避免初始化調用誤觸
       if (e && isMobileMenuOpen) setIsMobileMenuOpen(false);
 
       let currentScrollY = window.scrollY;
       
-      // 如果面板展開，則監聽面板內部的捲動
       if (isExpanded) {
         const panelContainer = document.getElementById('species-panel-scroll-container');
         if (panelContainer) {
@@ -47,7 +51,6 @@ export default function Header() {
       // 智慧顯示/隱藏邏輯
       const deltaY = currentScrollY - lastScrollYRef.current;
 
-      // 只有當位移超過一定像素 (10px) 時才更新狀態，避免因捲動抖動導致的頻繁閃爍
       if (Math.abs(deltaY) > 10) {
         if (currentScrollY <= 50) {
           setIsVisible(true);
@@ -58,33 +61,33 @@ export default function Header() {
         }
         lastScrollYRef.current = currentScrollY;
       } else if (currentScrollY <= 50) {
-        // 在頂部附近時始終顯示
         setIsVisible(true);
       }
     };
 
-    // 監聽 window
+    // 掛載時立即強行重算一次 scrollY，若 < 20 則強制歸零 isScrolled
+    if (typeof window !== 'undefined') {
+      setIsScrolled(window.scrollY > 20);
+    }
+
     window.addEventListener('scroll', handleScroll, { passive: true });
     
-    // 如果面板展開，額外監聽面板容器
     let panelContainer: HTMLElement | null = null;
     if (isExpanded) {
       panelContainer = document.getElementById('species-panel-scroll-container');
       if (panelContainer) {
         panelContainer.addEventListener('scroll', handleScroll, { passive: true });
-        // 初始化一次位置
         handleScroll();
       }
     }
 
-    // 當 mounted 或 isExpanded 變動時初始化一次，使用 raf 防護瀏覽器 scrollRestoration 延遲
     handleScroll();
-    const rafId = requestAnimationFrame(() => {
+    const timerId = setTimeout(() => {
       handleScroll();
-    });
+    }, 100);
 
     return () => {
-      cancelAnimationFrame(rafId);
+      clearTimeout(timerId);
       window.removeEventListener('scroll', handleScroll);
       if (panelContainer) {
         panelContainer.removeEventListener('scroll', handleScroll);
