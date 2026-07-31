@@ -63,6 +63,16 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="zh-TW">
+      <head>
+        {/* 在 React Hydration 前即封鎖 scroll restoration，防止瀏覽器在 JS 執行前就自動恢復捲動位置 */}
+        <script dangerouslySetInnerHTML={{ __html: `
+          (function() {
+            if ('scrollRestoration' in history) {
+              history.scrollRestoration = 'manual';
+            }
+          })();
+        `}} />
+      </head>
       <body className={`${workSans.variable} ${outfit.variable} font-sans antialiased text-cyan-900`}>
         <AuthProvider>
           <LanguageProvider>

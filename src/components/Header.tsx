@@ -90,17 +90,10 @@ export default function Header() {
       panelContainer = document.getElementById('species-panel-scroll-container');
       if (panelContainer) {
         panelContainer.addEventListener('scroll', handleScroll, { passive: true });
-        handleScroll();
       }
     }
 
-    handleScroll();
-    const timerId = setTimeout(() => {
-      handleScroll();
-    }, 100);
-
     return () => {
-      clearTimeout(timerId);
       window.removeEventListener('scroll', handleScroll);
       if (panelContainer) {
         panelContainer.removeEventListener('scroll', handleScroll);
