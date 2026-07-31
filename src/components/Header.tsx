@@ -10,7 +10,11 @@ import { useLanguage } from '@/context/LanguageContext';
 import { useAuth } from '@/context/AuthContext';
 import { useSpeciesPanel } from '@/context/SpeciesPanelContext';
 
-export default function Header() {
+interface HeaderProps {
+  isHomePage?: boolean;
+}
+
+export default function Header({ isHomePage: propIsHomePage }: HeaderProps = {}) {
   const { language, setLanguage, t } = useLanguage();
   const { user, profile, signOut } = useAuth();
   const pathname = usePathname();
@@ -27,7 +31,7 @@ export default function Header() {
   
   // 正規化路徑（移除結尾斜線或查詢參數，確保 Vercel 生產環境首頁正確辨識）
   const normalizedPath = (pathname || '/').replace(/\/$/, '') || '/';
-  const isHomePage = normalizedPath === '/';
+  const isHomePage = propIsHomePage !== undefined ? propIsHomePage : (normalizedPath === '/');
   const hasSpeciesOpen = openSpeciesIds.length > 0;
   const isHeaderTransparent = isHomePage && !isScrolled && !hasSpeciesOpen;
   const lastScrollYRef = useRef(0);
