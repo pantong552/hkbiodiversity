@@ -33,7 +33,8 @@ export default function Header({ isHomePage: propIsHomePage }: HeaderProps = {})
   const normalizedPath = (pathname || '/').replace(/\/$/, '') || '/';
   const isHomePage = propIsHomePage !== undefined ? propIsHomePage : (normalizedPath === '/');
   const hasSpeciesOpen = openSpeciesIds.length > 0;
-  const isHeaderTransparent = isHomePage && !isScrolled && !hasSpeciesOpen;
+  // 關鍵修正：只有當面板「展開且有物種開啟」時，Header 才需要變白色。如果面板收合，首頁 Header 依然保持透明。
+  const isHeaderTransparent = isHomePage && !isScrolled && !(isExpanded && hasSpeciesOpen);
   const lastScrollYRef = useRef(0);
   const mobileMenuRef = useRef<HTMLDivElement>(null);
   const menuToggleRef = useRef<HTMLButtonElement>(null);
