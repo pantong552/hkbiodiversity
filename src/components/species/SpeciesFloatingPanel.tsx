@@ -387,6 +387,24 @@ export default function SpeciesFloatingPanel() {
     });
   };
 
+  // 當 openSpeciesIds 改變時，自動清空已經關閉的物種資料快取，
+  // 這樣再次打開該物種時，就會重新向 supabase 抓取最新資料。
+  useEffect(() => {
+    setSpeciesData(prev => {
+      const nextData = { ...prev };
+      let changed = false;
+      
+      Object.keys(nextData).forEach(id => {
+        if (!openSpeciesIds.includes(id)) {
+          delete nextData[id];
+          changed = true;
+        }
+      });
+      
+      return changed ? nextData : prev;
+    });
+  }, [openSpeciesIds]);
+
   // 1. Fetch data for new IDs
   useEffect(() => {
     // 確保當前啟動的物種有資料
