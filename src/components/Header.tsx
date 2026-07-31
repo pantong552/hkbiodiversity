@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useLayoutEffect, useRef } from 'react';
 import { Leaf, Menu, X, User, LogOut, Settings, Globe } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
@@ -18,6 +18,11 @@ export default function Header() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isVisible, setIsVisible] = useState(true);
 
+  // 在瀏覽器繪製前立即同步 isScrolled 狀態，防止「閃白」
+  useLayoutEffect(() => {
+    setIsScrolled(window.scrollY > 20);
+  }, []);
+
   const { openSpeciesIds, isExpanded, isGalleryOpen, isUploadModalOpen, isFilterOpen, isEditModalOpen, toggleExpand, setIsAccountOpen, isAccountOpen } = useSpeciesPanel();
   
   // 正規化路徑（移除結尾斜線或查詢參數，確保 Vercel 生產環境首頁正確辨識）
@@ -29,11 +34,19 @@ export default function Header() {
   const mobileMenuRef = useRef<HTMLDivElement>(null);
   const menuToggleRef = useRef<HTMLButtonElement>(null);
 
+  // 監聽 BFCache（Back-Forward Cache）頁面恢復事件
+  // 當 Refresh 或返回時從快取恢復頁面，強制重新同步 scroll 狀態
   useEffect(() => {
-    // 禁用瀏覽器自動恢復捲動位置
-    if ('scrollRestoration' in history) {
-      history.scrollRestoration = 'manual';
-    }
+    const handlePageShow = (e: PageTransitionEvent) => {
+      // e.persisted === true 代表從 BFCache 恢復（不是全新加載）
+      setIsScrolled(window.scrollY > 20);
+      setIsVisible(true);
+    };
+    window.addEventListener('pageshow', handlePageShow);
+    return () => window.removeEventListener('pageshow', handlePageShow);
+  }, []);
+
+  useEffect(() => {
 
     const handleScroll = (e?: Event) => {
       if (e && isMobileMenuOpen) setIsMobileMenuOpen(false);
@@ -67,14 +80,8 @@ export default function Header() {
       }
     };
 
-    // 頁面加載完成 / Refresh 時，主動將 window 強制捲動回頂部 0，防止 refresh 停留
-    if (typeof window !== 'undefined') {
-      if (window.scrollY === 0) {
-        setIsScrolled(false);
-      } else {
-        handleScroll();
-      }
-    }
+    // 掛載時同步一次當前 scrollY 狀態
+    setIsScrolled(window.scrollY > 20);
 
     window.addEventListener('scroll', handleScroll, { passive: true });
     
