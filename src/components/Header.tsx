@@ -19,8 +19,10 @@ export default function Header() {
   const [isVisible, setIsVisible] = useState(true);
 
   const { openSpeciesIds, isExpanded, isGalleryOpen, isUploadModalOpen, isFilterOpen, isEditModalOpen, toggleExpand, setIsAccountOpen, isAccountOpen } = useSpeciesPanel();
-  // 相容 SSR 與 Hydration 的路徑正規化判斷
-  const isHomePage = pathname === '/' || pathname === '' || pathname.startsWith('/?');
+  
+  // 正規化路徑（移除結尾斜線或查詢參數，確保 Vercel 生產環境首頁正確辨識）
+  const normalizedPath = (pathname || '/').replace(/\/$/, '') || '/';
+  const isHomePage = normalizedPath === '/';
   const hasSpeciesOpen = openSpeciesIds.length > 0;
   const isHeaderTransparent = isHomePage && !isScrolled && !hasSpeciesOpen;
   const lastScrollYRef = useRef(0);
@@ -36,7 +38,7 @@ export default function Header() {
     const handleScroll = (e?: Event) => {
       if (e && isMobileMenuOpen) setIsMobileMenuOpen(false);
 
-      let currentScrollY = window.scrollY;
+      let currentScrollY = typeof window !== 'undefined' ? window.scrollY : 0;
       
       if (isExpanded) {
         const panelContainer = document.getElementById('species-panel-scroll-container');
@@ -65,9 +67,13 @@ export default function Header() {
       }
     };
 
-    // 掛載時立即強行重算一次 scrollY，若 < 20 則強制歸零 isScrolled
+    // 頁面加載完成 / Refresh 時，主動將 window 強制捲動回頂部 0，防止 refresh 停留
     if (typeof window !== 'undefined') {
-      setIsScrolled(window.scrollY > 20);
+      if (window.scrollY === 0) {
+        setIsScrolled(false);
+      } else {
+        handleScroll();
+      }
     }
 
     window.addEventListener('scroll', handleScroll, { passive: true });
