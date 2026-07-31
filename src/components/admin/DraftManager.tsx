@@ -392,9 +392,10 @@ export default function DraftManager() {
           species={targetSpecies}
           tableName={selectedDraft?.table_name || (targetSpecies.taxa_group === 'FLORA' ? 'plant_species' : 'species')}
           reviewDraft={selectedDraft}
-          onApproveDraft={async (draft) => {
+          onApproveDraft={async (draft, updatedData) => {
             if (!profile) return;
             const targetTable = draft.table_name || 'species';
+            const finalData = updatedData || draft.draft_data;
             
             // 1. 取得物種實體資料以進行精準更新
             const targetSpeciesData = await fetchSpeciesOrPlantRow(draft.species_id, targetTable);
@@ -406,7 +407,7 @@ export default function DraftManager() {
             // 2. 更新正式物種表
             const { error: updateError } = await supabase
               .from(targetTable)
-              .update(draft.draft_data)
+              .update(finalData)
               .eq('id', targetSpeciesData.id);
 
             if (updateError) {
@@ -419,6 +420,7 @@ export default function DraftManager() {
               .from('species_drafts')
               .update({
                 status: 'approved',
+                draft_data: finalData, // 將草稿的內容也更新為管理員最終修改並發布的內容
                 approved_by: profile.id,
                 approved_by_name: profile.username || (profile.email ? profile.email.split('@')[0] : undefined),
                 approved_at: new Date().toISOString()
