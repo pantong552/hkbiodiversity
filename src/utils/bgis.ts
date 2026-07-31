@@ -27,6 +27,10 @@ export const BGIS_DATASETS: Record<number, { zh: string; en: string }> = {
   109: {
     zh: '香港海洋哺乳類動物監察',
     en: 'Monitoring of Marine Mammals in Hong Kong Waters'
+  },
+  113: {
+    zh: '在香港試驗使用環境基因技術監測幼鱟',
+    en: 'Field trial of juvenile horseshoe crab monitoring in Hong Kong using environmental DNA technique'
   }
 };
 
@@ -124,11 +128,11 @@ export async function fetchBgisSpeciesList(
 
     const listData = await listRes.json();
     if (Array.isArray(listData)) {
-      // 僅保留 Dataset ID 為 62 及 109 的資料
+      // 僅保留 Dataset ID 為 62、109 及 113 的資料
       const filteredGridList: BgisGridRecord[] = listData
         .map((item: BgisGridRecord) => {
           const validDatasets = (item.dataset || []).filter(
-            ds => ds.datasetID === 62 || ds.datasetID === 109
+            ds => ds.datasetID === 62 || ds.datasetID === 109 || ds.datasetID === 113
           );
           const validCount = validDatasets.reduce((sum, ds) => sum + ds.count, 0);
           return {

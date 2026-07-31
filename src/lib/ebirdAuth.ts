@@ -161,7 +161,13 @@ export async function getActiveEbirdSession(): Promise<string | null> {
       return data[0].session_id;
     }
 
-    return await refreshEbirdSessionInSupabase();
+    // 若沒有 active session，改為先登入取得，之後異步更新 DB，並立即回傳
+    const newSessionId = await loginEbirdAndGetSession();
+    if (newSessionId) {
+      saveNewSessionToSupabase(newSessionId).catch(err => console.error('[eBird Auth] 異步寫入新 Session 失敗:', err));
+      return newSessionId;
+    }
+    return null;
   } catch (err) {
     console.error('[eBird Auth] 存取 ebird_sessions 表失敗:', err);
     return null;
@@ -194,12 +200,38 @@ export async function markEbirdSessionExpired(sessionId?: string): Promise<void>
 }
 
 /**
+ * 僅執行 Supabase 更新流程：將舊 Session 設為過期，並寫入新 Session
+ */
+export async function saveNewSessionToSupabase(newSessionId: string): Promise<void> {
+  console.log(`[eBird Auth] 準備在 Supabase 更新存放新 SessionID (${newSessionId})...`);
+  try {
+    await markEbirdSessionExpired();
+    const supabase = getSupabaseAdmin();
+    const { error } = await supabase
+      .from('ebird_sessions')
+      .insert([
+        {
+          session_id: newSessionId,
+          status: 'active',
+        }
+      ]);
+
+    if (error) {
+      console.error('[eBird Auth] 將新 Session 寫入 Supabase 失敗:', error.message);
+    } else {
+      console.log(`[eBird Auth] ✅ 新 SessionID (${newSessionId}) 已成功寫入 Supabase (active)`);
+    }
+  } catch (err) {
+    console.error('[eBird Auth] saveNewSessionToSupabase 發生錯誤:', err);
+  }
+}
+
+/**
  * 標記舊 session 為 expired -> 重新登入取得新 session -> 寫入 Supabase 並標記 active
  */
 export async function refreshEbirdSessionInSupabase(): Promise<string | null> {
   console.log('[eBird Auth] 開始執行 Session 刷新與 Supabase 更新流程...');
   
-  await markEbirdSessionExpired();
   const newSessionId = await loginEbirdAndGetSession();
 
   if (!newSessionId) {
@@ -207,21 +239,10 @@ export async function refreshEbirdSessionInSupabase(): Promise<string | null> {
     return null;
   }
 
-  const supabase = getSupabaseAdmin();
-  const { error } = await supabase
-    .from('ebird_sessions')
-    .insert([
-      {
-        session_id: newSessionId,
-        status: 'active',
-      }
-    ]);
-
-  if (error) {
-    console.error('[eBird Auth] 將新 Session 寫入 Supabase 失敗:', error.message);
-  } else {
-    console.log(`[eBird Auth] ✅ 新 SessionID (${newSessionId}) 已成功寫入 Supabase (active)`);
-  }
+  // 異步執行 Supabase 更新流程，不阻塞地圖數據的立即獲取
+  saveNewSessionToSupabase(newSessionId).catch(err => {
+    console.error('[eBird Auth] 異步更新 Supabase 失敗:', err);
+  });
 
   return newSessionId;
 }
