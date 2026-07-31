@@ -77,10 +77,14 @@ export default function Header() {
       }
     }
 
-    // 當 isExpanded 變動時也初始化一次
+    // 當 mounted 或 isExpanded 變動時初始化一次，使用 raf 防護瀏覽器 scrollRestoration 延遲
     handleScroll();
+    const rafId = requestAnimationFrame(() => {
+      handleScroll();
+    });
 
     return () => {
+      cancelAnimationFrame(rafId);
       window.removeEventListener('scroll', handleScroll);
       if (panelContainer) {
         panelContainer.removeEventListener('scroll', handleScroll);
