@@ -1,9 +1,9 @@
 'use client';
 
 import React, { useEffect, useRef, useState } from 'react';
-import maplibregl from 'maplibre-gl';
+import Map, { Source, Layer, NavigationControl as MapNavControl, FullscreenControl } from 'react-map-gl/maplibre';
 import 'maplibre-gl/dist/maplibre-gl.css';
-import { Globe2, Loader2, AlertCircle, Layers } from 'lucide-react';
+import { Globe2, Loader2, AlertCircle, Layers, Info, ExternalLink } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useLanguage } from '@/context/LanguageContext';
 
@@ -47,64 +47,75 @@ const BASEMAPS = [
     id: 'carto-light',
     name: { zh: 'Carto 亮色', en: 'Carto Light' },
     preview: 'https://a.basemaps.cartocdn.com/light_all/13/6694/3574.png',
+    attributionText: '© CARTO | MapLibre',
     style: createRasterStyle([{ id: 'carto-light', tiles: [MAP_SOURCES.cartoLight] }])
   },
   {
     id: 'carto-dark',
     name: { zh: 'Carto 深色', en: 'Carto Dark' },
     preview: 'https://a.basemaps.cartocdn.com/dark_all/13/6694/3574.png',
+    attributionText: '© CARTO | MapLibre',
     style: createRasterStyle([{ id: 'carto-dark', tiles: [MAP_SOURCES.cartoDark] }])
   },
   {
     id: 'osm',
     name: { zh: 'OpenStreetMap', en: 'OpenStreetMap' },
     preview: 'https://tile.openstreetmap.org/13/6694/3574.png',
+    attributionText: '© OpenStreetMap | MapLibre',
     style: createRasterStyle([{ id: 'osm', tiles: [MAP_SOURCES.osm] }])
   },
   {
     id: 'esri-sat',
     name: { zh: 'Esri 衛星圖', en: 'Esri Satellite' },
     preview: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/13/3574/6694',
+    attributionText: '© Esri | MapLibre',
     style: createRasterStyle([{ id: 'esri-sat', tiles: [MAP_SOURCES.esri] }])
   },
   {
     id: 'google-streets',
     name: { zh: 'Google 街道', en: 'Google Streets' },
     preview: 'https://mt1.google.com/vt/lyrs=m&x=6694&y=3574&z=13',
+    attributionText: '© Google Maps | MapLibre',
     style: createRasterStyle([{ id: 'google-streets', tiles: [MAP_SOURCES.googleStreets] }])
   },
   {
     id: 'google-sat',
     name: { zh: 'Google 衛星', en: 'Google Satellite' },
     preview: 'https://mt1.google.com/vt/lyrs=s&x=6694&y=3574&z=13',
+    attributionText: '© Google Maps | MapLibre',
     style: createRasterStyle([{ id: 'google-sat', tiles: [MAP_SOURCES.googleSatellite] }])
   },
   {
     id: 'google-hybrid',
     name: { zh: 'Google 混合', en: 'Google Hybrid' },
     preview: 'https://mt1.google.com/vt/lyrs=y&x=6694&y=3574&z=13',
+    attributionText: '© Google Maps | MapLibre',
     style: createRasterStyle([{ id: 'google-hybrid', tiles: [MAP_SOURCES.googleHybrid] }])
   },
   {
     id: 'google-terrain',
     name: { zh: 'Google 地形', en: 'Google Terrain' },
     preview: 'https://mt1.google.com/vt/lyrs=p&x=6694&y=3574&z=13',
+    attributionText: '© Google Maps | MapLibre',
     style: createRasterStyle([{ id: 'google-terrain', tiles: [MAP_SOURCES.googleTerrain] }])
   },
 ];
 
 export default function GbifGlobalMap({ scientificName }: GbifGlobalMapProps) {
   const { language } = useLanguage();
-  const mapContainerRef = useRef<HTMLDivElement>(null);
-  const wrapperRef = useRef<HTMLDivElement>(null);
-  const mapRef = useRef<maplibregl.Map | null>(null);
+  const mapRef = useRef<any>(null);
+  const attributionRef = useRef<HTMLDivElement>(null);
 
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [currentStyleId, setCurrentStyleId] = useState('carto-light');
   const [isBasemapPanelOpen, setIsBasemapPanelOpen] = useState(false);
+  const [showAttribution, setShowAttribution] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
+  const [taxonKey, setTaxonKey] = useState<number | null>(null);
+  const [bounds, setBounds] = useState<any>(null);
 
+  // 實時監聽 window resize 事件以動態切換 isMobile
   useEffect(() => {
     const checkMobile = () => setIsMobile(window.innerWidth < 1024);
     checkMobile();
@@ -112,157 +123,70 @@ export default function GbifGlobalMap({ scientificName }: GbifGlobalMapProps) {
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
 
-  const taxonKeyRef = useRef<number | null>(null);
-
-  const applyGbifLayer = (map: maplibregl.Map, key: number) => {
-    if (!map.getSource('gbif-occurrence')) {
-      map.addSource('gbif-occurrence', {
-        type: 'vector',
-        tiles: [
-          `https://api.gbif.org/v2/map/occurrence/density/{z}/{x}/{y}.mvt?taxonKey=${key}`
-        ],
-        minzoom: 0,
-        maxzoom: 16
-      });
+  // 點擊外部隱藏版權資訊 (Mobile 模式)
+  useEffect(() => {
+    if (!isMobile) return;
+    const handleClickOutside = (event: MouseEvent) => {
+      if (attributionRef.current && !attributionRef.current.contains(event.target as Node)) {
+        setShowAttribution(false);
+      }
+    };
+    if (showAttribution) {
+      document.addEventListener('mousedown', handleClickOutside);
     }
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [showAttribution, isMobile]);
 
-    if (!map.getLayer('gbif-points')) {
-      map.addLayer({
-        id: 'gbif-points',
-        type: 'circle',
-        source: 'gbif-occurrence',
-        'source-layer': 'occurrence',
-        paint: {
-          'circle-radius': [
-            'interpolate', ['linear'], ['zoom'],
-            0, 1.2,
-            5, 2.0,
-            10, 4.0
-          ],
-          'circle-color': '#047857', // 網站主色系深綠色 (emerald-700 / #047857)
-          'circle-opacity': 0.75,
-          'circle-stroke-width': [
-            'interpolate', ['linear'], ['zoom'],
-            0, 0.5,
-            10, 1.0
-          ],
-          'circle-stroke-color': '#ffffff',
-          'circle-stroke-opacity': 0.85
-        }
-      });
-    }
-  };
+  const currentStyle = BASEMAPS.find(m => m.id === currentStyleId)?.style || BASEMAPS[0].style;
+  const currentAttribution = (BASEMAPS.find(m => m.id === currentStyleId) || BASEMAPS[0]).attributionText;
 
-  const handleStyleChange = (basemapId: string) => {
-    setCurrentStyleId(basemapId);
-    setIsBasemapPanelOpen(false);
-    const basemap = BASEMAPS.find(m => m.id === basemapId);
-    if (basemap && mapRef.current) {
-      mapRef.current.setStyle(basemap.style as any);
-      mapRef.current.once('style.load', () => {
-        if (mapRef.current && taxonKeyRef.current) {
-          applyGbifLayer(mapRef.current, taxonKeyRef.current);
-        }
-      });
-    }
-  };
-
-  // 僅依據 scientificName 初始化 GBIF 數據 (切換語言不會觸發 re-fetch)
+  // 僅依據 scientificName 獲取 GBIF 數據
   useEffect(() => {
     let isMounted = true;
     if (!scientificName) return;
 
-    async function initGbifMap() {
+    async function fetchGbifData() {
       try {
         setLoading(true);
         setError(null);
 
-        // 並行 1: 立即開始發起 GBIF 網絡 API 查詢 (不阻塞 Map 實例建立)
-        const fetchGbifDataPromise = (async () => {
-          const matchRes = await fetch(
-            `https://api.gbif.org/v1/species/match?name=${encodeURIComponent(scientificName)}`
-          );
-          const matchData = await matchRes.json();
+        const matchRes = await fetch(
+          `https://api.gbif.org/v1/species/match?name=${encodeURIComponent(scientificName)}`
+        );
+        const matchData = await matchRes.json();
 
-          if (!matchData.usageKey) {
-            return { taxonKey: null, bounds: null };
+        if (!matchData.usageKey) {
+          if (isMounted) {
+            setError(language === 'zh' ? '於 GBIF 找不到該物種之全球數據' : 'No GBIF taxon key found');
+            setLoading(false);
           }
-
-          const taxonKey = matchData.usageKey;
-
-          let bounds: maplibregl.LngLatBoundsLike | null = null;
-          try {
-            const occRes = await fetch(
-              `https://api.gbif.org/v1/occurrence/search?taxonKey=${taxonKey}&hasCoordinate=true&limit=300`
-            );
-            const occData = await occRes.json();
-            if (occData.results && occData.results.length > 0) {
-              const lats = occData.results.map((r: any) => r.decimalLatitude).filter((v: any) => typeof v === 'number');
-              const lngs = occData.results.map((r: any) => r.decimalLongitude).filter((v: any) => typeof v === 'number');
-              if (lats.length > 0 && lngs.length > 0) {
-                const minLat = Math.min(...lats);
-                const maxLat = Math.max(...lats);
-                const minLng = Math.min(...lngs);
-                const maxLng = Math.max(...lngs);
-                bounds = [[minLng, minLat], [maxLng, maxLat]];
-              }
-            }
-          } catch (e) {
-            console.warn('GBIF Bounds calculation fallback used', e);
-          }
-
-          return { taxonKey, bounds };
-        })();
-
-        if (!mapContainerRef.current) return;
-
-        const defaultStyle = BASEMAPS[0].style;
-
-        // 並行 2: 立即建立 MapLibre 地圖實例，不等待 API 回傳
-        const map = new maplibregl.Map({
-          container: mapContainerRef.current,
-          style: defaultStyle as any,
-          center: [20, 20],
-          zoom: 1.5,
-          attributionControl: false
-        });
-
-        // 加入控制項
-        map.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'top-right');
-        map.addControl(new maplibregl.FullscreenControl({ container: wrapperRef.current || undefined }), 'top-right');
-
-        // 等待地圖載入與 GBIF 數據 fetch 同步完成
-        const [{ taxonKey, bounds }] = await Promise.all([
-          fetchGbifDataPromise,
-          new Promise((resolve) => {
-            if (map.isStyleLoaded()) {
-              resolve(true);
-            } else {
-              map.once('load', () => resolve(true));
-            }
-          })
-        ]);
-
-        if (!isMounted) return;
-
-        if (!taxonKey) {
-          setError(language === 'zh' ? '於 GBIF 找不到該物種之全球數據' : 'No GBIF taxon key found');
-          setLoading(false);
           return;
         }
 
-        taxonKeyRef.current = taxonKey;
-        applyGbifLayer(map, taxonKey);
+        const key = matchData.usageKey;
+        if (isMounted) setTaxonKey(key);
 
-        if (bounds) {
-          map.fitBounds(bounds, {
-            padding: { top: 40, bottom: 40, left: 40, right: 40 },
-            maxZoom: 6
-          });
+        try {
+          const occRes = await fetch(
+            `https://api.gbif.org/v1/occurrence/search?taxonKey=${key}&hasCoordinate=true&limit=300`
+          );
+          const occData = await occRes.json();
+          if (occData.results && occData.results.length > 0) {
+            const lats = occData.results.map((r: any) => r.decimalLatitude).filter((v: any) => typeof v === 'number');
+            const lngs = occData.results.map((r: any) => r.decimalLongitude).filter((v: any) => typeof v === 'number');
+            if (lats.length > 0 && lngs.length > 0) {
+              const minLat = Math.min(...lats);
+              const maxLat = Math.max(...lats);
+              const minLng = Math.min(...lngs);
+              const maxLng = Math.max(...lngs);
+              if (isMounted) setBounds([[minLng, minLat], [maxLng, maxLat]]);
+            }
+          }
+        } catch (e) {
+          console.warn('GBIF Bounds calculation fallback used', e);
         }
 
-        setLoading(false);
-        mapRef.current = map;
+        if (isMounted) setLoading(false);
       } catch (err) {
         if (isMounted) {
           setError(language === 'zh' ? '無法載入 GBIF 地圖數據' : 'Failed to load GBIF map');
@@ -271,21 +195,18 @@ export default function GbifGlobalMap({ scientificName }: GbifGlobalMapProps) {
       }
     }
 
-    initGbifMap();
+    fetchGbifData();
 
     return () => {
       isMounted = false;
-      if (mapRef.current) {
-        mapRef.current.remove();
-        mapRef.current = null;
-      }
     };
-  }, [scientificName]); // 不放 language，語言切換時不會重新 fetch
+  }, [scientificName]);
 
   return (
-    <div ref={wrapperRef} id="gbif-map-container" className="relative w-full h-[550px] rounded-[2.5rem] overflow-hidden bg-slate-100 border border-slate-200 shadow-inner group">
+    <div id="gbif-map-container" className="relative w-full h-[550px] rounded-[2.5rem] overflow-hidden bg-slate-100 border border-slate-200 shadow-inner group">
       <style jsx global>{`
         .maplibregl-ctrl-top-right { margin-top: 12px; margin-right: 12px; }
+        .maplibregl-ctrl-bottom-right { margin-bottom: 12px; margin-right: 12px; }
         .maplibregl-ctrl-group { border-radius: 12px !important; border: none !important; box-shadow: 0 4px 12px rgba(0,0,0,0.1) !important; }
       `}</style>
 
@@ -295,7 +216,63 @@ export default function GbifGlobalMap({ scientificName }: GbifGlobalMapProps) {
         <span>{language === 'zh' ? 'GBIF 全球分布地圖' : 'GBIF Global Distribution Map'}</span>
       </div>
 
-      {/* 右上角底圖切換器 (位置與 SpeciesMap.tsx 完美對齊 top-[130px] right-[22px]) */}
+      {/* 地圖 View */}
+      <Map
+        ref={mapRef}
+        initialViewState={{
+          longitude: 20,
+          latitude: 20,
+          zoom: 1.5
+        }}
+        mapStyle={currentStyle as any}
+        attributionControl={false}
+        onLoad={(e) => {
+          if (bounds) {
+            e.target.fitBounds(bounds, {
+              padding: { top: 40, bottom: 40, left: 40, right: 40 },
+              maxZoom: 6
+            });
+          }
+        }}
+      >
+        {!isMobile && <MapNavControl position="top-right" showCompass={false} />}
+        <FullscreenControl containerId="gbif-map-container" position="top-right" />
+
+        {taxonKey && (
+          <Source
+            id="gbif-occurrence-source"
+            type="vector"
+            tiles={[`https://api.gbif.org/v2/map/occurrence/density/{z}/{x}/{y}.mvt?taxonKey=${taxonKey}`]}
+            minzoom={0}
+            maxzoom={16}
+          >
+            <Layer
+              id="gbif-points"
+              type="circle"
+              source-layer="occurrence"
+              paint={{
+                'circle-radius': [
+                  'interpolate', ['linear'], ['zoom'],
+                  0, 1.2,
+                  5, 2.0,
+                  10, 4.0
+                ],
+                'circle-color': '#047857',
+                'circle-opacity': 0.75,
+                'circle-stroke-width': [
+                  'interpolate', ['linear'], ['zoom'],
+                  0, 0.5,
+                  10, 1.0
+                ],
+                'circle-stroke-color': '#ffffff',
+                'circle-stroke-opacity': 0.85
+              }}
+            />
+          </Source>
+        )}
+      </Map>
+
+      {/* 右上角底圖切換器 */}
       <div className={`absolute ${isMobile ? 'top-[54px]' : 'top-[130px]'} right-[22px] z-40`}>
         <div className="relative">
           <button
@@ -326,7 +303,10 @@ export default function GbifGlobalMap({ scientificName }: GbifGlobalMapProps) {
                   {BASEMAPS.map((basemap) => (
                     <button
                       key={basemap.id}
-                      onClick={() => handleStyleChange(basemap.id)}
+                      onClick={() => {
+                        setCurrentStyleId(basemap.id);
+                        setIsBasemapPanelOpen(false);
+                      }}
                       className={`flex items-center gap-3 p-2 rounded-xl transition-all border cursor-pointer ${
                         currentStyleId === basemap.id
                           ? 'bg-emerald-50 border-emerald-200 text-emerald-700 font-bold'
@@ -358,6 +338,54 @@ export default function GbifGlobalMap({ scientificName }: GbifGlobalMapProps) {
         </div>
       </div>
 
+      {/* 左下角 Attribution Info 按鈕 (與 SpeciesMap.tsx 同款) */}
+      <div 
+        ref={attributionRef}
+        className={`absolute ${isMobile ? 'bottom-4 left-4' : 'bottom-6 left-6'} z-40`}
+        onMouseEnter={() => !isMobile && setShowAttribution(true)}
+        onMouseLeave={() => !isMobile && setShowAttribution(false)}
+      >
+        <div className="relative flex flex-col items-start">
+          <AnimatePresence>
+            {showAttribution && (
+              <motion.div
+                initial={{ opacity: 0, y: 10, scale: 0.9 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: 10, scale: 0.9 }}
+                className="mb-2 p-3 bg-slate-900/90 backdrop-blur-md border border-white/10 text-white text-[10px] rounded-2xl shadow-2xl flex flex-col gap-2 whitespace-nowrap min-w-[220px]"
+              >
+                {/* GBIF Occurrence Data Attribution */}
+                <div className="flex items-center justify-between gap-3 pb-1.5 border-b border-white/10">
+                  <span className="text-emerald-400 font-bold">&copy; GBIF Occurrence Data</span>
+                  <a
+                    href="https://www.gbif.org"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1 px-2 py-0.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg font-bold text-[9px] transition-all shadow-xs"
+                  >
+                    <ExternalLink className="w-2.5 h-2.5" />
+                    <span>GBIF.org</span>
+                  </a>
+                </div>
+
+                {/* Basemap Credit */}
+                <div className="text-slate-300 text-[9px] opacity-80 font-mono">
+                  {currentAttribution}
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          <button
+            onClick={() => isMobile && setShowAttribution(!showAttribution)}
+            className={`${isMobile ? 'w-7 h-7' : 'w-8 h-8'} bg-white/90 backdrop-blur-md border border-slate-200 rounded-full flex items-center justify-center text-slate-500 shadow-lg hover:bg-white transition-colors active:scale-95 cursor-pointer`}
+            title={language === 'zh' ? '數據來源與條款聲明' : 'Data Credit & Terms'}
+          >
+            <Info className={`${isMobile ? 'w-4 h-4' : 'w-5 h-5'}`} />
+          </button>
+        </div>
+      </div>
+
       {/* Loading Overlay */}
       {loading && (
         <div className="absolute inset-0 z-40 bg-slate-900/30 backdrop-blur-xs flex flex-col items-center justify-center p-4">
@@ -377,9 +405,6 @@ export default function GbifGlobalMap({ scientificName }: GbifGlobalMapProps) {
           <p className="text-xs font-bold text-slate-600">{error}</p>
         </div>
       )}
-
-      {/* MapLibre Canvas Container */}
-      <div ref={mapContainerRef} className="w-full h-full" />
     </div>
   );
 }
