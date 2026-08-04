@@ -338,15 +338,14 @@ function EbirdYearGroupList({
                         {/* Evidence badge */}
                         <div className="flex items-center gap-1.5">
                           <span
-                            className={`inline-flex items-center px-1.5 py-0.5 rounded-md text-[9px] font-extrabold uppercase tracking-wide border ${
-                              info.evidence === 'P'
-                                ? 'bg-blue-50 text-blue-700 border-blue-200'
-                                : info.evidence === 'A'
-                                  ? 'bg-purple-50 text-purple-700 border-purple-200'
-                                  : info.evidence === 'V'
-                                    ? 'bg-rose-50 text-rose-700 border-rose-200'
-                                    : 'bg-slate-100 text-slate-600 border-slate-200'
-                            }`}
+                            className={`inline-flex items-center px-1.5 py-0.5 rounded-md text-[9px] font-extrabold uppercase tracking-wide border ${info.evidence === 'P'
+                              ? 'bg-blue-50 text-blue-700 border-blue-200'
+                              : info.evidence === 'A'
+                                ? 'bg-purple-50 text-purple-700 border-purple-200'
+                                : info.evidence === 'V'
+                                  ? 'bg-rose-50 text-rose-700 border-rose-200'
+                                  : 'bg-slate-100 text-slate-600 border-slate-200'
+                              }`}
                           >
                             {getEbirdEvidenceLabel(info.evidence, language === 'zh' ? 'zh' : 'en')}
                           </span>
@@ -456,7 +455,7 @@ export default function SpeciesMap({ taxonId, scientificName, chineseName, taxaG
   // 點擊外部隱藏版權資訊
   useEffect(() => {
     if (!isMobile) return;
-    
+
     const handleClickOutside = (event: MouseEvent) => {
       if (attributionRef.current && !attributionRef.current.contains(event.target as Node)) {
         setShowAttribution(false);
@@ -594,10 +593,10 @@ export default function SpeciesMap({ taxonId, scientificName, chineseName, taxaG
         // 遍歷所有網格並匹配兩者與 eBird 數據
         geojson.features.forEach((feature: any, idx: number) => {
           const rawId = feature.properties?.grid_no ?? feature.properties?.grid_id;
-          const cleanId = rawId !== undefined && rawId !== null 
+          const cleanId = rawId !== undefined && rawId !== null
             ? (isNaN(Number(rawId)) ? String(rawId) : String(parseFloat(String(rawId))))
             : String(idx + 1);
-          
+
           feature.properties.grid_id = cleanId;
           feature.properties.grid_no = cleanId;
 
@@ -768,20 +767,18 @@ export default function SpeciesMap({ taxonId, scientificName, chineseName, taxaG
               {/* Steps List */}
               <div className="space-y-2">
                 {/* Step 1: iNaturalist */}
-                <div className={`p-2.5 sm:p-3 rounded-2xl border transition-all flex items-center justify-between ${
-                  inatStatus === 'loading'
-                    ? 'bg-emerald-50/90 border-emerald-300 ring-2 ring-emerald-400/20 shadow-xs'
-                    : inatStatus === 'done'
+                <div className={`p-2.5 sm:p-3 rounded-2xl border transition-all flex items-center justify-between ${inatStatus === 'loading'
+                  ? 'bg-emerald-50/90 border-emerald-300 ring-2 ring-emerald-400/20 shadow-xs'
+                  : inatStatus === 'done'
                     ? 'bg-emerald-50/40 border-emerald-200/60'
                     : inatStatus === 'skipped'
-                    ? 'bg-slate-50 border-slate-100 opacity-50'
-                    : 'bg-slate-50/60 border-slate-100 text-slate-400'
-                }`}>
+                      ? 'bg-slate-50 border-slate-100 opacity-50'
+                      : 'bg-slate-50/60 border-slate-100 text-slate-400'
+                  }`}>
                   <div className="flex items-center gap-3">
-                    <div className={`p-2 rounded-xl text-xs transition-colors ${
-                      inatStatus === 'loading' ? 'bg-emerald-600 text-white shadow-xs' :
+                    <div className={`p-2 rounded-xl text-xs transition-colors ${inatStatus === 'loading' ? 'bg-emerald-600 text-white shadow-xs' :
                       inatStatus === 'done' ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-200/80 text-slate-500'
-                    }`}>
+                      }`}>
                       <Camera className="w-4 h-4" />
                     </div>
                     <div>
@@ -814,20 +811,18 @@ export default function SpeciesMap({ taxonId, scientificName, chineseName, taxaG
                 </div>
 
                 {/* Step 2: BGIS */}
-                <div className={`p-2.5 sm:p-3 rounded-2xl border transition-all flex items-center justify-between ${
-                  bgisStatus === 'loading'
-                    ? 'bg-teal-50/90 border-teal-300 ring-2 ring-teal-400/20 shadow-xs'
-                    : bgisStatus === 'done'
+                <div className={`p-2.5 sm:p-3 rounded-2xl border transition-all flex items-center justify-between ${bgisStatus === 'loading'
+                  ? 'bg-teal-50/90 border-teal-300 ring-2 ring-teal-400/20 shadow-xs'
+                  : bgisStatus === 'done'
                     ? 'bg-teal-50/40 border-teal-200/60'
                     : bgisStatus === 'skipped'
-                    ? 'bg-slate-50 border-slate-100 opacity-50'
-                    : 'bg-slate-50/60 border-slate-100 text-slate-400'
-                }`}>
+                      ? 'bg-slate-50 border-slate-100 opacity-50'
+                      : 'bg-slate-50/60 border-slate-100 text-slate-400'
+                  }`}>
                   <div className="flex items-center gap-3">
-                    <div className={`p-2 rounded-xl text-xs transition-colors ${
-                      bgisStatus === 'loading' ? 'bg-teal-600 text-white shadow-xs' :
+                    <div className={`p-2 rounded-xl text-xs transition-colors ${bgisStatus === 'loading' ? 'bg-teal-600 text-white shadow-xs' :
                       bgisStatus === 'done' ? 'bg-teal-100 text-teal-700' : 'bg-slate-200/80 text-slate-500'
-                    }`}>
+                      }`}>
                       <Building2 className="w-4 h-4" />
                     </div>
                     <div>
@@ -856,20 +851,18 @@ export default function SpeciesMap({ taxonId, scientificName, chineseName, taxaG
 
                 {/* Step 3: eBird (Bird group only) */}
                 {isBirdGroup && (
-                  <div className={`p-2.5 sm:p-3 rounded-2xl border transition-all flex items-center justify-between ${
-                    ebirdStatus === 'loading'
-                      ? 'bg-sky-50/90 border-sky-300 ring-2 ring-sky-400/20 shadow-xs'
-                      : ebirdStatus === 'done'
+                  <div className={`p-2.5 sm:p-3 rounded-2xl border transition-all flex items-center justify-between ${ebirdStatus === 'loading'
+                    ? 'bg-sky-50/90 border-sky-300 ring-2 ring-sky-400/20 shadow-xs'
+                    : ebirdStatus === 'done'
                       ? 'bg-sky-50/40 border-sky-200/60'
                       : ebirdStatus === 'skipped'
-                      ? 'bg-slate-50 border-slate-100 opacity-50'
-                      : 'bg-slate-50/60 border-slate-100 text-slate-400'
-                  }`}>
+                        ? 'bg-slate-50 border-slate-100 opacity-50'
+                        : 'bg-slate-50/60 border-slate-100 text-slate-400'
+                    }`}>
                     <div className="flex items-center gap-3">
-                      <div className={`p-2 rounded-xl text-xs transition-colors ${
-                        ebirdStatus === 'loading' ? 'bg-sky-600 text-white shadow-xs' :
+                      <div className={`p-2 rounded-xl text-xs transition-colors ${ebirdStatus === 'loading' ? 'bg-sky-600 text-white shadow-xs' :
                         ebirdStatus === 'done' ? 'bg-sky-100 text-sky-700' : 'bg-slate-200/80 text-slate-500'
-                      }`}>
+                        }`}>
                         <Bird className="w-4 h-4" />
                       </div>
                       <div>
@@ -898,18 +891,16 @@ export default function SpeciesMap({ taxonId, scientificName, chineseName, taxaG
                 )}
 
                 {/* Step 4: Spatial Grid Alignment */}
-                <div className={`p-2.5 sm:p-3 rounded-2xl border transition-all flex items-center justify-between ${
-                  gridStatus === 'loading'
-                    ? 'bg-indigo-50/90 border-indigo-300 ring-2 ring-indigo-400/20 shadow-xs'
-                    : gridStatus === 'done'
+                <div className={`p-2.5 sm:p-3 rounded-2xl border transition-all flex items-center justify-between ${gridStatus === 'loading'
+                  ? 'bg-indigo-50/90 border-indigo-300 ring-2 ring-indigo-400/20 shadow-xs'
+                  : gridStatus === 'done'
                     ? 'bg-indigo-50/40 border-indigo-200/60'
                     : 'bg-slate-50/60 border-slate-100 text-slate-400'
-                }`}>
+                  }`}>
                   <div className="flex items-center gap-3">
-                    <div className={`p-2 rounded-xl text-xs transition-colors ${
-                      gridStatus === 'loading' ? 'bg-indigo-600 text-white shadow-xs' :
+                    <div className={`p-2 rounded-xl text-xs transition-colors ${gridStatus === 'loading' ? 'bg-indigo-600 text-white shadow-xs' :
                       gridStatus === 'done' ? 'bg-indigo-100 text-indigo-700' : 'bg-slate-200/80 text-slate-500'
-                    }`}>
+                      }`}>
                       <Layers className="w-4 h-4" />
                     </div>
                     <div>
@@ -954,11 +945,10 @@ export default function SpeciesMap({ taxonId, scientificName, chineseName, taxaG
             {/* iNaturalist Button */}
             <button
               onClick={() => setShowInat(!showInat)}
-              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
-                showInat
-                  ? 'bg-emerald-600 text-white shadow-sm ring-2 ring-emerald-500/20'
-                  : 'bg-slate-100 text-slate-400 hover:bg-slate-200/70 hover:text-slate-600'
-              }`}
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${showInat
+                ? 'bg-emerald-600 text-white shadow-sm ring-2 ring-emerald-500/20'
+                : 'bg-slate-100 text-slate-400 hover:bg-slate-200/70 hover:text-slate-600'
+                }`}
             >
               <span className={`w-2 h-2 rounded-full ${showInat ? 'bg-white animate-pulse' : 'bg-slate-300'}`} />
               {t.filterInat}
@@ -967,11 +957,10 @@ export default function SpeciesMap({ taxonId, scientificName, chineseName, taxaG
             {/* BGIS Button */}
             <button
               onClick={() => setShowBgis(!showBgis)}
-              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
-                showBgis
-                  ? 'bg-teal-600 text-white shadow-sm ring-2 ring-teal-500/20'
-                  : 'bg-slate-100 text-slate-400 hover:bg-slate-200/70 hover:text-slate-600'
-              }`}
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${showBgis
+                ? 'bg-teal-600 text-white shadow-sm ring-2 ring-teal-500/20'
+                : 'bg-slate-100 text-slate-400 hover:bg-slate-200/70 hover:text-slate-600'
+                }`}
             >
               <span className={`w-2 h-2 rounded-full ${showBgis ? 'bg-white animate-pulse' : 'bg-slate-300'}`} />
               {t.filterBgis}
@@ -981,11 +970,10 @@ export default function SpeciesMap({ taxonId, scientificName, chineseName, taxaG
             {isBirdGroup && (
               <button
                 onClick={() => setShowEbird(!showEbird)}
-                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
-                  showEbird
-                    ? 'bg-sky-600 text-white shadow-sm ring-2 ring-sky-500/20'
-                    : 'bg-slate-100 text-slate-400 hover:bg-slate-200/70 hover:text-slate-600'
-                }`}
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${showEbird
+                  ? 'bg-sky-600 text-white shadow-sm ring-2 ring-sky-500/20'
+                  : 'bg-slate-100 text-slate-400 hover:bg-slate-200/70 hover:text-slate-600'
+                  }`}
               >
                 <span className={`w-2 h-2 rounded-full ${showEbird ? 'bg-white animate-pulse' : 'bg-slate-300'}`} />
                 {t.filterEbird}
@@ -1019,9 +1007,8 @@ export default function SpeciesMap({ taxonId, scientificName, chineseName, taxaG
                     onClick={() => {
                       setShowInat(!showInat);
                     }}
-                    className={`flex items-center justify-between px-3 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                      showInat ? 'bg-emerald-50 text-emerald-800' : 'text-slate-500 hover:bg-slate-50'
-                    }`}
+                    className={`flex items-center justify-between px-3 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${showInat ? 'bg-emerald-50 text-emerald-800' : 'text-slate-500 hover:bg-slate-50'
+                      }`}
                   >
                     <div className="flex items-center gap-2">
                       <span className={`w-2 h-2 rounded-full ${showInat ? 'bg-emerald-500 animate-pulse' : 'bg-slate-300'}`} />
@@ -1034,9 +1021,8 @@ export default function SpeciesMap({ taxonId, scientificName, chineseName, taxaG
                     onClick={() => {
                       setShowBgis(!showBgis);
                     }}
-                    className={`flex items-center justify-between px-3 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                      showBgis ? 'bg-teal-50 text-teal-800' : 'text-slate-500 hover:bg-slate-50'
-                    }`}
+                    className={`flex items-center justify-between px-3 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${showBgis ? 'bg-teal-50 text-teal-800' : 'text-slate-500 hover:bg-slate-50'
+                      }`}
                   >
                     <div className="flex items-center gap-2">
                       <span className={`w-2 h-2 rounded-full ${showBgis ? 'bg-teal-500 animate-pulse' : 'bg-slate-300'}`} />
@@ -1050,9 +1036,8 @@ export default function SpeciesMap({ taxonId, scientificName, chineseName, taxaG
                       onClick={() => {
                         setShowEbird(!showEbird);
                       }}
-                      className={`flex items-center justify-between px-3 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                        showEbird ? 'bg-sky-50 text-sky-800' : 'text-slate-500 hover:bg-slate-50'
-                      }`}
+                      className={`flex items-center justify-between px-3 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${showEbird ? 'bg-sky-50 text-sky-800' : 'text-slate-500 hover:bg-slate-50'
+                        }`}
                     >
                       <div className="flex items-center gap-2">
                         <span className={`w-2 h-2 rounded-full ${showEbird ? 'bg-sky-500 animate-pulse' : 'bg-slate-300'}`} />
@@ -1099,7 +1084,7 @@ export default function SpeciesMap({ taxonId, scientificName, chineseName, taxaG
 
         {gridData && (
           <Source id="grid-source" type="geojson" data={gridData}>
-            {/* Grid Fill Layer (Chloropleth) */}
+            {/* Grid Fill Layer (Chloropleth) - GBIF green.poly style */}
             <Layer
               id="grid-layer"
               type="fill"
@@ -1108,13 +1093,14 @@ export default function SpeciesMap({ taxonId, scientificName, chineseName, taxaG
                   'interpolate',
                   ['linear'],
                   ['get', 'totalCount'],
-                  1, '#d1fae5', // emerald-100
-                  5, '#10b981', // emerald-500
-                  10, '#059669', // emerald-600
-                  20, '#064e3b'  // emerald-900
+                  1, '#a8c28c',
+                  3, '#85A36F',
+                  6, '#5f804f',
+                  12, '#435f37',
+                  25, '#2b4724'
                 ],
-                'fill-opacity': 0.8,
-                'fill-outline-color': '#333333'
+                'fill-opacity': 0.85,
+                'fill-outline-color': 'rgba(0, 0, 0, 0.12)'
               }}
             />
           </Source>
@@ -1227,11 +1213,10 @@ export default function SpeciesMap({ taxonId, scientificName, chineseName, taxaG
                       showInat && selectedGrid.count > 0 ? `iNat: ${selectedGrid.count} ${getRecordUnit(selectedGrid.count)}` : null,
                       showBgis && (selectedGrid.bgisCount || 0) > 0 ? `BGIS: ${selectedGrid.bgisCount} ${getRecordUnit(selectedGrid.bgisCount || 0)}` : null,
                       (isBirdGroup && showEbird && (selectedGrid.ebirdCount || 0) > 0)
-                         ? `eBird: ${selectedGrid.ebirdCount} ${
-                             language === 'zh'
-                               ? `個觀測點`
-                               : `${selectedGrid.ebirdCount === 1 ? 'location' : 'locations'}`
-                           }` : null
+                        ? `eBird: ${selectedGrid.ebirdCount} ${language === 'zh'
+                          ? `個觀測點`
+                          : `${selectedGrid.ebirdCount === 1 ? 'location' : 'locations'}`
+                        }` : null
                     ].filter(Boolean).join(' | ') || (language === 'zh' ? '無觀測記錄' : 'No Records')}
                   </p>
                 </div>
@@ -1519,15 +1504,15 @@ export default function SpeciesMap({ taxonId, scientificName, chineseName, taxaG
               {/* Empty state prompt if all selected filters are hidden or empty */}
               {((!showInat && !showBgis && (!isBirdGroup || !showEbird)) ||
                 (showInat && (!selectedGrid.observations || selectedGrid.observations.length === 0) &&
-                 (!showBgis || (!selectedGrid.bgisDataset || selectedGrid.bgisDataset.length === 0)) &&
-                 (!isBirdGroup || !showEbird || (!selectedGrid.ebirdCount)))) && (
-                <div className="py-12 text-center text-slate-400 space-y-2">
-                  <Info className="w-8 h-8 mx-auto text-slate-300 opacity-60" />
-                  <p className="text-xs font-bold">
-                    {language === 'zh' ? '當前過濾條件下無相關觀測記錄' : 'No observation records under current filter'}
-                  </p>
-                </div>
-              )}
+                  (!showBgis || (!selectedGrid.bgisDataset || selectedGrid.bgisDataset.length === 0)) &&
+                  (!isBirdGroup || !showEbird || (!selectedGrid.ebirdCount)))) && (
+                  <div className="py-12 text-center text-slate-400 space-y-2">
+                    <Info className="w-8 h-8 mx-auto text-slate-300 opacity-60" />
+                    <p className="text-xs font-bold">
+                      {language === 'zh' ? '當前過濾條件下無相關觀測記錄' : 'No observation records under current filter'}
+                    </p>
+                  </div>
+                )}
             </div>
           </motion.div>
         )}
@@ -1695,12 +1680,12 @@ export default function SpeciesMap({ taxonId, scientificName, chineseName, taxaG
               {((!showInat || hoveredGrid.count === 0) &&
                 (!showBgis || (hoveredGrid.bgisCount || 0) === 0) &&
                 (!isBirdGroup || !showEbird || (hoveredGrid.ebirdCount || 0) === 0)) && (
-                <div className="text-[10px] text-slate-400 font-medium py-0.5">
-                  {!showInat && !showBgis && (!isBirdGroup || !showEbird)
-                    ? (language === 'zh' ? '未勾選來源' : 'No Source Selected')
-                    : (language === 'zh' ? '無觀測記錄' : 'No Records')}
-                </div>
-              )}
+                  <div className="text-[10px] text-slate-400 font-medium py-0.5">
+                    {!showInat && !showBgis && (!isBirdGroup || !showEbird)
+                      ? (language === 'zh' ? '未勾選來源' : 'No Source Selected')
+                      : (language === 'zh' ? '無觀測記錄' : 'No Records')}
+                  </div>
+                )}
             </div>
           </motion.div>
         )}
@@ -1723,12 +1708,12 @@ export default function SpeciesMap({ taxonId, scientificName, chineseName, taxaG
           <div className="text-[9px] font-bold text-slate-500">
             <span>{t.densityTitle}</span>
           </div>
-          <div className="w-full h-1.5 bg-gradient-to-r from-[#d1fae5] via-[#10b981] to-[#064e3b] rounded-full shadow-inner" />
+          <div className="w-full h-1.5 bg-gradient-to-r from-[#a8c28c] via-[#5f804f] to-[#2b4724] rounded-full shadow-inner" />
         </div>
       </div>
 
       {/* Attribution info icon (Bottom Left) */}
-      <div 
+      <div
         ref={attributionRef}
         className={`absolute ${isMobile ? 'bottom-4 left-4' : 'bottom-6 left-6'} z-40`}
         onMouseEnter={() => !isMobile && setShowAttribution(true)}
