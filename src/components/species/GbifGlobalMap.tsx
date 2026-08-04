@@ -202,6 +202,19 @@ export default function GbifGlobalMap({ scientificName }: GbifGlobalMapProps) {
     };
   }, [scientificName]);
 
+  // 當 bounds 數據非同步載入完成時，立即對地圖進行 fitBounds 縮放
+  useEffect(() => {
+    if (!bounds) return;
+    const mapInstance = mapRef.current?.getMap ? mapRef.current.getMap() : mapRef.current;
+    if (mapInstance) {
+      mapInstance.fitBounds(bounds, {
+        padding: { top: 50, bottom: 50, left: 50, right: 50 },
+        maxZoom: 6,
+        duration: 1000
+      });
+    }
+  }, [bounds]);
+
   return (
     <div id="gbif-map-container" className="relative w-full h-[550px] rounded-[2.5rem] overflow-hidden bg-slate-100 border border-slate-200 shadow-inner group">
       <style jsx global>{`
@@ -224,13 +237,15 @@ export default function GbifGlobalMap({ scientificName }: GbifGlobalMapProps) {
           latitude: 20,
           zoom: 1.5
         }}
+        maxZoom={7}
         mapStyle={currentStyle as any}
         attributionControl={false}
         onLoad={(e) => {
           if (bounds) {
             e.target.fitBounds(bounds, {
-              padding: { top: 40, bottom: 40, left: 40, right: 40 },
-              maxZoom: 6
+              padding: { top: 50, bottom: 50, left: 50, right: 50 },
+              maxZoom: 6,
+              duration: 1000
             });
           }
         }}
@@ -240,32 +255,18 @@ export default function GbifGlobalMap({ scientificName }: GbifGlobalMapProps) {
 
         {taxonKey && (
           <Source
-            id="gbif-occurrence-source"
-            type="vector"
-            tiles={[`https://api.gbif.org/v2/map/occurrence/density/{z}/{x}/{y}.mvt?taxonKey=${taxonKey}`]}
+            id="gbif-raster-green"
+            type="raster"
+            tiles={[`https://api.gbif.org/v2/map/occurrence/density/{z}/{x}/{y}@1x.png?srs=EPSG:3857&taxonKey=${taxonKey}&style=green2.poly&bin=square&squareSize=64`]}
+            tileSize={512}
             minzoom={0}
-            maxzoom={16}
+            maxzoom={7}
           >
             <Layer
-              id="gbif-points"
-              type="circle"
-              source-layer="occurrence"
+              id="gbif-green-layer"
+              type="raster"
               paint={{
-                'circle-radius': [
-                  'interpolate', ['linear'], ['zoom'],
-                  0, 1.2,
-                  5, 2.0,
-                  10, 4.0
-                ],
-                'circle-color': '#047857',
-                'circle-opacity': 0.75,
-                'circle-stroke-width': [
-                  'interpolate', ['linear'], ['zoom'],
-                  0, 0.5,
-                  10, 1.0
-                ],
-                'circle-stroke-color': '#ffffff',
-                'circle-stroke-opacity': 0.85
+                'raster-opacity': 0.8
               }}
             />
           </Source>
@@ -277,11 +278,10 @@ export default function GbifGlobalMap({ scientificName }: GbifGlobalMapProps) {
         <div className="relative">
           <button
             onClick={() => setIsBasemapPanelOpen(!isBasemapPanelOpen)}
-            className={`w-[29px] h-[29px] flex items-center justify-center rounded-lg shadow-md border transition-all duration-300 cursor-pointer ${
-              isBasemapPanelOpen
-                ? 'bg-emerald-500 border-emerald-400 text-white'
-                : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
-            }`}
+            className={`w-[29px] h-[29px] flex items-center justify-center rounded-lg shadow-md border transition-all duration-300 cursor-pointer ${isBasemapPanelOpen
+              ? 'bg-emerald-500 border-emerald-400 text-white'
+              : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
+              }`}
             title={language === 'zh' ? '底圖切換' : 'Basemap Switcher'}
           >
             <Layers className="w-4 h-4" />
@@ -307,16 +307,14 @@ export default function GbifGlobalMap({ scientificName }: GbifGlobalMapProps) {
                         setCurrentStyleId(basemap.id);
                         setIsBasemapPanelOpen(false);
                       }}
-                      className={`flex items-center gap-3 p-2 rounded-xl transition-all border cursor-pointer ${
-                        currentStyleId === basemap.id
-                          ? 'bg-emerald-50 border-emerald-200 text-emerald-700 font-bold'
-                          : 'bg-transparent border-transparent text-slate-600 hover:bg-slate-50 hover:border-slate-100'
-                      }`}
+                      className={`flex items-center gap-3 p-2 rounded-xl transition-all border cursor-pointer ${currentStyleId === basemap.id
+                        ? 'bg-emerald-50 border-emerald-200 text-emerald-700 font-bold'
+                        : 'bg-transparent border-transparent text-slate-600 hover:bg-slate-50 hover:border-slate-100'
+                        }`}
                     >
                       <div
-                        className={`w-12 h-12 rounded-lg overflow-hidden flex-shrink-0 bg-slate-100 border relative ${
-                          currentStyleId === basemap.id ? 'border-emerald-300' : 'border-slate-200'
-                        }`}
+                        className={`w-12 h-12 rounded-lg overflow-hidden flex-shrink-0 bg-slate-100 border relative ${currentStyleId === basemap.id ? 'border-emerald-300' : 'border-slate-200'
+                          }`}
                       >
                         <div
                           className="absolute inset-0 bg-cover bg-center"
@@ -339,7 +337,7 @@ export default function GbifGlobalMap({ scientificName }: GbifGlobalMapProps) {
       </div>
 
       {/* 左下角 Attribution Info 按鈕 (與 SpeciesMap.tsx 同款) */}
-      <div 
+      <div
         ref={attributionRef}
         className={`absolute ${isMobile ? 'bottom-4 left-4' : 'bottom-6 left-6'} z-40`}
         onMouseEnter={() => !isMobile && setShowAttribution(true)}
