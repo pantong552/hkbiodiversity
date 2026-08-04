@@ -3,6 +3,7 @@ import { Species } from '@/types/species';
 import { useLanguage } from '@/context/LanguageContext';
 import { Shield, Info } from 'lucide-react';
 import { formatNativeStatus } from '@/utils/formatters';
+import HkbwsCategoryInfoModal from './HkbwsCategoryInfoModal';
 
 interface ConservationStatusProps {
   species: Species;
@@ -24,53 +25,63 @@ export default function ConservationStatus({ species }: ConservationStatusProps)
     {
       labelChi: '林務條例 (第96章) 保育類',
       labelEng: 'Forests and Countryside Ordinance (Cap. 96)',
-      value: formatYesNo((species as any).is_cap96)
+      value: formatYesNo((species as any).is_cap96),
+      isHkbws: false
     },
     {
       labelChi: '保護瀕危動植物物種條例 (第586章)',
       labelEng: 'Protection of Endangered Species Ordinance (Cap. 586)',
-      value: formatYesNo((species as any).is_cap586)
+      value: formatYesNo((species as any).is_cap586),
+      isHkbws: false
     },
     {
       labelChi: '香港稀有及珍貴植物',
       labelEng: 'HK Rare and Precious Plants',
-      value: (species as any).hk_rare_precious_note === 'No' ? '-' : (species as any).hk_rare_precious_note
+      value: (species as any).hk_rare_precious_note === 'No' ? '-' : (species as any).hk_rare_precious_note,
+      isHkbws: false
     },
     {
       labelChi: '中國植物紅皮書',
       labelEng: 'China Plant Red Data Book',
-      value: (species as any).china_red_data_book_note === '沒有列入' || (species as any).china_red_data_book_note === 'Not Listed' ? '-' : (species as any).china_red_data_book_note
+      value: (species as any).china_red_data_book_note === '沒有列入' || (species as any).china_red_data_book_note === 'Not Listed' ? '-' : (species as any).china_red_data_book_note,
+      isHkbws: false
     }
   ] : [
     { 
       labelChi: 'IUCN 紅皮書', 
       labelEng: 'IUCN Red List', 
-      value: species.iucn 
+      value: species.iucn,
+      isHkbws: false
     },
     { 
       labelChi: '中國脊椎動物紅皮書', 
       labelEng: 'China Vertebrates Red List', 
-      value: species.china_vertebrates_red_list 
+      value: species.china_vertebrates_red_list,
+      isHkbws: false
     },
     { 
       labelChi: '香港保護法例', 
       labelEng: 'HK Protection Status', 
-      value: species.hk_protection 
+      value: species.hk_protection,
+      isHkbws: false
     },
     { 
       labelChi: '香港原生概況', 
       labelEng: 'HK Native Status', 
-      value: formatNativeStatus(species.native_status, language) 
+      value: formatNativeStatus(species.native_status, language),
+      isHkbws: false
     },
     ...(species.class_eng === 'Aves' ? [{ 
       labelChi: '鳥種類別（香港觀鳥會）', 
       labelEng: 'Category (HKBWS)', 
-      value: species.hkbws_cat 
+      value: species.hkbws_cat,
+      isHkbws: true
     }] : []),
     ...(species.afcd ? [{ 
       labelChi: '漁農自然護理署 (AFCD) 評級', 
       labelEng: 'AFCD Rating', 
-      value: species.afcd 
+      value: species.afcd,
+      isHkbws: false
     }] : []),
   ];
 
@@ -85,7 +96,10 @@ export default function ConservationStatus({ species }: ConservationStatusProps)
         {statuses.map((status, idx) => (
           <div key={idx} className="flex flex-col group h-full">
             <span className="text-[11px] sm:text-xs font-bold text-slate-500 tracking-tight mb-1.5 sm:mb-3 transition-colors group-hover:text-emerald-600 sm:min-h-[32px] flex items-end">
-              {language === 'zh' ? status.labelChi : status.labelEng}
+              <span className="inline-flex items-center">
+                {language === 'zh' ? status.labelChi : status.labelEng}
+                {status.isHkbws && <HkbwsCategoryInfoModal />}
+              </span>
             </span>
             <div className={`
               text-xs sm:text-base font-bold sm:font-black px-3 sm:px-5 py-2 sm:py-3.5 rounded-xl sm:rounded-2xl transition-all flex items-center justify-center text-center leading-tight
