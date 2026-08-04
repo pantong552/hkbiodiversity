@@ -14,6 +14,7 @@ import { useInaturalistSpeciesPhotos, InatGalleryPhoto } from '@/hooks/useInatur
 import { motion, AnimatePresence } from 'framer-motion';
 import { useRef } from 'react';
 import SpeciesMap from './SpeciesMap';
+import GbifGlobalMap from './GbifGlobalMap';
 import { formatScientificName } from '@/utils/formatters';
 import CongenericExplorer from './CongenericExplorer';
 import SimilarSpeciesExplorer from './SimilarSpeciesExplorer';
@@ -399,6 +400,11 @@ export default function SpeciesContent({ species, showBreadcrumb = true, refresh
                 <div className="w-full h-[300px] bg-slate-200 rounded-[2.5rem] flex items-center justify-center text-slate-500">
                   <p>{language === 'zh' ? '無 iNaturalist ID' : 'No iNaturalist ID available'}</p>
                 </div>
+              )}
+
+              {/* GBIF 全球分布地圖 */}
+              {species.scientific_name && (
+                <GbifGlobalMap scientificName={species.scientific_name} />
               )}
 
               <div className="grid md:grid-cols-2 gap-6">
