@@ -299,8 +299,8 @@ export default function GbifGlobalMap({ scientificName }: GbifGlobalMapProps) {
           <Source
             id="gbif-raster-green"
             type="raster"
-            tiles={[`https://api.gbif.org/v2/map/occurrence/density/{z}/{x}/{y}@1x.png?srs=EPSG:3857&taxonKey=${taxonKey}&style=green2.poly&bin=square&squareSize=64`]}
-            tileSize={512}
+            tiles={[`https://api.gbif.org/v2/map/occurrence/density/{z}/{x}/{y}@2x.png?srs=EPSG:3857&taxonKey=${taxonKey}&style=green2.poly&bin=square&squareSize=128`]}
+            tileSize={256}
             minzoom={0}
             maxzoom={7}
           >
@@ -308,7 +308,8 @@ export default function GbifGlobalMap({ scientificName }: GbifGlobalMapProps) {
               id="gbif-green-layer"
               type="raster"
               paint={{
-                'raster-opacity': 0.8
+                'raster-opacity': 0.85,
+                'raster-resampling': 'nearest'
               }}
             />
           </Source>
