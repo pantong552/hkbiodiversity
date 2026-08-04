@@ -111,9 +111,13 @@ export default function GbifGlobalMap({ scientificName }: GbifGlobalMapProps) {
   const [currentStyleId, setCurrentStyleId] = useState('carto-light');
   const [isBasemapPanelOpen, setIsBasemapPanelOpen] = useState(false);
   const [showAttribution, setShowAttribution] = useState(false);
-  const [isMobile, setIsMobile] = useState(false);
+  const [isMobile, setIsMobile] = useState<boolean>(() => {
+    if (typeof window !== 'undefined') {
+      return window.innerWidth < 1024;
+    }
+    return false;
+  });
   const [taxonKey, setTaxonKey] = useState<number | null>(null);
-  const [bounds, setBounds] = useState<any>(null);
 
   // 實時監聽 window resize 事件以動態切換 isMobile
   useEffect(() => {
@@ -140,7 +144,7 @@ export default function GbifGlobalMap({ scientificName }: GbifGlobalMapProps) {
   const currentStyle = BASEMAPS.find(m => m.id === currentStyleId)?.style || BASEMAPS[0].style;
   const currentAttribution = (BASEMAPS.find(m => m.id === currentStyleId) || BASEMAPS[0]).attributionText;
 
-  // 僅依據 scientificName 獲取 GBIF 數據
+  // 僅依據 scientificName 獲取 GBIF taxonKey (僅發送 1 次 API 請求)
   useEffect(() => {
     let isMounted = true;
     if (!scientificName) return;
@@ -163,59 +167,10 @@ export default function GbifGlobalMap({ scientificName }: GbifGlobalMapProps) {
           return;
         }
 
-        const key = matchData.usageKey;
-        if (isMounted) setTaxonKey(key);
-
-        try {
-          // 並行查詢 5 個地理分區以確保涵蓋全球所有極值點
-          // GBIF occurrence API 每次最多回傳 300 筆，單次查詢可能遺漏邊緣分布點
-          const baseUrl = `https://api.gbif.org/v1/occurrence/search?taxonKey=${key}&hasCoordinate=true&limit=300`;
-          const queries = [
-            baseUrl,                                          // 一般採樣（不過濾地理範圍）
-            `${baseUrl}&decimalLatitude=45,90`,              // 極北（北緯 45~90 度）
-            `${baseUrl}&decimalLatitude=-90,-45`,            // 極南（南緯 45~90 度）
-            `${baseUrl}&decimalLongitude=90,180`,            // 極東（東經 90~180 度）
-            `${baseUrl}&decimalLongitude=-180,-90`,          // 極西（西經 90~180 度）
-          ];
-
-          const responses = await Promise.all(
-            queries.map(q => fetch(q).then(r => r.json()).catch(() => ({ results: [] })))
-          );
-
-          // 合併所有分區查詢結果
-          const allResults = responses.flatMap(r => (r.results || []));
-
-          const lats = allResults
-            .map((r: any) => r.decimalLatitude)
-            .filter((v: any) => typeof v === 'number' && v >= -90 && v <= 90);
-          const lngs = allResults
-            .map((r: any) => r.decimalLongitude)
-            .filter((v: any) => typeof v === 'number' && v >= -180 && v <= 180);
-
-          if (lats.length > 0 && lngs.length > 0) {
-            let minLat = Math.min(...lats);
-            let maxLat = Math.max(...lats);
-            let minLng = Math.min(...lngs);
-            let maxLng = Math.max(...lngs);
-
-            // 加入 5% buffer，確保邊緣的 raster 方塊不被截斷
-            const latSpan = maxLat - minLat;
-            const lngSpan = maxLng - minLng;
-            const latBuffer = Math.max(latSpan * 0.08, 3);
-            const lngBuffer = Math.max(lngSpan * 0.08, 3);
-
-            minLat = Math.max(-85, minLat - latBuffer);
-            maxLat = Math.min(85, maxLat + latBuffer);
-            minLng = Math.max(-180, minLng - lngBuffer);
-            maxLng = Math.min(180, maxLng + lngBuffer);
-
-            if (isMounted) setBounds([[minLng, minLat], [maxLng, maxLat]]);
-          }
-        } catch (e) {
-          console.warn('GBIF Bounds calculation fallback used', e);
+        if (isMounted) {
+          setTaxonKey(matchData.usageKey);
+          setLoading(false);
         }
-
-        if (isMounted) setLoading(false);
       } catch (err) {
         if (isMounted) {
           setError(language === 'zh' ? '無法載入 GBIF 地圖數據' : 'Failed to load GBIF map');
@@ -230,32 +185,6 @@ export default function GbifGlobalMap({ scientificName }: GbifGlobalMapProps) {
       isMounted = false;
     };
   }, [scientificName]);
-
-  // 當 bounds 數據非同步載入完成時，觀測數據點對地圖進行 fitBounds 縮放 (調適適中 maxZoom 與 padding 確保完全在視域內)
-  useEffect(() => {
-    if (!bounds) return;
-
-    const applyFitBounds = () => {
-      const mapInstance = mapRef.current?.getMap ? mapRef.current.getMap() : mapRef.current;
-      if (mapInstance) {
-        try {
-          mapInstance.fitBounds(bounds, {
-            padding: { top: 50, bottom: 50, left: 50, right: 50 },
-            maxZoom: 3.5, // 保守的 maxZoom，確保全球分布的 raster 方塊完全在視野內
-            duration: 1000
-          });
-        } catch (e) {
-          console.warn('fitBounds execution error:', e);
-        }
-      }
-    };
-
-    applyFitBounds();
-
-    // 延遲再執行一次，確保地圖完全初始化後再套用 fitBounds
-    const timer = setTimeout(applyFitBounds, 500);
-    return () => clearTimeout(timer);
-  }, [bounds]);
 
   return (
     <div id="gbif-map-container" className="relative w-full h-[550px] rounded-[2.5rem] overflow-hidden bg-slate-100 border border-slate-200 shadow-inner group">
@@ -275,22 +204,13 @@ export default function GbifGlobalMap({ scientificName }: GbifGlobalMapProps) {
       <Map
         ref={mapRef}
         initialViewState={{
-          longitude: 20,
+          longitude: 15,
           latitude: 20,
-          zoom: 1.5
+          zoom: isMobile ? 0 : 0.6
         }}
         maxZoom={7}
         mapStyle={currentStyle as any}
         attributionControl={false}
-        onLoad={(e) => {
-          if (bounds) {
-            e.target.fitBounds(bounds, {
-              padding: { top: 50, bottom: 50, left: 50, right: 50 },
-              maxZoom: 3.5,
-              duration: 1000
-            });
-          }
-        }}
       >
         {!isMobile && <MapNavControl position="top-right" showCompass={false} />}
         <FullscreenControl containerId="gbif-map-container" position="top-right" />
@@ -299,7 +219,7 @@ export default function GbifGlobalMap({ scientificName }: GbifGlobalMapProps) {
           <Source
             id="gbif-raster-green"
             type="raster"
-            tiles={[`https://api.gbif.org/v2/map/occurrence/density/{z}/{x}/{y}@2x.png?srs=EPSG:3857&taxonKey=${taxonKey}&style=green2.poly&bin=square&squareSize=128`]}
+            tiles={[`https://api.gbif.org/v2/map/occurrence/density/{z}/{x}/{y}@2x.png?srs=EPSG:3857&taxonKey=${taxonKey}&style=green.poly&bin=square&squareSize=128`]}
             tileSize={256}
             minzoom={0}
             maxzoom={7}
