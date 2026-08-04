@@ -219,7 +219,7 @@ export default function GbifGlobalMap({ scientificName }: GbifGlobalMapProps) {
           <Source
             id="gbif-raster-green"
             type="raster"
-            tiles={[`https://api.gbif.org/v2/map/occurrence/density/{z}/{x}/{y}@2x.png?srs=EPSG:3857&taxonKey=${taxonKey}&style=green.poly&bin=square&squareSize=128`]}
+            tiles={[`https://api.gbif.org/v2/map/occurrence/density/{z}/{x}/{y}@2x.png?srs=EPSG:3857&taxonKey=${taxonKey}&style=purpleWhite.poly&bin=square&squareSize=128`]}
             tileSize={256}
             minzoom={0}
             maxzoom={7}

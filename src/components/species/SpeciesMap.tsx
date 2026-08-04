@@ -1093,11 +1093,11 @@ export default function SpeciesMap({ taxonId, scientificName, chineseName, taxaG
                   'interpolate',
                   ['linear'],
                   ['get', 'totalCount'],
-                  1, '#a8c28c',
-                  3, '#85A36F',
-                  6, '#5f804f',
-                  12, '#435f37',
-                  25, '#2b4724'
+                  1, '#cf7fcf',
+                  3, '#c35fc3',
+                  6, '#b73fb7',
+                  12, '#ab1fab',
+                  25, '#a000a0'
                 ],
                 'fill-opacity': 0.85,
                 'fill-outline-color': 'rgba(0, 0, 0, 0.12)'
@@ -1691,25 +1691,14 @@ export default function SpeciesMap({ taxonId, scientificName, chineseName, taxaG
         )}
       </AnimatePresence>
 
-      {/* Combined Compact Info & Density Legend Box (Bottom Right) */}
-      <div className={`absolute ${isMobile ? 'bottom-4 right-4 p-2.5 max-w-[180px]' : 'bottom-6 right-6 p-3 min-w-[200px]'} z-20 bg-white/95 backdrop-blur-md rounded-2xl border border-slate-200/90 shadow-xl flex flex-col gap-2 pointer-events-auto`}>
-        {/* Record Count Badge */}
-        <div className="flex items-center gap-1.5 text-xs font-bold text-slate-800 border-b border-slate-100 pb-1.5">
-          <span className="w-2 h-2 rounded-full bg-emerald-500 shadow-glow animate-pulse flex-shrink-0" />
-          <span className="text-[11px] font-extrabold text-slate-700 truncate">
-            {language === 'zh'
-              ? `已載入 ${(showInat ? observations.length : 0) + (showBgis ? totalBgisCount : 0) + ((isBirdGroup && showEbird) ? ebirdRecords.length : 0)} 筆記錄`
-              : `Loaded ${(showInat ? observations.length : 0) + (showBgis ? totalBgisCount : 0) + ((isBirdGroup && showEbird) ? ebirdRecords.length : 0)} Records`}
-          </span>
-        </div>
-
-        {/* Density Scale Legend */}
-        <div className="flex flex-col gap-1">
-          <div className="text-[9px] font-bold text-slate-500">
-            <span>{t.densityTitle}</span>
-          </div>
-          <div className="w-full h-1.5 bg-gradient-to-r from-[#a8c28c] via-[#5f804f] to-[#2b4724] rounded-full shadow-inner" />
-        </div>
+      {/* Record Count Badge (Bottom Right) */}
+      <div className={`absolute ${isMobile ? 'bottom-3 right-3 px-2.5 py-1.5' : 'bottom-4 right-4 px-3 py-2'} z-20 bg-white/95 backdrop-blur-md rounded-2xl border border-slate-200/90 shadow-lg flex items-center gap-2 pointer-events-auto`}>
+        <span className="w-2 h-2 rounded-full bg-emerald-500 shadow-glow animate-pulse flex-shrink-0" />
+        <span className="text-[11px] font-extrabold text-slate-700 whitespace-nowrap">
+          {language === 'zh'
+            ? `已載入 ${(showInat ? observations.length : 0) + (showBgis ? totalBgisCount : 0) + ((isBirdGroup && showEbird) ? ebirdRecords.length : 0)} 筆記錄`
+            : `Loaded ${(showInat ? observations.length : 0) + (showBgis ? totalBgisCount : 0) + ((isBirdGroup && showEbird) ? ebirdRecords.length : 0)} Records`}
+        </span>
       </div>
 
       {/* Attribution info icon (Bottom Left) */}
