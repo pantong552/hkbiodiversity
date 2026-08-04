@@ -42,7 +42,7 @@ export default async function HomePage() {
 
   return (
     <>
-      <Header />
+      <Header isHomePage={true} />
       <main className="min-h-screen bg-white">
         {/* 1. Hero Section */}
         <HomeHero />

@@ -63,6 +63,22 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="zh-TW">
+      <head>
+        {/* 關鍵修正：在 React Hydration 前禁用 scroll restoration 並強制跻動回頂部 */}
+        {/* 這確保在 Vercel 生產環境中，無論是第一次開啟还是 Refresh，頁面永遠從 Y=0 開始渲染 */}
+        <script dangerouslySetInnerHTML={{ __html: `
+          (function() {
+            if ('scrollRestoration' in history) {
+              history.scrollRestoration = 'manual';
+            }
+            // 強制滚動至頂部，防止瀏覽器 scroll restoration 將 scrollY 設為 > 0
+            // 這樣 React Hydration 時 useLayoutEffect 重算 isScrolled 就必為 false
+            if (window.scrollY !== 0) {
+              window.scrollTo(0, 0);
+            }
+          })();
+        `}} />
+      </head>
       <body className={`${workSans.variable} ${outfit.variable} font-sans antialiased text-cyan-900`}>
         <AuthProvider>
           <LanguageProvider>

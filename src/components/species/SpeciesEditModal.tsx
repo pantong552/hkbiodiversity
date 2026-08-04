@@ -30,7 +30,7 @@ interface SpeciesEditModalProps {
   tableName?: string; // 'species' | 'plant_species'
   onSuccess?: () => void;
   reviewDraft?: SpeciesDraft | null;
-  onApproveDraft?: (draft: SpeciesDraft) => Promise<void>;
+  onApproveDraft?: (draft: SpeciesDraft, updatedData?: any) => Promise<void>;
   onRejectDraft?: (draft: SpeciesDraft, reason: string) => Promise<void>;
 }
 
@@ -50,6 +50,7 @@ export default function SpeciesEditModal({
 
   const [loadingDraft, setLoadingDraft] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [isApproving, setIsApproving] = useState(false);
   const [activeDraft, setActiveDraft] = useState<SpeciesDraft | null>(null);
   const [editorData, setEditorData] = useState<any>(species);
   const [toastMessage, setToastMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
@@ -201,6 +202,15 @@ export default function SpeciesEditModal({
 
     setSubmitting(true);
     try {
+      if (isApproving && onApproveDraft && currentDraft) {
+        // Admin「批准並發布」模式：調用批准並帶入管理員最新編輯的 updatedData
+        await onApproveDraft(currentDraft, updatedData);
+        showToast('success', language === 'zh' ? '已成功批准修訂並發布！' : 'Draft approved and published!');
+        if (onSuccess) onSuccess();
+        setTimeout(() => onClose(), 1200);
+        return;
+      }
+
       if (isAdmin) {
         // Admin: 直接更新正本 species / plant_species 表
         const isPlant = tableName === 'plant_species' || species?.taxa_group === 'FLORA' || (species as any)?.category_chi || String(species?.taxa_id || '').startsWith('flora_');
@@ -218,7 +228,7 @@ export default function SpeciesEditModal({
         const { error: updateError } = await query;
         if (updateError) throw updateError;
 
-        // 同時將任何 pending 草稿設為 approved (若原本有館員草稿，則標記批准)
+        // 同時將 any pending 草稿設為 approved (若原本有館員草稿，則標記批准)
         if (activeDraft) {
           await supabase
             .from('species_drafts')
@@ -287,6 +297,7 @@ export default function SpeciesEditModal({
       showToast('error', err.message || (language === 'zh' ? '儲存失敗，請重試' : 'Save failed, please try again'));
     } finally {
       setSubmitting(false);
+      setIsApproving(false);
     }
   };
 
@@ -388,16 +399,24 @@ export default function SpeciesEditModal({
                   disabled={submitting || deletingDraft}
                   onClick={async () => {
                     if (onApproveDraft && currentDraft) {
-                      setSubmitting(true);
-                      try {
-                        await onApproveDraft(currentDraft);
-                        showToast('success', language === 'zh' ? '已成功批准修訂並發布！' : 'Draft approved and published!');
-                        if (onSuccess) onSuccess();
-                        setTimeout(() => onClose(), 1200);
-                      } catch (err) {
-                        showToast('error', language === 'zh' ? '審核失敗' : 'Approval failed');
-                      } finally {
-                        setSubmitting(false);
+                      setIsApproving(true);
+                      if (triggerSaveRef.current) {
+                        // 觸發編輯器儲存，會收集最新資料並呼叫 handleSave
+                        triggerSaveRef.current();
+                      } else {
+                        // Fallback: 如果沒有編輯器，則直接批准
+                        setSubmitting(true);
+                        try {
+                          await onApproveDraft(currentDraft);
+                          showToast('success', language === 'zh' ? '已成功批准修訂並發布！' : 'Draft approved and published!');
+                          if (onSuccess) onSuccess();
+                          setTimeout(() => onClose(), 1200);
+                        } catch (err) {
+                          showToast('error', language === 'zh' ? '審核失敗' : 'Approval failed');
+                        } finally {
+                          setSubmitting(false);
+                          setIsApproving(false);
+                        }
                       }
                     }
                   }}

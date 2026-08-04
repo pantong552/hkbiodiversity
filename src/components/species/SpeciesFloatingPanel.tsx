@@ -197,14 +197,15 @@ export default function SpeciesFloatingPanel() {
   const [reviewDraft, setReviewDraft] = useState<SpeciesDraft | null>(null);
   const [bannerRefreshKey, setBannerRefreshKey] = useState(0);
 
-  const handleApproveDraft = async (draft: SpeciesDraft) => {
+  const handleApproveDraft = async (draft: SpeciesDraft, updatedData?: any) => {
     if (!activeSpecies || !profile) return;
     const targetTable = activeSpecies.taxa_group === 'FLORA' || (activeSpecies as any).category_chi ? 'plant_species' : 'species';
+    const finalData = updatedData || draft.draft_data;
 
     // 1. 更新正式物種表
     const { error: updateError } = await supabase
       .from(targetTable)
-      .update(draft.draft_data)
+      .update(finalData)
       .eq('id', activeSpecies.id);
 
     if (updateError) throw updateError;
@@ -214,6 +215,7 @@ export default function SpeciesFloatingPanel() {
       .from('species_drafts')
       .update({
         status: 'approved',
+        draft_data: finalData, // 將草稿的內容也更新為管理員最終修改並發布的內容
         approved_by: profile.id,
         approved_by_name: profile.username || profile.email?.split('@')[0],
         approved_at: new Date().toISOString()
@@ -386,6 +388,24 @@ export default function SpeciesFloatingPanel() {
       url: shareUrl
     });
   };
+
+  // 當 openSpeciesIds 改變時，自動清空已經關閉的物種資料快取，
+  // 這樣再次打開該物種時，就會重新向 supabase 抓取最新資料。
+  useEffect(() => {
+    setSpeciesData(prev => {
+      const nextData = { ...prev };
+      let changed = false;
+      
+      Object.keys(nextData).forEach(id => {
+        if (!openSpeciesIds.includes(id)) {
+          delete nextData[id];
+          changed = true;
+        }
+      });
+      
+      return changed ? nextData : prev;
+    });
+  }, [openSpeciesIds]);
 
   // 1. Fetch data for new IDs
   useEffect(() => {

@@ -59,10 +59,10 @@ export async function GET(request: Request) {
     if (!response.ok || data === null) {
       console.warn(`[eBird Points Proxy] Session ${currentSessionId} 請求失敗 (status ${response.status})，準備標記過期並全自動重新登入...`);
       
-      // 將過期的 session 在 Supabase 標記為 expired
-      await markEbirdSessionExpired(currentSessionId);
+      // 將過期的 session 在 Supabase 標記為 expired (異步背景執行，不阻塞數據重試)
+      markEbirdSessionExpired(currentSessionId).catch(err => console.error('[eBird Points Proxy] 標記過期失敗:', err));
 
-      // 自動發起 eBird 登入腳本，獲取最新的 EBIRD_SESSIONID 並存入 Supabase active
+      // 自動發起 eBird 登入腳本，獲取最新的 EBIRD_SESSIONID (新 ID 的 Supabase 寫入程序在 refreshEbirdSessionInSupabase 內亦為異步非阻塞)
       const newSessionId = await refreshEbirdSessionInSupabase();
 
       if (newSessionId) {

@@ -60,6 +60,34 @@ export default function SpeciesPhotoGallery({
   const [isLightboxOpen, setIsLightboxOpen] = useState(false);
   const [showTooltip, setShowTooltip] = useState(false);
   const thumbRef = useRef<HTMLDivElement>(null);
+  const loadMoreSentinelRef = useRef<HTMLDivElement>(null);
+
+  // 3. 橫向滾動無限加載 (Intersection Observer)
+  useEffect(() => {
+    if (!hasMore || isLoading) return;
+
+    const container = thumbRef.current;
+    const sentinel = loadMoreSentinelRef.current;
+    if (!container || !sentinel) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const entry = entries[0];
+        if (entry.isIntersecting) {
+          console.log('[Gallery] Sentinel visible, triggering loadMore...');
+          loadMore();
+        }
+      },
+      {
+        root: container,
+        rootMargin: '0px 120px 0px 0px', // 提早 120px 觸發載入
+        threshold: 0.05
+      }
+    );
+
+    observer.observe(sentinel);
+    return () => observer.disconnect();
+  }, [hasMore, isLoading, loadMore]);
 
   useEffect(() => {
     if (isLoading && fetchedPhotos.length === 0) {
@@ -546,23 +574,16 @@ export default function SpeciesPhotoGallery({
               ))}
   
               {hasMore && (
-                <button
-                  onClick={loadMore}
-                  disabled={isLoading}
-                  className="flex-shrink-0 w-24 aspect-square rounded-2xl bg-white border-2 border-dashed border-emerald-200 flex flex-col items-center justify-center text-emerald-600 hover:bg-emerald-50 transition-all group active:scale-95 gap-1 shadow-sm"
+                <div
+                  ref={loadMoreSentinelRef}
+                  className="flex-shrink-0 w-24 aspect-square rounded-2xl bg-white border border-slate-100 flex flex-col items-center justify-center text-slate-400 gap-1.5 shadow-xs relative overflow-hidden group select-none"
                 >
-                  {isLoading ? (
-                    <Loader2 className="w-5 h-5 animate-spin" />
-                  ) : (
-                    <>
-                      <Plus className="w-6 h-6 group-hover:scale-110 transition-transform" />
-                      {/* (1) + 更多 Text */}
-                      <span className="text-[10px] font-bold uppercase tracking-tight">
-                        {language === 'zh' ? '更多' : 'More'}
-                      </span>
-                    </>
-                  )}
-                </button>
+                  <div className="absolute inset-0 bg-gradient-to-r from-transparent via-slate-100/50 to-transparent -translate-x-full animate-[shimmer_1.5s_infinite]" />
+                  <Loader2 className="w-5 h-5 animate-spin text-emerald-500 relative z-10" />
+                  <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest relative z-10 animate-pulse">
+                    {language === 'zh' ? '載入中' : 'Loading'}
+                  </span>
+                </div>
               )}
             </div>
           </div>
@@ -598,6 +619,11 @@ export default function SpeciesPhotoGallery({
         .no-scrollbar {
           -ms-overflow-style: none;
           scrollbar-width: none;
+        }
+        @keyframes shimmer {
+          100% {
+            transform: translateX(100%);
+          }
         }
       `}</style>
     </section>

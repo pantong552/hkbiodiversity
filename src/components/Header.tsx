@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useLayoutEffect, useRef } from 'react';
 import { Leaf, Menu, X, User, LogOut, Settings, Globe } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
@@ -10,7 +10,11 @@ import { useLanguage } from '@/context/LanguageContext';
 import { useAuth } from '@/context/AuthContext';
 import { useSpeciesPanel } from '@/context/SpeciesPanelContext';
 
-export default function Header() {
+interface HeaderProps {
+  isHomePage?: boolean;
+}
+
+export default function Header({ isHomePage: propIsHomePage }: HeaderProps = {}) {
   const { language, setLanguage, t } = useLanguage();
   const { user, profile, signOut } = useAuth();
   const pathname = usePathname();
@@ -18,22 +22,42 @@ export default function Header() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isVisible, setIsVisible] = useState(true);
 
+  // 在瀏覽器繪製前立即同步 isScrolled 狀態，防止「閃白」
+  useLayoutEffect(() => {
+    setIsScrolled(window.scrollY > 20);
+  }, []);
+
   const { openSpeciesIds, isExpanded, isGalleryOpen, isUploadModalOpen, isFilterOpen, isEditModalOpen, toggleExpand, setIsAccountOpen, isAccountOpen } = useSpeciesPanel();
-  const isHomePage = pathname === '/';
+  
+  // 正規化路徑（移除結尾斜線或查詢參數，確保 Vercel 生產環境首頁正確辨識）
+  const normalizedPath = (pathname || '/').replace(/\/$/, '') || '/';
+  const isHomePage = propIsHomePage !== undefined ? propIsHomePage : (normalizedPath === '/');
   const hasSpeciesOpen = openSpeciesIds.length > 0;
-  const isHeaderTransparent = isHomePage && !isScrolled && !hasSpeciesOpen;
+  // 關鍵修正：只有當面板「展開且有物種開啟」時，Header 才需要變白色。如果面板收合，首頁 Header 依然保持透明。
+  const isHeaderTransparent = isHomePage && !isScrolled && !(isExpanded && hasSpeciesOpen);
   const lastScrollYRef = useRef(0);
   const mobileMenuRef = useRef<HTMLDivElement>(null);
   const menuToggleRef = useRef<HTMLButtonElement>(null);
 
+  // 監聽 BFCache（Back-Forward Cache）頁面恢復事件
+  // 當 Refresh 或返回時從快取恢復頁面，強制重新同步 scroll 狀態
   useEffect(() => {
+    const handlePageShow = (e: PageTransitionEvent) => {
+      // e.persisted === true 代表從 BFCache 恢復（不是全新加載）
+      setIsScrolled(window.scrollY > 20);
+      setIsVisible(true);
+    };
+    window.addEventListener('pageshow', handlePageShow);
+    return () => window.removeEventListener('pageshow', handlePageShow);
+  }, []);
+
+  useEffect(() => {
+
     const handleScroll = (e?: Event) => {
-      // 僅在真正的捲動事件觸發且選單開啟時才關閉，避免初始化調用誤觸
       if (e && isMobileMenuOpen) setIsMobileMenuOpen(false);
 
-      let currentScrollY = window.scrollY;
+      let currentScrollY = typeof window !== 'undefined' ? window.scrollY : 0;
       
-      // 如果面板展開，則監聽面板內部的捲動
       if (isExpanded) {
         const panelContainer = document.getElementById('species-panel-scroll-container');
         if (panelContainer) {
@@ -47,7 +71,6 @@ export default function Header() {
       // 智慧顯示/隱藏邏輯
       const deltaY = currentScrollY - lastScrollYRef.current;
 
-      // 只有當位移超過一定像素 (10px) 時才更新狀態，避免因捲動抖動導致的頻繁閃爍
       if (Math.abs(deltaY) > 10) {
         if (currentScrollY <= 50) {
           setIsVisible(true);
@@ -58,27 +81,22 @@ export default function Header() {
         }
         lastScrollYRef.current = currentScrollY;
       } else if (currentScrollY <= 50) {
-        // 在頂部附近時始終顯示
         setIsVisible(true);
       }
     };
 
-    // 監聽 window
+    // 掛載時同步一次當前 scrollY 狀態
+    setIsScrolled(window.scrollY > 20);
+
     window.addEventListener('scroll', handleScroll, { passive: true });
     
-    // 如果面板展開，額外監聽面板容器
     let panelContainer: HTMLElement | null = null;
     if (isExpanded) {
       panelContainer = document.getElementById('species-panel-scroll-container');
       if (panelContainer) {
         panelContainer.addEventListener('scroll', handleScroll, { passive: true });
-        // 初始化一次位置
-        handleScroll();
       }
     }
-
-    // 當 isExpanded 變動時也初始化一次
-    handleScroll();
 
     return () => {
       window.removeEventListener('scroll', handleScroll);
