@@ -178,7 +178,7 @@ const translations = {
     datasetFilterLabel: '資料來源',
     filterInat: 'iNaturalist',
     filterBgis: 'BGIS / HKBIH',
-    filterEbird: 'eBird (HK)',
+    filterEbird: 'eBird',
     ebirdSectionTitle: 'eBird 觀察記錄數據',
     ebirdLocationUnit: '個觀測點',
     creditTitle: 'BGIS / HKBIH 資料來源與條款聲明',
@@ -226,7 +226,7 @@ const translations = {
     datasetFilterLabel: 'Data Sources',
     filterInat: 'iNaturalist',
     filterBgis: 'BGIS / HKBIH',
-    filterEbird: 'eBird (HK)',
+    filterEbird: 'eBird',
     ebirdSectionTitle: 'eBird Observation Data',
     ebirdLocationUnit: 'location',
     creditTitle: 'BGIS / HKBIH Data Attribution & Terms',
@@ -933,36 +933,30 @@ export default function SpeciesMap({ taxonId, scientificName, chineseName, taxaG
 
       {/* Top Left Dataset Filter Control */}
       {!isLoading && (
-        <div ref={filterRef} className="absolute top-4 left-4 z-30 flex items-center">
-          {/* Desktop Filter Bar (sm:flex) */}
-          <div className="hidden sm:flex bg-white/95 backdrop-blur-md border border-slate-200/80 shadow-lg rounded-2xl p-1.5 items-center gap-1.5">
-            {/* Filter Label */}
-            <div className="px-2 py-1 flex items-center gap-1.5 text-xs font-bold text-slate-700 border-r border-slate-200/60 pr-2.5">
-              <Filter className="w-3.5 h-3.5 text-emerald-600" />
-              <span>{t.datasetFilterLabel}</span>
-            </div>
-
+        <div ref={filterRef} className="absolute top-3 left-3 z-30 flex items-center">
+          {/* Desktop Filter Bar (sm:flex) - Compact Glass Pill */}
+          <div className="hidden sm:flex bg-white/90 backdrop-blur-md border border-slate-200/80 shadow-md rounded-full p-1 items-center gap-1">
             {/* iNaturalist Button */}
             <button
               onClick={() => setShowInat(!showInat)}
-              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${showInat
-                ? 'bg-emerald-600 text-white shadow-sm ring-2 ring-emerald-500/20'
-                : 'bg-slate-100 text-slate-400 hover:bg-slate-200/70 hover:text-slate-600'
+              className={`px-2.5 py-1 rounded-full text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${showInat
+                ? 'bg-emerald-600 text-white shadow-xs ring-1 ring-emerald-500/30'
+                : 'bg-slate-100/80 text-slate-400 hover:bg-slate-200/70 hover:text-slate-600'
                 }`}
             >
-              <span className={`w-2 h-2 rounded-full ${showInat ? 'bg-white animate-pulse' : 'bg-slate-300'}`} />
+              <span className={`w-1.5 h-1.5 rounded-full ${showInat ? 'bg-white animate-pulse' : 'bg-slate-300'}`} />
               {t.filterInat}
             </button>
 
             {/* BGIS Button */}
             <button
               onClick={() => setShowBgis(!showBgis)}
-              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${showBgis
-                ? 'bg-teal-600 text-white shadow-sm ring-2 ring-teal-500/20'
-                : 'bg-slate-100 text-slate-400 hover:bg-slate-200/70 hover:text-slate-600'
+              className={`px-2.5 py-1 rounded-full text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${showBgis
+                ? 'bg-teal-600 text-white shadow-xs ring-1 ring-teal-500/30'
+                : 'bg-slate-100/80 text-slate-400 hover:bg-slate-200/70 hover:text-slate-600'
                 }`}
             >
-              <span className={`w-2 h-2 rounded-full ${showBgis ? 'bg-white animate-pulse' : 'bg-slate-300'}`} />
+              <span className={`w-1.5 h-1.5 rounded-full ${showBgis ? 'bg-white animate-pulse' : 'bg-slate-300'}`} />
               {t.filterBgis}
             </button>
 
@@ -970,12 +964,12 @@ export default function SpeciesMap({ taxonId, scientificName, chineseName, taxaG
             {isBirdGroup && (
               <button
                 onClick={() => setShowEbird(!showEbird)}
-                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${showEbird
-                  ? 'bg-sky-600 text-white shadow-sm ring-2 ring-sky-500/20'
-                  : 'bg-slate-100 text-slate-400 hover:bg-slate-200/70 hover:text-slate-600'
+                className={`px-2.5 py-1 rounded-full text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${showEbird
+                  ? 'bg-sky-600 text-white shadow-xs ring-1 ring-sky-500/30'
+                  : 'bg-slate-100/80 text-slate-400 hover:bg-slate-200/70 hover:text-slate-600'
                   }`}
               >
-                <span className={`w-2 h-2 rounded-full ${showEbird ? 'bg-white animate-pulse' : 'bg-slate-300'}`} />
+                <span className={`w-1.5 h-1.5 rounded-full ${showEbird ? 'bg-white animate-pulse' : 'bg-slate-300'}`} />
                 {t.filterEbird}
               </button>
             )}
@@ -1056,9 +1050,9 @@ export default function SpeciesMap({ taxonId, scientificName, chineseName, taxaG
       {/* Map View */}
       <Map
         initialViewState={{
-          longitude: 114.1694,
-          latitude: 22.3193,
-          zoom: 9.5
+          longitude: 114.135,
+          latitude: 22.365,
+          zoom: 10
         }}
         mapStyle={currentStyle as any}
         onClick={onMapClick}
@@ -1070,13 +1064,11 @@ export default function SpeciesMap({ taxonId, scientificName, chineseName, taxaG
         onLoad={(e) => {
           setMapLoaded(true);
           const map = e.target;
-          // 行動端偵測並自動縮放至香港範圍
-          if (isMobile) {
-            map.fitBounds(
-              [[113.8, 22.15], [114.4, 22.58]], // 香港經緯度範圍 [西南, 東北]
-              { padding: 20, duration: 1000 }
-            );
-          }
+          // 自動縮放置中至香港地理全境範圍
+          map.fitBounds(
+            [[113.82, 22.14], [114.44, 22.58]],
+            { padding: isMobile ? 20 : 36, duration: 800 }
+          );
         }}
       >
         {!isMobile && <MapNavControl position="top-right" showCompass={false} />}
