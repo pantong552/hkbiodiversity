@@ -167,20 +167,49 @@ export default function GbifGlobalMap({ scientificName }: GbifGlobalMapProps) {
         if (isMounted) setTaxonKey(key);
 
         try {
-          const occRes = await fetch(
-            `https://api.gbif.org/v1/occurrence/search?taxonKey=${key}&hasCoordinate=true&limit=300`
+          // 並行查詢 5 個地理分區以確保涵蓋全球所有極值點
+          // GBIF occurrence API 每次最多回傳 300 筆，單次查詢可能遺漏邊緣分布點
+          const baseUrl = `https://api.gbif.org/v1/occurrence/search?taxonKey=${key}&hasCoordinate=true&limit=300`;
+          const queries = [
+            baseUrl,                                          // 一般採樣（不過濾地理範圍）
+            `${baseUrl}&decimalLatitude=45,90`,              // 極北（北緯 45~90 度）
+            `${baseUrl}&decimalLatitude=-90,-45`,            // 極南（南緯 45~90 度）
+            `${baseUrl}&decimalLongitude=90,180`,            // 極東（東經 90~180 度）
+            `${baseUrl}&decimalLongitude=-180,-90`,          // 極西（西經 90~180 度）
+          ];
+
+          const responses = await Promise.all(
+            queries.map(q => fetch(q).then(r => r.json()).catch(() => ({ results: [] })))
           );
-          const occData = await occRes.json();
-          if (occData.results && occData.results.length > 0) {
-            const lats = occData.results.map((r: any) => r.decimalLatitude).filter((v: any) => typeof v === 'number');
-            const lngs = occData.results.map((r: any) => r.decimalLongitude).filter((v: any) => typeof v === 'number');
-            if (lats.length > 0 && lngs.length > 0) {
-              const minLat = Math.min(...lats);
-              const maxLat = Math.max(...lats);
-              const minLng = Math.min(...lngs);
-              const maxLng = Math.max(...lngs);
-              if (isMounted) setBounds([[minLng, minLat], [maxLng, maxLat]]);
-            }
+
+          // 合併所有分區查詢結果
+          const allResults = responses.flatMap(r => (r.results || []));
+
+          const lats = allResults
+            .map((r: any) => r.decimalLatitude)
+            .filter((v: any) => typeof v === 'number' && v >= -90 && v <= 90);
+          const lngs = allResults
+            .map((r: any) => r.decimalLongitude)
+            .filter((v: any) => typeof v === 'number' && v >= -180 && v <= 180);
+
+          if (lats.length > 0 && lngs.length > 0) {
+            let minLat = Math.min(...lats);
+            let maxLat = Math.max(...lats);
+            let minLng = Math.min(...lngs);
+            let maxLng = Math.max(...lngs);
+
+            // 加入 5% buffer，確保邊緣的 raster 方塊不被截斷
+            const latSpan = maxLat - minLat;
+            const lngSpan = maxLng - minLng;
+            const latBuffer = Math.max(latSpan * 0.08, 3);
+            const lngBuffer = Math.max(lngSpan * 0.08, 3);
+
+            minLat = Math.max(-85, minLat - latBuffer);
+            maxLat = Math.min(85, maxLat + latBuffer);
+            minLng = Math.max(-180, minLng - lngBuffer);
+            maxLng = Math.min(180, maxLng + lngBuffer);
+
+            if (isMounted) setBounds([[minLng, minLat], [maxLng, maxLat]]);
           }
         } catch (e) {
           console.warn('GBIF Bounds calculation fallback used', e);
@@ -202,17 +231,30 @@ export default function GbifGlobalMap({ scientificName }: GbifGlobalMapProps) {
     };
   }, [scientificName]);
 
-  // 當 bounds 數據非同步載入完成時，立即對地圖進行 fitBounds 縮放
+  // 當 bounds 數據非同步載入完成時，觀測數據點對地圖進行 fitBounds 縮放 (調適適中 maxZoom 與 padding 確保完全在視域內)
   useEffect(() => {
     if (!bounds) return;
-    const mapInstance = mapRef.current?.getMap ? mapRef.current.getMap() : mapRef.current;
-    if (mapInstance) {
-      mapInstance.fitBounds(bounds, {
-        padding: { top: 50, bottom: 50, left: 50, right: 50 },
-        maxZoom: 6,
-        duration: 1000
-      });
-    }
+
+    const applyFitBounds = () => {
+      const mapInstance = mapRef.current?.getMap ? mapRef.current.getMap() : mapRef.current;
+      if (mapInstance) {
+        try {
+          mapInstance.fitBounds(bounds, {
+            padding: { top: 50, bottom: 50, left: 50, right: 50 },
+            maxZoom: 3.5, // 保守的 maxZoom，確保全球分布的 raster 方塊完全在視野內
+            duration: 1000
+          });
+        } catch (e) {
+          console.warn('fitBounds execution error:', e);
+        }
+      }
+    };
+
+    applyFitBounds();
+
+    // 延遲再執行一次，確保地圖完全初始化後再套用 fitBounds
+    const timer = setTimeout(applyFitBounds, 500);
+    return () => clearTimeout(timer);
   }, [bounds]);
 
   return (
@@ -244,7 +286,7 @@ export default function GbifGlobalMap({ scientificName }: GbifGlobalMapProps) {
           if (bounds) {
             e.target.fitBounds(bounds, {
               padding: { top: 50, bottom: 50, left: 50, right: 50 },
-              maxZoom: 6,
+              maxZoom: 3.5,
               duration: 1000
             });
           }
