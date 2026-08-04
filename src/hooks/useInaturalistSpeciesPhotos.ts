@@ -256,10 +256,13 @@ export function useInaturalistSpeciesPhotos(inatId: number | string | undefined,
             : [...prev.photos, ...fetchedInatPhotos];
           const uniquePhotos = Array.from(new Map(newPhotos.map(p => [p.id, p])).values());
           
+          // 計算目前已載入的 iNaturalist 圖片數量（扣除 communityPhotos）
+          const currentInatPhotosCount = uniquePhotos.filter(p => !p.observedOn || typeof p.id === 'number' || (typeof p.id === 'string' && !p.id.startsWith('photo-'))).length;
+          
           return {
             photos: uniquePhotos,
             isLoading: false,
-            hasMore: uniquePhotos.length < result.totalResults,
+            hasMore: fetchedInatPhotos.length > 0 && (currentInatPhotosCount < result.totalResults || result.photos.length === 12),
             totalCount: result.totalResults,
             dataScope: targetScope,
             hasHkPhotos: targetScope === 'hongkong' ? (uniquePhotos.length > 0) : prev.hasHkPhotos,
@@ -286,6 +289,12 @@ export function useInaturalistSpeciesPhotos(inatId: number | string | undefined,
     }
   }, [inatId, fetchInternal, fetchCommunityPhotos]);
 
+  // Keep a ref to current state to avoid stale closure issues in loadMore
+  const stateRef = useRef(state);
+  useEffect(() => {
+    stateRef.current = state;
+  }, [state]);
+
   // Initial load when inatId or taxaId changes
   useEffect(() => {
     const mainId = inatId || taxaId;
@@ -296,10 +305,11 @@ export function useInaturalistSpeciesPhotos(inatId: number | string | undefined,
   }, [inatId, taxaId, loadData]);
 
   const loadMore = useCallback(() => {
-    if (!state.isLoading && state.hasMore) {
-      loadData(state.page + 1, state.dataScope, false);
+    const currentState = stateRef.current;
+    if (!currentState.isLoading && currentState.hasMore && !isFetchingRef.current) {
+      loadData(currentState.page + 1, currentState.dataScope, false);
     }
-  }, [state, loadData]);
+  }, [loadData]);
 
   const setScope = useCallback((newScope: 'hongkong' | 'global') => {
     loadData(1, newScope, true);
