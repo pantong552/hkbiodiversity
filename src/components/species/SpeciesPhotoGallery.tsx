@@ -60,9 +60,9 @@ export default function SpeciesPhotoGallery({
   const [isLightboxOpen, setIsLightboxOpen] = useState(false);
   const [showTooltip, setShowTooltip] = useState(false);
   const thumbRef = useRef<HTMLDivElement>(null);
-  const loadMoreSentinelRef = useRef<HTMLDivElement>(null);
+  const loadMoreSentinelRef = useRef<HTMLButtonElement>(null);
 
-  // 3. 橫向滾動無限加載 (Intersection Observer)
+  // 3. 橫向滾動無限加載 (Intersection Observer + Scroll Boundary Listener)
   useEffect(() => {
     if (!hasMore || isLoading) return;
 
@@ -80,14 +80,21 @@ export default function SpeciesPhotoGallery({
       },
       {
         root: container,
-        rootMargin: '0px 120px 0px 0px', // 提早 120px 觸發載入
-        threshold: 0.05
+        rootMargin: '0px 250px 0px 0px', // 提早 250px 觸發載入
+        threshold: 0.01
       }
     );
 
     observer.observe(sentinel);
     return () => observer.disconnect();
   }, [hasMore, isLoading, loadMore]);
+
+  // 切換大圖當靠近末端時，預先觸發載入更多
+  useEffect(() => {
+    if (hasMore && !isLoading && photos.length > 0 && currentIndex >= photos.length - 3) {
+      loadMore();
+    }
+  }, [currentIndex, photos.length, hasMore, isLoading, loadMore]);
 
   useEffect(() => {
     if (isLoading && fetchedPhotos.length === 0) {
@@ -117,13 +124,18 @@ export default function SpeciesPhotoGallery({
   const [showLeftArrow, setShowLeftArrow] = useState(false);
   const [showRightArrow, setShowRightArrow] = useState(false);
 
-  const checkArrows = () => {
+  const checkArrows = useCallback(() => {
     if (thumbRef.current) {
       const { scrollLeft, scrollWidth, clientWidth } = thumbRef.current;
       setShowLeftArrow(scrollLeft > 20);
       setShowRightArrow(scrollLeft < scrollWidth - clientWidth - 20);
+
+      // 雙重保障：滾動接近右端 150px 時自動觸發加載更多
+      if (hasMore && !isLoading && scrollLeft + clientWidth >= scrollWidth - 150) {
+        loadMore();
+      }
     }
-  };
+  }, [hasMore, isLoading, loadMore]);
 
   useEffect(() => {
     checkArrows();
@@ -149,7 +161,7 @@ export default function SpeciesPhotoGallery({
         window.removeEventListener('resize', checkArrows);
       };
     }
-  }, [photos]);
+  }, [photos, checkArrows]);
   useEffect(() => {
     setGalleryOpen(isLightboxOpen);
   }, [isLightboxOpen, setGalleryOpen]);
@@ -574,16 +586,21 @@ export default function SpeciesPhotoGallery({
               ))}
   
               {hasMore && (
-                <div
+                <button
+                  type="button"
                   ref={loadMoreSentinelRef}
-                  className="flex-shrink-0 w-24 aspect-square rounded-2xl bg-white border border-slate-100 flex flex-col items-center justify-center text-slate-400 gap-1.5 shadow-xs relative overflow-hidden group select-none"
+                  onClick={() => !isLoading && loadMore()}
+                  disabled={isLoading}
+                  className="flex-shrink-0 w-24 aspect-square rounded-2xl bg-white hover:bg-slate-50 border border-slate-200 flex flex-col items-center justify-center text-slate-500 gap-1.5 shadow-xs relative overflow-hidden group select-none transition-all active:scale-95 disabled:cursor-not-allowed"
                 >
                   <div className="absolute inset-0 bg-gradient-to-r from-transparent via-slate-100/50 to-transparent -translate-x-full animate-[shimmer_1.5s_infinite]" />
-                  <Loader2 className="w-5 h-5 animate-spin text-emerald-500 relative z-10" />
-                  <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest relative z-10 animate-pulse">
-                    {language === 'zh' ? '載入中' : 'Loading'}
+                  <Loader2 className={`w-5 h-5 text-emerald-500 relative z-10 ${isLoading ? 'animate-spin' : 'group-hover:scale-110 transition-transform'}`} />
+                  <span className="text-[8px] font-black text-slate-500 uppercase tracking-widest relative z-10">
+                    {isLoading 
+                      ? (language === 'zh' ? '載入中...' : 'Loading...') 
+                      : (language === 'zh' ? '載入更多' : 'Load More')}
                   </span>
-                </div>
+                </button>
               )}
             </div>
           </div>

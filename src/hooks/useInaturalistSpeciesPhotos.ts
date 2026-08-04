@@ -249,36 +249,42 @@ export function useInaturalistSpeciesPhotos(inatId: number | string | undefined,
 
       // NORMAL UPDATE
       if (result) {
+        const fetchedInatPhotos = result.photos || [];
+        
         setState(prev => {
-          const fetchedInatPhotos = result?.photos || [];
           const newPhotos = isInitial 
             ? [...communityPhotos, ...fetchedInatPhotos] 
             : [...prev.photos, ...fetchedInatPhotos];
           const uniquePhotos = Array.from(new Map(newPhotos.map(p => [p.id, p])).values());
           
-          // 計算目前已載入的 iNaturalist 圖片數量（扣除 communityPhotos）
-          const currentInatPhotosCount = uniquePhotos.filter(p => !p.observedOn || typeof p.id === 'number' || (typeof p.id === 'string' && !p.id.startsWith('photo-'))).length;
+          // 精確計算來源為 iNaturalist 的照片總數 (排除社群上傳照片)
+          const currentInatPhotosCount = uniquePhotos.filter(p => 
+            p.observationUrl?.includes('inaturalist.org') || p.nativePageUrl?.includes('inaturalist.org')
+          ).length;
+          
+          // 如果這頁 API 有結果或尚未到達 iNat 的 totalResults
+          const canHaveMore = (currentInatPhotosCount < result.totalResults) && (fetchedInatPhotos.length > 0 || targetPage * 12 < result.totalResults);
           
           return {
             photos: uniquePhotos,
             isLoading: false,
-            hasMore: fetchedInatPhotos.length > 0 && (currentInatPhotosCount < result.totalResults || result.photos.length === 12),
+            hasMore: canHaveMore,
             totalCount: result.totalResults,
             dataScope: targetScope,
             hasHkPhotos: targetScope === 'hongkong' ? (uniquePhotos.length > 0) : prev.hasHkPhotos,
             page: targetPage
           };
         });
-      } else if (isInitial) {
-        // No inatId case - just community photos
+      } else {
+        // No inatId case or null result
         setState(prev => ({
           ...prev,
-          photos: communityPhotos,
+          photos: isInitial ? communityPhotos : prev.photos,
           isLoading: false,
           hasMore: false,
-          totalCount: communityPhotos.length,
-          hasHkPhotos: communityPhotos.length > 0,
-          page: 1
+          totalCount: isInitial ? communityPhotos.length : prev.totalCount,
+          hasHkPhotos: isInitial ? (communityPhotos.length > 0) : prev.hasHkPhotos,
+          page: isInitial ? 1 : prev.page
         }));
       }
     } catch (err) {
