@@ -34,7 +34,8 @@ export interface TaxonPhoto {
 export interface TaxonInfo {
   id: number;
   name: string; // 學名
-  preferred_common_name?: string; // 常用名
+  preferred_common_name?: string; // 常用名 (語系偏好/中文名)
+  english_common_name?: string; // 英文常用名
   rank: string; // species, genus, etc.
   rank_level?: number;
   iconic_taxon_name?: string;
@@ -276,12 +277,10 @@ export default function SpeciesAutoIdModal() {
       setUploadProgress(50);
       setLoadingStep(isZh ? '正在上傳相片資料至辨識伺服器...' : 'Uploading photo data to server...');
 
-      // 2. 獲取 API Token (根據語系)
-      const tokenChi = process.env.NEXT_PUBLIC_INAT_AUTOID_CHI_API || '';
-      const tokenEng = process.env.NEXT_PUBLIC_INAT_AUTOID_ENG_API || '';
-      const token = isZh ? (tokenChi || tokenEng) : (tokenEng || tokenChi);
+      // 2. 獲取 API Token (統一使用 NEXT_PUBLIC_INAT_AUTOID_ENG_API)
+      const token = process.env.NEXT_PUBLIC_INAT_AUTOID_ENG_API || process.env.NEXT_PUBLIC_INAT_AUTOID_CHI_API || '';
 
-      const API_URL = 'https://api.inaturalist.org/v2/computervision/score_image';
+      const API_URL = 'https://api.inaturalist.org/v2/computervision/score_image?locale=zh-HK';
 
       const formData = new FormData();
       formData.append('image', compressedBlob, file.name);
@@ -297,8 +296,9 @@ export default function SpeciesAutoIdModal() {
           iconic_taxon_name: true,
           is_active: true,
           matched_term: true,
-          name: true,
-          preferred_common_name: true,
+          name: true,                     // 拉丁學名
+          preferred_common_name: true,    // 語系偏好常用名 (中文名)
+          english_common_name: true,      // 英文常用名
           rank: true,
           rank_level: true
         }
@@ -596,7 +596,10 @@ export default function SpeciesAutoIdModal() {
                     <div className="flex items-center justify-between">
                       <div>
                         <span className="text-base font-bold text-white block">
-                          {resultsData.common_ancestor.taxon.preferred_common_name || resultsData.common_ancestor.taxon.name}
+                          {isZh
+                            ? (resultsData.common_ancestor.taxon.preferred_common_name || resultsData.common_ancestor.taxon.english_common_name || resultsData.common_ancestor.taxon.name)
+                            : (resultsData.common_ancestor.taxon.english_common_name || resultsData.common_ancestor.taxon.preferred_common_name || resultsData.common_ancestor.taxon.name)
+                          }
                         </span>
                         <span className="text-xs text-emerald-200/80">
                           <span className="italic">{resultsData.common_ancestor.taxon.name}</span>
@@ -624,7 +627,9 @@ export default function SpeciesAutoIdModal() {
                       || (photoUrl ? photoUrl.replace(/\/(square|small|medium)\./i, '/original.') : null)
                       || photoUrl;
 
-                    const commonName = taxon.preferred_common_name || (isZh ? '未有中文俗名' : 'No Common Name');
+                    const commonName = isZh
+                      ? (taxon.preferred_common_name || taxon.english_common_name || taxon.name)
+                      : (taxon.english_common_name || taxon.preferred_common_name || taxon.name);
                     const scientificName = taxon.name;
 
                     // 色彩等級
