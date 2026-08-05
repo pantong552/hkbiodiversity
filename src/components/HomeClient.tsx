@@ -837,7 +837,7 @@ export default function HomeClient() {
               
               {/* Full Pagination Navigation */}
               {!isLoading && totalPages > 1 && (
-                  <div className="mt-20 pt-10 border-t border-slate-200/60 flex flex-col items-center gap-6">
+                  <div className="mt-6 sm:mt-16 pt-5 sm:pt-10 border-t border-slate-200/60 flex flex-col items-center gap-4 sm:gap-6">
                     <div className="flex items-center gap-2">
                         <button
                         disabled={currentPage === 1}

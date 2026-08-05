@@ -41,9 +41,13 @@ export default function MobileToolbar({
   useEffect(() => {
     const controlNavbar = () => {
       const currentScrollY = window.scrollY;
+      const windowHeight = window.innerHeight;
+      const documentHeight = document.documentElement.scrollHeight;
+      const isNearBottom = (documentHeight - (currentScrollY + windowHeight)) <= 30;
+
       if (currentScrollY > lastScrollY && currentScrollY > 50) {
         setIsVisible(false);
-      } else {
+      } else if (!isNearBottom) {
         setIsVisible(true);
       }
       setLastScrollY(currentScrollY);
@@ -53,16 +57,16 @@ export default function MobileToolbar({
   }, [lastScrollY]);
 
   const sortOptions = [
-    { 
-      value: 'common_name', 
+    {
+      value: 'common_name',
       label: (sortBy === 'common_name' && sortOrder === 'desc') ? t('sort.common_name').replace('A-Z', 'Z-A') : t('sort.common_name')
     },
-    { 
-      value: 'scientific_name', 
+    {
+      value: 'scientific_name',
       label: (sortBy === 'scientific_name' && sortOrder === 'desc') ? t('sort.scientific_name').replace('A-Z', 'Z-A') : t('sort.scientific_name')
     },
-    { 
-      value: 'rarity', 
+    {
+      value: 'rarity',
       label: (sortBy === 'rarity' && sortOrder === 'desc') ? t('sort.rarity').replace('High First', 'Low First') : t('sort.rarity')
     }
   ];
@@ -75,16 +79,16 @@ export default function MobileToolbar({
       ${isVisible && !shouldHideDueToPanel && !isUploadModalOpen && !isFilterOpen ? 'translate-y-0 opacity-100' : 'translate-y-32 opacity-0 pointer-events-none'}
     `}>
       <div className="bg-white/90 backdrop-blur-3xl border border-white/50 shadow-[0_20px_50px_rgba(0,0,0,0.2)] rounded-[1.75rem] p-3 flex flex-col gap-3">
-        
+
         {/* Row 0: Prominent Filter Button for Mobile */}
-        <button 
+        <button
           onClick={onFilterOpen}
           className="w-full bg-emerald-600 hover:bg-emerald-700 text-white rounded-2xl py-3 flex items-center justify-center gap-2.5 shadow-lg shadow-emerald-200 active:scale-95 transition-all"
         >
           <Layers className="w-4 h-4" />
           <span className="text-xs font-black uppercase tracking-[0.2em]">{t?.('filter.title') || 'Filter & Search'}</span>
         </button>
-        
+
         {/* Row 1: Sort (Left) & Mode (Right) */}
         <div className="flex items-center justify-between gap-2 overflow-hidden">
           {/* Sorting Control */}
@@ -97,11 +101,10 @@ export default function MobileToolbar({
                 <button
                   key={opt.value}
                   onClick={() => onSortChange(opt.value)}
-                  className={`px-3 py-1.5 rounded-xl text-[11px] font-black transition-all whitespace-nowrap ${
-                    sortBy === opt.value 
-                      ? 'bg-white text-emerald-600 shadow-sm' 
+                  className={`px-3 py-1.5 rounded-xl text-[11px] font-black transition-all whitespace-nowrap ${sortBy === opt.value
+                      ? 'bg-white text-emerald-600 shadow-sm'
                       : 'text-slate-500'
-                  }`}
+                    }`}
                 >
                   {opt.label}
                 </button>
@@ -119,11 +122,10 @@ export default function MobileToolbar({
               <button
                 key={mode.id}
                 onClick={() => onDisplayModeChange(mode.id as any)}
-                className={`p-2 rounded-xl flex-1 flex justify-center transition-all ${
-                  displayMode === mode.id 
-                    ? 'bg-white text-emerald-600 shadow-sm' 
+                className={`p-2 rounded-xl flex-1 flex justify-center transition-all ${displayMode === mode.id
+                    ? 'bg-white text-emerald-600 shadow-sm'
                     : 'text-slate-400 hover:text-slate-600'
-                }`}
+                  }`}
               >
                 <mode.icon className="w-3.5 h-3.5" />
               </button>
@@ -143,11 +145,10 @@ export default function MobileToolbar({
                 <button
                   key={size}
                   onClick={() => onItemsPerPageChange(size)}
-                  className={`px-2.5 py-1.5 rounded-xl text-[11px] font-black transition-all whitespace-nowrap ${
-                    itemsPerPage === size 
-                      ? 'bg-emerald-600 text-white shadow-md' 
+                  className={`px-2.5 py-1.5 rounded-xl text-[11px] font-black transition-all whitespace-nowrap ${itemsPerPage === size
+                      ? 'bg-emerald-600 text-white shadow-md'
                       : 'text-emerald-700/60'
-                  }`}
+                    }`}
                 >
                   {size}
                 </button>
