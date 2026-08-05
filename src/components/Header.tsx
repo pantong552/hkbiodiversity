@@ -57,12 +57,18 @@ export default function Header({ isHomePage: propIsHomePage }: HeaderProps = {})
       if (e && isMobileMenuOpen) setIsMobileMenuOpen(false);
 
       let currentScrollY = typeof window !== 'undefined' ? window.scrollY : 0;
+      let isNearBottom = false;
       
       if (isExpanded) {
         const panelContainer = document.getElementById('species-panel-scroll-container');
         if (panelContainer) {
           currentScrollY = panelContainer.scrollTop;
+          isNearBottom = (panelContainer.scrollHeight - (currentScrollY + panelContainer.clientHeight)) <= 30;
         }
+      } else if (typeof window !== 'undefined' && document.documentElement) {
+        const windowHeight = window.innerHeight;
+        const documentHeight = document.documentElement.scrollHeight;
+        isNearBottom = (documentHeight - (currentScrollY + windowHeight)) <= 30;
       }
 
       // 切換透明度/高度
@@ -76,7 +82,7 @@ export default function Header({ isHomePage: propIsHomePage }: HeaderProps = {})
           setIsVisible(true);
         } else if (deltaY > 0 && currentScrollY > 100) {
           setIsVisible(false);
-        } else if (deltaY < 0) {
+        } else if (deltaY < 0 && !isNearBottom) {
           setIsVisible(true);
         }
         lastScrollYRef.current = currentScrollY;
