@@ -64,6 +64,15 @@ export interface InatApiResponse {
   results: InatResultItem[];
 }
 
+// 1. 圖片轉換 API 封裝工具 (將網路圖片經過 /api/image/transform 處理)
+function getTransformedImageUrl(url: string | null | undefined): string | undefined {
+  if (!url) return undefined;
+  if (url.startsWith('blob:') || url.startsWith('data:') || url.startsWith('/api/image/transform')) {
+    return url;
+  }
+  return `/api/image/transform?url=${encodeURIComponent(url)}`;
+}
+
 // 1. 前端圖像壓縮與縮放函式 (長邊 1024px 以內，quality 0.85)
 function compressImage(file: File, maxDimension = 1024, quality = 0.85): Promise<Blob> {
   return new Promise((resolve, reject) => {
@@ -120,6 +129,8 @@ export default function SpeciesAutoIdModal() {
   const [compressedSize, setCompressedSize] = useState<number | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [loadingStep, setLoadingStep] = useState<string>('');
+  const [uploadProgress, setUploadProgress] = useState<number>(0);
+  const [isUploadingPhase, setIsUploadingPhase] = useState<boolean>(true);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [resultsData, setResultsData] = useState<InatApiResponse | null>(null);
   const [isDragOver, setIsDragOver] = useState(false);
@@ -215,6 +226,8 @@ export default function SpeciesAutoIdModal() {
     setResultsData(null);
     setErrorMsg(null);
     setIsLoading(false);
+    setUploadProgress(0);
+    setIsUploadingPhase(true);
   };
 
   const handleClose = () => {
@@ -228,19 +241,40 @@ export default function SpeciesAutoIdModal() {
       return;
     }
 
+    // 換圖片或上傳圖片時，先重設狀態並開起 Uploading 階段
     setSelectedFile(file);
     const localUrl = URL.createObjectURL(file);
     setPreviewUrl(localUrl);
+    setResultsData(null); // 清空舊辨識結果
     setErrorMsg(null);
+
     setIsLoading(true);
-    setLoadingStep(isZh ? '正在優化與壓縮圖片尺寸...' : 'Compressing image...');
+    setIsUploadingPhase(true);
+    setUploadProgress(15);
+    setLoadingStep(isZh ? '正在讀取與處理相片檔案...' : 'Reading & processing photo...');
+
+    // 關鍵優化：先給 React 60ms 完成畫面繪製，即刻無延遲彈出 Progress Bar 與動畫，避免 Canvas 解碼佔據主線程卡頓
+    await new Promise((resolve) => setTimeout(resolve, 60));
+
+    let progressInterval: NodeJS.Timeout | null = null;
 
     try {
+      // 動態模擬平滑上傳進度推進
+      progressInterval = setInterval(() => {
+        setUploadProgress((prev) => {
+          if (prev < 45) return prev + 5;
+          if (prev < 75) return prev + 2;
+          if (prev < 90) return prev + 1;
+          return prev;
+        });
+      }, 150);
+
       // 1. 自動壓縮圖片至 1024px 長邊以內
       const compressedBlob = await compressImage(file, 1024, 0.85);
       setCompressedSize(compressedBlob.size);
 
-      setLoadingStep(isZh ? 'AI 正在進行視覺特徵分析與物種比對...' : 'AI is analyzing features and matching species...');
+      setUploadProgress(50);
+      setLoadingStep(isZh ? '正在上傳相片資料至辨識伺服器...' : 'Uploading photo data to server...');
 
       // 2. 獲取 API Token (根據語系)
       const tokenChi = process.env.NEXT_PUBLIC_INAT_AUTOID_CHI_API || '';
@@ -282,6 +316,11 @@ export default function SpeciesAutoIdModal() {
         headers['Accept-Language'] = 'zh-HK,zh;q=0.9,zh-TW;q=0.8';
       }
 
+      // 轉入 AI 物種比對識別階段
+      setUploadProgress(78);
+      setIsUploadingPhase(false);
+      setLoadingStep(isZh ? 'AI 正在進行視覺特徵分析與物種比對...' : 'AI is analyzing features and matching species...');
+
       const response = await fetch(API_URL, {
         method: 'POST',
         headers,
@@ -293,11 +332,20 @@ export default function SpeciesAutoIdModal() {
       }
 
       const jsonResult: InatApiResponse = await response.json();
+
+      if (progressInterval) clearInterval(progressInterval);
+      setUploadProgress(100);
+
+      // 短暫停留呈現 100% 滿格感
+      await new Promise((res) => setTimeout(res, 250));
+
       setResultsData(jsonResult);
     } catch (err: any) {
+      if (progressInterval) clearInterval(progressInterval);
       console.error('Species Identification failed:', err);
       setErrorMsg(err.message || (isZh ? '辨識服務暫時無法存取，請稍後再試。' : 'Identification failed. Please try again.'));
     } finally {
+      if (progressInterval) clearInterval(progressInterval);
       setIsLoading(false);
     }
   };
@@ -382,8 +430,8 @@ export default function SpeciesAutoIdModal() {
                 onDrop={handleDrop}
                 onClick={() => fileInputRef.current?.click()}
                 className={`relative border-2 border-dashed rounded-3xl p-8 text-center transition-all cursor-pointer flex flex-col items-center justify-center min-h-[220px] ${isDragOver
-                    ? 'border-emerald-500 bg-emerald-50/80 scale-[0.99]'
-                    : 'border-emerald-200 bg-white hover:border-emerald-400 hover:bg-emerald-50/30 hover:shadow-lg'
+                  ? 'border-emerald-500 bg-emerald-50/80 scale-[0.99]'
+                  : 'border-emerald-200 bg-white hover:border-emerald-400 hover:bg-emerald-50/30 hover:shadow-lg'
                   }`}
               >
                 <input
@@ -470,15 +518,40 @@ export default function SpeciesAutoIdModal() {
               </div>
             )}
 
-            {/* 載入中狀態 (AI 處理中) */}
+            {/* 載入/上傳與辨識中狀態 (包含 Uploading Animation 與 Progress Bar) */}
             {isLoading && (
-              <div className="bg-emerald-50/60 border border-emerald-100 rounded-2xl p-6 text-center space-y-3 animate-pulse">
-                <div className="w-10 h-10 rounded-full border-3 border-emerald-500 border-t-transparent animate-spin mx-auto text-emerald-600" />
-                <div>
-                  <h5 className="text-sm font-semibold text-emerald-900">
-                    {isZh ? '正在進行物種辨識...' : 'Identifying species...'}
-                  </h5>
-                  <p className="text-xs text-emerald-700 mt-1">{loadingStep}</p>
+              <div className="bg-gradient-to-br from-emerald-50/90 via-teal-50/50 to-emerald-100/40 border border-emerald-200/80 rounded-3xl p-5 shadow-sm space-y-3.5">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="w-10 h-10 rounded-2xl bg-emerald-600 text-white flex items-center justify-center shadow-md shadow-emerald-600/20 shrink-0">
+                      {isUploadingPhase ? (
+                        <UploadCloud className="w-5 h-5 animate-bounce" />
+                      ) : (
+                        <Sparkles className="w-5 h-5 animate-spin" />
+                      )}
+                    </div>
+                    <div className="min-w-0">
+                      <h5 className="text-sm font-bold text-slate-800 flex items-center gap-2 truncate">
+                        {isUploadingPhase
+                          ? (isZh ? '正在上傳與處理相片...' : 'Uploading & processing photo...')
+                          : (isZh ? 'AI 正在辨識物種...' : 'AI identifying species...')}
+                      </h5>
+                      <p className="text-xs text-emerald-700 font-medium truncate mt-0.5">{loadingStep}</p>
+                    </div>
+                  </div>
+                  <span className="text-xs font-mono font-extrabold px-3 py-1 rounded-full bg-emerald-600 text-white shadow-sm shrink-0 ml-2">
+                    {Math.round(uploadProgress)}%
+                  </span>
+                </div>
+
+                {/* Progress Bar 進度條 */}
+                <div className="w-full h-3 bg-emerald-200/60 rounded-full overflow-hidden p-0.5 border border-emerald-300/40 relative shadow-inner">
+                  <div
+                    className="h-full bg-gradient-to-r from-emerald-500 via-teal-400 to-emerald-500 rounded-full transition-all duration-300 shadow-sm relative overflow-hidden"
+                    style={{ width: `${Math.min(100, Math.max(5, uploadProgress))}%` }}
+                  >
+                    <div className="absolute inset-0 bg-white/25 animate-pulse" />
+                  </div>
                 </div>
               </div>
             )}
@@ -516,7 +589,7 @@ export default function SpeciesAutoIdModal() {
                     <div className="flex items-center justify-between text-xs text-emerald-400 font-semibold mb-1">
                       <span className="flex items-center gap-1.5">
                         <CheckCircle2 className="w-4 h-4" />
-                        {isZh ? '高信心標的階元 (High Confidence Rank)' : 'We are pretty sure this is in:'}
+                        {isZh ? '肯定屬於這個類別' : 'This must belong to this category:'}
                       </span>
                       <ChevronRight className="w-4 h-4 text-emerald-300" />
                     </div>
@@ -525,8 +598,9 @@ export default function SpeciesAutoIdModal() {
                         <span className="text-base font-bold text-white block">
                           {resultsData.common_ancestor.taxon.preferred_common_name || resultsData.common_ancestor.taxon.name}
                         </span>
-                        <span className="text-xs italic text-emerald-200/80">
-                          {resultsData.common_ancestor.taxon.name} ({resultsData.common_ancestor.taxon.rank})
+                        <span className="text-xs text-emerald-200/80">
+                          <span className="italic">{resultsData.common_ancestor.taxon.name}</span>
+                          <span className="not-italic opacity-90"> ({resultsData.common_ancestor.taxon.rank})</span>
                         </span>
                       </div>
                       <span className="text-xs px-2.5 py-1 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-400/30">
@@ -541,9 +615,16 @@ export default function SpeciesAutoIdModal() {
                   {resultsData.results.map((item, idx) => {
                     const taxon = item.taxon;
                     const score = Math.round(item.vision_score || item.combined_score || 0);
-                    const photoUrl = taxon.representative_photo?.url || taxon.default_photo?.url;
+                    const rawPhotoObj = (item as any).photo || taxon.representative_photo || taxon.default_photo;
+                    const photoUrl = taxon.representative_photo?.url || taxon.default_photo?.url || (item as any).photo?.url;
 
-                    const commonName = taxon.preferred_common_name || (isZh ? '未知俗名' : 'No Common Name');
+                    // 優先採用 original_url / large_url，或將 /square. /small. 替換為 /original. 高畫質大圖
+                    const originalPhotoUrl = rawPhotoObj?.original_url
+                      || rawPhotoObj?.large_url
+                      || (photoUrl ? photoUrl.replace(/\/(square|small|medium)\./i, '/original.') : null)
+                      || photoUrl;
+
+                    const commonName = taxon.preferred_common_name || (isZh ? '未有中文俗名' : 'No Common Name');
                     const scientificName = taxon.name;
 
                     // 色彩等級
@@ -561,18 +642,18 @@ export default function SpeciesAutoIdModal() {
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ delay: idx * 0.05 }}
                         className={`group relative bg-white border rounded-2xl p-3 sm:p-3.5 transition-all hover:shadow-md flex items-center gap-3.5 ${isTop1
-                            ? 'border-emerald-300 ring-2 ring-emerald-500/20 bg-emerald-50/20'
-                            : 'border-slate-200/90 hover:border-emerald-200'
+                          ? 'border-emerald-300 ring-2 ring-emerald-500/20 bg-emerald-50/20'
+                          : 'border-slate-200/90 hover:border-emerald-200'
                           }`}
                       >
                         {/* 縮圖 Thumbnail */}
                         <div
-                          onClick={() => photoUrl && setEnlargedPhoto(photoUrl)}
+                          onClick={() => originalPhotoUrl && setEnlargedPhoto(originalPhotoUrl)}
                           className="relative w-14 h-14 sm:w-16 sm:h-16 rounded-xl overflow-hidden shrink-0 border border-slate-100 bg-slate-100 cursor-pointer shadow-sm group-hover:scale-105 transition-transform"
                         >
                           {photoUrl ? (
                             <img
-                              src={photoUrl}
+                              src={getTransformedImageUrl(photoUrl)}
                               alt={commonName}
                               className="w-full h-full object-cover"
                             />
@@ -660,7 +741,7 @@ export default function SpeciesAutoIdModal() {
             className="fixed inset-0 z-[120] bg-black/85 flex items-center justify-center p-4 cursor-zoom-out"
           >
             <img
-              src={enlargedPhoto}
+              src={getTransformedImageUrl(enlargedPhoto)}
               alt="Enlarged view"
               className="max-w-full max-h-[90vh] object-contain rounded-2xl shadow-2xl"
             />
