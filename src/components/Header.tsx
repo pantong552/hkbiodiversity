@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useLayoutEffect, useRef } from 'react';
-import { Leaf, Menu, X, User, LogOut, Settings, Globe } from 'lucide-react';
+import { Leaf, Menu, X, User, LogOut, Settings, Globe, Camera, Sparkles } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { motion } from 'framer-motion';
@@ -27,7 +27,7 @@ export default function Header({ isHomePage: propIsHomePage }: HeaderProps = {})
     setIsScrolled(window.scrollY > 20);
   }, []);
 
-  const { openSpeciesIds, isExpanded, isGalleryOpen, isUploadModalOpen, isFilterOpen, isEditModalOpen, toggleExpand, setIsAccountOpen, isAccountOpen } = useSpeciesPanel();
+  const { openSpeciesIds, isExpanded, isGalleryOpen, isUploadModalOpen, isFilterOpen, isEditModalOpen, toggleExpand, setIsAccountOpen, isAccountOpen, setAutoIdOpen } = useSpeciesPanel();
   
   // 正規化路徑（移除結尾斜線或查詢參數，確保 Vercel 生產環境首頁正確辨識）
   const normalizedPath = (pathname || '/').replace(/\/$/, '') || '/';
@@ -241,6 +241,20 @@ export default function Header({ isHomePage: propIsHomePage }: HeaderProps = {})
             ))}
           </div>
 
+          {/* AI 相片物種辨識按鈕 */}
+          <button
+            onClick={() => setAutoIdOpen(true)}
+            className={`px-3 py-1.5 rounded-full text-xs font-bold flex items-center gap-1.5 transition-all duration-300 cursor-pointer border ${
+              isHeaderTransparent 
+                ? 'bg-white/10 hover:bg-white/20 text-white border-white/20 backdrop-blur-md shadow-sm' 
+                : 'bg-slate-100/80 hover:bg-emerald-50 text-slate-700 hover:text-emerald-700 border-slate-200/60 hover:border-emerald-200 shadow-sm'
+            }`}
+            title={language === 'zh' ? 'AI 相片物種辨識' : 'AI Species Photo ID'}
+          >
+            <Camera className={`w-3.5 h-3.5 ${isHeaderTransparent ? 'text-emerald-300' : 'text-emerald-600'}`} />
+            <span>{language === 'zh' ? '物種辨識' : 'Species ID'}</span>
+          </button>
+
           {/* Language Switcher - Desktop */}
           <div className={`flex items-center p-1 rounded-full border transition-all duration-500 backdrop-blur-sm ${isHeaderTransparent ? 'bg-white/10 border-white/20' : 'bg-slate-100/50 border-slate-200/50'}`}>
             <button
@@ -326,6 +340,22 @@ export default function Header({ isHomePage: propIsHomePage }: HeaderProps = {})
                 </button>
               </div>
             </div>
+
+            {/* 行動端 AI 相片物種辨識按鈕 */}
+            <button
+              onClick={() => {
+                setIsMobileMenuOpen(false);
+                setAutoIdOpen(true);
+              }}
+              className="w-full py-3 px-4 rounded-2xl bg-emerald-50 hover:bg-emerald-100 text-emerald-800 font-bold text-sm flex items-center justify-between border border-emerald-200/80 active:scale-[0.98] transition-all cursor-pointer"
+            >
+              <div className="flex items-center gap-2.5">
+                <div className="w-7 h-7 rounded-xl bg-emerald-600 text-white flex items-center justify-center shadow-sm">
+                  <Camera className="w-4 h-4" />
+                </div>
+                <span>{language === 'zh' ? '物種 AI 相片辨識' : 'AI Species Photo ID'}</span>
+              </div>
+            </button>
 
             <div className="flex flex-col gap-2">
               {navLinks.map((link) => (

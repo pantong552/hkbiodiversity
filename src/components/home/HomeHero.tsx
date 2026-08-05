@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef, useCallback, Fragment } from 'react';
 import { useRouter } from 'next/navigation';
-import { Search, ChevronRight, ChevronDown, Sparkles, Loader2, Leaf, Bug, ArrowRight, CornerDownLeft } from 'lucide-react';
+import { Search, ChevronRight, ChevronDown, Sparkles, Loader2, Leaf, Bug, ArrowRight, CornerDownLeft, Camera } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useLanguage } from '@/context/LanguageContext';
 import { SuggestionItem } from '@/app/api/species/suggest/route';
@@ -50,6 +50,7 @@ function SuggestionItemAvatar({ item, isSelected }: { item: SuggestionItem; isSe
 
 export default function HomeHero() {
   const { language, t } = useLanguage();
+  const { setAutoIdOpen } = useSpeciesPanel();
   const router = useRouter();
   
   // Search state
@@ -346,12 +347,23 @@ export default function HomeHero() {
                 )}
               </div>
 
+              {/* AI 相片辨識按鈕 (圓形相機圖示按鈕) */}
+              <button
+                type="button"
+                onClick={() => setAutoIdOpen(true)}
+                className="w-10 h-10 md:w-14 md:h-14 shrink-0 flex items-center justify-center bg-emerald-50 hover:bg-emerald-100 text-emerald-700 hover:text-emerald-800 rounded-full border border-emerald-200/80 shadow-md shadow-emerald-900/5 hover:scale-105 active:scale-95 transition-all duration-300 mr-1.5 md:mr-2 cursor-pointer"
+                title={language === 'zh' ? '相片 AI 物種辨識' : 'Species Photo Recognition'}
+              >
+                <Camera className="w-4 h-4 md:w-6 md:h-6" />
+              </button>
+
               {/* Search Trigger*/}
               <button 
                 type="submit"
-                className="w-10 h-10 md:w-14 md:h-14 shrink-0 flex items-center justify-center bg-emerald-600 hover:bg-emerald-500 text-white rounded-full shadow-lg shadow-emerald-200/40 hover:scale-105 active:scale-95 transition-all duration-300 mr-0.5 md:mr-1"
+                className="w-10 h-10 md:w-14 md:h-14 shrink-0 flex items-center justify-center bg-emerald-600 hover:bg-emerald-500 text-white rounded-full shadow-lg shadow-emerald-200/40 hover:scale-105 active:scale-95 transition-all duration-300 mr-0.5 md:mr-1 cursor-pointer"
+                title={language === 'zh' ? '搜尋物種' : 'Search Species'}
               >
-                <Search className="w-4 h-4 md:w-6 h-6" />
+                <Search className="w-4 h-4 md:w-6 md:h-6" />
               </button>
             </div>
 

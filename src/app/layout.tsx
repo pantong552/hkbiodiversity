@@ -54,6 +54,7 @@ import { SpeciesPanelProvider } from '@/context/SpeciesPanelContext';
 import { AuthProvider } from '@/context/AuthContext';
 import { TaxonomyProvider } from '@/context/TaxonomyContext';
 import SpeciesFloatingPanel from '@/components/species/SpeciesFloatingPanel';
+import SpeciesAutoIdModal from '@/components/species/SpeciesAutoIdModal';
 import AccountModule from '@/components/profile/AccountModule';
 
 export default function RootLayout({
@@ -86,6 +87,7 @@ export default function RootLayout({
               <SpeciesPanelProvider>
                 {children}
                 <SpeciesFloatingPanel />
+                <SpeciesAutoIdModal />
                 <AccountModule />
               </SpeciesPanelProvider>
             </TaxonomyProvider>
