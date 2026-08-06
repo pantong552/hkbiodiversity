@@ -274,57 +274,18 @@ export default function SpeciesAutoIdModal() {
       const compressedBlob = await compressImage(file, 1024, 0.85);
       setCompressedSize(compressedBlob.size);
 
-      setUploadProgress(50);
-      setLoadingStep(isZh ? '正在上傳相片資料至辨識伺服器...' : 'Uploading photo data to server...');
-
-      // 2. 獲取 API Token (統一使用 NEXT_PUBLIC_INAT_AUTOID_ENG_API)
-      const token = process.env.NEXT_PUBLIC_INAT_AUTOID_ENG_API || process.env.NEXT_PUBLIC_INAT_AUTOID_CHI_API || '';
-
-      const API_URL = 'https://api.inaturalist.org/v2/computervision/score_image?locale=zh-HK';
-
+      // 2. 發送至站內 Serverless Proxy (由伺服端自動登入並續刷 Token，永不失效)
       const formData = new FormData();
       formData.append('image', compressedBlob, file.name);
-      formData.append('include_representative_photos', 'true');
-      formData.append('fields', JSON.stringify({
-        frequency_score: true,
-        vision_score: true,
-        taxon: {
-          ancestor_ids: true,
-          default_photo: { url: true },
-          representative_photo: { url: true },
-          iconic_taxon_id: true,
-          iconic_taxon_name: true,
-          is_active: true,
-          matched_term: true,
-          name: true,                     // 拉丁學名
-          preferred_common_name: true,    // 語系偏好常用名 (中文名)
-          english_common_name: true,      // 英文常用名
-          rank: true,
-          rank_level: true
-        }
-      }));
-
-      const headers: Record<string, string> = {
-        'Accept': 'application/json',
-        'X-Via': 'inaturalistjs'
-      };
-
-      if (token) {
-        headers['Authorization'] = token;
-      }
-      if (isZh) {
-        headers['Accept-Language'] = 'zh-HK,zh;q=0.9,zh-TW;q=0.8';
-      }
 
       // 轉入 AI 物種比對識別階段
       setUploadProgress(78);
       setIsUploadingPhase(false);
       setLoadingStep(isZh ? 'AI 正在進行視覺特徵分析與物種比對...' : 'AI is analyzing features and matching species...');
 
-      const response = await fetch(API_URL, {
+      const response = await fetch('/api/inaturalist/score', {
         method: 'POST',
-        headers,
-        body: formData
+        body: formData,
       });
 
       if (!response.ok) {
