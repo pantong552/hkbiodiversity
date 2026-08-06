@@ -131,8 +131,13 @@ async function updateEdgeConfigToken(newToken: string): Promise<void> {
   const edgeConfigId = process.env.EDGE_CONFIG_ID;
 
   if (!vercelApiToken || !edgeConfigId) {
+    console.warn('[iNatAuth] ⚠️ 缺少 VERCEL_API_TOKEN 或 EDGE_CONFIG_ID，無法寫入 Edge Config。');
     return;
   }
+
+  // 診斷日誌：顯示 token 前綴以確認類型 (vcp_ = 只讀連線金鑰, vercel_pat_ = 有寫入權限)
+  const tokenPrefix = vercelApiToken.slice(0, 12);
+  console.log(`[iNatAuth] 📝 Updating Edge Config [${edgeConfigId}] with token prefix [${tokenPrefix}...]`);
 
   try {
     const updateRes = await fetch(`https://api.vercel.com/v1/edge-config/${edgeConfigId}/items`, {
@@ -155,6 +160,8 @@ async function updateEdgeConfigToken(newToken: string): Promise<void> {
     const resText = await updateRes.text();
     if (updateRes.ok) {
       console.log('[iNatAuth] 🎉 Successfully updated INAT_API_TOKEN in Vercel Edge Config!');
+    } else if (updateRes.status === 401 || updateRes.status === 403) {
+      console.error(`[iNatAuth] 🔑 Edge Config 寫入權限不足 (${updateRes.status})! VERCEL_API_TOKEN 必須是 Personal Access Token，而非 vcp_ 連線金鑰。請至 vercel.com/account/tokens 建立新的 Personal Access Token 並更新環境變數。`);
     } else {
       console.warn(`[iNatAuth] Edge Config API status ${updateRes.status}:`, resText);
     }
