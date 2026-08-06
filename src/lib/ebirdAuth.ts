@@ -165,8 +165,12 @@ export async function updateEdgeConfigEbirdSession(newSessionId: string): Promis
   const edgeConfigId = process.env.EDGE_CONFIG_ID;
 
   if (!vercelApiToken || !edgeConfigId) {
+    console.warn('[eBird Auth] ⚠️ 缺少 VERCEL_API_TOKEN 或 EDGE_CONFIG_ID，無法寫入 Edge Config。');
     return;
   }
+
+  const tokenPrefix = vercelApiToken.slice(0, 12);
+  console.log(`[eBird Auth] 📝 準備寫入 Edge Config [${edgeConfigId}]，使用 Token 前綴: [${tokenPrefix}...]`);
 
   try {
     const updateRes = await fetch(`https://api.vercel.com/v1/edge-config/${edgeConfigId}/items`, {
@@ -188,12 +192,12 @@ export async function updateEdgeConfigEbirdSession(newSessionId: string): Promis
 
     const resText = await updateRes.text();
     if (updateRes.ok) {
-      console.log('[eBird Auth] 🎉 成功將最新 EBIRD_SESSIONID 更新至 Vercel Edge Config！');
+      console.log(`[eBird Auth] 🎉 成功將最新 EBIRD_SESSIONID (${maskSession(newSessionId)}) 更新至 Vercel Edge Config！`);
     } else {
-      console.warn(`[eBird Auth] Edge Config API status ${updateRes.status}:`, resText);
+      console.warn(`[eBird Auth] ⚠️ Edge Config API 寫入回應狀態 ${updateRes.status}:`, resText);
     }
   } catch (err) {
-    console.error('[eBird Auth] 更新 Edge Config 時發生錯誤:', err);
+    console.error('[eBird Auth] ❌ 更新 Edge Config 時發生錯誤:', err);
   }
 }
 
@@ -217,15 +221,22 @@ export async function getActiveEbirdSession(): Promise<string | null> {
         process.env.EDGE_CONFIG = edgeConfigUrl;
       }
 
+      console.log('[eBird Auth] ⚡ 嘗試從 Vercel Edge Config 讀取 EBIRD_SESSIONID...');
       const edgeSession = await getEdgeConfig<string>('EBIRD_SESSIONID');
+      console.log(`[eBird Auth] ⚡ Edge Config 中的 raw 內容: [${maskSession(edgeSession || '')}]`);
+
       if (edgeSession && typeof edgeSession === 'string' && edgeSession !== 'test test' && edgeSession.trim().length > 0) {
-        console.log(`[eBird Auth] ⚡ 使用 Vercel Edge Config 中的 Session: [${maskSession(edgeSession)}]`);
+        console.log(`[eBird Auth] ✅ 成功取得 Edge Config 有效 Session: [${maskSession(edgeSession)}]`);
         globalThis.__ebirdMemoryCachedSession = edgeSession;
         return edgeSession;
+      } else {
+        console.log('[eBird Auth] ⚠️ Edge Config 中的 Session 為無效值或佔位符 (test test)，準備登入刷新...');
       }
     } catch (err) {
       console.warn('[eBird Auth] 無法從 Edge Config 讀取 eBird Session:', err);
     }
+  } else {
+    console.warn('[eBird Auth] 未偵測到 EDGE_CONFIG 或 INAT_API_TOKEN 連線網址');
   }
 
   // 3. 無可用 Session，自動登入刷新並同步至 Edge Config
@@ -256,10 +267,12 @@ export async function refreshEbirdSession(): Promise<string | null> {
 
   globalThis.__ebirdMemoryCachedSession = newSessionId;
 
-  // 非同步寫入 Vercel Edge Config，不阻塞當前 Request
-  updateEdgeConfigEbirdSession(newSessionId).catch(err => {
-    console.error('[eBird Auth] 異步寫入 Edge Config 失敗:', err);
-  });
+  // 使用 await 確保 Serverless Function 結束凍結前完成 Edge Config 寫入
+  try {
+    await updateEdgeConfigEbirdSession(newSessionId);
+  } catch (err) {
+    console.error('[eBird Auth] 寫入 Edge Config 時發生錯誤:', err);
+  }
 
   return newSessionId;
 }
