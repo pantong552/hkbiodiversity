@@ -138,7 +138,8 @@ async function updateEdgeConfigToken(newToken: string): Promise<void> {
   }
 
   try {
-    const updateRes = await fetch(`https://api.vercel.com/v1/edge-config/${edgeConfigId}/items`, {
+    // 1. 優先嘗試 create 操作 (若該項目尚不存在)
+    let updateRes = await fetch(`https://api.vercel.com/v1/edge-config/${edgeConfigId}/items`, {
       method: 'PATCH',
       headers: {
         'Authorization': `Bearer ${vercelApiToken}`,
@@ -147,7 +148,7 @@ async function updateEdgeConfigToken(newToken: string): Promise<void> {
       body: JSON.stringify({
         items: [
           {
-            operation: 'upsert',
+            operation: 'create',
             key: 'INAT_API_TOKEN',
             value: newToken,
           },
@@ -155,10 +156,30 @@ async function updateEdgeConfigToken(newToken: string): Promise<void> {
       }),
     });
 
+    // 2. 若項目已存在，退回 update 操作
+    if (!updateRes.ok) {
+      updateRes = await fetch(`https://api.vercel.com/v1/edge-config/${edgeConfigId}/items`, {
+        method: 'PATCH',
+        headers: {
+          'Authorization': `Bearer ${vercelApiToken}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          items: [
+            {
+              operation: 'update',
+              key: 'INAT_API_TOKEN',
+              value: newToken,
+            },
+          ],
+        }),
+      });
+    }
+
     if (updateRes.ok) {
-      console.log('[iNatAuth] Updated INAT_API_TOKEN in Vercel Edge Config.');
+      console.log('[iNatAuth] 🎉 Successfully updated INAT_API_TOKEN in Vercel Edge Config.');
     } else {
-      console.warn('[iNatAuth] Failed to update Edge Config:', await updateRes.text());
+      console.warn('[iNatAuth] Edge Config update warning:', await updateRes.text());
     }
   } catch (err) {
     console.error('[iNatAuth] Error updating Edge Config:', err);
