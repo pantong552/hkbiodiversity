@@ -1,11 +1,25 @@
-import { createClient } from '@supabase/supabase-js';
+import { get as getEdgeConfig } from '@vercel/edge-config';
 
 const LOGIN_URL = "https://secure.birds.cornell.edu/cassso/login?service=https%3A%2F%2Febird.org%2Flogin%2Fcas%3Fportal%3Debird&locale=zh_TW";
 
-function getSupabaseAdmin() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
-  return createClient(url, key);
+declare global {
+  var __ebirdMemoryCachedSession: string | undefined;
+}
+
+/**
+ * 清除本地記憶體中的 eBird Session 快取
+ */
+export function clearEbirdMemoryCache() {
+  globalThis.__ebirdMemoryCachedSession = undefined;
+}
+
+/**
+ * 遮罩 SessionID 輸出日誌
+ */
+function maskSession(session: string): string {
+  if (!session) return 'null';
+  if (session.length <= 10) return session;
+  return `${session.slice(0, 8)}...${session.slice(-4)}`;
 }
 
 /**
@@ -67,13 +81,18 @@ async function sessionFetch(url: string, options: RequestInit = {}, cookieJar = 
 }
 
 /**
- * 全自動 CAS 登入並獲取受信任的 EBIRD_SESSIONID (與 import re.py 完全一致)
+ * 全自動 CAS 登入並獲取受信任的 EBIRD_SESSIONID
  */
 export async function loginEbirdAndGetSession(): Promise<string | null> {
-  const username = process.env.EBIRD_USERNAME || 'pantong';
-  const password = process.env.EBIRD_PASSWORD || 'P@ss93681816';
+  const username = process.env.EBIRD_USERNAME;
+  const password = process.env.EBIRD_PASSWORD;
 
-  console.log('[eBird Auth] 正在發起全自動 CAS Session 登入鏈...');
+  if (!username || !password) {
+    console.error('[eBird Auth] 未設定環境變數 EBIRD_USERNAME 或 EBIRD_PASSWORD');
+    return null;
+  }
+
+  console.log('[eBird Auth] 正在發起全自動 CAS Session 登入鏈 (帳號:', username, ')...');
 
   try {
     const cookieJar = new Map<string, string>();
@@ -126,7 +145,7 @@ export async function loginEbirdAndGetSession(): Promise<string | null> {
 
     const sessionId = cookieJar.get('EBIRD_SESSIONID');
     if (sessionId) {
-      console.log(`[eBird Auth] 🎉 登入認證完成！新 EBIRD_SESSIONID = ${sessionId}`);
+      console.log(`[eBird Auth] 🎉 CAS 登入完成！新 EBIRD_SESSIONID = ${maskSession(sessionId)}`);
       return sessionId;
     }
 
@@ -139,110 +158,111 @@ export async function loginEbirdAndGetSession(): Promise<string | null> {
 }
 
 /**
- * 取得當前 Supabase 中的 active EBIRD_SESSIONID
+ * 非同步更新 Vercel Edge Config 中的 EBIRD_SESSIONID
+ */
+export async function updateEdgeConfigEbirdSession(newSessionId: string): Promise<void> {
+  const vercelApiToken = process.env.VERCEL_API_TOKEN;
+  const edgeConfigId = process.env.EDGE_CONFIG_ID;
+
+  if (!vercelApiToken || !edgeConfigId) {
+    return;
+  }
+
+  try {
+    const updateRes = await fetch(`https://api.vercel.com/v1/edge-config/${edgeConfigId}/items`, {
+      method: 'PATCH',
+      headers: {
+        'Authorization': `Bearer ${vercelApiToken}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        items: [
+          {
+            operation: 'upsert',
+            key: 'EBIRD_SESSIONID',
+            value: newSessionId,
+          },
+        ],
+      }),
+    });
+
+    const resText = await updateRes.text();
+    if (updateRes.ok) {
+      console.log('[eBird Auth] 🎉 成功將最新 EBIRD_SESSIONID 更新至 Vercel Edge Config！');
+    } else {
+      console.warn(`[eBird Auth] Edge Config API status ${updateRes.status}:`, resText);
+    }
+  } catch (err) {
+    console.error('[eBird Auth] 更新 Edge Config 時發生錯誤:', err);
+  }
+}
+
+/**
+ * 取得當前有效的 EBIRD_SESSIONID (優先 Memory -> 其次 Edge Config -> 補救登入)
  */
 export async function getActiveEbirdSession(): Promise<string | null> {
-  const supabase = getSupabaseAdmin();
+  console.log('[eBird Auth] 🔍 檢查 eBird Session 狀態...');
 
-  try {
-    const { data, error } = await supabase
-      .from('ebird_sessions')
-      .select('session_id')
-      .eq('status', 'active')
-      .order('created_at', { ascending: false })
-      .limit(1);
-
-    if (error) {
-      console.error('[eBird Auth] 讀取 active session 失敗:', error.message);
-      return null;
-    }
-
-    if (data && data.length > 0 && data[0].session_id) {
-      return data[0].session_id;
-    }
-
-    // 若沒有 active session，改為先登入取得，之後異步更新 DB，並立即回傳
-    const newSessionId = await loginEbirdAndGetSession();
-    if (newSessionId) {
-      saveNewSessionToSupabase(newSessionId).catch(err => console.error('[eBird Auth] 異步寫入新 Session 失敗:', err));
-      return newSessionId;
-    }
-    return null;
-  } catch (err) {
-    console.error('[eBird Auth] 存取 ebird_sessions 表失敗:', err);
-    return null;
+  // 1. 優先從 Node.js 全域 Memory 快取讀取
+  if (globalThis.__ebirdMemoryCachedSession) {
+    console.log(`[eBird Auth] 🧠 使用 Global Memory 快取中的 Session: [${maskSession(globalThis.__ebirdMemoryCachedSession)}]`);
+    return globalThis.__ebirdMemoryCachedSession;
   }
+
+  // 2. 嘗試從 Vercel Edge Config 讀取
+  const edgeConfigUrl = process.env.EDGE_CONFIG || (process.env.INAT_API_TOKEN?.startsWith('http') ? process.env.INAT_API_TOKEN : '');
+  if (edgeConfigUrl) {
+    try {
+      if (!process.env.EDGE_CONFIG && edgeConfigUrl) {
+        process.env.EDGE_CONFIG = edgeConfigUrl;
+      }
+
+      const edgeSession = await getEdgeConfig<string>('EBIRD_SESSIONID');
+      if (edgeSession && typeof edgeSession === 'string' && edgeSession !== 'test test' && edgeSession.trim().length > 0) {
+        console.log(`[eBird Auth] ⚡ 使用 Vercel Edge Config 中的 Session: [${maskSession(edgeSession)}]`);
+        globalThis.__ebirdMemoryCachedSession = edgeSession;
+        return edgeSession;
+      }
+    } catch (err) {
+      console.warn('[eBird Auth] 無法從 Edge Config 讀取 eBird Session:', err);
+    }
+  }
+
+  // 3. 無可用 Session，自動登入刷新並同步至 Edge Config
+  return await refreshEbirdSession();
 }
 
 /**
- * 將指定或當前的 Session 標記為 expired
+ * 標記指定或當前的 Session 為過期並清除快取
  */
 export async function markEbirdSessionExpired(sessionId?: string): Promise<void> {
-  const supabase = getSupabaseAdmin();
-
-  try {
-    if (sessionId) {
-      await supabase
-        .from('ebird_sessions')
-        .update({ status: 'expired', updated_at: new Date().toISOString() })
-        .eq('session_id', sessionId);
-      console.log(`[eBird Auth] 已將 SessionID: ${sessionId} 在 Supabase 標記為 expired`);
-    } else {
-      await supabase
-        .from('ebird_sessions')
-        .update({ status: 'expired', updated_at: new Date().toISOString() })
-        .eq('status', 'active');
-      console.log(`[eBird Auth] 已將所有 active Sessions 在 Supabase 標記為 expired`);
-    }
-  } catch (err) {
-    console.error('[eBird Auth] 標記 session expired 失敗:', err);
-  }
+  console.log(`[eBird Auth] ⚠️ 標記 eBird Session 為過期: [${maskSession(sessionId || globalThis.__ebirdMemoryCachedSession || '')}]`);
+  clearEbirdMemoryCache();
 }
 
 /**
- * 僅執行 Supabase 更新流程：將舊 Session 設為過期，並寫入新 Session
+ * 刷新 eBird Session：重新登入取得新 SessionID 並寫入 Edge Config & Memory
  */
-export async function saveNewSessionToSupabase(newSessionId: string): Promise<void> {
-  console.log(`[eBird Auth] 準備在 Supabase 更新存放新 SessionID (${newSessionId})...`);
-  try {
-    await markEbirdSessionExpired();
-    const supabase = getSupabaseAdmin();
-    const { error } = await supabase
-      .from('ebird_sessions')
-      .insert([
-        {
-          session_id: newSessionId,
-          status: 'active',
-        }
-      ]);
-
-    if (error) {
-      console.error('[eBird Auth] 將新 Session 寫入 Supabase 失敗:', error.message);
-    } else {
-      console.log(`[eBird Auth] ✅ 新 SessionID (${newSessionId}) 已成功寫入 Supabase (active)`);
-    }
-  } catch (err) {
-    console.error('[eBird Auth] saveNewSessionToSupabase 發生錯誤:', err);
-  }
-}
-
-/**
- * 標記舊 session 為 expired -> 重新登入取得新 session -> 寫入 Supabase 並標記 active
- */
-export async function refreshEbirdSessionInSupabase(): Promise<string | null> {
-  console.log('[eBird Auth] 開始執行 Session 刷新與 Supabase 更新流程...');
+export async function refreshEbirdSession(): Promise<string | null> {
+  console.log('[eBird Auth] 🔄 發起 eBird Session 刷新流程...');
   
+  clearEbirdMemoryCache();
   const newSessionId = await loginEbirdAndGetSession();
 
   if (!newSessionId) {
-    console.error('[eBird Auth] 刷新 Session 失敗：無法取得新 SessionID');
+    console.error('[eBird Auth] 刷新 eBird Session 失敗');
     return null;
   }
 
-  // 異步執行 Supabase 更新流程，不阻塞地圖數據的立即獲取
-  saveNewSessionToSupabase(newSessionId).catch(err => {
-    console.error('[eBird Auth] 異步更新 Supabase 失敗:', err);
+  globalThis.__ebirdMemoryCachedSession = newSessionId;
+
+  // 非同步寫入 Vercel Edge Config，不阻塞當前 Request
+  updateEdgeConfigEbirdSession(newSessionId).catch(err => {
+    console.error('[eBird Auth] 異步寫入 Edge Config 失敗:', err);
   });
 
   return newSessionId;
 }
+
+// 保持與舊 Supabase 介面名相容的別名導出
+export const refreshEbirdSessionInSupabase = refreshEbirdSession;

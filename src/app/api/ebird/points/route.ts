@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getActiveEbirdSession, markEbirdSessionExpired, refreshEbirdSessionInSupabase } from '@/lib/ebirdAuth';
+import { getActiveEbirdSession, markEbirdSessionExpired, refreshEbirdSession } from '@/lib/ebirdAuth';
 
 async function fetchFromEbird(url: string, sessionId: string) {
   return await fetch(url, {
@@ -38,12 +38,12 @@ export async function GET(request: Request) {
   const ebirdUrl = `https://ebird.org/map/points?speciesCode=${encodeURIComponent(speciesCode)}&byr=1900&eyr=2026&yr=all&bmo=1&emo=12&maxY=22.589236214522156&maxX=114.51671170162061&minY=22.116124821214388&ev=Z&excludeExX=false&excludeExAll=false&minX=113.76208828853467&continue`;
 
   try {
-    // 1. 取得 Supabase 中 active 的 Session ID
+    // 1. 取得當前 Edge Config / Memory 中 active 的 Session ID
     let currentSessionId = await getActiveEbirdSession();
 
     if (!currentSessionId) {
-      // 若連 active session 都沒有，嘗試自動登入
-      currentSessionId = await refreshEbirdSessionInSupabase();
+      // 若無可用 session，嘗試自動登入
+      currentSessionId = await refreshEbirdSession();
     }
 
     if (!currentSessionId) {
@@ -57,13 +57,12 @@ export async function GET(request: Request) {
 
     // 3. 判斷是否失敗（status 非 200，或未能解析出合法 JSON）
     if (!response.ok || data === null) {
-      console.warn(`[eBird Points Proxy] Session ${currentSessionId} 請求失敗 (status ${response.status})，準備標記過期並全自動重新登入...`);
+      console.warn(`[eBird Points Proxy] Session ${currentSessionId} 請求失敗 (status ${response.status})，準備全自動重新登入並更新 Edge Config...`);
       
-      // 將過期的 session 在 Supabase 標記為 expired (異步背景執行，不阻塞數據重試)
       markEbirdSessionExpired(currentSessionId).catch(err => console.error('[eBird Points Proxy] 標記過期失敗:', err));
 
-      // 自動發起 eBird 登入腳本，獲取最新的 EBIRD_SESSIONID (新 ID 的 Supabase 寫入程序在 refreshEbirdSessionInSupabase 內亦為異步非阻塞)
-      const newSessionId = await refreshEbirdSessionInSupabase();
+      // 自動發起 eBird 登入腳本，獲取最新的 EBIRD_SESSIONID 並寫入 Edge Config
+      const newSessionId = await refreshEbirdSession();
 
       if (newSessionId) {
         console.log(`[eBird Points Proxy] 成功獲取新 Session (${newSessionId})，立即執行重試 (Retry)...`);

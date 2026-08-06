@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getActiveEbirdSession, markEbirdSessionExpired, refreshEbirdSessionInSupabase } from '@/lib/ebirdAuth';
+import { getActiveEbirdSession, markEbirdSessionExpired, refreshEbirdSession } from '@/lib/ebirdAuth';
 
 async function fetchFromEbirdLocInfo(url: string, sessionId: string) {
   return await fetch(url, {
@@ -38,11 +38,11 @@ export async function GET(request: Request) {
   const ebirdUrl = `https://ebird.org/mapServices/getLocInfo.do?fmt=json&locID=${encodeURIComponent(locID)}&speciesCodes=${encodeURIComponent(speciesCode)}&evidSort=false&excludeExX=false&excludeExAll=false&byr=1900&eyr=2026&yr=all&bmo=1&emo=12`;
 
   try {
-    // 1. 取得 Supabase active session
+    // 1. 取得 Edge Config / Memory active session
     let currentSessionId = await getActiveEbirdSession();
 
     if (!currentSessionId) {
-      currentSessionId = await refreshEbirdSessionInSupabase();
+      currentSessionId = await refreshEbirdSession();
     }
 
     if (!currentSessionId) {
@@ -56,13 +56,12 @@ export async function GET(request: Request) {
 
     // 3. 判斷是否過期/失敗
     if (!response.ok || data === null) {
-      console.warn(`[eBird LocInfo Proxy] Session ${currentSessionId} 請求失敗 (status ${response.status})，準備標記過期並全自動重新登入...`);
+      console.warn(`[eBird LocInfo Proxy] Session ${currentSessionId} 請求失敗 (status ${response.status})，準備全自動重新登入並更新 Edge Config...`);
       
-      // 將過期的 session 在 Supabase 標記為 expired (異步背景執行，不阻塞數據重試)
       markEbirdSessionExpired(currentSessionId).catch(err => console.error('[eBird LocInfo Proxy] 標記過期失敗:', err));
 
-      // 自動發起 eBird 登入腳本，獲取最新的 EBIRD_SESSIONID (新 ID 的 Supabase 寫入程序在 refreshEbirdSessionInSupabase 內亦為異步非阻塞)
-      const newSessionId = await refreshEbirdSessionInSupabase();
+      // 自動發起 eBird 登入腳本，獲取最新的 EBIRD_SESSIONID 並寫入 Edge Config
+      const newSessionId = await refreshEbirdSession();
 
       if (newSessionId) {
         console.log(`[eBird LocInfo Proxy] 成功獲取新 Session (${newSessionId})，立即執行重試 (Retry)...`);
