@@ -3,14 +3,16 @@
  * 自動登入 iNaturalist，擷取並續刷 JWT api_token
  */
 
-// 伺服端記憶體快取 (Memory Cache Fallback)
-let memoryCachedToken: string | null = null;
+// 使用 Node.js 全域 globalThis 防止 Next.js App Router 跨 Request 重載模組導致快取變數被清空
+declare global {
+  var __inatMemoryCachedToken: string | undefined;
+}
 
 /**
  * 手動清空記憶體快取
  */
 export function clearTokenCache() {
-  memoryCachedToken = null;
+  globalThis.__inatMemoryCachedToken = undefined;
 }
 
 /**
@@ -51,8 +53,12 @@ export function isTokenExpired(token: string | null | undefined): boolean {
  * 透過純 API 自動登入 iNaturalist 並獲取全新 JWT api_token (連線 /session 端點)
  */
 export async function fetchFreshInatToken(): Promise<string> {
-  const username = process.env.INAT_ACCOUNT || 'pantong0505@gmail.com';
-  const password = process.env.INAT_PASSWORD || 'P@ss93681816';
+  const username = process.env.INAT_ACCOUNT;
+  const password = process.env.INAT_PASSWORD;
+
+  if (!username || !password) {
+    throw new Error('[iNatAuth] 未設定環境變數 INAT_ACCOUNT 或 INAT_PASSWORD，無法發起自動登入。');
+  }
 
   console.log('[iNatAuth] Initiating pure API auto-login to /session for:', username);
 
@@ -174,10 +180,21 @@ export async function getValidInatToken(): Promise<string> {
   console.log('\n---------------------------------------------------------');
   console.log('[iNatAuth] 🔍 Checking iNaturalist Token Status...');
 
-  // 1. 嘗試從 Vercel Edge Config 讀取
-  if (process.env.EDGE_CONFIG) {
+  // 1. 優先從 Node.js 全域 Memory 快取 (globalThis) 讀取
+  if (globalThis.__inatMemoryCachedToken) {
+    if (!isTokenExpired(globalThis.__inatMemoryCachedToken)) {
+      console.log(`[iNatAuth] 🧠 Using valid Token from Global Memory Cache: [${maskToken(globalThis.__inatMemoryCachedToken)}]`);
+      console.log('---------------------------------------------------------\n');
+      return globalThis.__inatMemoryCachedToken;
+    } else {
+      console.log(`[iNatAuth] ⚠️ Token in Global Memory Cache is EXPIRED: [${maskToken(globalThis.__inatMemoryCachedToken)}]`);
+    }
+  }
+
+  // 2. 嘗試從 Vercel Edge Config 讀取 (相容 EDGE_CONFIG 與 INAT_API_TOKEN 環境變數)
+  const edgeConfigUrl = process.env.EDGE_CONFIG || (process.env.INAT_API_TOKEN?.startsWith('http') ? process.env.INAT_API_TOKEN : '');
+  if (edgeConfigUrl) {
     try {
-      const edgeConfigUrl = process.env.EDGE_CONFIG;
       const urlObj = new URL(edgeConfigUrl);
       const itemUrl = `${urlObj.origin}${urlObj.pathname}/item/INAT_API_TOKEN${urlObj.search}`;
       
@@ -188,6 +205,7 @@ export async function getValidInatToken(): Promise<string> {
           if (!isTokenExpired(edgeToken)) {
             console.log(`[iNatAuth] ⚡ Using valid Token from Vercel Edge Config: [${maskToken(edgeToken)}]`);
             console.log('---------------------------------------------------------\n');
+            globalThis.__inatMemoryCachedToken = edgeToken;
             return edgeToken;
           } else {
             console.log(`[iNatAuth] ⚠️ Token in Edge Config is EXPIRED: [${maskToken(edgeToken)}]`);
@@ -199,24 +217,13 @@ export async function getValidInatToken(): Promise<string> {
     }
   }
 
-  // 2. 嘗試從伺服端 Memory 快取讀取
-  if (memoryCachedToken) {
-    if (!isTokenExpired(memoryCachedToken)) {
-      console.log(`[iNatAuth] 🧠 Using valid Token from Memory Cache: [${maskToken(memoryCachedToken)}]`);
-      console.log('---------------------------------------------------------\n');
-      return memoryCachedToken;
-    } else {
-      console.log(`[iNatAuth] ⚠️ Token in Memory Cache is EXPIRED: [${maskToken(memoryCachedToken)}]`);
-    }
-  }
-
   // 3. 嘗試從環境變數 NEXT_PUBLIC_INAT_AUTOID_ENG_API 讀取
   const envToken = process.env.NEXT_PUBLIC_INAT_AUTOID_ENG_API;
   if (envToken) {
     if (!isTokenExpired(envToken)) {
       console.log(`[iNatAuth] 📄 Using valid Token from .env.local: [${maskToken(envToken)}]`);
       console.log('---------------------------------------------------------\n');
-      memoryCachedToken = envToken;
+      globalThis.__inatMemoryCachedToken = envToken;
       return envToken;
     } else {
       console.log(`[iNatAuth] ⚠️ Token in .env.local is EXPIRED: [${maskToken(envToken)}]`);
@@ -226,7 +233,7 @@ export async function getValidInatToken(): Promise<string> {
   // 4. Token 已過期或不存在，自動發起純 API 登入重刷
   console.log('[iNatAuth] 🔄 Token is EXPIRED or MISSING! Initiating Pure API Auto-Login...');
   const freshToken = await fetchFreshInatToken();
-  memoryCachedToken = freshToken;
+  globalThis.__inatMemoryCachedToken = freshToken;
 
   console.log(`[iNatAuth] 🎉 Auto-Refresh SUCCESS! Using newly generated Token: [${maskToken(freshToken)}]`);
   console.log('---------------------------------------------------------\n');
