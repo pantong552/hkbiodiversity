@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { Search, ChevronRight, ChevronDown, Sparkles, Loader2, Leaf, Bug, ArrowRight, CornerDownLeft, Camera } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useLanguage } from '@/context/LanguageContext';
+import { useAuth } from '@/context/AuthContext';
 import { SuggestionItem } from '@/app/api/species/suggest/route';
 import { useInaturalistPhoto } from '@/hooks/useInaturalistPhoto';
 import { useSpeciesPanel } from '@/context/SpeciesPanelContext';
@@ -51,6 +52,7 @@ function SuggestionItemAvatar({ item, isSelected }: { item: SuggestionItem; isSe
 export default function HomeHero() {
   const { language, t } = useLanguage();
   const { setAutoIdOpen } = useSpeciesPanel();
+  const { isAuthorized, requireAuth } = useAuth();
   const router = useRouter();
   
   // Search state
@@ -68,10 +70,10 @@ export default function HomeHero() {
   const searchContainerRef = useRef<HTMLFormElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
 
-  // Debounced Suggestion Fetching
+  // Debounced Suggestion Fetching (限制：必須已登入且帳號 status 為 active 才會抓取建議)
   useEffect(() => {
     const trimmed = searchQuery.trim();
-    if (!trimmed) {
+    if (!trimmed || !isAuthorized) {
       setSuggestions([]);
       setShowSuggestions(false);
       setIsSuggestLoading(false);
@@ -100,7 +102,7 @@ export default function HomeHero() {
     }, 250);
 
     return () => clearTimeout(timer);
-  }, [searchQuery, searchType]);
+  }, [searchQuery, searchType, isAuthorized]);
 
   // Click outside to dismiss dropdowns
   useEffect(() => {
@@ -120,6 +122,11 @@ export default function HomeHero() {
 
   // Open species in Floating Panel AND navigate background to /database with keyword search
   const navigateToSpecies = useCallback((taxaId: string) => {
+    if (!requireAuth(undefined, 'Quick Search 快速搜尋')) {
+      setShowSuggestions(false);
+      return;
+    }
+
     setShowSuggestions(false);
 
     // 1. 儲存關鍵字搜尋條件於 sessionStorage
@@ -144,11 +151,16 @@ export default function HomeHero() {
 
     // 4. 同時開啟浮動面板顯示選中的物種詳情
     addSpecies(taxaId);
-  }, [searchQuery, searchType, router, addSpecies, skipNextAutoCollapse]);
+  }, [searchQuery, searchType, router, addSpecies, skipNextAutoCollapse, requireAuth]);
 
   const handleSearch = (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     
+    if (!requireAuth(undefined, 'Quick Search 快速搜尋')) {
+      setShowSuggestions(false);
+      return;
+    }
+
     // 如果有使用鍵盤選擇建議項目
     if (selectedIndex >= 0 && suggestions[selectedIndex]) {
       navigateToSpecies(suggestions[selectedIndex].taxa_id);
@@ -336,7 +348,10 @@ export default function HomeHero() {
                   type="text" 
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  onFocus={() => { if (searchQuery.trim()) setShowSuggestions(true); }}
+                  onFocus={() => {
+                    if (!requireAuth(undefined, 'Quick Search 快速搜尋')) return;
+                    if (searchQuery.trim()) setShowSuggestions(true);
+                  }}
                   onKeyDown={handleKeyDown}
                   placeholder={t('search.placeholder')}
                   className="w-full bg-transparent border-none outline-none text-slate-800 font-bold placeholder:text-slate-400 py-3 md:py-4 text-sm md:text-lg truncate"
@@ -350,7 +365,7 @@ export default function HomeHero() {
               {/* AI 相片辨識按鈕 (圓形相機圖示按鈕) */}
               <button
                 type="button"
-                onClick={() => setAutoIdOpen(true)}
+                onClick={() => requireAuth(() => setAutoIdOpen(true), 'AI 相片物種辨識')}
                 className="w-10 h-10 md:w-14 md:h-14 shrink-0 flex items-center justify-center bg-emerald-50 hover:bg-emerald-100 text-emerald-700 hover:text-emerald-800 rounded-full border border-emerald-200/80 shadow-md shadow-emerald-900/5 hover:scale-105 active:scale-95 transition-all duration-300 mr-1.5 md:mr-2 cursor-pointer"
                 title={language === 'zh' ? '相片 AI 物種辨識' : 'Species Photo Recognition'}
               >

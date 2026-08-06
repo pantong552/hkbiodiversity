@@ -1,4 +1,12 @@
-import { get as getEdgeConfig } from '@vercel/edge-config';
+async function getEdgeConfig<T>(key: string): Promise<T | undefined> {
+  try {
+    // @ts-ignore
+    const edgeConfig: any = await import('@vercel/edge-config');
+    return await edgeConfig.get(key);
+  } catch {
+    return undefined;
+  }
+}
 
 const LOGIN_URL = "https://secure.birds.cornell.edu/cassso/login?service=https%3A%2F%2Febird.org%2Flogin%2Fcas%3Fportal%3Debird&locale=zh_TW";
 

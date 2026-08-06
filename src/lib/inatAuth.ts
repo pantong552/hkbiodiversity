@@ -1,4 +1,12 @@
-import { get as getEdgeConfig } from '@vercel/edge-config';
+async function getEdgeConfig<T>(key: string): Promise<T | undefined> {
+  try {
+    // @ts-ignore
+    const edgeConfig: any = await import('@vercel/edge-config');
+    return await edgeConfig.get(key);
+  } catch {
+    return undefined;
+  }
+}
 
 // 使用 Node.js 全域 globalThis 防止 Next.js App Router 跨 Request 重載模組導致快取變數被清空
 declare global {

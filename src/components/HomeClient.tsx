@@ -2,7 +2,7 @@
 
 import { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Search, X, FilterX, LayoutGrid, List, ChevronLeft, ChevronRight, Filter, Table as TableIcon } from 'lucide-react';
+import { Search, X, FilterX, LayoutGrid, List, ChevronLeft, ChevronRight, Filter, Table as TableIcon, Lock, Sparkles } from 'lucide-react';
 import SpeciesCard from '@/components/SpeciesCard';
 import SpeciesTable from '@/components/species/SpeciesTable';
 import SidebarFilter, { SelectedFilters } from '@/components/SidebarFilter';
@@ -46,7 +46,7 @@ const INITIAL_PLANT_FILTERS: PlantFilterState = {
 export default function HomeClient() {
   const { language, t } = useLanguage();
   const { getTaxonomyChi } = useTaxonomy();
-  const { isLoading: isAuthLoading } = useAuth();
+  const { isAuthorized, isLoading: isAuthLoading, openAuthReminder } = useAuth();
   const { addSpecies, openSpeciesIds, isExpanded, isFilterOpen, setIsFilterOpen, pendingTaxonomyFilter, setPendingTaxonomyFilter } = useSpeciesPanel();
   const searchParams = useSearchParams();
   const router = useRouter();
@@ -600,10 +600,71 @@ export default function HomeClient() {
     return () => clearTimeout(timer);
   }, [searchParams, addSpecies, setIsFilterOpen, router]);
 
-  // Reset page when triggers change
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [selectedFilters, plantFilters, searchQuery, itemsPerPage]);
+  // 權限管制防護：未登入或 user status !== 'active' 時顯示存取限制鎖定頁面
+  if (!isAuthLoading && !isAuthorized) {
+    return (
+      <div className="min-h-screen bg-slate-950 text-slate-900 font-sans selection:bg-emerald-100 selection:text-emerald-900 relative overflow-hidden">
+        <Header />
+        
+        {/* Background Ambience */}
+        <div className="absolute inset-0 z-0 pointer-events-none">
+          <div className="absolute inset-0 bg-gradient-to-b from-slate-900/90 via-slate-900/95 to-slate-950 z-10" />
+          <img 
+            src="https://images.unsplash.com/photo-1518173946687-a4c8892bbd9f?q=80&w=2574&auto=format&fit=crop" 
+            alt="Nature Background"
+            className="w-full h-full object-cover blur-md opacity-25 scale-105"
+          />
+        </div>
+
+        <main className="relative z-20 max-w-4xl mx-auto px-6 pt-36 pb-20 min-h-[85vh] flex items-center justify-center">
+          <motion.div 
+            initial={{ opacity: 0, y: 20, scale: 0.95 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            className="w-full bg-white/95 backdrop-blur-2xl rounded-[3rem] p-8 sm:p-12 shadow-2xl border border-white/80 text-center relative overflow-hidden"
+          >
+            <div className="w-20 h-20 bg-gradient-to-tr from-emerald-500 to-teal-400 p-0.5 rounded-3xl mx-auto mb-6 shadow-xl shadow-emerald-500/20">
+              <div className="w-full h-full bg-white rounded-[1.4rem] flex items-center justify-center">
+                <Lock className="w-10 h-10 text-emerald-600" />
+              </div>
+            </div>
+
+            <h1 className="text-2xl sm:text-4xl font-black text-slate-900 tracking-tight mb-3">
+              {language === 'zh' ? '資料庫僅供已啟用會員存取' : 'Database Access Restricted'}
+            </h1>
+
+            <p className="text-xs font-bold text-emerald-600 uppercase tracking-widest mb-6">
+              {language === 'zh' ? '需要登入與 Active 帳號狀態' : 'Login & Active Account Required'}
+            </p>
+
+            <div className="max-w-md mx-auto bg-slate-50 border border-slate-100 rounded-2xl p-5 mb-8 text-left space-y-3">
+              <p className="text-xs text-slate-600 font-medium leading-relaxed">
+                {language === 'zh'
+                  ? '香港自然生態物種資料庫包含上萬筆生物數據與研究級影像紀錄。根據權限規範，資料庫內容、Quick Search 快搜及 AI 物種辨識功能僅開放予已登入且帳號狀態為 Active 的正式會員使用。'
+                  : 'The species database, Quick Search, and AI Photo Recognition are restricted to signed-in members with an Active account status.'}
+              </p>
+            </div>
+
+            <div className="max-w-xs mx-auto space-y-3">
+              <button
+                onClick={() => openAuthReminder('資料庫全庫檢索')}
+                className="w-full py-4 px-6 bg-slate-900 hover:bg-emerald-600 text-white font-bold text-sm rounded-2xl shadow-xl hover:shadow-emerald-500/20 transition-all duration-300 flex items-center justify-center gap-2 cursor-pointer group active:scale-[0.98]"
+              >
+                <Sparkles className="w-4 h-4 text-emerald-400" />
+                <span>{language === 'zh' ? '登入 / 註冊會員' : 'Sign In / Register'}</span>
+              </button>
+
+              <Link
+                href="/"
+                className="block w-full py-3 text-xs font-bold text-slate-400 hover:text-slate-600 transition-colors"
+              >
+                {language === 'zh' ? '返回網站首頁' : 'Return to Home'}
+              </Link>
+            </div>
+          </motion.div>
+        </main>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen text-slate-900 font-sans selection:bg-emerald-100 selection:text-emerald-900">

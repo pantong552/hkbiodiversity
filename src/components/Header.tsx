@@ -16,7 +16,7 @@ interface HeaderProps {
 
 export default function Header({ isHomePage: propIsHomePage }: HeaderProps = {}) {
   const { language, setLanguage, t } = useLanguage();
-  const { user, profile, signOut } = useAuth();
+  const { user, profile, signOut, requireAuth } = useAuth();
   const pathname = usePathname();
   const [isScrolled, setIsScrolled] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -243,7 +243,7 @@ export default function Header({ isHomePage: propIsHomePage }: HeaderProps = {})
 
           {/* AI 相片物種辨識按鈕 */}
           <button
-            onClick={() => setAutoIdOpen(true)}
+            onClick={() => requireAuth(() => setAutoIdOpen(true), 'AI 相片物種辨識')}
             className={`px-3 py-1.5 rounded-full text-xs font-bold flex items-center gap-1.5 transition-all duration-300 cursor-pointer border ${
               isHeaderTransparent 
                 ? 'bg-white/10 hover:bg-white/20 text-white border-white/20 backdrop-blur-md shadow-sm' 
@@ -345,7 +345,7 @@ export default function Header({ isHomePage: propIsHomePage }: HeaderProps = {})
             <button
               onClick={() => {
                 setIsMobileMenuOpen(false);
-                setAutoIdOpen(true);
+                requireAuth(() => setAutoIdOpen(true), 'AI 相片物種辨識');
               }}
               className="w-full py-3 px-4 rounded-2xl bg-emerald-50 hover:bg-emerald-100 text-emerald-800 font-bold text-sm flex items-center justify-between border border-emerald-200/80 active:scale-[0.98] transition-all cursor-pointer"
             >

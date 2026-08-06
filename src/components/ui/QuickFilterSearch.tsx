@@ -4,6 +4,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Search, RotateCcw, Sparkles, Loader2, Leaf, Bug, ArrowRight } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useLanguage } from '@/context/LanguageContext';
+import { useAuth } from '@/context/AuthContext';
 import { SuggestionItem } from '@/app/api/species/suggest/route';
 import { useInaturalistPhoto } from '@/hooks/useInaturalistPhoto';
 import { useSpeciesPanel } from '@/context/SpeciesPanelContext';
@@ -65,6 +66,7 @@ export default function QuickFilterSearch({
   taxaType = 'all'
 }: QuickFilterSearchProps) {
   const { language, t } = useLanguage();
+  const { isAuthorized, requireAuth } = useAuth();
   const { addSpecies, setIsFilterOpen, skipNextAutoCollapse } = useSpeciesPanel();
   const [localValue, setLocalValue] = useState(initialValue);
 
@@ -82,10 +84,10 @@ export default function QuickFilterSearch({
     setLocalValue(initialValue);
   }, [initialValue]);
 
-  // Debounced Suggestion Fetching
+  // Debounced Suggestion Fetching (限制：必須已登入且帳號 status 為 active 才會抓取建議)
   useEffect(() => {
     const trimmed = localValue.trim();
-    if (!trimmed) {
+    if (!trimmed || !isAuthorized) {
       setSuggestions([]);
       setShowSuggestions(false);
       setIsSuggestLoading(false);
@@ -114,7 +116,7 @@ export default function QuickFilterSearch({
     }, 250);
 
     return () => clearTimeout(timer);
-  }, [localValue, taxaType]);
+  }, [localValue, taxaType, isAuthorized]);
 
   // Click outside to dismiss dropdown
   useEffect(() => {
@@ -128,6 +130,11 @@ export default function QuickFilterSearch({
   }, []);
 
   const handleSelectSpecies = (item: SuggestionItem) => {
+    if (!requireAuth(undefined, 'Quick Search 快速搜尋')) {
+      setShowSuggestions(false);
+      return;
+    }
+
     setShowSuggestions(false);
     const selectedName = (language === 'zh' 
       ? (item.common_name_chi || item.scientific_name)
@@ -145,6 +152,11 @@ export default function QuickFilterSearch({
   };
 
   const handleSubmit = () => {
+    if (!requireAuth(undefined, 'Quick Search 快速搜尋')) {
+      setShowSuggestions(false);
+      return;
+    }
+
     setShowSuggestions(false);
     if (selectedIndex >= 0 && suggestions[selectedIndex]) {
       handleSelectSpecies(suggestions[selectedIndex]);
@@ -199,7 +211,10 @@ export default function QuickFilterSearch({
         placeholder={placeholder || (language === 'zh' ? '快速搜尋...' : 'Quick search...')} 
         value={localValue}
         onChange={(e) => setLocalValue(e.target.value)}
-        onFocus={() => { if (localValue.trim()) setShowSuggestions(true); }}
+        onFocus={() => {
+          if (!requireAuth(undefined, 'Quick Search 快速搜尋')) return;
+          if (localValue.trim()) setShowSuggestions(true);
+        }}
         onKeyDown={handleKeyDown}
         suppressHydrationWarning={true}
         className="w-full pl-12 pr-12 py-4 bg-emerald-50/30 border-2 border-transparent rounded-2xl text-emerald-900 placeholder:text-slate-400 focus:bg-white focus:border-emerald-200 focus:ring-4 focus:ring-emerald-50/50 transition-all outline-none text-sm"
