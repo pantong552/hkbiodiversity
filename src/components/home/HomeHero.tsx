@@ -14,7 +14,7 @@ import { HighlightText } from '@/utils/formatters';
 
 // 建議物種頭像/縮圖組件 (動態獲取 iNaturalist 圖片)
 function SuggestionItemAvatar({ item, isSelected }: { item: SuggestionItem; isSelected: boolean }) {
-  const { imageUrl, isLoading } = useInaturalistPhoto(item.inat_id || undefined);
+  const { imageUrl, isLoading } = useInaturalistPhoto(item.inat_id || undefined, 'square', true);
   const [imgError, setImgError] = useState(false);
 
   if (imageUrl && !imgError) {

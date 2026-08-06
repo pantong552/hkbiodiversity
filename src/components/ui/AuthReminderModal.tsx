@@ -112,15 +112,15 @@ export default function AuthReminderModal({
             {isNotActiveUser ? (
               <p className="text-xs text-slate-600 font-medium leading-relaxed">
                 {language === 'zh'
-                  ? `您目前的帳號狀態為「${profile?.status || 'Pending'}」。此功能（資料庫、Quick Search 及 AI 物種辨識）僅開放給 Active 狀態的正式會員。如有疑問請聯絡管理員啟用帳號。`
+                  ? `您目前的帳號狀態為「${profile?.status || 'Pending'}」。此功能（資料庫、快速搜尋 及 AI 物種辨識）僅開放給 Active 狀態的正式會員。如有疑問請聯絡管理員啟用帳號。`
                   : `Your account status is currently "${profile?.status || 'Pending'}". This feature requires an "Active" user status. Please contact an administrator to activate your account.`}
               </p>
             ) : (
               <>
                 <p className="text-xs text-slate-600 font-medium leading-relaxed">
                   {language === 'zh'
-                    ? '資料庫瀏覽、Quick Search 快速搜尋及 AI 物種辨識功能僅開放給登入會員及狀態為 Active 之用戶使用。'
-                    : 'Species Database browsing, Quick Search, and AI Photo Recognition are restricted to signed-in Active members.'}
+                    ? '資料庫瀏覽、快速搜尋及 AI 物種辨識功能僅開放給會員使用。'
+                    : 'Species Database browsing, Quick Search, and AI Photo Recognition are restricted to members.'}
                 </p>
                 <div className="pt-2 border-t border-slate-200/60 space-y-1.5">
                   <div className="flex items-center gap-2 text-[11px] font-bold text-slate-700">

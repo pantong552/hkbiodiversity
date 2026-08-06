@@ -11,6 +11,18 @@ const nextConfig: NextConfig = {
         source: '/ebird-api/:path*',
         destination: 'https://ebird.org/:path*',
       },
+      {
+        source: '/inat-s3/:path*',
+        destination: 'https://inaturalist-open-data.s3.amazonaws.com/:path*',
+      },
+      {
+        source: '/inat-static/:path*',
+        destination: 'https://static.inaturalist.org/:path*',
+      },
+      {
+        source: '/inat-uploads/:path*',
+        destination: 'https://uploads.inaturalist.org/:path*',
+      },
     ];
   },
   images: {

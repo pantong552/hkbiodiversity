@@ -59,6 +59,24 @@ const getProxyUrl = (url: string, id: string | number, size: string = 'medium') 
   return url;
 };
 
+/**
+ * 將圖片 URL 轉換為 Vercel External Rewrite 相對路徑（反向代理）
+ */
+const getRewriteUrl = (url: string, size: 'square' | 'small' | 'medium' | 'large' | 'original' = 'medium') => {
+  if (!url) return '';
+  const sizedUrl = convertInatUrl(url, size);
+  if (sizedUrl.includes('inaturalist-open-data.s3.amazonaws.com/')) {
+    return sizedUrl.replace('https://inaturalist-open-data.s3.amazonaws.com/', '/inat-s3/');
+  }
+  if (sizedUrl.includes('static.inaturalist.org/')) {
+    return sizedUrl.replace('https://static.inaturalist.org/', '/inat-static/');
+  }
+  if (sizedUrl.includes('uploads.inaturalist.org/')) {
+    return sizedUrl.replace('https://uploads.inaturalist.org/', '/inat-uploads/');
+  }
+  return sizedUrl;
+};
+
 
 /**
  * Helper to fetch with retry, exponential backoff, AND concurrency control
@@ -99,7 +117,11 @@ async function fetchWithRetry(url: string, retries = 3, delay = 1000): Promise<a
  * Supports scanning multiple photos to find one with an open license (non-ARR)
  * Includes retry, deduplication, and concurrency control for maximum stability
  */
-export function useInaturalistPhoto(taxonId: number | string | undefined) {
+export function useInaturalistPhoto(
+  taxonId: number | string | undefined,
+  size: 'square' | 'small' | 'medium' | 'large' | 'original' = 'medium',
+  useRewrite = false
+) {
   const [photoData, setPhotoData] = useState<InatPhoto | null>(null);
   // 若有 taxonId，初始就是載入中狀態，避免短暫 placeholder 閃爍的 Race Condition
   const [isLoading, setIsLoading] = useState(!!taxonId);
@@ -108,15 +130,16 @@ export function useInaturalistPhoto(taxonId: number | string | undefined) {
     if (!taxonId) return;
 
     const tId = taxonId.toString();
+    const cacheKey = `${PHOTO_CACHE_KEY}_${tId}_${size}_${useRewrite ? 'rw' : 'tr'}`;
 
     // 1. Try Cache First
-    const cached = sessionStorage.getItem(`${PHOTO_CACHE_KEY}_${tId}`);
+    const cached = sessionStorage.getItem(cacheKey);
     if (cached) {
       try {
         setPhotoData(JSON.parse(cached));
         return;
       } catch (e) {
-        sessionStorage.removeItem(`${PHOTO_CACHE_KEY}_${tId}`);
+        sessionStorage.removeItem(cacheKey);
       }
     }
 
@@ -203,11 +226,14 @@ export function useInaturalistPhoto(taxonId: number | string | undefined) {
           const simplifiedAttribution = `${author} (${licenseDisplay})`;
           const nativeUrl = validPhoto.native_page_url || `https://www.inaturalist.org/photos/${validPhoto.id}`;
 
-          const finalData: InatPhoto = {
-            // Use medium resolution for cards to balance quality and mobile loading speed
-            url: getProxyUrl(convertInatUrl(validPhoto.medium_url || validPhoto.url, 'medium'), tId, 'medium'),
-            attribution: simplifiedAttribution,
+          const rawPhotoUrl = validPhoto.square_url || validPhoto.medium_url || validPhoto.url;
+          const finalUrl = useRewrite 
+            ? getRewriteUrl(rawPhotoUrl, size)
+            : getProxyUrl(convertInatUrl(rawPhotoUrl, size), tId, size);
 
+          const finalData: InatPhoto = {
+            url: finalUrl,
+            attribution: simplifiedAttribution,
 
             licenseCode: validPhoto.license_code,
             nativePageUrl: nativeUrl
@@ -215,7 +241,7 @@ export function useInaturalistPhoto(taxonId: number | string | undefined) {
           
           if (isMounted) {
             setPhotoData(finalData);
-            sessionStorage.setItem(`${PHOTO_CACHE_KEY}_${tId}`, JSON.stringify(finalData));
+            sessionStorage.setItem(cacheKey, JSON.stringify(finalData));
           }
         } else {
           if (isMounted) setPhotoData(null);

@@ -63,7 +63,7 @@ const SpeciesHeroBackground = ({ photos, defaultImage, isLoading }: { photos: In
     
     const timer = setInterval(() => {
       setIndex((prev) => (prev + 1) % displayPhotos.length);
-    }, 10000);
+    }, 20000);
     
     return () => clearInterval(timer);
   }, [displayPhotos.length]);
