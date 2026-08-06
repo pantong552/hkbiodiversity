@@ -1,7 +1,4 @@
-/**
- * iNaturalist API Token Auto-Refresh & Edge Config Manager
- * 自動登入 iNaturalist，擷取並續刷 JWT api_token
- */
+import { get as getEdgeConfig } from '@vercel/edge-config';
 
 // 使用 Node.js 全域 globalThis 防止 Next.js App Router 跨 Request 重載模組導致快取變數被清空
 declare global {
@@ -138,8 +135,7 @@ async function updateEdgeConfigToken(newToken: string): Promise<void> {
   }
 
   try {
-    // 1. 優先嘗試 create 操作 (若該項目尚不存在)
-    let updateRes = await fetch(`https://api.vercel.com/v1/edge-config/${edgeConfigId}/items`, {
+    const updateRes = await fetch(`https://api.vercel.com/v1/edge-config/${edgeConfigId}/items`, {
       method: 'PATCH',
       headers: {
         'Authorization': `Bearer ${vercelApiToken}`,
@@ -148,7 +144,7 @@ async function updateEdgeConfigToken(newToken: string): Promise<void> {
       body: JSON.stringify({
         items: [
           {
-            operation: 'create',
+            operation: 'upsert',
             key: 'INAT_API_TOKEN',
             value: newToken,
           },
@@ -156,30 +152,11 @@ async function updateEdgeConfigToken(newToken: string): Promise<void> {
       }),
     });
 
-    // 2. 若項目已存在，退回 update 操作
-    if (!updateRes.ok) {
-      updateRes = await fetch(`https://api.vercel.com/v1/edge-config/${edgeConfigId}/items`, {
-        method: 'PATCH',
-        headers: {
-          'Authorization': `Bearer ${vercelApiToken}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          items: [
-            {
-              operation: 'update',
-              key: 'INAT_API_TOKEN',
-              value: newToken,
-            },
-          ],
-        }),
-      });
-    }
-
+    const resText = await updateRes.text();
     if (updateRes.ok) {
-      console.log('[iNatAuth] 🎉 Successfully updated INAT_API_TOKEN in Vercel Edge Config.');
+      console.log('[iNatAuth] 🎉 Successfully updated INAT_API_TOKEN in Vercel Edge Config!');
     } else {
-      console.warn('[iNatAuth] Edge Config update warning:', await updateRes.text());
+      console.warn(`[iNatAuth] Edge Config API status ${updateRes.status}:`, resText);
     }
   } catch (err) {
     console.error('[iNatAuth] Error updating Edge Config:', err);
@@ -212,29 +189,28 @@ export async function getValidInatToken(): Promise<string> {
     }
   }
 
-  // 2. 嘗試從 Vercel Edge Config 讀取 (相容 EDGE_CONFIG 與 INAT_API_TOKEN 環境變數)
+  // 2. 嘗試從 Vercel Edge Config 官方 SDK 讀取 (自動抓取 EDGE_CONFIG / INAT_API_TOKEN)
   const edgeConfigUrl = process.env.EDGE_CONFIG || (process.env.INAT_API_TOKEN?.startsWith('http') ? process.env.INAT_API_TOKEN : '');
   if (edgeConfigUrl) {
     try {
-      const urlObj = new URL(edgeConfigUrl);
-      const itemUrl = `${urlObj.origin}${urlObj.pathname}/item/INAT_API_TOKEN${urlObj.search}`;
+      // 若設置了 INAT_API_TOKEN 作為 connection string，手動導向 EDGE_CONFIG
+      if (!process.env.EDGE_CONFIG && edgeConfigUrl) {
+        process.env.EDGE_CONFIG = edgeConfigUrl;
+      }
       
-      const res = await fetch(itemUrl, { cache: 'no-store' });
-      if (res.ok) {
-        const edgeToken = await res.json();
-        if (typeof edgeToken === 'string') {
-          if (!isTokenExpired(edgeToken)) {
-            console.log(`[iNatAuth] ⚡ Using valid Token from Vercel Edge Config: [${maskToken(edgeToken)}]`);
-            console.log('---------------------------------------------------------\n');
-            globalThis.__inatMemoryCachedToken = edgeToken;
-            return edgeToken;
-          } else {
-            console.log(`[iNatAuth] ⚠️ Token in Edge Config is EXPIRED: [${maskToken(edgeToken)}]`);
-          }
+      const edgeToken = await getEdgeConfig<string>('INAT_API_TOKEN');
+      if (edgeToken && typeof edgeToken === 'string') {
+        if (!isTokenExpired(edgeToken)) {
+          console.log(`[iNatAuth] ⚡ Using valid Token from Vercel Edge Config: [${maskToken(edgeToken)}]`);
+          console.log('---------------------------------------------------------\n');
+          globalThis.__inatMemoryCachedToken = edgeToken;
+          return edgeToken;
+        } else {
+          console.log(`[iNatAuth] ⚠️ Token in Edge Config is EXPIRED: [${maskToken(edgeToken)}]`);
         }
       }
     } catch (err) {
-      console.warn('[iNatAuth] Could not read from Edge Config:', err);
+      console.warn('[iNatAuth] Could not read from Edge Config SDK:', err);
     }
   }
 
