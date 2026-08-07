@@ -54,6 +54,24 @@ const nextConfig: NextConfig = {
           },
         ],
       },
+      {
+        source: '/logo/:path*',
+        headers: [
+          {
+            key: 'Cache-Control',
+            value: 'public, max-age=31536000, immutable',
+          },
+        ],
+      },
+      {
+        source: '/site.webmanifest',
+        headers: [
+          {
+            key: 'Cache-Control',
+            value: 'public, max-age=31536000, immutable',
+          },
+        ],
+      },
     ];
   },
   images: {
