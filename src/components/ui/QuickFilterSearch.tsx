@@ -211,13 +211,27 @@ export default function QuickFilterSearch({
         placeholder={placeholder || (language === 'zh' ? '快速搜尋...' : 'Quick search...')} 
         value={localValue}
         onChange={(e) => setLocalValue(e.target.value)}
-        onFocus={() => {
-          if (!requireAuth(undefined, 'Quick Search 快速搜尋')) return;
+        readOnly={!isAuthorized}
+        inputMode={!isAuthorized ? 'none' : undefined}
+        onClick={(e) => {
+          if (!isAuthorized) {
+            e.preventDefault();
+            e.currentTarget.blur();
+            requireAuth(undefined, 'Quick Search 快速搜尋');
+          }
+        }}
+        onFocus={(e) => {
+          if (!isAuthorized) {
+            e.preventDefault();
+            e.currentTarget.blur();
+            requireAuth(undefined, 'Quick Search 快速搜尋');
+            return;
+          }
           if (localValue.trim()) setShowSuggestions(true);
         }}
         onKeyDown={handleKeyDown}
         suppressHydrationWarning={true}
-        className="w-full pl-12 pr-12 py-4 bg-emerald-50/30 border-2 border-transparent rounded-2xl text-emerald-900 placeholder:text-slate-400 focus:bg-white focus:border-emerald-200 focus:ring-4 focus:ring-emerald-50/50 transition-all outline-none text-sm"
+        className="w-full pl-12 pr-12 py-4 bg-emerald-50/30 border-2 border-transparent rounded-2xl text-emerald-900 placeholder:text-slate-400 focus:bg-white focus:border-emerald-200 focus:ring-4 focus:ring-emerald-50/50 transition-all outline-none text-sm cursor-pointer"
       />
 
       {isSuggestLoading && (

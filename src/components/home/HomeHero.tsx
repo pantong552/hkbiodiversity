@@ -348,13 +348,27 @@ export default function HomeHero() {
                   type="text" 
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  onFocus={() => {
-                    if (!requireAuth(undefined, 'Quick Search 快速搜尋')) return;
+                  readOnly={!isAuthorized}
+                  inputMode={!isAuthorized ? 'none' : undefined}
+                  onClick={(e) => {
+                    if (!isAuthorized) {
+                      e.preventDefault();
+                      e.currentTarget.blur();
+                      requireAuth(undefined, 'Quick Search 快速搜尋');
+                    }
+                  }}
+                  onFocus={(e) => {
+                    if (!isAuthorized) {
+                      e.preventDefault();
+                      e.currentTarget.blur();
+                      requireAuth(undefined, 'Quick Search 快速搜尋');
+                      return;
+                    }
                     if (searchQuery.trim()) setShowSuggestions(true);
                   }}
                   onKeyDown={handleKeyDown}
                   placeholder={t('search.placeholder')}
-                  className="w-full bg-transparent border-none outline-none text-slate-800 font-bold placeholder:text-slate-400 py-3 md:py-4 text-sm md:text-lg truncate"
+                  className="w-full bg-transparent border-none outline-none text-slate-800 font-bold placeholder:text-slate-400 py-3 md:py-4 text-sm md:text-lg truncate cursor-pointer"
                   suppressHydrationWarning
                 />
                 {isSuggestLoading && (
