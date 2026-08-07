@@ -15,6 +15,8 @@ export interface InatGalleryPhoto {
   nativePageUrl: string | null;
   observationUrl: string | null;
   observedOn: string | null;
+  isCommunityPhoto?: boolean;
+  uploaderUserId?: string;
 }
 
 interface CommunityPhoto {
@@ -118,7 +120,9 @@ export function useInaturalistSpeciesPhotos(inatId: number | string | undefined,
           licenseCode: p.license,
           nativePageUrl: null,
           observationUrl: null,
-          observedOn: p.created_at
+          observedOn: p.created_at,
+          isCommunityPhoto: true,
+          uploaderUserId: p.user_id
         };
       });
     } catch (err) {
@@ -317,6 +321,27 @@ export function useInaturalistSpeciesPhotos(inatId: number | string | undefined,
     }
   }, [loadData]);
 
+  const deletePhoto = useCallback(async (photoId: string | number) => {
+    try {
+      const res = await fetch('/api/species/delete-photo', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ photoId })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to delete photo');
+
+      setState(prev => ({
+        ...prev,
+        photos: prev.photos.filter(p => p.id !== photoId)
+      }));
+      return true;
+    } catch (err) {
+      console.error('deletePhoto error:', err);
+      throw err;
+    }
+  }, []);
+
   const setScope = useCallback((newScope: 'hongkong' | 'global') => {
     loadData(1, newScope, true);
   }, [loadData]);
@@ -324,6 +349,7 @@ export function useInaturalistSpeciesPhotos(inatId: number | string | undefined,
   return {
     ...state,
     loadMore,
-    setScope
+    setScope,
+    deletePhoto
   };
 }

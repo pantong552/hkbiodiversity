@@ -15,7 +15,8 @@ import {
   Calendar,
   Star,
   CheckCircle2,
-  AlertCircle
+  AlertCircle,
+  Trash2
 } from 'lucide-react';
 import { useInaturalistSpeciesPhotos, InatGalleryPhoto } from '@/hooks/useInaturalistSpeciesPhotos';
 import { useLanguage } from '@/context/LanguageContext';
@@ -24,6 +25,7 @@ import { useAuth } from '@/context/AuthContext';
 import { supabase } from '@/lib/supabase';
 import EnrichedLightbox from '../ui/EnrichedLightbox';
 import PhotoUploadModal from './PhotoUploadModal';
+import DeleteConfirmModal from '../ui/DeleteConfirmModal';
 import { Upload } from 'lucide-react';
 
 
@@ -45,10 +47,12 @@ export default function SpeciesPhotoGallery({
   const { language, t } = useLanguage();
   const { profile } = useAuth();
   const { setGalleryOpen, isUploadModalOpen, setUploadModalOpen, updateProfilePicture } = useSpeciesPanel();
-  const { photos: fetchedPhotos, isLoading, hasMore, loadMore, dataScope, setScope, hasHkPhotos } = useInaturalistSpeciesPhotos(inatId, taxaId);
+  const { photos: fetchedPhotos, isLoading, hasMore, loadMore, dataScope, setScope, hasHkPhotos, deletePhoto } = useInaturalistSpeciesPhotos(inatId, taxaId);
   
   const [isUpdatingProfile, setIsUpdatingProfile] = useState(false);
   const [updateStatus, setUpdateStatus] = useState<'idle' | 'success' | 'error'>('idle');
+  const [isDeletingPhoto, setIsDeletingPhoto] = useState(false);
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
 
   const handleScopeToggle = () => {
     if (!hasHkPhotos && dataScope === 'global') return;
@@ -292,6 +296,39 @@ export default function SpeciesPhotoGallery({
     }
   };
 
+  const canDeleteCurrentPhoto = useMemo(() => {
+    if (!currentPhoto || !currentPhoto.isCommunityPhoto) return false;
+    if (!profile) return false;
+    if (profile.role === 'admin' || profile.role === 'curator') return true;
+    return currentPhoto.uploaderUserId === profile.id;
+  }, [currentPhoto, profile]);
+
+  const handleDeletePhoto = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!currentPhoto || !canDeleteCurrentPhoto || isDeletingPhoto) return;
+    setIsDeleteModalOpen(true);
+  };
+
+  const confirmDeletePhoto = async () => {
+    if (!currentPhoto || !canDeleteCurrentPhoto || isDeletingPhoto) return;
+
+    setIsDeletingPhoto(true);
+    try {
+      console.log('[Gallery UI] Calling deletePhoto API for photoId:', currentPhoto.id);
+      await deletePhoto(currentPhoto.id);
+      console.log('[Gallery UI] deletePhoto API call succeeded');
+      setIsDeleteModalOpen(false);
+      if (currentIndex > 0 && currentIndex >= photos.length - 1) {
+        setCurrentIndex(prev => prev - 1);
+      }
+    } catch (err: any) {
+      console.error('[Gallery UI] Failed to delete photo:', err);
+      alert((language === 'zh' ? '刪除照片失敗：' : 'Failed to delete photo: ') + (err.message || ''));
+    } finally {
+      setIsDeletingPhoto(false);
+    }
+  };
+
   useEffect(() => {
     if (thumbRef.current && !isDragging) {
       const activeThumb = thumbRef.current.children[currentIndex] as HTMLElement;
@@ -496,27 +533,46 @@ export default function SpeciesPhotoGallery({
   
             {/* 張數指示器 - 調整至行動端邊角 */}
             <div className="absolute top-4 right-4 sm:top-6 sm:right-6 flex items-center gap-2">
+              {/* 刪除相片按鈕 (擁有者 / Admin / Curator) */}
+              {canDeleteCurrentPhoto && (
+                <button
+                  onClick={handleDeletePhoto}
+                  disabled={isDeletingPhoto}
+                  className="flex items-center gap-2.5 px-4 h-[34px] leading-none bg-rose-500/80 hover:bg-rose-600 border border-rose-400 text-white backdrop-blur-md rounded-xl transition-all shadow-lg active:scale-95 disabled:opacity-50"
+                  title={language === 'zh' ? '刪除這張相片' : 'Delete Photo'}
+                >
+                  {isDeletingPhoto ? (
+                    <Loader2 className="w-3.5 h-3.5 animate-spin shrink-0" />
+                  ) : (
+                    <Trash2 className="w-3.5 h-3.5 shrink-0" />
+                  )}
+                  <span className="text-[11px] font-black uppercase tracking-wider hidden sm:inline leading-none">
+                    {language === 'zh' ? '刪除相片' : 'Delete'}
+                  </span>
+                </button>
+              )}
+
               {/* 指定封面按鈕 (Admin/Curator only) */}
               {(profile?.role === 'admin' || profile?.role === 'curator') && (
                 <button 
                   onClick={handleSetProfilePicture}
                   disabled={isUpdatingProfile}
-                  className={`flex items-center gap-2.5 px-4 py-2 backdrop-blur-md border rounded-xl transition-all group/star shadow-lg ${
+                  className={`flex items-center gap-2.5 px-4 h-[34px] leading-none backdrop-blur-md border rounded-xl transition-all group/star shadow-lg ${
                     updateStatus === 'success' ? 'bg-emerald-500 border-emerald-400 text-white' : 
                     updateStatus === 'error' ? 'bg-red-500 border-red-400 text-white' :
                     isCurrentPhotoProfile ? 'bg-amber-400 border-amber-500 text-slate-900 font-bold shadow-amber-500/20' : 'bg-black/40 border-white/10 text-white/70 hover:bg-black/60 hover:text-white'
                   }`}
                 >
                   {isUpdatingProfile ? (
-                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    <Loader2 className="w-3.5 h-3.5 animate-spin shrink-0" />
                   ) : updateStatus === 'success' ? (
-                    <CheckCircle2 className="w-3.5 h-3.5" />
+                    <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
                   ) : updateStatus === 'error' ? (
-                    <AlertCircle className="w-3.5 h-3.5" />
+                    <AlertCircle className="w-3.5 h-3.5 shrink-0" />
                   ) : (
-                    <Star className={`w-3.5 h-3.5 ${isCurrentPhotoProfile ? 'fill-current' : ''}`} />
+                    <Star className={`w-3.5 h-3.5 shrink-0 ${isCurrentPhotoProfile ? 'fill-current' : ''}`} />
                   )}
-                  <span className="text-[11px] font-black uppercase tracking-wider hidden sm:inline">
+                  <span className="text-[11px] font-black uppercase tracking-wider hidden sm:inline leading-none">
                     {updateStatus === 'success' ? t('gallery.set_profile_success') : 
                      isCurrentPhotoProfile ? t('gallery.current_profile') : t('gallery.set_profile_picture')}
                   </span>
@@ -627,6 +683,16 @@ export default function SpeciesPhotoGallery({
         onProfilePictureUpdate={(newUrl) => {
           onProfilePictureUpdate?.(newUrl);
         }}
+        onDeletePhoto={async (photoId) => {
+          await deletePhoto(photoId);
+        }}
+      />
+
+      <DeleteConfirmModal 
+        isOpen={isDeleteModalOpen}
+        onClose={() => setIsDeleteModalOpen(false)}
+        onConfirm={confirmDeletePhoto}
+        isLoading={isDeletingPhoto}
       />
 
       <style jsx global>{`

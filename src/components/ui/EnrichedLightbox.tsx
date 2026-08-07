@@ -20,7 +20,8 @@ import {
   Loader2,
   Star,
   CheckCircle2,
-  AlertCircle
+  AlertCircle,
+  Trash2
 } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { useSpeciesPanel } from '@/context/SpeciesPanelContext';
@@ -28,6 +29,7 @@ import { supabase } from '@/lib/supabase';
 import { useLanguage } from '@/context/LanguageContext';
 import Image from 'next/image';
 import { InatGalleryPhoto } from '@/hooks/useInaturalistSpeciesPhotos';
+import DeleteConfirmModal from './DeleteConfirmModal';
 
 interface EnrichedLightboxProps {
   isOpen: boolean;
@@ -39,6 +41,7 @@ interface EnrichedLightboxProps {
   taxaId?: string;
   currentProfilePicture?: string;
   onProfilePictureUpdate?: (newUrl: string) => void;
+  onDeletePhoto?: (photoId: string | number) => Promise<void>;
 }
 
 export default function EnrichedLightbox({
@@ -50,13 +53,16 @@ export default function EnrichedLightbox({
   commonName,
   taxaId,
   currentProfilePicture,
-  onProfilePictureUpdate
+  onProfilePictureUpdate,
+  onDeletePhoto
 }: EnrichedLightboxProps) {
   const { profile } = useAuth();
   const { t, language } = useLanguage();
   const { updateProfilePicture } = useSpeciesPanel();
   const [isUpdatingProfile, setIsUpdatingProfile] = useState(false);
   const [updateStatus, setUpdateStatus] = useState<'idle' | 'success' | 'error'>('idle');
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [scale, setScale] = useState(1);
   const [position, setPosition] = useState({ x: 0, y: 0 });
   const [isAutoplay, setIsAutoplay] = useState(false);
@@ -272,6 +278,40 @@ export default function EnrichedLightbox({
     }
   };
 
+  const canDeleteCurrentPhoto = useMemo(() => {
+    if (!currentPhoto || !currentPhoto.isCommunityPhoto) return false;
+    if (!profile) return false;
+    if (profile.role === 'admin' || profile.role === 'curator') return true;
+    return currentPhoto.uploaderUserId === profile.id;
+  }, [currentPhoto, profile]);
+
+  const handleDeletePhoto = () => {
+    if (!currentPhoto || !canDeleteCurrentPhoto || isDeleting) return;
+    setIsDeleteModalOpen(true);
+  };
+
+  const confirmDeletePhoto = async () => {
+    if (!currentPhoto || !canDeleteCurrentPhoto || isDeleting) return;
+
+    setIsDeleting(true);
+    try {
+      if (onDeletePhoto) {
+        await onDeletePhoto(currentPhoto.id);
+      }
+      setIsDeleteModalOpen(false);
+      if (photos.length <= 1) {
+        onClose();
+      } else if (currentIndex >= photos.length - 1) {
+        onNavigate(photos.length - 2);
+      }
+    } catch (err) {
+      console.error('Failed to delete photo in Lightbox:', err);
+      alert(language === 'zh' ? '刪除照片失敗，請稍後再試。' : 'Failed to delete photo. Please try again.');
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
   // 滾輪縮放邏輯
   const handleWheel = (e: React.WheelEvent) => {
     if (e.deltaY < 0) {
@@ -386,6 +426,22 @@ export default function EnrichedLightbox({
             
             <button onClick={handleDownload} className="p-2.5 text-white/70 hover:bg-white/10 hover:text-white rounded-full transition-all" title="Download Original"><Download className="w-4 h-4" /></button>
             
+            {/* 刪除相片按鈕 (擁有者 / Admin / Curator) */}
+            {canDeleteCurrentPhoto && (
+              <button 
+                onClick={handleDeletePhoto}
+                disabled={isDeleting}
+                className="p-2.5 rounded-full transition-all text-red-400 hover:bg-red-500/20 hover:text-red-300 border border-red-500/30 disabled:opacity-50"
+                title={language === 'zh' ? '刪除這張相片' : 'Delete Photo'}
+              >
+                {isDeleting ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <Trash2 className="w-4 h-4" />
+                )}
+              </button>
+            )}
+
             {/* 指定封面按鈕 (Admin/Curator only) */}
             {(profile?.role === 'admin' || profile?.role === 'curator') && taxaId && (
               <button 
@@ -560,6 +616,13 @@ export default function EnrichedLightbox({
             />
           ))}
         </div>
+
+        <DeleteConfirmModal 
+          isOpen={isDeleteModalOpen}
+          onClose={() => setIsDeleteModalOpen(false)}
+          onConfirm={confirmDeletePhoto}
+          isLoading={isDeleting}
+        />
       </motion.div>
     </AnimatePresence>
   );
