@@ -217,7 +217,7 @@ export default function HomeHero() {
       <div className="absolute inset-0 z-0 overflow-hidden">
         <div className="absolute inset-0 bg-gradient-to-b from-slate-900/60 via-slate-900/40 to-white z-10" />
         <img 
-          src="https://images.unsplash.com/photo-1518173946687-a4c8892bbd9f?q=80&w=2574&auto=format&fit=crop" 
+          src="/cloudinary/dpvdoeoc0/image/upload/f_auto,q_auto/v1786118511/hero_bg/photo-1518173946687-a4c8892bbd9f.jpg" 
           alt="Nature Background"
           className="w-full h-full object-cover scale-105 animate-slow-zoom"
         />

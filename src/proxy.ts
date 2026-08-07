@@ -2,6 +2,25 @@ import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 
 export async function proxy(request: NextRequest) {
+  // 如果是圖片重寫路由，剝離 Cookie, Cache-Control, Pragma 標頭
+  // 以利 Vercel Edge Network (CDN) 命中所快取 (HIT)
+  if (
+    request.nextUrl.pathname.startsWith('/inat-s3/') ||
+    request.nextUrl.pathname.startsWith('/inat-static/') ||
+    request.nextUrl.pathname.startsWith('/inat-uploads/') ||
+    request.nextUrl.pathname.startsWith('/cloudinary/')
+  ) {
+    const requestHeaders = new Headers(request.headers);
+    requestHeaders.delete('cookie');
+    requestHeaders.delete('cache-control');
+    requestHeaders.delete('pragma');
+    return NextResponse.next({
+      request: {
+        headers: requestHeaders,
+      },
+    });
+  }
+
   let supabaseResponse = NextResponse.next({
     request,
   })
@@ -53,6 +72,10 @@ export async function proxy(request: NextRequest) {
 
 export const config = {
   matcher: [
+    '/inat-s3/:path*',
+    '/inat-static/:path*',
+    '/inat-uploads/:path*',
+    '/cloudinary/:path*',
     /*
      * 匹配所有請求路徑，除了以下開頭的：
      * - _next/static (靜態檔案)

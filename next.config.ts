@@ -23,10 +23,27 @@ const nextConfig: NextConfig = {
         source: '/inat-uploads/:path*',
         destination: 'https://uploads.inaturalist.org/:path*',
       },
+      {
+        source: '/cloudinary/:path*',
+        destination: 'https://res.cloudinary.com/:path*',
+      },
     ];
   },
   async headers() {
     return [
+      {
+        source: '/cloudinary/:path*',
+        headers: [
+          {
+            key: 'Cache-Control',
+            value: 'public, max-age=31536000, s-maxage=31536000, immutable',
+          },
+          {
+            key: 'Vary',
+            value: 'Accept-Encoding',
+          },
+        ],
+      },
       {
         source: '/inat-s3/:path*',
         headers: [
@@ -68,7 +85,7 @@ const nextConfig: NextConfig = {
         headers: [
           {
             key: 'Cache-Control',
-            value: 'public, max-age=31536000, immutable',
+            value: 'public, max-age=86400, must-revalidate',
           },
         ],
       },
