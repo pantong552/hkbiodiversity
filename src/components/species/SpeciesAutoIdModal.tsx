@@ -179,19 +179,65 @@ export default function SpeciesAutoIdModal() {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [compressedSize, setCompressedSize] = useState<number | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
-  const [loadingStep, setLoadingStep] = useState<string>('');
-  const [uploadProgress, setUploadProgress] = useState<number>(0);
-  const [isUploadingPhase, setIsUploadingPhase] = useState<boolean>(true);
-  const [errorMsg, setErrorMsg] = useState<string | null>(null);
-  const [resultsData, setResultsData] = useState<InatApiResponse | null>(null);
   const [isDragOver, setIsDragOver] = useState(false);
   const [enlargedPhoto, setEnlargedPhoto] = useState<string | null>(null);
   const [navigatingTaxonId, setNavigatingTaxonId] = useState<number | null>(null);
 
+  // 雙引擎獨立狀態儲存 (快取機制)
+  const [engineState, setEngineState] = useState<{
+    [key in AutoIdEngine]: {
+      resultsData: InatApiResponse | null;
+      errorMsg: string | null;
+      isLoading: boolean;
+      loadingStep: string;
+      uploadProgress: number;
+      isUploadingPhase: boolean;
+    };
+  }>({
+    inaturalist: {
+      resultsData: null,
+      errorMsg: null,
+      isLoading: false,
+      loadingStep: '',
+      uploadProgress: 0,
+      isUploadingPhase: true,
+    },
+    plantnet: {
+      resultsData: null,
+      errorMsg: null,
+      isLoading: false,
+      loadingStep: '',
+      uploadProgress: 0,
+      isUploadingPhase: true,
+    },
+  });
+
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const isZh = language === 'zh';
+
+  // 當前引擎對應的狀態
+  const currentEngineState = engineState[engine];
+  const resultsData = currentEngineState.resultsData;
+  const errorMsg = currentEngineState.errorMsg;
+  const isLoading = currentEngineState.isLoading;
+  const loadingStep = currentEngineState.loadingStep;
+  const uploadProgress = currentEngineState.uploadProgress;
+  const isUploadingPhase = currentEngineState.isUploadingPhase;
+
+  // 輔助函式：更新指定引擎的狀態
+  const updateEngineState = useCallback(
+    (targetEngine: AutoIdEngine, update: Partial<(typeof engineState)[AutoIdEngine]>) => {
+      setEngineState((prev) => ({
+        ...prev,
+        [targetEngine]: {
+          ...prev[targetEngine],
+          ...update,
+        },
+      }));
+    },
+    []
+  );
 
   // 根據 inat_id 或學名尋找 Supabase 對應物種以開啟 Species Floating Panel
   const handleViewSpecies = async (taxon: TaxonInfo) => {
@@ -274,71 +320,87 @@ export default function SpeciesAutoIdModal() {
     }
   };
 
-  // 清除/重設
+  // 清除/重設所有引擎資料
   const handleReset = () => {
     setSelectedFile(null);
     if (previewUrl) URL.revokeObjectURL(previewUrl);
     setPreviewUrl(null);
     setCompressedSize(null);
-    setResultsData(null);
-    setErrorMsg(null);
-    setIsLoading(false);
-    setUploadProgress(0);
-    setIsUploadingPhase(true);
+    setEngineState({
+      inaturalist: {
+        resultsData: null,
+        errorMsg: null,
+        isLoading: false,
+        loadingStep: '',
+        uploadProgress: 0,
+        isUploadingPhase: true,
+      },
+      plantnet: {
+        resultsData: null,
+        errorMsg: null,
+        isLoading: false,
+        loadingStep: '',
+        uploadProgress: 0,
+        isUploadingPhase: true,
+      },
+    });
   };
 
   const handleClose = () => {
     setAutoIdOpen(false);
   };
 
-  // 選擇檔案與 API 識別處理 (支援多引擎 iNaturalist 與 Pl@ntNet)
-  const processImageFile = async (file: File, selectedEngine = engine) => {
-    if (!file.type.startsWith('image/')) {
-      setErrorMsg(isZh ? '請選擇正確的圖片檔案 (JPG, PNG, WEBP)' : 'Please select a valid image file');
-      return;
-    }
+  // 執行特定引擎的辨識
+  const runIdentificationForEngine = async (file: File, targetEngine: AutoIdEngine) => {
+    // 第一時間更新狀態，讓 React DOM 立即顯示動畫卡片
+    updateEngineState(targetEngine, {
+      isLoading: true,
+      isUploadingPhase: true,
+      uploadProgress: 15,
+      loadingStep: isZh ? '正在讀取與處理相片檔案...' : 'Reading & processing photo...',
+      resultsData: null,
+      errorMsg: null,
+    });
 
-    // 換圖片或上傳圖片時，先重設狀態並開起 Uploading 階段
-    setSelectedFile(file);
-    const localUrl = URL.createObjectURL(file);
-    setPreviewUrl(localUrl);
-    setResultsData(null); // 清空舊辨識結果
-    setErrorMsg(null);
-
-    setIsLoading(true);
-    setIsUploadingPhase(true);
-    setUploadProgress(15);
-    setLoadingStep(isZh ? '正在讀取與處理相片檔案...' : 'Reading & processing photo...');
-
-    // 關鍵優化：先給 React 60ms 完成畫面繪製，即刻無延遲彈出 Progress Bar 與動畫
-    await new Promise((resolve) => setTimeout(resolve, 60));
+    // 關鍵無卡頓優化：留給 React 瀏覽器繪製線程 (Paint Loop) 100ms 時間順暢渲染 DOM，避免同步 Canvas 壓縮解碼卡住 UI
+    await new Promise((resolve) => setTimeout(resolve, 100));
 
     let progressInterval: NodeJS.Timeout | null = null;
 
     try {
-      // 動態模擬平滑上傳進度推進
       progressInterval = setInterval(() => {
-        setUploadProgress((prev) => {
-          if (prev < 45) return prev + 5;
-          if (prev < 75) return prev + 2;
-          if (prev < 90) return prev + 1;
-          return prev;
+        setEngineState((prev) => {
+          const currentProg = prev[targetEngine].uploadProgress;
+          let newProg = currentProg;
+          if (currentProg < 45) newProg += 5;
+          else if (currentProg < 75) newProg += 2;
+          else if (currentProg < 90) newProg += 1;
+
+          return {
+            ...prev,
+            [targetEngine]: {
+              ...prev[targetEngine],
+              uploadProgress: newProg,
+            },
+          };
         });
       }, 150);
 
-      // 1. 自動壓縮圖片至 1024px 長邊以內
       const compressedBlob = await compressImage(file, 1024, 0.85);
       setCompressedSize(compressedBlob.size);
 
       const formData = new FormData();
       formData.append('image', compressedBlob, file.name);
 
-      setUploadProgress(78);
-      setIsUploadingPhase(false);
+      updateEngineState(targetEngine, {
+        uploadProgress: 78,
+        isUploadingPhase: false,
+      });
 
-      if (selectedEngine === 'plantnet') {
-        // --- Pl@ntNet 辨識流程 ---
-        setLoadingStep(isZh ? 'Pl@ntNet AI 正在分析植物花葉特徵比對...' : 'Pl@ntNet AI analyzing plant features...');
+      if (targetEngine === 'plantnet') {
+        updateEngineState(targetEngine, {
+          loadingStep: isZh ? 'Pl@ntNet AI 正在分析植物花葉特徵比對...' : 'Pl@ntNet AI analyzing plant features...',
+        });
 
         const response = await fetch('/api/plantnet/identify', {
           method: 'POST',
@@ -352,7 +414,6 @@ export default function SpeciesAutoIdModal() {
 
         const plantnetRes = await response.json();
 
-        // 將 Pl@ntNet 的 JSON 格式適應標準化轉為 InatApiResponse
         const convertedResults: InatResultItem[] = (plantnetRes.results || []).map((pnItem: any) => {
           const score = Math.round((pnItem.score || 0) * 100);
           const cName = pnItem.species?.commonNames?.[0] || pnItem.species?.secondaryCommonNames?.[0] || '';
@@ -361,7 +422,7 @@ export default function SpeciesAutoIdModal() {
           const photoUrl = pnItem.images?.[0]?.m || pnItem.images?.[0]?.s || pnItem.images?.[0]?.o || '';
 
           const taxonInfo: TaxonInfo = {
-            id: 0, // Pl@ntNet 無 iNaturalist ID
+            id: 0,
             name: sName,
             preferred_common_name: cName || sName,
             english_common_name: cName,
@@ -388,13 +449,15 @@ export default function SpeciesAutoIdModal() {
         };
 
         if (progressInterval) clearInterval(progressInterval);
-        setUploadProgress(100);
-        await new Promise((res) => setTimeout(res, 250));
-        setResultsData(jsonResult);
+        updateEngineState(targetEngine, {
+          uploadProgress: 100,
+          resultsData: jsonResult,
+        });
 
       } else {
-        // --- iNaturalist 萬物辨識流程 ---
-        setLoadingStep(isZh ? 'iNaturalist AI 正在進行視覺特徵分析與物種比對...' : 'iNaturalist AI analyzing features...');
+        updateEngineState(targetEngine, {
+          loadingStep: isZh ? 'iNaturalist AI 正在進行視覺特徵分析與物種比對...' : 'iNaturalist AI analyzing features...',
+        });
 
         const response = await fetch('/api/inaturalist/score', {
           method: 'POST',
@@ -408,21 +471,64 @@ export default function SpeciesAutoIdModal() {
         const jsonResult: InatApiResponse = await response.json();
 
         if (progressInterval) clearInterval(progressInterval);
-        setUploadProgress(100);
-
-        // 短暫停留呈現 100% 滿格感
-        await new Promise((res) => setTimeout(res, 250));
-
-        setResultsData(jsonResult);
+        updateEngineState(targetEngine, {
+          uploadProgress: 100,
+          resultsData: jsonResult,
+        });
       }
     } catch (err: any) {
       if (progressInterval) clearInterval(progressInterval);
-      console.error('Species Identification failed:', err);
-      setErrorMsg(err.message || (isZh ? '辨識服務暫時無法存取，請稍後再試。' : 'Identification failed. Please try again.'));
+      console.error(`${targetEngine} identification failed:`, err);
+      updateEngineState(targetEngine, {
+        errorMsg: err.message || (isZh ? '辨識服務暫時無法存取，請稍後再試。' : 'Identification failed. Please try again.'),
+      });
     } finally {
       if (progressInterval) clearInterval(progressInterval);
-      setIsLoading(false);
+      updateEngineState(targetEngine, { isLoading: false });
     }
+  };
+
+  // 當使用者選擇新圖片時，重設兩個引擎並為目前引擎觸發辨識
+  const processImageFile = async (file: File) => {
+    if (!file.type.startsWith('image/')) {
+      updateEngineState(engine, {
+        errorMsg: isZh ? '請選擇正確的圖片檔案 (JPG, PNG, WEBP)' : 'Please select a valid image file',
+      });
+      return;
+    }
+
+    setSelectedFile(file);
+    const localUrl = URL.createObjectURL(file);
+    setPreviewUrl(localUrl);
+
+    // 清空兩邊引擎的舊結果
+    setEngineState({
+      inaturalist: {
+        resultsData: null,
+        errorMsg: null,
+        isLoading: false,
+        loadingStep: '',
+        uploadProgress: 0,
+        isUploadingPhase: true,
+      },
+      plantnet: {
+        resultsData: null,
+        errorMsg: null,
+        isLoading: false,
+        loadingStep: '',
+        uploadProgress: 0,
+        isUploadingPhase: true,
+      },
+    });
+
+    // 啟動當前引擎辨識
+    runIdentificationForEngine(file, engine);
+  };
+
+  // 切換 AI 引擎 (保留選擇好的圖片與各自快取結果，不自動觸發 API 請求)
+  const handleEngineSwitch = (targetEngine: AutoIdEngine) => {
+    if (targetEngine === engine) return;
+    setEngine(targetEngine);
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -502,10 +608,7 @@ export default function SpeciesAutoIdModal() {
             <div className="bg-slate-200/70 p-1 rounded-2xl flex items-center gap-1 border border-slate-300/60 shadow-inner">
               <button
                 type="button"
-                onClick={() => {
-                  setEngine('inaturalist');
-                  if (selectedFile) processImageFile(selectedFile, 'inaturalist');
-                }}
+                onClick={() => handleEngineSwitch('inaturalist')}
                 className={`flex-1 py-2 px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer ${
                   engine === 'inaturalist'
                     ? 'bg-white text-emerald-700 shadow-sm border border-slate-200'
@@ -518,10 +621,7 @@ export default function SpeciesAutoIdModal() {
 
               <button
                 type="button"
-                onClick={() => {
-                  setEngine('plantnet');
-                  if (selectedFile) processImageFile(selectedFile, 'plantnet');
-                }}
+                onClick={() => handleEngineSwitch('plantnet')}
                 className={`flex-1 py-2 px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer ${
                   engine === 'plantnet'
                     ? 'bg-emerald-600 text-white shadow-sm shadow-emerald-600/30'
@@ -630,6 +730,24 @@ export default function SpeciesAutoIdModal() {
                   className="hidden"
                 />
               </div>
+            )}
+
+            {/* 手動觸發辨識按鈕 (當已選擇圖片，但目前引擎尚未辨識且非載入中時顯示) */}
+            {selectedFile && !resultsData && !isLoading && (
+              <motion.button
+                initial={{ opacity: 0, y: 5 }}
+                animate={{ opacity: 1, y: 0 }}
+                type="button"
+                onClick={() => selectedFile && runIdentificationForEngine(selectedFile, engine)}
+                className="w-full py-3 px-4 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 active:scale-[0.99] text-white font-bold text-sm rounded-2xl shadow-lg shadow-emerald-600/25 flex items-center justify-center gap-2 transition-all cursor-pointer"
+              >
+                {engine === 'plantnet' ? <Leaf className="w-4 h-4" /> : <Sparkles className="w-4 h-4 text-amber-300 animate-pulse" />}
+                <span>
+                  {isZh
+                    ? `開始 ${engine === 'plantnet' ? 'Pl@ntNet 植物' : 'iNaturalist'} AI 辨識`
+                    : `Start ${engine === 'plantnet' ? 'Pl@ntNet' : 'iNaturalist'} AI Identification`}
+                </span>
+              </motion.button>
             )}
 
             {/* 載入/上傳與辨識中狀態 (包含 Uploading Animation 與 Progress Bar) */}
