@@ -8,7 +8,10 @@ export async function proxy(request: NextRequest) {
     request.nextUrl.pathname.startsWith('/inat-s3/') ||
     request.nextUrl.pathname.startsWith('/inat-static/') ||
     request.nextUrl.pathname.startsWith('/inat-uploads/') ||
-    request.nextUrl.pathname.startsWith('/cloudinary/')
+    request.nextUrl.pathname.startsWith('/cloudinary/') ||
+    request.nextUrl.pathname.startsWith('/plantnet-img/') ||
+    request.nextUrl.pathname.startsWith('/plantnet-bs/') ||
+    request.nextUrl.pathname.startsWith('/freeimage-host/')
   ) {
     const requestHeaders = new Headers(request.headers);
     requestHeaders.delete('cookie');
@@ -76,10 +79,13 @@ export const config = {
     '/inat-static/:path*',
     '/inat-uploads/:path*',
     '/cloudinary/:path*',
+    '/plantnet-img/:path*',
+    '/plantnet-bs/:path*',
+    '/freeimage-host/:path*',
     /*
      * 匹配所有請求路徑，除了以下開頭的：
      * - _next/static (靜態檔案)
-     * - _next/image (圖片最佳化檔案)
+     * - _next/image (靜態圖片)
      * - favicon.ico (瀏覽器圖示)
      * 也排除所有帶有常見靜態副檔名的檔案
      */

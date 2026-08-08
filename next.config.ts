@@ -27,6 +27,18 @@ const nextConfig: NextConfig = {
         source: '/cloudinary/:path*',
         destination: 'https://res.cloudinary.com/:path*',
       },
+      {
+        source: '/plantnet-img/:path*',
+        destination: 'https://my-plantnet.s3.amazonaws.com/:path*',
+      },
+      {
+        source: '/plantnet-bs/:path*',
+        destination: 'https://bs.plantnet.org/:path*',
+      },
+      {
+        source: '/freeimage-host/:path*',
+        destination: 'https://i.freeimage.host/:path*',
+      },
     ];
   },
   async headers() {
@@ -64,6 +76,33 @@ const nextConfig: NextConfig = {
       },
       {
         source: '/inat-uploads/:path*',
+        headers: [
+          {
+            key: 'Cache-Control',
+            value: 'public, max-age=31536000, s-maxage=31536000, immutable',
+          },
+        ],
+      },
+      {
+        source: '/plantnet-img/:path*',
+        headers: [
+          {
+            key: 'Cache-Control',
+            value: 'public, max-age=31536000, s-maxage=31536000, immutable',
+          },
+        ],
+      },
+      {
+        source: '/plantnet-bs/:path*',
+        headers: [
+          {
+            key: 'Cache-Control',
+            value: 'public, max-age=31536000, s-maxage=31536000, immutable',
+          },
+        ],
+      },
+      {
+        source: '/freeimage-host/:path*',
         headers: [
           {
             key: 'Cache-Control',

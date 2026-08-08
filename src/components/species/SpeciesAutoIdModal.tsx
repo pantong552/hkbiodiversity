@@ -65,12 +65,59 @@ export interface InatApiResponse {
   results: InatResultItem[];
 }
 
-// 1. 圖片轉換 API 封裝工具 (將網路圖片經過 /api/image/transform 處理)
+// 1. 圖片轉換與 Rewrite 路由處理工具
 function getTransformedImageUrl(url: string | null | undefined): string | undefined {
   if (!url) return undefined;
-  if (url.startsWith('blob:') || url.startsWith('data:') || url.startsWith('/api/image/transform')) {
+  if (
+    url.startsWith('blob:') ||
+    url.startsWith('data:') ||
+    url.startsWith('/api/image/transform') ||
+    url.startsWith('/plantnet-img/') ||
+    url.startsWith('/plantnet-bs/') ||
+    url.startsWith('/freeimage-host/') ||
+    url.startsWith('/inat-s3/') ||
+    url.startsWith('/inat-static/') ||
+    url.startsWith('/inat-uploads/') ||
+    url.startsWith('/cloudinary/')
+  ) {
     return url;
   }
+
+  // 1. Pl@ntNet S3 圖片轉 Rewrite
+  if (url.includes('my-plantnet.s3.amazonaws.com')) {
+    return url.replace(/^https?:\/\/my-plantnet\.s3\.amazonaws\.com\//i, '/plantnet-img/');
+  }
+
+  // 2. Pl@ntNet BS 官方圖床 (bs.plantnet.org) 轉 Rewrite
+  if (url.includes('bs.plantnet.org')) {
+    return url.replace(/^https?:\/\/bs\.plantnet\.org\//i, '/plantnet-bs/');
+  }
+
+  // 2. FreeImage Host 圖片轉 Rewrite
+  if (url.includes('i.freeimage.host')) {
+    return url.replace(/^https?:\/\/i\.freeimage\.host\//i, '/freeimage-host/');
+  }
+
+  // 3. iNaturalist S3 圖片轉 Rewrite
+  if (url.includes('inaturalist-open-data.s3.amazonaws.com')) {
+    return url.replace(/^https?:\/\/inaturalist-open-data\.s3\.amazonaws\.com\//i, '/inat-s3/');
+  }
+
+  // 4. iNaturalist Static 圖片轉 Rewrite
+  if (url.includes('static.inaturalist.org')) {
+    return url.replace(/^https?:\/\/static\.inaturalist\.org\//i, '/inat-static/');
+  }
+
+  // 5. iNaturalist Uploads 圖片轉 Rewrite
+  if (url.includes('uploads.inaturalist.org')) {
+    return url.replace(/^https?:\/\/uploads\.inaturalist\.org\//i, '/inat-uploads/');
+  }
+
+  // 6. Cloudinary 圖片轉 Rewrite
+  if (url.includes('res.cloudinary.com')) {
+    return url.replace(/^https?:\/\/res\.cloudinary\.com\//i, '/cloudinary/');
+  }
+
   return `/api/image/transform?url=${encodeURIComponent(url)}`;
 }
 
@@ -120,11 +167,15 @@ function compressImage(file: File, maxDimension = 1024, quality = 0.85): Promise
   });
 }
 
+// iNaturalist / Pl@ntNet 辨識引擎類型
+export type AutoIdEngine = 'inaturalist' | 'plantnet';
+
 export default function SpeciesAutoIdModal() {
   const { language } = useLanguage();
   const { isAutoIdOpen, setAutoIdOpen, addSpecies } = useSpeciesPanel();
 
   // 狀態管理
+  const [engine, setEngine] = useState<AutoIdEngine>('inaturalist');
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [compressedSize, setCompressedSize] = useState<number | null>(null);
@@ -207,12 +258,17 @@ export default function SpeciesAutoIdModal() {
         }
       }
 
-      // 4. 若 Supabase 無相關紀錄，轉用 iNaturalist 外部連結
-      const targetInatId = inatId || taxon.id;
-      window.open(`https://www.inaturalist.org/taxa/${targetInatId}`, '_blank');
+      // 4. 若 Supabase 無相關紀錄，轉用外部搜尋連結
+      if (inatId && inatId > 0) {
+        window.open(`https://www.inaturalist.org/taxa/${inatId}`, '_blank');
+      } else if (sciName) {
+        window.open(`https://www.google.com/search?q=${encodeURIComponent(sciName)}`, '_blank');
+      }
     } catch (err) {
       console.error('Error matching species taxa_id:', err);
-      window.open(`https://www.inaturalist.org/taxa/${taxon.id}`, '_blank');
+      if (taxon.id && taxon.id > 0) {
+        window.open(`https://www.inaturalist.org/taxa/${taxon.id}`, '_blank');
+      }
     } finally {
       setNavigatingTaxonId(null);
     }
@@ -235,8 +291,8 @@ export default function SpeciesAutoIdModal() {
     setAutoIdOpen(false);
   };
 
-  // 選擇檔案與 API 識別處理
-  const processImageFile = async (file: File) => {
+  // 選擇檔案與 API 識別處理 (支援多引擎 iNaturalist 與 Pl@ntNet)
+  const processImageFile = async (file: File, selectedEngine = engine) => {
     if (!file.type.startsWith('image/')) {
       setErrorMsg(isZh ? '請選擇正確的圖片檔案 (JPG, PNG, WEBP)' : 'Please select a valid image file');
       return;
@@ -254,7 +310,7 @@ export default function SpeciesAutoIdModal() {
     setUploadProgress(15);
     setLoadingStep(isZh ? '正在讀取與處理相片檔案...' : 'Reading & processing photo...');
 
-    // 關鍵優化：先給 React 60ms 完成畫面繪製，即刻無延遲彈出 Progress Bar 與動畫，避免 Canvas 解碼佔據主線程卡頓
+    // 關鍵優化：先給 React 60ms 完成畫面繪製，即刻無延遲彈出 Progress Bar 與動畫
     await new Promise((resolve) => setTimeout(resolve, 60));
 
     let progressInterval: NodeJS.Timeout | null = null;
@@ -274,33 +330,91 @@ export default function SpeciesAutoIdModal() {
       const compressedBlob = await compressImage(file, 1024, 0.85);
       setCompressedSize(compressedBlob.size);
 
-      // 2. 發送至站內 Serverless Proxy (由伺服端自動登入並續刷 Token，永不失效)
       const formData = new FormData();
       formData.append('image', compressedBlob, file.name);
 
-      // 轉入 AI 物種比對識別階段
       setUploadProgress(78);
       setIsUploadingPhase(false);
-      setLoadingStep(isZh ? 'AI 正在進行視覺特徵分析與物種比對...' : 'AI is analyzing features and matching species...');
 
-      const response = await fetch('/api/inaturalist/score', {
-        method: 'POST',
-        body: formData,
-      });
+      if (selectedEngine === 'plantnet') {
+        // --- Pl@ntNet 辨識流程 ---
+        setLoadingStep(isZh ? 'Pl@ntNet AI 正在分析植物花葉特徵比對...' : 'Pl@ntNet AI analyzing plant features...');
 
-      if (!response.ok) {
-        throw new Error(`API Error ${response.status}: ${response.statusText}`);
+        const response = await fetch('/api/plantnet/identify', {
+          method: 'POST',
+          body: formData,
+        });
+
+        if (!response.ok) {
+          const errRes = await response.json().catch(() => ({}));
+          throw new Error(errRes.error || `Pl@ntNet API Error ${response.status}`);
+        }
+
+        const plantnetRes = await response.json();
+
+        // 將 Pl@ntNet 的 JSON 格式適應標準化轉為 InatApiResponse
+        const convertedResults: InatResultItem[] = (plantnetRes.results || []).map((pnItem: any) => {
+          const score = Math.round((pnItem.score || 0) * 100);
+          const cName = pnItem.species?.commonNames?.[0] || pnItem.species?.secondaryCommonNames?.[0] || '';
+          const sName = pnItem.species?.name || '';
+          const family = pnItem.species?.family?.scientificNameWithoutAuthor || pnItem.species?.family || '';
+          const photoUrl = pnItem.images?.[0]?.m || pnItem.images?.[0]?.s || pnItem.images?.[0]?.o || '';
+
+          const taxonInfo: TaxonInfo = {
+            id: 0, // Pl@ntNet 無 iNaturalist ID
+            name: sName,
+            preferred_common_name: cName || sName,
+            english_common_name: cName,
+            rank: 'species',
+            iconic_taxon_name: family ? `Pl@ntNet (${family})` : 'Pl@ntNet',
+            default_photo: photoUrl ? { id: 0, url: photoUrl } : undefined,
+            representative_photo: photoUrl ? { id: 0, url: photoUrl } : undefined,
+          };
+
+          return {
+            combined_score: score,
+            vision_score: score,
+            frequency_score: 0,
+            taxon: taxonInfo,
+          };
+        });
+
+        const jsonResult: InatApiResponse = {
+          results: convertedResults,
+          common_ancestor: plantnetRes.bestMatch ? {
+            score: Math.round((plantnetRes.results?.[0]?.score || 0) * 100),
+            taxon: convertedResults[0]?.taxon
+          } : undefined
+        };
+
+        if (progressInterval) clearInterval(progressInterval);
+        setUploadProgress(100);
+        await new Promise((res) => setTimeout(res, 250));
+        setResultsData(jsonResult);
+
+      } else {
+        // --- iNaturalist 萬物辨識流程 ---
+        setLoadingStep(isZh ? 'iNaturalist AI 正在進行視覺特徵分析與物種比對...' : 'iNaturalist AI analyzing features...');
+
+        const response = await fetch('/api/inaturalist/score', {
+          method: 'POST',
+          body: formData,
+        });
+
+        if (!response.ok) {
+          throw new Error(`API Error ${response.status}: ${response.statusText}`);
+        }
+
+        const jsonResult: InatApiResponse = await response.json();
+
+        if (progressInterval) clearInterval(progressInterval);
+        setUploadProgress(100);
+
+        // 短暫停留呈現 100% 滿格感
+        await new Promise((res) => setTimeout(res, 250));
+
+        setResultsData(jsonResult);
       }
-
-      const jsonResult: InatApiResponse = await response.json();
-
-      if (progressInterval) clearInterval(progressInterval);
-      setUploadProgress(100);
-
-      // 短暫停留呈現 100% 滿格感
-      await new Promise((res) => setTimeout(res, 250));
-
-      setResultsData(jsonResult);
     } catch (err: any) {
       if (progressInterval) clearInterval(progressInterval);
       console.error('Species Identification failed:', err);
@@ -383,6 +497,45 @@ export default function SpeciesAutoIdModal() {
 
           {/* 內容區域 - 可滾動 */}
           <div className="p-6 overflow-y-auto space-y-5 custom-scrollbar flex-1 bg-slate-50/50">
+
+            {/* AI 辨識引擎選擇切換列 */}
+            <div className="bg-slate-200/70 p-1 rounded-2xl flex items-center gap-1 border border-slate-300/60 shadow-inner">
+              <button
+                type="button"
+                onClick={() => {
+                  setEngine('inaturalist');
+                  if (selectedFile) processImageFile(selectedFile, 'inaturalist');
+                }}
+                className={`flex-1 py-2 px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer ${
+                  engine === 'inaturalist'
+                    ? 'bg-white text-emerald-700 shadow-sm border border-slate-200'
+                    : 'text-slate-600 hover:text-slate-900 hover:bg-white/40'
+                }`}
+              >
+                <Sparkles className="w-3.5 h-3.5 text-emerald-600" />
+                <span>{isZh ? 'iNaturalist' : 'iNaturalist'}</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setEngine('plantnet');
+                  if (selectedFile) processImageFile(selectedFile, 'plantnet');
+                }}
+                className={`flex-1 py-2 px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer ${
+                  engine === 'plantnet'
+                    ? 'bg-emerald-600 text-white shadow-sm shadow-emerald-600/30'
+                    : 'text-slate-600 hover:text-slate-900 hover:bg-white/40'
+                }`}
+              >
+                <Leaf className="w-3.5 h-3.5" />
+                <span>{isZh ? 'Pl@ntNet' : 'Pl@ntNet'}</span>
+                <span className="text-[9px] px-1.5 py-0.2 rounded-full bg-emerald-700/60 text-emerald-100 uppercase tracking-wider font-mono">
+                  {isZh ? '只限植物' : 'Plants Only'}
+                </span>
+              </button>
+            </div>
+
             {/* 上傳區域 (當尚未選擇圖片，或是可重新上傳時) */}
             {!previewUrl ? (
               <div
