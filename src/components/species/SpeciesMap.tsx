@@ -15,6 +15,29 @@ import { FullscreenControl, NavigationControl as MapNavControl, Popup } from 're
 import { fetchBgisSpeciesList, BgisGridRecord, BgisDatasetItem, BGIS_DATASETS } from '@/utils/bgis';
 import { fetchEbirdMapPoints, EbirdRecord, fetchEbirdLocInfo, EbirdLocInfo, getEbirdEvidenceLabel } from '@/utils/ebird';
 
+/**
+ * 將 iNaturalist 圖片 URL 轉換為 Vercel External Rewrite 相對路徑（反向代理）與指定尺寸
+ */
+const getInatRewriteUrl = (url: string, size: 'square' | 'small' | 'medium' | 'large' | 'original' = 'square') => {
+  if (!url) return '';
+  let sizedUrl = url
+    .replace('/square.', `/${size}.`)
+    .replace('/medium.', `/${size}.`)
+    .replace('/large.', `/${size}.`)
+    .replace('/small.', `/${size}.`);
+
+  if (sizedUrl.includes('inaturalist-open-data.s3.amazonaws.com/')) {
+    return sizedUrl.replace('https://inaturalist-open-data.s3.amazonaws.com/', '/inat-s3/');
+  }
+  if (sizedUrl.includes('static.inaturalist.org/')) {
+    return sizedUrl.replace('https://static.inaturalist.org/', '/inat-static/');
+  }
+  if (sizedUrl.includes('uploads.inaturalist.org/')) {
+    return sizedUrl.replace('https://uploads.inaturalist.org/', '/inat-uploads/');
+  }
+  return sizedUrl;
+};
+
 interface SpeciesMapProps {
   taxonId?: number;
   scientificName?: string;
@@ -1451,9 +1474,10 @@ export default function SpeciesMap({ taxonId, scientificName, chineseName, taxaG
                         <div className="relative w-16 h-16 rounded-xl overflow-hidden flex-shrink-0 bg-slate-100 border border-slate-200/60">
                           {obs.photos?.[0] ? (
                             <Image
-                              src={obs.photos[0].url.replace('square', 'medium')}
+                              src={getInatRewriteUrl(obs.photos[0].url, 'square')}
                               alt="observation"
                               fill
+                              unoptimized
                               sizes="64px"
                               className="object-cover group-hover/item:scale-110 transition-transform duration-500"
                             />
