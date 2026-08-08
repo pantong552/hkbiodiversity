@@ -32,41 +32,70 @@ const SpeciesHeroBackground = ({ photos, defaultImage, isLoading }: { photos: In
   const [imgLoaded, setImgLoaded] = React.useState(false);
   const [isFullyReady, setIsFullyReady] = React.useState(false);
   const [mounted, setMounted] = React.useState(false);
+  const [isVisible, setIsVisible] = React.useState(true);
   
-  // Use a ref to keep track of the last valid photos to prevent flickering during scope fallback
+  const containerRef = useRef<HTMLDivElement>(null);
   const lastValidPhotosRef = useRef<InatGalleryPhoto[]>([]);
-  
+
+  // 1. 隨機挑選最多 5 張相片，固定留在 memory/disk cache 進行輪播
+  const selectedPhotos = React.useMemo(() => {
+    if (!photos || photos.length === 0) return [];
+    if (photos.length <= 5) return photos;
+    
+    // 使用費雪-葉茲演算法亂數隨機洗牌，挑選前 5 張
+    const shuffled = [...photos];
+    for (let i = shuffled.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+    }
+    return shuffled.slice(0, 5);
+  }, [photos]);
+
   React.useEffect(() => {
     setMounted(true);
     return () => setMounted(false);
   }, []);
 
+  // 2. 監聽 IntersectionObserver：只在 Hero Banner 在 viewport 可視範圍內才啟用切換計時器
+  React.useEffect(() => {
+    if (!containerRef.current) return;
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        setIsVisible(entry.isIntersecting);
+      },
+      { threshold: 0.1 } // 出現 10% 即視為在可視範圍
+    );
+
+    observer.observe(containerRef.current);
+    return () => observer.disconnect();
+  }, []);
+
   // Handle seamless transition delay
   React.useEffect(() => {
-    // If we have photos and the first one is loaded, or if we fell back to default image already
     if (imgLoaded || (!isLoading && photos.length === 0 && mounted)) {
       const timer = setTimeout(() => setIsFullyReady(true), 300);
       return () => clearTimeout(timer);
     }
   }, [imgLoaded, isLoading, photos.length, mounted]);
 
-  
-  if (photos.length > 0) {
-    lastValidPhotosRef.current = photos;
+  if (selectedPhotos.length > 0) {
+    lastValidPhotosRef.current = selectedPhotos;
   }
 
-  const displayPhotos = photos.length > 0 ? photos : lastValidPhotosRef.current;
+  const displayPhotos = selectedPhotos.length > 0 ? selectedPhotos : lastValidPhotosRef.current;
   const hasPhotos = displayPhotos.length > 0;
 
+  // 3. 切換定時器：只有當 displayPhotos > 1 且 Hero Banner 在可視範圍內 (isVisible) 才倒數切換
   React.useEffect(() => {
-    if (displayPhotos.length <= 1) return;
+    if (displayPhotos.length <= 1 || !isVisible) return;
     
     const timer = setInterval(() => {
       setIndex((prev) => (prev + 1) % displayPhotos.length);
     }, 20000);
     
     return () => clearInterval(timer);
-  }, [displayPhotos.length]);
+  }, [displayPhotos.length, isVisible]);
 
   const [isMobile, setIsMobile] = React.useState(false);
   React.useEffect(() => {
@@ -79,7 +108,7 @@ const SpeciesHeroBackground = ({ photos, defaultImage, isLoading }: { photos: In
   }, []);
 
   return (
-    <div className="absolute inset-0 z-0 bg-slate-950 overflow-hidden">
+    <div ref={containerRef} className="absolute inset-0 z-0 bg-slate-950 overflow-hidden">
       {/* Background Image Layer */}
       <AnimatePresence mode="wait">
         <motion.div

@@ -22,6 +22,8 @@ interface SpeciesPanelContextType {
   setIsEditModalOpen: (open: boolean) => void;
   isAutoIdOpen: boolean;
   setAutoIdOpen: (open: boolean) => void;
+  isLightboxOpen: boolean;
+  setLightboxOpen: (open: boolean) => void;
   profilePictureMap: Record<string, string | null>;
   updateProfilePicture: (taxaId: string, url: string | null) => void;
   pendingTaxonomyFilter: { level: string; value: string } | null;
@@ -92,12 +94,14 @@ export const SpeciesPanelProvider: React.FC<{ children: React.ReactNode }> = ({ 
     setIsExpanded((prev) => (expand !== undefined ? expand : !prev));
   };
 
-  const setGalleryOpen = (open: boolean) => {
-    setIsGalleryOpen(open);
-  };
+  const [isLightboxOpen, setLightboxOpen] = useState(false);
 
   const setUploadModalOpen = (open: boolean) => {
     setIsUploadModalOpen(open);
+  };
+
+  const setGalleryOpen = (open: boolean) => {
+    setIsGalleryOpen(open);
   };
 
   const skipAutoCollapseRef = React.useRef<boolean>(false);
@@ -127,6 +131,8 @@ export const SpeciesPanelProvider: React.FC<{ children: React.ReactNode }> = ({ 
         setIsEditModalOpen,
         isAutoIdOpen,
         setAutoIdOpen,
+        isLightboxOpen,
+        setLightboxOpen,
         profilePictureMap,
         updateProfilePicture,
         pendingTaxonomyFilter,

@@ -27,7 +27,7 @@ export default function Header({ isHomePage: propIsHomePage }: HeaderProps = {})
     setIsScrolled(window.scrollY > 20);
   }, []);
 
-  const { openSpeciesIds, isExpanded, isGalleryOpen, isUploadModalOpen, isFilterOpen, isEditModalOpen, toggleExpand, setIsAccountOpen, isAccountOpen, setAutoIdOpen } = useSpeciesPanel();
+  const { openSpeciesIds, isExpanded, isGalleryOpen, isUploadModalOpen, isFilterOpen, isEditModalOpen, isLightboxOpen, toggleExpand, setIsAccountOpen, isAccountOpen, setAutoIdOpen } = useSpeciesPanel();
   
   // 正規化路徑（移除結尾斜線或查詢參數，確保 Vercel 生產環境首頁正確辨識）
   const normalizedPath = (pathname || '/').replace(/\/$/, '') || '/';
@@ -149,7 +149,7 @@ export default function Header({ isHomePage: propIsHomePage }: HeaderProps = {})
       fixed top-4 inset-x-0 z-[60] 
       px-6 md:px-8 lg:px-10 xl:px-16
       transition-all duration-500 cubic-bezier(0.16, 1, 0.3, 1)
-      ${(isVisible && !isGalleryOpen && !isUploadModalOpen && !isAccountOpen && !isEditModalOpen) ? 'translate-y-0 opacity-100' : '-translate-y-40 opacity-0 pointer-events-none'}
+      ${(isVisible && !isGalleryOpen && !isUploadModalOpen && !isAccountOpen && !isEditModalOpen && !isLightboxOpen) ? 'translate-y-0 opacity-100' : '-translate-y-40 opacity-0 pointer-events-none'}
     `}>
       <nav className={`
         max-w-[1920px] mx-auto rounded-[2rem]

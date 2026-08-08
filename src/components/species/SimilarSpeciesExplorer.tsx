@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import Image from 'next/image';
 import { Species } from '@/types/species';
 import { useLanguage } from '@/context/LanguageContext';
@@ -16,10 +16,32 @@ interface SimilarSpeciesExplorerProps {
 }
 
 // 橫向卡片 - 用於 Tablet 與 Desktop
-const HorizontalSpeciesCard = ({ species }: { species: Species }) => {
+const HorizontalSpeciesCard = ({ species, index }: { species: Species; index: number }) => {
   const { language } = useLanguage();
   const { addSpecies, profilePictureMap } = useSpeciesPanel();
-  const { imageUrl, isLoading: isInatLoading } = useInaturalistPhoto(species.inat_id);
+  
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [shouldLoad, setShouldLoad] = useState(index < 5);
+
+  useEffect(() => {
+    if (index < 5 || shouldLoad) return;
+    if (!containerRef.current) return;
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          setShouldLoad(true);
+          observer.disconnect();
+        }
+      },
+      { rootMargin: '100px 0px', threshold: 0.01 }
+    );
+
+    observer.observe(containerRef.current);
+    return () => observer.disconnect();
+  }, [index, shouldLoad]);
+
+  const { imageUrl, isLoading: isInatLoading } = useInaturalistPhoto(shouldLoad ? species.inat_id : undefined);
   
   const [imgLoaded, setImgLoaded] = useState(false);
   const [isFullyReady, setIsFullyReady] = useState(false);
@@ -42,6 +64,7 @@ const HorizontalSpeciesCard = ({ species }: { species: Species }) => {
 
   return (
     <motion.div 
+      ref={containerRef}
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
       whileHover={{ y: -4 }}
@@ -50,7 +73,7 @@ const HorizontalSpeciesCard = ({ species }: { species: Species }) => {
     >
       {/* Image Area */}
       <div className="relative w-full h-32 rounded-2xl overflow-hidden bg-white shadow-inner flex items-center justify-center mb-3">
-        {(() => {
+        {shouldLoad && (() => {
           const taxaId = species.taxa_id || '';
           const globalProfilePic = taxaId ? profilePictureMap[taxaId] : undefined;
           const effectiveSpecies = globalProfilePic !== undefined ? { ...species, profile_picture: globalProfilePic } : species;
@@ -75,7 +98,7 @@ const HorizontalSpeciesCard = ({ species }: { species: Species }) => {
           );
         })()}
 
-        {!isFullyReady && (
+        {(!isFullyReady || !shouldLoad) && (
           <div className={`
             absolute inset-0 flex flex-col items-center justify-center bg-slate-50 z-10 overflow-hidden
             transition-all duration-500 ease-in-out
@@ -110,10 +133,32 @@ const HorizontalSpeciesCard = ({ species }: { species: Species }) => {
 };
 
 // 垂直卡片 - 用於 Mobile
-const MiniSpeciesCard = ({ species }: { species: Species }) => {
+const MiniSpeciesCard = ({ species, index }: { species: Species; index: number }) => {
   const { language } = useLanguage();
   const { addSpecies, profilePictureMap } = useSpeciesPanel();
-  const { imageUrl, isLoading: isInatLoading } = useInaturalistPhoto(species.inat_id);
+
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [shouldLoad, setShouldLoad] = useState(index < 5);
+
+  useEffect(() => {
+    if (index < 5 || shouldLoad) return;
+    if (!containerRef.current) return;
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          setShouldLoad(true);
+          observer.disconnect();
+        }
+      },
+      { rootMargin: '100px 0px', threshold: 0.01 }
+    );
+
+    observer.observe(containerRef.current);
+    return () => observer.disconnect();
+  }, [index, shouldLoad]);
+
+  const { imageUrl, isLoading: isInatLoading } = useInaturalistPhoto(shouldLoad ? species.inat_id : undefined);
   
   const [imgLoaded, setImgLoaded] = useState(false);
   const [isFullyReady, setIsFullyReady] = useState(false);
@@ -127,6 +172,7 @@ const MiniSpeciesCard = ({ species }: { species: Species }) => {
   const placeholderImage = '/images/placeholder/no-species-image.svg';
   const commonName = language === 'zh' ? species.common_name_chi : species.common_name_eng;
 
+  // Handle seamless transition delay
   useEffect(() => {
     if (imgLoaded || (!species.inat_id && mounted)) {
       const timer = setTimeout(() => setIsFullyReady(true), 250);
@@ -136,6 +182,7 @@ const MiniSpeciesCard = ({ species }: { species: Species }) => {
 
   return (
     <motion.div 
+      ref={containerRef}
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
       whileHover={{ y: -2 }}
@@ -143,7 +190,8 @@ const MiniSpeciesCard = ({ species }: { species: Species }) => {
       className="group relative flex items-center gap-3 p-2.5 rounded-2xl bg-slate-50/50 hover:bg-emerald-50 border border-slate-100/60 hover:border-emerald-100 hover:shadow-lg hover:shadow-emerald-900/5 transition-all duration-300 cursor-pointer overflow-hidden shrink-0"
     >
       <div className="relative w-16 h-16 shrink-0 rounded-xl overflow-hidden bg-white shadow-inner flex items-center justify-center">
-        {(() => {
+        {/* Actual Image */}
+        {shouldLoad && (() => {
           const taxaId = species.taxa_id || '';
           const globalProfilePic = taxaId ? profilePictureMap[taxaId] : undefined;
           const effectiveSpecies = globalProfilePic !== undefined ? { ...species, profile_picture: globalProfilePic } : species;
@@ -168,7 +216,8 @@ const MiniSpeciesCard = ({ species }: { species: Species }) => {
           );
         })()}
 
-        {!isFullyReady && (
+        {/* Nature Loader Overlay (Seamless Transition) */}
+        {(!isFullyReady || !shouldLoad) && (
           <div className={`
             absolute inset-0 flex flex-col items-center justify-center bg-slate-50 z-10 overflow-hidden
             transition-all duration-500 ease-in-out
@@ -342,8 +391,8 @@ export default function SimilarSpeciesExplorer({ species }: SimilarSpeciesExplor
               layout
               className="hidden md:flex gap-4 overflow-x-auto pb-2 scrollbar-thin scrollbar-thumb-slate-200"
             >
-              {similarSpecies.map((item) => (
-                <HorizontalSpeciesCard key={item.taxa_id || item.id} species={item} />
+              {similarSpecies.map((item, idx) => (
+                <HorizontalSpeciesCard key={item.taxa_id || item.id} species={item} index={idx} />
               ))}
             </motion.div>
 
@@ -353,8 +402,8 @@ export default function SimilarSpeciesExplorer({ species }: SimilarSpeciesExplor
               layout
               className="flex md:hidden flex-col gap-2"
             >
-              {similarSpecies.map((item) => (
-                <MiniSpeciesCard key={item.taxa_id || item.id} species={item} />
+              {similarSpecies.map((item, idx) => (
+                <MiniSpeciesCard key={item.taxa_id || item.id} species={item} index={idx} />
               ))}
             </motion.div>
           </AnimatePresence>

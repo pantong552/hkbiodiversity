@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import Image from 'next/image';
 import { Species } from '@/types/species';
 import { useLanguage } from '@/context/LanguageContext';
@@ -9,11 +9,14 @@ import { createClient } from '@/utils/supabase/client';
 import { useInaturalistPhoto } from '@/hooks/useInaturalistPhoto';
 import { formatScientificName, getSpeciesImageUrl } from '@/utils/formatters';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Sparkles, Leaf } from 'lucide-react';
+import { Sparkles, Leaf, ChevronDown, ChevronUp, Maximize2 } from 'lucide-react';
+import EnrichedLightbox from '../ui/EnrichedLightbox';
+import { InatGalleryPhoto } from '@/hooks/useInaturalistSpeciesPhotos';
 
 interface CongenericExplorerProps {
   species: Species;
   isMobile?: boolean;
+  onOpenLightbox?: (photo: { url: string; commonName: string; scientificName: string }) => void;
 }
 
 const SkeletonCard = () => (
@@ -27,10 +30,32 @@ const SkeletonCard = () => (
 );
 
 // 橫向卡片 - 用於 Tablet mode
-const HorizontalSpeciesCard = ({ species }: { species: Species }) => {
+const HorizontalSpeciesCard = ({ species, index, onOpenLightbox }: { species: Species; index: number; onOpenLightbox?: (photo: { url: string; commonName: string; scientificName: string }) => void }) => {
   const { language } = useLanguage();
   const { addSpecies, profilePictureMap } = useSpeciesPanel();
-  const { imageUrl, isLoading: isInatLoading } = useInaturalistPhoto(species.inat_id);
+  
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [shouldLoad, setShouldLoad] = useState(index < 5);
+
+  useEffect(() => {
+    if (index < 5 || shouldLoad) return;
+    if (!containerRef.current) return;
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          setShouldLoad(true);
+          observer.disconnect();
+        }
+      },
+      { rootMargin: '100px 0px', threshold: 0.01 }
+    );
+
+    observer.observe(containerRef.current);
+    return () => observer.disconnect();
+  }, [index, shouldLoad]);
+
+  const { imageUrl, isLoading: isInatLoading } = useInaturalistPhoto(shouldLoad ? species.inat_id : undefined);
   
   const [imgLoaded, setImgLoaded] = useState(false);
   const [isFullyReady, setIsFullyReady] = useState(false);
@@ -53,6 +78,7 @@ const HorizontalSpeciesCard = ({ species }: { species: Species }) => {
 
   return (
     <motion.div 
+      ref={containerRef}
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
       whileHover={{ y: -4 }}
@@ -61,32 +87,50 @@ const HorizontalSpeciesCard = ({ species }: { species: Species }) => {
     >
       {/* Image Area */}
       <div className="relative w-full h-32 rounded-2xl overflow-hidden bg-white shadow-inner flex items-center justify-center mb-3">
-        {(() => {
+        {shouldLoad && (() => {
           const taxaId = species.taxa_id || '';
           const globalProfilePic = taxaId ? profilePictureMap[taxaId] : undefined;
           const effectiveSpecies = globalProfilePic !== undefined ? { ...species, profile_picture: globalProfilePic } : species;
-          const displayImage = getSpeciesImageUrl(effectiveSpecies as any, 'square');
+          const displayImage = getSpeciesImageUrl(effectiveSpecies as any, 'medium') || getSpeciesImageUrl(effectiveSpecies as any, 'square');
           const finalImage = displayImage || imageUrl || (isInatLoading ? '' : placeholderImage);
           
           if (!finalImage) return null;
           
           return (
-            <Image
-              src={finalImage}
-              alt={commonName || species.scientific_name}
-              fill
-              sizes="(max-width: 768px) 192px, 192px"
-              onLoad={() => setImgLoaded(true)}
-              unoptimized={finalImage.includes('/api/image/transform')}
-              className={`
-                object-cover transition-all duration-700 group-hover:scale-110
-                ${!isFullyReady ? 'opacity-0 scale-105 blur-md' : 'opacity-100 scale-100 blur-0'}
-              `}
-            />
+            <div 
+              className="relative w-full h-full group/thumb cursor-pointer"
+              onClick={(e) => {
+                e.stopPropagation();
+                if (finalImage && finalImage !== placeholderImage) {
+                  onOpenLightbox?.({
+                    url: finalImage,
+                    commonName: commonName || species.scientific_name,
+                    scientificName: species.scientific_name,
+                  });
+                }
+              }}
+              title={language === 'zh' ? '點擊放大檢視照片' : 'Click to enlarge photo'}
+            >
+              <Image
+                src={finalImage}
+                alt={commonName || species.scientific_name}
+                fill
+                sizes="(max-width: 768px) 192px, 192px"
+                onLoad={() => setImgLoaded(true)}
+                unoptimized={finalImage.includes('/api/image/transform')}
+                className={`
+                  object-cover transition-all duration-700 group-hover:scale-110
+                  ${!isFullyReady ? 'opacity-0 scale-105 blur-md' : 'opacity-100 scale-100 blur-0'}
+                `}
+              />
+              <div className="absolute inset-0 bg-slate-900/30 opacity-0 group-hover/thumb:opacity-100 transition-opacity flex items-center justify-center text-white">
+                <Maximize2 className="w-5 h-5 shadow-sm" />
+              </div>
+            </div>
           );
         })()}
 
-        {!isFullyReady && (
+        {(!isFullyReady || !shouldLoad) && (
           <div className={`
             absolute inset-0 flex flex-col items-center justify-center bg-slate-50 z-10 overflow-hidden
             transition-all duration-500 ease-in-out
@@ -121,10 +165,32 @@ const HorizontalSpeciesCard = ({ species }: { species: Species }) => {
 };
 
 // 垂直卡片 - 用於 Mobile 與 Desktop Sidebar
-const MiniSpeciesCard = ({ species }: { species: Species }) => {
+const MiniSpeciesCard = ({ species, index, onOpenLightbox }: { species: Species; index: number; onOpenLightbox?: (photo: { url: string; commonName: string; scientificName: string }) => void }) => {
   const { language } = useLanguage();
   const { addSpecies, profilePictureMap } = useSpeciesPanel();
-  const { imageUrl, isLoading: isInatLoading } = useInaturalistPhoto(species.inat_id);
+
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [shouldLoad, setShouldLoad] = useState(index < 5);
+
+  useEffect(() => {
+    if (index < 5 || shouldLoad) return;
+    if (!containerRef.current) return;
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          setShouldLoad(true);
+          observer.disconnect();
+        }
+      },
+      { rootMargin: '100px 0px', threshold: 0.01 }
+    );
+
+    observer.observe(containerRef.current);
+    return () => observer.disconnect();
+  }, [index, shouldLoad]);
+
+  const { imageUrl, isLoading: isInatLoading } = useInaturalistPhoto(shouldLoad ? species.inat_id : undefined);
   
   const [imgLoaded, setImgLoaded] = useState(false);
   const [isFullyReady, setIsFullyReady] = useState(false);
@@ -148,6 +214,7 @@ const MiniSpeciesCard = ({ species }: { species: Species }) => {
 
   return (
     <motion.div 
+      ref={containerRef}
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
       whileHover={{ y: -2 }}
@@ -155,34 +222,52 @@ const MiniSpeciesCard = ({ species }: { species: Species }) => {
       className="group relative flex items-center gap-3 p-2.5 rounded-2xl bg-slate-50/50 hover:bg-emerald-50 border border-slate-100/60 hover:border-emerald-100 hover:shadow-lg hover:shadow-emerald-900/5 transition-all duration-300 cursor-pointer overflow-hidden shrink-0"
     >
       <div className="relative w-16 h-16 shrink-0 rounded-xl overflow-hidden bg-white shadow-inner flex items-center justify-center">
-        {/* Actual Image */}
-        {(() => {
+        {/* Actual Image & Lightbox Trigger */}
+        {shouldLoad && (() => {
           const taxaId = species.taxa_id || '';
           const globalProfilePic = taxaId ? profilePictureMap[taxaId] : undefined;
           const effectiveSpecies = globalProfilePic !== undefined ? { ...species, profile_picture: globalProfilePic } : species;
-          const displayImage = getSpeciesImageUrl(effectiveSpecies as any, 'square');
+          const displayImage = getSpeciesImageUrl(effectiveSpecies as any, 'medium') || getSpeciesImageUrl(effectiveSpecies as any, 'square');
           const finalImage = displayImage || imageUrl || (isInatLoading ? '' : placeholderImage);
           
           if (!finalImage) return null;
           
           return (
-            <Image
-              src={finalImage}
-              alt={commonName || species.scientific_name}
-              fill
-              sizes="64px"
-              onLoad={() => setImgLoaded(true)}
-              unoptimized={finalImage.includes('/api/image/transform')}
-              className={`
-                object-cover transition-all duration-700 group-hover:scale-115
-                ${!isFullyReady ? 'opacity-0 scale-110 blur-md' : 'opacity-100 scale-100 blur-0'}
-              `}
-            />
+            <div 
+              className="relative w-full h-full group/thumb cursor-pointer"
+              onClick={(e) => {
+                e.stopPropagation();
+                if (finalImage && finalImage !== placeholderImage) {
+                  onOpenLightbox?.({
+                    url: finalImage,
+                    commonName: commonName || species.scientific_name,
+                    scientificName: species.scientific_name,
+                  });
+                }
+              }}
+              title={language === 'zh' ? '點擊放大檢視照片' : 'Click to enlarge photo'}
+            >
+              <Image
+                src={finalImage}
+                alt={commonName || species.scientific_name}
+                fill
+                sizes="64px"
+                onLoad={() => setImgLoaded(true)}
+                unoptimized={finalImage.includes('/api/image/transform')}
+                className={`
+                  object-cover transition-all duration-700 group-hover:scale-115
+                  ${!isFullyReady ? 'opacity-0 scale-110 blur-md' : 'opacity-100 scale-100 blur-0'}
+                `}
+              />
+              <div className="absolute inset-0 bg-slate-900/30 opacity-0 group-hover/thumb:opacity-100 transition-opacity flex items-center justify-center text-white">
+                <Maximize2 className="w-4 h-4 shadow-sm" />
+              </div>
+            </div>
           );
         })()}
 
         {/* Nature Loader Overlay (Seamless Transition) */}
-        {!isFullyReady && (
+        {(!isFullyReady || !shouldLoad) && (
           <div className={`
             absolute inset-0 flex flex-col items-center justify-center bg-slate-50 z-10 overflow-hidden
             transition-all duration-500 ease-in-out
@@ -233,9 +318,22 @@ export default function CongenericExplorer({ species, isMobile = false }: Congen
   const { language } = useLanguage();
   const supabase = useMemo(() => createClient(), []);
   
+  const { setLightboxOpen } = useSpeciesPanel();
   const [congenericSpecies, setCongenericSpecies] = useState<Species[]>([]);
   const [discoveryLevel, setDiscoveryLevel] = useState<'genus' | 'subfamily' | 'family' | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isExpanded, setIsExpanded] = useState(false);
+  const [activeLightboxPhoto, setActiveLightboxPhoto] = useState<{ url: string; commonName: string; scientificName: string } | null>(null);
+
+  const handleOpenLightbox = useCallback((photo: { url: string; commonName: string; scientificName: string }) => {
+    setActiveLightboxPhoto(photo);
+    setLightboxOpen(true);
+  }, [setLightboxOpen]);
+
+  const handleCloseLightbox = useCallback(() => {
+    setActiveLightboxPhoto(null);
+    setLightboxOpen(false);
+  }, [setLightboxOpen]);
 
   useEffect(() => {
     async function fetchRelated() {
@@ -255,6 +353,7 @@ export default function CongenericExplorer({ species, isMobile = false }: Congen
             .select('*')
             .eq(genusField, genusValue)
             .neq('inat_id', species.inat_id)
+            .order('scientific_name', { ascending: true })
             .limit(20);
           
           if (data && data.length > 0) {
@@ -268,7 +367,11 @@ export default function CongenericExplorer({ species, isMobile = false }: Congen
               genus_eng: p.genus_eng,
             })) : data;
 
-            setCongenericSpecies([...mappedData].sort(() => Math.random() - 0.5));
+            const sortedData = [...mappedData].sort((a, b) => 
+              (a.scientific_name || '').localeCompare(b.scientific_name || '')
+            );
+
+            setCongenericSpecies(sortedData);
             setDiscoveryLevel('genus');
             setIsLoading(false);
             return;
@@ -282,6 +385,7 @@ export default function CongenericExplorer({ species, isMobile = false }: Congen
             .select('*')
             .eq(familyField, familyValue)
             .neq('inat_id', species.inat_id)
+            .order('scientific_name', { ascending: true })
             .limit(20);
           
           if (data && data.length > 0) {
@@ -297,7 +401,11 @@ export default function CongenericExplorer({ species, isMobile = false }: Congen
               genus_eng: p.genus_eng,
             })) : data;
 
-            setCongenericSpecies([...mappedData].sort(() => Math.random() - 0.5));
+            const sortedData = [...mappedData].sort((a, b) => 
+              (a.scientific_name || '').localeCompare(b.scientific_name || '')
+            );
+
+            setCongenericSpecies(sortedData);
             setDiscoveryLevel('family');
             setIsLoading(false);
             return;
@@ -334,6 +442,22 @@ export default function CongenericExplorer({ species, isMobile = false }: Congen
 
   if (!isLoading && congenericSpecies.length === 0) return null;
 
+  const hasMoreThanFive = congenericSpecies.length > 5;
+
+  const galleryPhotoFormat: InatGalleryPhoto[] = activeLightboxPhoto ? [{
+    id: 1,
+    url: activeLightboxPhoto.url,
+    large_url: activeLightboxPhoto.url,
+    medium_url: activeLightboxPhoto.url,
+    small_url: activeLightboxPhoto.url,
+    original_url: activeLightboxPhoto.url,
+    attribution: activeLightboxPhoto.commonName,
+    licenseCode: 'CC-BY',
+    nativePageUrl: activeLightboxPhoto.url,
+    observationUrl: '',
+    observedOn: '',
+  }] : [];
+
   return (
     <div className={`p-6 rounded-[2.5rem] bg-white border border-slate-100 shadow-sm ${isMobile ? 'mt-6 mb-8' : ''}`}>
       <div className="flex items-center justify-between mb-6">
@@ -367,8 +491,13 @@ export default function CongenericExplorer({ species, isMobile = false }: Congen
                 layout
                 className="flex flex-col gap-2 h-[460px] overflow-y-auto pr-1.5 custom-scrollbar"
               >
-                {congenericSpecies.map((item) => (
-                  <MiniSpeciesCard key={item.taxa_id || item.id} species={item} />
+                {congenericSpecies.map((item, idx) => (
+                  <MiniSpeciesCard 
+                    key={item.taxa_id || item.id} 
+                    species={item} 
+                    index={idx} 
+                    onOpenLightbox={handleOpenLightbox}
+                  />
                 ))}
               </motion.div>
             )}
@@ -382,26 +511,90 @@ export default function CongenericExplorer({ species, isMobile = false }: Congen
                   layout
                   className="hidden md:flex gap-4 overflow-x-auto pb-2 scrollbar-thin scrollbar-thumb-slate-200"
                 >
-                  {congenericSpecies.map((item) => (
-                    <HorizontalSpeciesCard key={item.taxa_id || item.id} species={item} />
+                  {congenericSpecies.map((item, idx) => (
+                    <HorizontalSpeciesCard 
+                      key={item.taxa_id || item.id} 
+                      species={item} 
+                      index={idx} 
+                      onOpenLightbox={handleOpenLightbox}
+                    />
                   ))}
                 </motion.div>
 
                 {/* Mobile Mode - Vertical List (flex md:hidden) */}
-                <motion.div 
-                  key="congeneric-mobile-vertical"
-                  layout
-                  className="flex md:hidden flex-col gap-2"
-                >
-                  {congenericSpecies.map((item) => (
-                    <MiniSpeciesCard key={item.taxa_id || item.id} species={item} />
+                <div key="congeneric-mobile-vertical" className="flex md:hidden flex-col gap-2">
+                  {/* 前 5 個永遠保持靜態無淡入淡出 */}
+                  {congenericSpecies.slice(0, 5).map((item, idx) => (
+                    <MiniSpeciesCard 
+                      key={item.taxa_id || item.id} 
+                      species={item} 
+                      index={idx} 
+                      onOpenLightbox={handleOpenLightbox}
+                    />
                   ))}
-                </motion.div>
+
+                  {/* 第 6 個之後的物種：平滑捲簾式展開/收起 (保持 Mount 以免重複觸發 Request，完全重用 Disk/Memory Cache) */}
+                  {hasMoreThanFive && (
+                    <motion.div
+                      initial={false}
+                      animate={{
+                        height: isExpanded ? 'auto' : 0,
+                        opacity: isExpanded ? 1 : 0,
+                        marginTop: isExpanded ? 0 : -8,
+                      }}
+                      transition={{ duration: 0.35, ease: [0.25, 1, 0.5, 1] }}
+                      className="overflow-hidden flex flex-col gap-2 pointer-events-auto"
+                    >
+                      {congenericSpecies.slice(5).map((item, idx) => (
+                        <MiniSpeciesCard 
+                          key={item.taxa_id || item.id} 
+                          species={item} 
+                          index={idx + 5} 
+                          onOpenLightbox={handleOpenLightbox}
+                        />
+                      ))}
+                    </motion.div>
+                  )}
+
+                  {/* Show More / Show Less Toggle Button for Mobile Mode */}
+                  {hasMoreThanFive && (
+                    <button
+                      type="button"
+                      onClick={() => setIsExpanded(!isExpanded)}
+                      className="mt-2 w-full py-2.5 px-4 rounded-2xl bg-slate-50 hover:bg-emerald-50 border border-slate-200/80 hover:border-emerald-200 text-xs font-bold text-slate-700 hover:text-emerald-700 transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-sm active:scale-[0.99]"
+                    >
+                      <span>
+                        {isExpanded
+                          ? (language === 'zh' ? '收起物種列表' : 'Show Less')
+                          : (language === 'zh'
+                            ? `顯示更多物種 (+${congenericSpecies.length - 5})`
+                            : `Show All Species (+${congenericSpecies.length - 5})`)}
+                      </span>
+                      {isExpanded ? (
+                        <ChevronUp className="w-4 h-4 text-emerald-600" />
+                      ) : (
+                        <ChevronDown className="w-4 h-4 text-emerald-600" />
+                      )}
+                    </button>
+                  )}
+                </div>
               </React.Fragment>
             )}
           </AnimatePresence>
         )}
       </div>
+
+      {/* Enriched Lightbox Modal (點擊卡片縮圖觸發直讀已下載圖片，無網絡發送) */}
+      {activeLightboxPhoto && (
+        <EnrichedLightbox
+          isOpen={!!activeLightboxPhoto}
+          onClose={handleCloseLightbox}
+          photos={galleryPhotoFormat}
+          currentIndex={0}
+          onNavigate={() => {}}
+          commonName={activeLightboxPhoto.commonName}
+        />
+      )}
     </div>
   );
 }
