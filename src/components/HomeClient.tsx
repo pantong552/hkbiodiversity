@@ -105,24 +105,24 @@ export default function HomeClient() {
     if (taxaType === 'flora') {
         const fetchMeta = async () => {
             const levels = ['categories', 'families', 'genuses'];
-            
             try {
                 const levelPromises = levels.map(async (level) => {
                     const rpcParams = {
-                        p_categories: level === 'categories' ? [] : plantFilters.categories,
-                        p_families: level === 'families' ? [] : plantFilters.families,
-                        p_genuses: level === 'genuses' ? [] : plantFilters.genuses,
-                        p_origins: plantFilters.origins.flatMap(o => 
+                        p_categories: level === 'categories' ? [] : (plantFilters.categories || []),
+                        p_families: level === 'families' ? [] : (plantFilters.families || []),
+                        p_genuses: level === 'genuses' ? [] : (plantFilters.genuses || []),
+                        p_origins: (plantFilters.origins || []).flatMap(o => 
                             o === 'Native' ? ['Native', '原生'] : o === 'Exotic' ? ['Exotic', '外來'] : [o]
                         ),
-                        p_is_cap96: plantFilters.isCap96,
-                        p_is_cap586: plantFilters.isCap586,
-                        p_is_rare: plantFilters.isRare,
-                        p_is_china_red_book: plantFilters.isInChinaRedBook,
-                        p_flowering_months: plantFilters.floweringMonths,
-                        p_fruiting_months: plantFilters.fruitingMonths,
-                        p_search: searchQuery.trim() || plantFilters.searchQuery.trim()
+                        p_is_cap96: plantFilters.isCap96 === true,
+                        p_is_cap586: plantFilters.isCap586 === true,
+                        p_is_rare: plantFilters.isRare === true,
+                        p_is_china_red_book: plantFilters.isInChinaRedBook === true,
+                        p_flowering_months: (plantFilters.floweringMonths || []).map(Number),
+                        p_fruiting_months: (plantFilters.fruitingMonths || []).map(Number),
+                        p_search: (searchQuery || plantFilters.searchQuery || '').trim()
                     };
+
                     const { data, error } = await supabaseSingleton.rpc('get_plant_stats', rpcParams);
                     return { level, data, error };
                 });
@@ -133,7 +133,7 @@ export default function HomeClient() {
                     categories: any[];
                     families: any[];
                     genuses: any[];
-                    [key: string]: any[]; // 加入索引簽名
+                    [key: string]: any[];
                 }
                 
                 const newMeta: PlantMeta = { categories: [], families: [], genuses: [] };
@@ -171,7 +171,6 @@ export default function HomeClient() {
     setCurrentPage(1);
     setSearchQuery('');
     setTableFilters({}); // 切換物種類型時清空表格篩選，以便 Metadata 重新初始化為全選
-    setIsFilterOpen(false);
   };
 
   // Handle Taxonomy Click from Species Card
@@ -689,7 +688,9 @@ export default function HomeClient() {
 
           {/* Sidebar Area */}
           <div className="shrink-0 min-[1101px]:w-[320px] space-y-6">
-            <TaxaGroupSwitcher activeType={taxaType} onChange={handleTaxaChange} />
+            <div className="hidden min-[1101px]:block">
+              <TaxaGroupSwitcher activeType={taxaType} onChange={handleTaxaChange} />
+            </div>
             
             {taxaType === 'fauna' ? (
                 <SidebarFilter
@@ -699,6 +700,8 @@ export default function HomeClient() {
                     onSearchSubmit={setSearchQuery}
                     searchQuery={searchQuery}
                     selectedFilters={selectedFilters}
+                    activeTaxaType={taxaType}
+                    onTaxaChange={handleTaxaChange}
                 />
             ) : (
                 <div className="hidden min-[1101px]:block animate-in fade-in slide-in-from-left-4 duration-500">
@@ -973,6 +976,8 @@ export default function HomeClient() {
             setSearchQuery('');
           }}
           onSearchSubmit={setSearchQuery}
+          activeTaxaType={taxaType}
+          onTaxaChange={handleTaxaChange}
         />
       )}
     </div>

@@ -7,6 +7,7 @@ import { supabase } from '@/lib/supabase';
 import QuickFilterSearch from './ui/QuickFilterSearch';
 import { getIUCNConfig, IUCN_CONFIG } from '../constants/statusStyles';
 import MultiSelectDropdown from './ui/MultiSelectDropdown';
+import TaxaGroupSwitcher from './search/TaxaGroupSwitcher';
 
 
 interface SidebarFilterProps {
@@ -16,6 +17,8 @@ interface SidebarFilterProps {
   onSearchSubmit: (value: string) => void;
   searchQuery?: string;
   selectedFilters?: SelectedFilters;
+  activeTaxaType?: 'fauna' | 'flora';
+  onTaxaChange?: (type: 'fauna' | 'flora') => void;
 }
 
 export interface SelectedFilters {
@@ -31,7 +34,9 @@ export default function SidebarFilter({
   onFilterChange,
   onSearchSubmit,
   searchQuery = '',
-  selectedFilters
+  selectedFilters,
+  activeTaxaType,
+  onTaxaChange
 }: SidebarFilterProps) {
   const { language, t } = useLanguage();
   const { getTaxonomyChi } = useTaxonomy();
@@ -285,23 +290,36 @@ export default function SidebarFilter({
         ${isOpen ? 'translate-x-0 opacity-100' : '-translate-x-full min-[1101px]:translate-x-0'}
         scrollbar-thin scrollbar-thumb-slate-100 scrollbar-track-transparent
       `}>
-        <div className="p-8">
+        <div className="p-6 min-[1101px]:p-8">
+          {activeTaxaType && onTaxaChange && (
+            <div className="min-[1101px]:hidden mb-4">
+              <TaxaGroupSwitcher activeType={activeTaxaType} onChange={onTaxaChange} compact={true} />
+            </div>
+          )}
+
           <div className="flex items-center justify-between mb-6">
-            <h2 className="text-2xl font-black text-emerald-900 flex items-center gap-3">
-              <Filter className="w-6 h-6 text-emerald-500" />
-              {t('filter.title')}
-            </h2>
-            {activeCount > 0 && (
-              <button
-                onClick={clearFilters}
-                className="text-xs font-bold text-emerald-600 hover:text-emerald-700 bg-emerald-50 px-2 py-1 rounded-lg transition-colors"
+            <div className="flex items-center gap-3">
+              <Filter className="w-5 h-5 min-[1101px]:w-6 min-[1101px]:h-6 text-emerald-600" />
+              <h2 className="text-2xl font-black text-emerald-900 flex items-center gap-3">
+                {t('filter.title')}
+              </h2>
+            </div>
+            <div className="flex items-center gap-2">
+              {activeCount > 0 && (
+                <button
+                  onClick={clearFilters}
+                  className="text-xs font-bold text-emerald-600 hover:text-emerald-700 bg-emerald-50 px-2 py-1 rounded-lg transition-colors"
+                >
+                  {t('filter.reset')}
+                </button>
+              )}
+              <button 
+                onClick={onClose} 
+                className="min-[1101px]:hidden p-2 bg-slate-50 hover:bg-slate-100 text-slate-400 hover:text-slate-600 rounded-xl transition-all"
               >
-                {t('filter.reset')}
+                <X className="w-5 h-5" />
               </button>
-            )}
-            <button onClick={onClose} className="min-[1101px]:hidden p-2 text-slate-400 hover:bg-emerald-50 rounded-xl">
-              <X className="w-6 h-6" />
-            </button>
+            </div>
           </div>
 
           <QuickFilterSearch
@@ -361,7 +379,7 @@ export default function SidebarFilter({
               )}
             </div>
 
-            <div className="space-y-4 pt-4 border-t border-emerald-50">
+            <div className="space-y-4">
               <button
                 onClick={() => toggleExpand('protection')}
                 className="w-full flex items-center justify-between text-sm font-black uppercase tracking-widest text-slate-400 hover:text-emerald-700 transition-colors"
@@ -371,29 +389,60 @@ export default function SidebarFilter({
               </button>
 
               {expanded.protection && (
-                <div className="grid grid-cols-2 gap-2 pt-2">
-                  {[
-                    { id: 'isCap170', label: language === 'zh' ? '第 170 章' : 'Cap. 170' },
-                    { id: 'isCap586', label: language === 'zh' ? '第 586 章' : 'Cap. 586' },
-                  ].map(item => (
-                    <button
-                      key={item.id}
-                      onClick={() => handleCapToggle(item.id as 'isCap170' | 'isCap586')}
-                      className={`flex flex-col items-center justify-center gap-1.5 p-3 rounded-2xl text-[11px] font-black transition-all border ${
-                        selected[item.id as 'isCap170' | 'isCap586'] === true
-                          ? 'bg-emerald-600 border-emerald-600 text-white shadow-md'
-                          : 'bg-white border-slate-100 text-slate-500 hover:bg-slate-50'
-                      }`}
-                    >
-                      <Shield className="w-3.5 h-3.5" />
-                      {item.label}
-                    </button>
-                  ))}
+                <div className="pt-2">
+                  {/* Desktop Grid with Icons */}
+                  <div className="hidden min-[1101px]:grid grid-cols-2 gap-2">
+                    {[
+                      { id: 'isCap170', label: language === 'zh' ? '第 170 章' : 'Cap. 170', icon: Shield },
+                      { id: 'isCap586', label: language === 'zh' ? '第 586 章' : 'Cap. 586', icon: Shield },
+                    ].map(item => {
+                      const isSelected = selected[item.id as 'isCap170' | 'isCap586'] === true;
+                      return (
+                        <button
+                          key={item.id}
+                          onClick={() => handleCapToggle(item.id as 'isCap170' | 'isCap586')}
+                          className={`flex flex-col items-center justify-center gap-1.5 p-3 rounded-2xl text-[11px] font-black transition-all border ${
+                            isSelected
+                              ? 'bg-emerald-600 border-emerald-600 text-white shadow-md'
+                              : 'bg-white border-slate-100 text-slate-400 hover:bg-slate-50'
+                          }`}
+                        >
+                          <item.icon className="w-3.5 h-3.5" />
+                          {item.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  {/* Mobile Compact Pills */}
+                  <div className="min-[1101px]:hidden flex flex-wrap gap-2">
+                    {[
+                      { id: 'isCap170', label: language === 'zh' ? '第 170 章' : 'Cap. 170' },
+                      { id: 'isCap586', label: language === 'zh' ? '第 586 章' : 'Cap. 586' },
+                    ].map(item => {
+                      const isSelected = selected[item.id as 'isCap170' | 'isCap586'] === true;
+                      return (
+                        <button
+                          key={item.id}
+                          onClick={() => handleCapToggle(item.id as 'isCap170' | 'isCap586')}
+                          className={`
+                            px-3 py-1.5 rounded-xl text-[11px] font-black transition-all border shadow-sm flex items-center gap-1.5 uppercase tracking-wider
+                            ${isSelected
+                              ? 'bg-emerald-600 border-emerald-600 text-white shadow-md scale-105 ring-2 ring-emerald-500/20'
+                              : 'bg-white border-slate-200 text-slate-600 hover:border-emerald-200 hover:bg-slate-50'}
+                          `}
+                        >
+                          {isSelected && <CheckCircle2 className="w-3 h-3" />}
+                          {item.label}
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
               )}
             </div>
 
-            <div className="space-y-4 pt-4 border-t border-emerald-50">
+            <div className="space-y-4">
               <button
                 onClick={() => toggleExpand('iucn')}
                 className="w-full flex items-center justify-between text-sm font-black uppercase tracking-widest text-slate-400 hover:text-emerald-700 transition-colors"

@@ -5,6 +5,7 @@ import { X, Filter } from 'lucide-react';
 import { useLanguage } from '@/context/LanguageContext';
 import { PlantFilterState } from '@/types/plants';
 import PlantFilterPanel from './plants/PlantFilterPanel';
+import TaxaGroupSwitcher from './search/TaxaGroupSwitcher';
 
 interface MobilePlantFilterProps {
   isOpen: boolean;
@@ -16,6 +17,8 @@ interface MobilePlantFilterProps {
   availableGenuses: any[];
   onReset: () => void;
   onSearchSubmit?: (val: string) => void;
+  activeTaxaType?: 'fauna' | 'flora';
+  onTaxaChange?: (type: 'fauna' | 'flora') => void;
 }
 
 export default function MobilePlantFilter({
@@ -27,7 +30,9 @@ export default function MobilePlantFilter({
   availableFamilies,
   availableGenuses,
   onReset,
-  onSearchSubmit
+  onSearchSubmit,
+  activeTaxaType,
+  onTaxaChange
 }: MobilePlantFilterProps) {
   const { language } = useLanguage();
 
@@ -58,25 +63,32 @@ export default function MobilePlantFilter({
         fixed top-0 left-0 h-[100dvh] w-[320px] bg-white z-[101] min-[1101px]:hidden
         shadow-2xl flex flex-col transition-all duration-500 cubic-bezier(0.4, 0, 0.2, 1)
         ${isOpen ? 'translate-x-0 opacity-100' : '-translate-x-full opacity-0 pointer-events-none'}
+        overflow-y-auto scrollbar-thin scrollbar-thumb-slate-100 scrollbar-track-transparent
       `}>
-        {/* Header */}
-        <div className="p-6 border-b border-slate-50 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <Filter className="w-5 h-5 text-emerald-600" />
-            <h2 className="text-2xl font-black text-emerald-900 flex items-center gap-3">
-              {language === 'zh' ? '植物篩選' : 'Plant Filter'}
-            </h2>
-          </div>
-          <button 
-            onClick={onClose}
-            className="p-2 bg-slate-50 hover:bg-slate-100 text-slate-400 hover:text-slate-600 rounded-xl transition-all"
-          >
-            <X className="w-5 h-5" />
-          </button>
-        </div>
+        <div className="p-6 min-[1101px]:p-8">
+          {activeTaxaType && onTaxaChange && (
+            <div className="min-[1101px]:hidden mb-4">
+              <TaxaGroupSwitcher activeType={activeTaxaType} onChange={onTaxaChange} compact={true} />
+            </div>
+          )}
 
-        {/* Content */}
-        <div className="flex-1 overflow-y-auto p-6 scrollbar-thin scrollbar-thumb-slate-100">
+          <div className="flex items-center justify-between mb-6">
+            <div className="flex items-center gap-3">
+              <Filter className="w-5 h-5 text-emerald-600" />
+              <h2 className="text-2xl font-black text-emerald-900 flex items-center gap-3">
+                {language === 'zh' ? '植物篩選' : 'Plant Filter'}
+              </h2>
+            </div>
+            <div className="flex items-center gap-2">
+              <button 
+                onClick={onClose}
+                className="p-2 bg-slate-50 hover:bg-slate-100 text-slate-400 hover:text-slate-600 rounded-xl transition-all"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+          </div>
+
           <PlantFilterPanel 
             filters={filters}
             setFilters={setFilters}

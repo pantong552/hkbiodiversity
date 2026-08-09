@@ -10,18 +10,19 @@ export type TaxaType = 'fauna' | 'flora';
 interface TaxaGroupSwitcherProps {
   activeType: TaxaType;
   onChange: (type: TaxaType) => void;
+  compact?: boolean;
 }
 
-export default function TaxaGroupSwitcher({ activeType, onChange }: TaxaGroupSwitcherProps) {
+export default function TaxaGroupSwitcher({ activeType, onChange, compact = false }: TaxaGroupSwitcherProps) {
   const { language } = useLanguage();
 
   const options = [
-    { id: 'fauna', label: language === 'zh' ? '動物 (Fauna)' : 'Fauna', icon: Dog },
-    { id: 'flora', label: language === 'zh' ? '植物 (Flora)' : 'Flora', icon: Leaf },
+    { id: 'fauna', label: language === 'zh' ? (compact ? '動物' : '動物 (Fauna)') : 'Fauna', icon: Dog },
+    { id: 'flora', label: language === 'zh' ? (compact ? '植物' : '植物 (Flora)') : 'Flora', icon: Leaf },
   ] as const;
 
   return (
-    <div className="relative flex p-1 bg-slate-100 rounded-2xl w-full mb-6 ring-1 ring-slate-200/50 shadow-inner">
+    <div className={`relative flex p-1 bg-slate-100 rounded-2xl w-full ring-1 ring-slate-200/50 shadow-inner ${compact ? 'mb-4' : 'mb-6'}`}>
       {/* Active Background Slide */}
       <motion.div
         className="absolute h-[calc(100%-8px)] bg-white rounded-xl shadow-sm z-0"

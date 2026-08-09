@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Calendar, Shield, RotateCcw, Star, BookOpen, Filter, Search, ChevronDown, ChevronRight } from 'lucide-react';
+import { Calendar, Shield, RotateCcw, Star, BookOpen, Filter, Search, ChevronDown, ChevronRight, CheckCircle2 } from 'lucide-react';
 import { useLanguage } from '@/context/LanguageContext';
 import { PlantFilterState } from '@/types/plants';
 import MultiSelectDropdown from '@/components/ui/MultiSelectDropdown';
@@ -135,7 +135,7 @@ export default function PlantFilterPanel({
         {expanded.category && (
           <MultiSelectDropdown 
             label={t.category}
-            options={availableCategories.map(cat => ({ name: cat.name, display: cat.display }))}
+            options={availableCategories.map(cat => ({ name: cat.name, display: cat.display, count: cat.count }))}
             selectedValues={filters.categories}
             onChange={(values) => setFilters(prev => ({ ...prev, categories: values }))}
             placeholder={t.category}
@@ -144,7 +144,7 @@ export default function PlantFilterPanel({
       </div>
 
       {/* Family & Genus (Custom Dropdown) */}
-      <div className="space-y-4 pt-4 border-t border-emerald-50">
+      <div className="space-y-4">
         <button
           onClick={() => toggleExpand('classification')}
           className="w-full flex items-center justify-between text-sm font-black uppercase tracking-widest text-slate-400 hover:text-emerald-700 transition-colors"
@@ -173,7 +173,7 @@ export default function PlantFilterPanel({
       </div>
 
       {/* Origin Filter */}
-      <div className="space-y-4 pt-4 border-t border-emerald-50">
+      <div className="space-y-4">
         <button
           onClick={() => toggleExpand('origin')}
           className="w-full flex items-center justify-between text-sm font-black uppercase tracking-widest text-slate-400 hover:text-emerald-700 transition-colors"
@@ -212,7 +212,7 @@ export default function PlantFilterPanel({
       </div>
 
       {/* Protection & Rarity Status */}
-      <div className="space-y-4 pt-4 border-t border-emerald-50">
+      <div className="space-y-4">
         <button
           onClick={() => toggleExpand('protection')}
           className="w-full flex items-center justify-between text-sm font-black uppercase tracking-widest text-slate-400 hover:text-emerald-700 transition-colors"
@@ -221,32 +221,65 @@ export default function PlantFilterPanel({
           {expanded.protection ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
         </button>
         {expanded.protection && (
-          <div className="grid grid-cols-2 gap-2">
-            {[
-              { id: 'isCap96', label: t.cap96, icon: Shield },
-              { id: 'isCap586', label: t.cap586, icon: Shield },
-              { id: 'isRare', label: t.isRare, icon: Star },
-              { id: 'isInChinaRedBook', label: t.redBook, icon: BookOpen },
-            ].map(item => (
-              <button
-                key={item.id}
-                onClick={() => setFilters(prev => ({ ...prev, [item.id as any]: (prev as any)[item.id] === true ? null : true }))}
-                className={`flex flex-col items-center justify-center gap-1.5 p-3 rounded-2xl text-[10px] font-black transition-all border ${
-                  (filters as any)[item.id] === true
-                    ? `bg-emerald-600 border-emerald-600 text-white shadow-md`
-                    : 'bg-white border-slate-100 text-slate-400 hover:bg-slate-50'
-                }`}
-              >
-                <item.icon className="w-3.5 h-3.5" />
-                {item.label}
-              </button>
-            ))}
+          <div className="pt-2">
+            {/* Desktop Grid with Icons */}
+            <div className="hidden min-[1101px]:grid grid-cols-2 gap-2">
+              {[
+                { id: 'isCap96', label: t.cap96, icon: Shield },
+                { id: 'isCap586', label: t.cap586, icon: Shield },
+                { id: 'isRare', label: t.isRare, icon: Star },
+                { id: 'isInChinaRedBook', label: t.redBook, icon: BookOpen },
+              ].map(item => {
+                const isSelected = (filters as any)[item.id] === true;
+                return (
+                  <button
+                    key={item.id}
+                    onClick={() => setFilters(prev => ({ ...prev, [item.id as any]: (prev as any)[item.id] === true ? null : true }))}
+                    className={`flex flex-col items-center justify-center gap-1.5 p-3 rounded-2xl text-[11px] font-black transition-all border ${
+                      isSelected
+                        ? 'bg-emerald-600 border-emerald-600 text-white shadow-md'
+                        : 'bg-white border-slate-100 text-slate-400 hover:bg-slate-50'
+                    }`}
+                  >
+                    <item.icon className="w-3.5 h-3.5" />
+                    {item.label}
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Mobile Compact Pills */}
+            <div className="min-[1101px]:hidden flex flex-wrap gap-2">
+              {[
+                { id: 'isCap96', label: t.cap96 },
+                { id: 'isCap586', label: t.cap586 },
+                { id: 'isRare', label: t.isRare },
+                { id: 'isInChinaRedBook', label: t.redBook },
+              ].map(item => {
+                const isSelected = (filters as any)[item.id] === true;
+                return (
+                  <button
+                    key={item.id}
+                    onClick={() => setFilters(prev => ({ ...prev, [item.id as any]: (prev as any)[item.id] === true ? null : true }))}
+                    className={`
+                      px-3 py-1.5 rounded-xl text-[11px] font-black transition-all border shadow-sm flex items-center gap-1.5 uppercase tracking-wider
+                      ${isSelected
+                        ? 'bg-emerald-600 border-emerald-600 text-white shadow-md scale-105 ring-2 ring-emerald-500/20'
+                        : 'bg-white border-slate-200 text-slate-600 hover:border-emerald-200 hover:bg-slate-50'}
+                    `}
+                  >
+                    {isSelected && <CheckCircle2 className="w-3 h-3" />}
+                    {item.label}
+                  </button>
+                );
+              })}
+            </div>
           </div>
         )}
       </div>
 
       {/* Months Area */}
-      <div className="space-y-6 pt-4 border-t border-emerald-50">
+      <div className="space-y-6">
           {/* Flowering Months */}
           <div className="space-y-4">
             <button
