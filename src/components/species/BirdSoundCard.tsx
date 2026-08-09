@@ -498,15 +498,23 @@ export default function BirdSoundCard({ scientificName, commonName }: BirdSoundC
                   )}
                 </div>
 
-                {/* 2. Spectrogram Container (位置：移到 AudioPlayer 上方) */}
-                {isLoaded && isSpectroOpen && sonoImgUrl && (
-                  <div className="animate-fadeIn">
-                    <SpectrogramViewer
-                      sonoImgUrl={sonoImgUrl}
-                      recId={rec.id}
-                      audioElementRef={audioRef}
-                      language={language}
-                    />
+                {/* 2. Spectrogram Container (Smooth grid-rows collapse/expand animation) */}
+                {isLoaded && sonoImgUrl && (
+                  <div
+                    className={`grid transition-all duration-300 ease-in-out ${
+                      isSpectroOpen
+                        ? 'grid-rows-[1fr] opacity-100 mt-2 mb-1'
+                        : 'grid-rows-[0fr] opacity-0 mt-0 mb-0 pointer-events-none'
+                    }`}
+                  >
+                    <div className="overflow-hidden">
+                      <SpectrogramViewer
+                        sonoImgUrl={sonoImgUrl}
+                        recId={rec.id}
+                        audioElementRef={audioRef}
+                        language={language}
+                      />
+                    </div>
                   </div>
                 )}
 
@@ -585,37 +593,49 @@ export default function BirdSoundCard({ scientificName, commonName }: BirdSoundC
                         <span className="font-semibold text-slate-800">{rec.date || '-'} {rec.time || ''}</span>
                       </div>
                       <div>
-                        <span className="text-[10px] font-bold text-slate-400 block">{language === 'zh' ? '經緯度 (Lat / Lon)' : 'Coordinates'}</span>
+                        <span className="text-[10px] font-bold text-slate-400 block">{language === 'zh' ? '經緯度' : 'Coordinates (Lat / Lon)'}</span>
                         <span className="font-semibold text-slate-800">
                           {rec.lat && rec.lon ? `${rec.lat}, ${rec.lon}` : '-'}
                         </span>
                       </div>
                       <div>
-                        <span className="text-[10px] font-bold text-slate-400 block">{language === 'zh' ? '海拔 (Elevation)' : 'Altitude'}</span>
+                        <span className="text-[10px] font-bold text-slate-400 block">{language === 'zh' ? '海拔' : 'Altitude (Elevation)'}</span>
                         <span className="font-semibold text-slate-800">{rec.alt ? `${rec.alt}m` : '-'}</span>
                       </div>
                       <div>
-                        <span className="text-[10px] font-bold text-slate-400 block">{language === 'zh' ? '發聲個體階段 / 性別' : 'Stage / Sex'}</span>
+                        <span className="text-[10px] font-bold text-slate-400 block">{language === 'zh' ? '發聲個體階段 │ 性別' : 'Stage │ Sex'}</span>
                         <span className="font-semibold text-slate-800 capitalize">
-                          {[rec.stage, rec.sex].filter(Boolean).join(', ') || '-'}
+                          {[rec.stage, rec.sex].filter(Boolean).join(' │ ') || '-'}
                         </span>
                       </div>
                       <div>
                         <span className="text-[10px] font-bold text-slate-400 block">{language === 'zh' ? '錄音方法' : 'Method'}</span>
-                        <span className="font-semibold text-slate-800">{rec.method || '-'}</span>
+                        <span className="font-semibold text-slate-800">
+                          {rec.method
+                            ? rec.method.charAt(0).toUpperCase() + rec.method.slice(1)
+                            : '-'}
+                        </span>
                       </div>
                       <div>
-                        <span className="text-[10px] font-bold text-slate-400 block">{language === 'zh' ? '採樣率 (Sample rate)' : 'Sample Rate'}</span>
+                        <span className="text-[10px] font-bold text-slate-400 block">{language === 'zh' ? '採樣率' : 'Sample Rate'}</span>
                         <span className="font-semibold text-slate-800">{rec.smp ? `${rec.smp} Hz` : '-'}</span>
                       </div>
                       <div>
-                        <span className="text-[10px] font-bold text-slate-400 block">{language === 'zh' ? '錄音品質等級 (Quality)' : 'Quality Rating'}</span>
+                        <span className="text-[10px] font-bold text-slate-400 block">{language === 'zh' ? '錄音品質等級' : 'Quality Rating'}</span>
                         <span className="font-extrabold text-emerald-600">Grade {rec.q || '-'}</span>
                       </div>
                       <div>
-                        <span className="text-[10px] font-bold text-slate-400 block">{language === 'zh' ? '目擊動物 / 回放引誘' : 'Seen / Playback'}</span>
+                        <span className="text-[10px] font-bold text-slate-400 block">{language === 'zh' ? '目擊動物 │ 回放引誘' : 'Seen │ Playback'}</span>
                         <span className="font-semibold text-slate-800">
-                          Seen: {rec['animal-seen'] || '-'} | Playback: {rec['playback-used'] || '-'}
+                          {(() => {
+                            const formatBool = (val?: string) => {
+                              if (!val || val === 'unknown') return '-';
+                              const isYes = val.toLowerCase() === 'yes';
+                              if (language === 'zh') return isYes ? '是' : '否';
+                              return isYes ? 'Yes' : 'No';
+                            };
+                            return `${formatBool(rec['animal-seen'])} │ ${formatBool(rec['playback-used'])}`;
+                          })()}
                         </span>
                       </div>
                       <div>
