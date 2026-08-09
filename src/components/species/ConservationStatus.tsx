@@ -60,9 +60,21 @@ export default function ConservationStatus({ species }: ConservationStatusProps)
       isHkbws: false
     },
     { 
-      labelChi: '香港保護法例', 
-      labelEng: 'HK Protection Status', 
-      value: species.hk_protection,
+      labelChi: '保護瀕危動植物物種條例（第586章）', 
+      labelEng: 'Protection of Endangered Species Ordinance (Cap. 586)', 
+      value: formatYesNo(species.cap586),
+      isHkbws: false
+    },
+    { 
+      labelChi: '野生動物保護條例（第170章）', 
+      labelEng: 'Wild Animal Protection Ordinance (Cap. 170)', 
+      value: formatYesNo(species.cap170),
+      isHkbws: false
+    },
+    { 
+      labelChi: 'CITES 附錄', 
+      labelEng: 'CITES Appendix', 
+      value: species.cites,
       isHkbws: false
     },
     { 
@@ -113,30 +125,17 @@ export default function ConservationStatus({ species }: ConservationStatusProps)
         ))}
         
         {/* Additional information if present */}
-        {(species.endemic || species.cites) && (
+        {species.endemic && (
           <div className="col-span-2 lg:col-span-3 grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-6 pt-3 sm:pt-4 border-t border-slate-50 mt-1 sm:mt-2">
-            {species.endemic && (
-              <div className="group">
-                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1 sm:mb-2 block">
-                  {language === 'zh' ? '特有種' : 'Endemicity'}
-                </span>
-                <div className="flex justify-between items-center px-3.5 sm:px-5 py-2.5 sm:py-4 bg-amber-50 rounded-xl sm:rounded-2xl border border-amber-100 group-hover:bg-amber-100 transition-colors">
-                  <span className="text-xs sm:text-sm font-bold sm:font-black text-amber-900">{species.endemic}</span>
-                  <Info className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-amber-400" />
-                </div>
+            <div className="group">
+              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1 sm:mb-2 block">
+                {language === 'zh' ? '特有種' : 'Endemicity'}
+              </span>
+              <div className="flex justify-between items-center px-3.5 sm:px-5 py-2.5 sm:py-4 bg-amber-50 rounded-xl sm:rounded-2xl border border-amber-100 group-hover:bg-amber-100 transition-colors">
+                <span className="text-xs sm:text-sm font-bold sm:font-black text-amber-900">{species.endemic}</span>
+                <Info className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-amber-400" />
               </div>
-            )}
-            {species.cites && (
-              <div className="group">
-                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1 sm:mb-2 block">
-                  CITES
-                </span>
-                <div className="flex justify-between items-center px-3.5 sm:px-5 py-2.5 sm:py-4 bg-blue-50 rounded-xl sm:rounded-2xl border border-blue-100 group-hover:bg-blue-100 transition-colors">
-                  <span className="text-xs sm:text-sm font-bold sm:font-black text-blue-900">{species.cites}</span>
-                  <Info className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-blue-400" />
-                </div>
-              </div>
-            )}
+            </div>
           </div>
         )}
       </div>

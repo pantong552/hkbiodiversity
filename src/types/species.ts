@@ -36,7 +36,8 @@ export interface Species {
   hkbws_cat?: string;
   cites?: string;
   endemic?: string;
-  hk_protection?: string;
+  cap170?: string;
+  cap586?: string;
   iucn: string;
   native_status?: string;
   restrictedness?: string;

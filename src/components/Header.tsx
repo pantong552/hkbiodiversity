@@ -38,6 +38,15 @@ export default function Header({ isHomePage: propIsHomePage }: HeaderProps = {})
   const lastScrollYRef = useRef(0);
   const mobileMenuRef = useRef<HTMLDivElement>(null);
   const menuToggleRef = useRef<HTMLButtonElement>(null);
+  const isMobileMenuOpenRef = useRef(isMobileMenuOpen);
+
+  // 保持 isMobileMenuOpenRef 與最新 state 同步，且開啟 Menu 時確保 Header 保持顯示
+  useEffect(() => {
+    isMobileMenuOpenRef.current = isMobileMenuOpen;
+    if (isMobileMenuOpen) {
+      setIsVisible(true);
+    }
+  }, [isMobileMenuOpen]);
 
   // 監聽 BFCache（Back-Forward Cache）頁面恢復事件
   // 當 Refresh 或返回時從快取恢復頁面，強制重新同步 scroll 狀態
@@ -54,7 +63,7 @@ export default function Header({ isHomePage: propIsHomePage }: HeaderProps = {})
   useEffect(() => {
 
     const handleScroll = (e?: Event) => {
-      if (e && isMobileMenuOpen) setIsMobileMenuOpen(false);
+      if (e && isMobileMenuOpenRef.current) setIsMobileMenuOpen(false);
 
       let currentScrollY = typeof window !== 'undefined' ? window.scrollY : 0;
       let isNearBottom = false;
@@ -80,7 +89,7 @@ export default function Header({ isHomePage: propIsHomePage }: HeaderProps = {})
       if (Math.abs(deltaY) > 10) {
         if (currentScrollY <= 50) {
           setIsVisible(true);
-        } else if (deltaY > 0 && currentScrollY > 100) {
+        } else if (deltaY > 0 && currentScrollY > 100 && !isMobileMenuOpenRef.current) {
           setIsVisible(false);
         } else if (deltaY < 0 && !isNearBottom) {
           setIsVisible(true);
@@ -91,7 +100,7 @@ export default function Header({ isHomePage: propIsHomePage }: HeaderProps = {})
       }
     };
 
-    // 切換模式/頁面時，同步當前目標容器的 scrollY
+    // 切換模式/頁面 (isExpanded 改變) 時，同步當前目標容器的 scrollY
     const currentScrollY = isExpanded
       ? (document.getElementById('species-panel-scroll-container')?.scrollTop || 0)
       : (typeof window !== 'undefined' ? window.scrollY : 0);
@@ -122,7 +131,7 @@ export default function Header({ isHomePage: propIsHomePage }: HeaderProps = {})
         panelContainer.removeEventListener('scroll', handleScroll);
       }
     };
-  }, [isExpanded, isMobileMenuOpen]);
+  }, [isExpanded]);
 
   // 處理點擊外部關閉選單
   useEffect(() => {
