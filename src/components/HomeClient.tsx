@@ -371,7 +371,13 @@ export default function HomeClient() {
         if (currentFetchId !== fetchIdRef.current) return;
 
         setSpecies(data || []);
-        setTotalResultCount(count || 0);
+        const total = count || 0;
+        setTotalResultCount(total);
+
+        // 手機模式下，若結果太少不足以觸發出現 Scrollbar（例如少於 4 筆），直接開啟 mobile filter panel
+        if (typeof window !== 'undefined' && window.innerWidth <= 1100 && total <= 3) {
+          setIsFilterOpen(true);
+        }
       } catch (err: any) {
         setError(err.message || '連線錯誤');
       } finally {
