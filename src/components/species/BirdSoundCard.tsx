@@ -230,18 +230,15 @@ export default function BirdSoundCard({ scientificName, commonName }: BirdSoundC
 
   return (
     <section className="bg-white p-6 sm:p-8 rounded-[2.5rem] shadow-sm border border-slate-100 space-y-6">
-      {/* Header */}
-      <div className="border-b border-slate-100 pb-5">
+      {/* Header (無下劃分隔線與數字 Badge) */}
+      <div>
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-2xl bg-emerald-50 flex items-center justify-center text-emerald-600 shadow-sm border border-emerald-100/50">
             <Volume2 className="w-5 h-5" />
           </div>
           <div>
-            <h2 className="text-xl font-black text-slate-900 leading-tight flex items-center gap-2">
-              <span>{language === 'zh' ? '鳥類鳴聲紀錄' : 'Bird Sounds'}</span>
-              <span className="text-xs px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 font-extrabold">
-                {rawRecordings.length}
-              </span>
+            <h2 className="text-xl font-black text-slate-900 leading-tight">
+              {language === 'zh' ? '鳥類鳴聲' : 'Bird Sounds'}
             </h2>
             <p className="text-xs font-medium text-slate-400">
               {language === 'zh' ? '來自 Xeno-Canto 野外錄音資料庫' : 'Field recordings from Xeno-Canto'}
@@ -255,7 +252,7 @@ export default function BirdSoundCard({ scientificName, commonName }: BirdSoundC
         <div className="space-y-2">
           <label className="text-[11px] font-extrabold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
             <Tag className="w-3 h-3 text-emerald-500" />
-            <span>{language === 'zh' ? '鳴聲類型篩選 (Type)' : 'Filter by Sound Type'}</span>
+            <span>{language === 'zh' ? '鳴聲類型篩選' : 'Filter by Sound Type'}</span>
           </label>
 
           {/* Mobile Mode: Completely Customized Floating Dropdown Menu */}
@@ -272,7 +269,7 @@ export default function BirdSoundCard({ scientificName, commonName }: BirdSoundC
                 <span className="capitalize truncate">
                   {selectedType === 'ALL'
                     ? language === 'zh'
-                      ? '全部 (All)'
+                      ? '全部'
                       : 'All'
                     : selectedType}
                 </span>
@@ -305,7 +302,7 @@ export default function BirdSoundCard({ scientificName, commonName }: BirdSoundC
                       : 'text-slate-700 hover:bg-slate-50'
                   }`}
                 >
-                  <span className="truncate">{language === 'zh' ? '全部 (All)' : 'All'}</span>
+                  <span className="truncate">{language === 'zh' ? '全部' : 'All'}</span>
                   <div className="flex items-center gap-2 shrink-0">
                     <span className="text-[10px] px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 font-bold">
                       {rawRecordings.length}
@@ -359,7 +356,7 @@ export default function BirdSoundCard({ scientificName, commonName }: BirdSoundC
                   : 'bg-slate-100 text-slate-600 hover:bg-slate-200/80'
               }`}
             >
-              <span>{language === 'zh' ? '全部 (All)' : 'All'}</span>
+              <span>{language === 'zh' ? '全部' : 'All'}</span>
               <span
                 className={`text-[10px] px-1.5 py-0.2 rounded-full font-black ${
                   selectedType === 'ALL' ? 'bg-white/20 text-white' : 'bg-slate-200 text-slate-700'
@@ -434,7 +431,6 @@ export default function BirdSoundCard({ scientificName, commonName }: BirdSoundC
                 ? `顯示 ${filteredRecordings.length} / ${rawRecordings.length} 筆錄音`
                 : `Showing ${filteredRecordings.length} / ${rawRecordings.length} recordings`}
             </span>
-            <span>Xeno-Canto Field Archive</span>
           </div>
 
           {filteredRecordings.map((rec, index) => {
@@ -490,10 +486,24 @@ export default function BirdSoundCard({ scientificName, commonName }: BirdSoundC
                       className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${
                         rec.status === 'identified'
                           ? 'bg-emerald-50 text-emerald-600 border border-emerald-200/50'
-                          : 'bg-amber-50 text-amber-600 border border-amber-200/50'
+                          : rec.status === 'unidentified'
+                          ? 'bg-red-50 text-red-600 border border-red-200/50'
+                          : rec.status === 'questioned'
+                          ? 'bg-amber-50 text-amber-600 border border-amber-200/50'
+                          : 'bg-slate-100 text-slate-600 border border-slate-200/50'
                       }`}
                     >
-                      {rec.status}
+                      {language === 'zh'
+                        ? rec.status === 'identified'
+                          ? '已確認'
+                          : rec.status === 'unidentified'
+                          ? '未確認'
+                          : rec.status === 'questioned'
+                          ? '存疑'
+                          : rec.status === 'unconfirmed'
+                          ? '待核實'
+                          : rec.status
+                        : rec.status}
                     </span>
                   )}
                 </div>
