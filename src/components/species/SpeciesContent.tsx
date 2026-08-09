@@ -18,6 +18,7 @@ import GbifGlobalMap from './GbifGlobalMap';
 import { formatScientificName } from '@/utils/formatters';
 import CongenericExplorer from './CongenericExplorer';
 import SimilarSpeciesExplorer from './SimilarSpeciesExplorer';
+import BirdSoundCard from './BirdSoundCard';
 import SpeciesContributionCard from './SpeciesContributionCard';
 import { useTaxonomy } from '@/context/TaxonomyContext';
 
@@ -450,6 +451,14 @@ export default function SpeciesContent({ species, showBreadcrumb = true, refresh
 
             {/* Conservation Status - Back to original place */}
             <ConservationStatus species={species} />
+
+            {/* Bird Sound Recordings Card (Xeno-Canto) */}
+            {String(species.taxa_group || '').trim().toUpperCase() === 'BIRD' && (
+              <BirdSoundCard
+                scientificName={species.scientific_name}
+                commonName={language === 'zh' ? species.common_name_chi : species.common_name_eng}
+              />
+            )}
 
             {/* Similar Species Section */}
             <SimilarSpeciesExplorer species={species} />
