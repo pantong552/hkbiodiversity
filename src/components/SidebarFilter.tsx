@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
-import { ChevronDown, ChevronRight, Search, Filter, X, CheckCircle2, RotateCcw } from 'lucide-react';
+import { ChevronDown, ChevronRight, Search, Filter, X, CheckCircle2, RotateCcw, Shield } from 'lucide-react';
 import { Species, TaxonomyLevel } from '../types/species';
 import { useLanguage } from '../context/LanguageContext';
 import { useTaxonomy } from '../context/TaxonomyContext';
@@ -21,6 +21,8 @@ interface SidebarFilterProps {
 export interface SelectedFilters {
   taxonomy: Record<TaxonomyLevel, string[]>;
   iucn: string[];
+  isCap170?: boolean | null;
+  isCap586?: boolean | null;
 }
 
 export default function SidebarFilter({
@@ -48,6 +50,7 @@ export default function SidebarFilter({
 
   const [expanded, setExpanded] = useState<Record<string, boolean>>({
     taxonomy: true,
+    protection: true,
     iucn: true,
     taxaGroup: true,
     phylum_eng: false,
@@ -68,6 +71,8 @@ export default function SidebarFilter({
       informal_group_eng: [],
     },
     iucn: [],
+    isCap170: null,
+    isCap586: null,
   });
 
   // 1. Sync local selected state with external selectedFilters prop
@@ -110,7 +115,9 @@ export default function SidebarFilter({
             p_genus_eng: level === 'genus_eng' ? [] : selected.taxonomy.genus_eng,
             p_informal_group_eng: level === 'informal_group_eng' ? [] : selected.taxonomy.informal_group_eng,
             p_iucn: selected.iucn,
-            p_search: searchQuery
+            p_search: searchQuery,
+            p_is_cap170: selected.isCap170 || null,
+            p_is_cap586: selected.isCap586 || null,
           };
           const { data, error } = await supabase.rpc('get_species_stats', rpcParams);
           return { level, data, error };
@@ -125,7 +132,9 @@ export default function SidebarFilter({
           p_genus_eng: selected.taxonomy.genus_eng,
           p_informal_group_eng: selected.taxonomy.informal_group_eng,
           p_iucn: selected.iucn,
-          p_search: searchQuery
+          p_search: searchQuery,
+          p_is_cap170: selected.isCap170 || null,
+          p_is_cap586: selected.isCap586 || null,
         });
 
         const [levelResults, iucnResult] = await Promise.all([
@@ -232,17 +241,32 @@ export default function SidebarFilter({
     onFilterChange(newSelected);
   };
 
+  const handleCapToggle = (key: 'isCap170' | 'isCap586') => {
+    const newSelected = {
+      ...selected,
+      [key]: selected[key] === true ? null : true
+    };
+    setSelected(newSelected);
+    onFilterChange(newSelected);
+  };
+
   const clearFilters = () => {
     const reset = {
       taxonomy: { phylum_eng: [], class_eng: [], order_eng: [], family_eng: [], genus_eng: [], informal_group_eng: [] },
       iucn: [],
+      isCap170: null,
+      isCap586: null,
     };
     setSelected(reset);
     onFilterChange(reset);
     onSearchSubmit('');
   };
 
-  const activeCount = Object.values(selected.taxonomy).flat().length + selected.iucn.length + (searchQuery.length > 0 ? 1 : 0);
+  const activeCount = Object.values(selected.taxonomy).flat().length 
+    + selected.iucn.length 
+    + (selected.isCap170 ? 1 : 0) 
+    + (selected.isCap586 ? 1 : 0) 
+    + (searchQuery.length > 0 ? 1 : 0);
 
   return (
     <>
@@ -333,6 +357,38 @@ export default function SidebarFilter({
                         placeholder={TAXONOMY_LABELS[level]}
                       />
                     ))}
+                </div>
+              )}
+            </div>
+
+            <div className="space-y-4 pt-4 border-t border-emerald-50">
+              <button
+                onClick={() => toggleExpand('protection')}
+                className="w-full flex items-center justify-between text-sm font-black uppercase tracking-widest text-slate-400 hover:text-emerald-700 transition-colors"
+              >
+                {language === 'zh' ? '法律保護' : 'Protection'}
+                {expanded.protection ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+              </button>
+
+              {expanded.protection && (
+                <div className="grid grid-cols-2 gap-2 pt-2">
+                  {[
+                    { id: 'isCap170', label: language === 'zh' ? '第 170 章' : 'Cap. 170' },
+                    { id: 'isCap586', label: language === 'zh' ? '第 586 章' : 'Cap. 586' },
+                  ].map(item => (
+                    <button
+                      key={item.id}
+                      onClick={() => handleCapToggle(item.id as 'isCap170' | 'isCap586')}
+                      className={`flex flex-col items-center justify-center gap-1.5 p-3 rounded-2xl text-[11px] font-black transition-all border ${
+                        selected[item.id as 'isCap170' | 'isCap586'] === true
+                          ? 'bg-emerald-600 border-emerald-600 text-white shadow-md'
+                          : 'bg-white border-slate-100 text-slate-500 hover:bg-slate-50'
+                      }`}
+                    >
+                      <Shield className="w-3.5 h-3.5" />
+                      {item.label}
+                    </button>
+                  ))}
                 </div>
               )}
             </div>

@@ -264,6 +264,14 @@ export default function HomeClient() {
                 query = query.in('native_status', finalNative);
             }
 
+            // Protection Filters (Cap. 170 & Cap. 586)
+            if (selectedFilters.isCap170) {
+                query = query.eq('cap170', 'Y');
+            }
+            if (selectedFilters.isCap586) {
+                query = query.eq('cap586', 'Y');
+            }
+
             // Scientific & Common Name Table Filters
             if (tableFilters.scientific_name?.length > 0) {
                 query = query.in('scientific_name', tableFilters.scientific_name);
