@@ -69,6 +69,7 @@ export default function QuickFilterSearch({
   const { isAuthorized, requireAuth } = useAuth();
   const { addSpecies, setIsFilterOpen, skipNextAutoCollapse } = useSpeciesPanel();
   const [localValue, setLocalValue] = useState(initialValue);
+  const [isFocused, setIsFocused] = useState(false);
 
   // Suggestions state
   const [suggestions, setSuggestions] = useState<SuggestionItem[]>([]);
@@ -77,6 +78,7 @@ export default function QuickFilterSearch({
   const [selectedIndex, setSelectedIndex] = useState<number>(-1);
 
   const containerRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
 
   // Sync with initialValue (e.g. when filters are reset globally)
@@ -84,10 +86,10 @@ export default function QuickFilterSearch({
     setLocalValue(initialValue);
   }, [initialValue]);
 
-  // Debounced Suggestion Fetching (限制：必須已登入且帳號 status 為 active 才會抓取建議)
+  // Debounced Suggestion Fetching (限制：必須已登入且帳號 status 為 active 且輸入框處於 focus 狀態才會抓取建議)
   useEffect(() => {
     const trimmed = localValue.trim();
-    if (!trimmed || !isAuthorized) {
+    if (!trimmed || !isAuthorized || !isFocused) {
       setSuggestions([]);
       setShowSuggestions(false);
       setIsSuggestLoading(false);
@@ -116,13 +118,14 @@ export default function QuickFilterSearch({
     }, 250);
 
     return () => clearTimeout(timer);
-  }, [localValue, taxaType, isAuthorized]);
+  }, [localValue, taxaType, isAuthorized, isFocused]);
 
   // Click outside to dismiss dropdown
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
       if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
         setShowSuggestions(false);
+        setIsFocused(false);
       }
     }
     document.addEventListener('mousedown', handleClickOutside);
@@ -132,10 +135,14 @@ export default function QuickFilterSearch({
   const handleSelectSpecies = (item: SuggestionItem) => {
     if (!requireAuth(undefined, 'Quick Search 快速搜尋')) {
       setShowSuggestions(false);
+      setIsFocused(false);
       return;
     }
 
     setShowSuggestions(false);
+    setIsFocused(false);
+    if (inputRef.current) inputRef.current.blur();
+
     const selectedName = (language === 'zh' 
       ? (item.common_name_chi || item.scientific_name)
       : (item.common_name_eng || item.scientific_name)) || localValue;
@@ -154,10 +161,14 @@ export default function QuickFilterSearch({
   const handleSubmit = () => {
     if (!requireAuth(undefined, 'Quick Search 快速搜尋')) {
       setShowSuggestions(false);
+      setIsFocused(false);
       return;
     }
 
     setShowSuggestions(false);
+    setIsFocused(false);
+    if (inputRef.current) inputRef.current.blur();
+
     if (selectedIndex >= 0 && suggestions[selectedIndex]) {
       handleSelectSpecies(suggestions[selectedIndex]);
       return;
@@ -168,6 +179,8 @@ export default function QuickFilterSearch({
   const handleReset = () => {
     setLocalValue('');
     setShowSuggestions(false);
+    setIsFocused(false);
+    if (inputRef.current) inputRef.current.blur();
     if (onClear) {
       onClear();
     } else {
@@ -189,6 +202,8 @@ export default function QuickFilterSearch({
       setSelectedIndex((prev) => (prev > -1 ? prev - 1 : suggestions.length - 1));
     } else if (e.key === 'Escape') {
       setShowSuggestions(false);
+      setIsFocused(false);
+      if (inputRef.current) inputRef.current.blur();
     } else if (e.key === 'Enter') {
       e.preventDefault();
       handleSubmit();
@@ -207,6 +222,7 @@ export default function QuickFilterSearch({
       </button>
       
       <input 
+        ref={inputRef}
         type="text" 
         placeholder={placeholder || (language === 'zh' ? '快速搜尋...' : 'Quick search...')} 
         value={localValue}
@@ -227,6 +243,7 @@ export default function QuickFilterSearch({
             requireAuth(undefined, 'Quick Search 快速搜尋');
             return;
           }
+          setIsFocused(true);
           if (localValue.trim()) setShowSuggestions(true);
         }}
         onKeyDown={handleKeyDown}

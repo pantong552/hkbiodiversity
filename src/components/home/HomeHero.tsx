@@ -65,15 +65,16 @@ export default function HomeHero() {
   const [isSuggestLoading, setIsSuggestLoading] = useState(false);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [selectedIndex, setSelectedIndex] = useState<number>(-1);
+  const [isFocused, setIsFocused] = useState(false);
   
   const dropdownRef = useRef<HTMLDivElement>(null);
   const searchContainerRef = useRef<HTMLFormElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
 
-  // Debounced Suggestion Fetching (限制：必須已登入且帳號 status 為 active 才會抓取建議)
+  // Debounced Suggestion Fetching (限制：必須已登入且帳號 status 為 active 且輸入框 focus 才會抓取建議)
   useEffect(() => {
     const trimmed = searchQuery.trim();
-    if (!trimmed || !isAuthorized) {
+    if (!trimmed || !isAuthorized || !isFocused) {
       setSuggestions([]);
       setShowSuggestions(false);
       setIsSuggestLoading(false);
@@ -102,7 +103,7 @@ export default function HomeHero() {
     }, 250);
 
     return () => clearTimeout(timer);
-  }, [searchQuery, searchType, isAuthorized]);
+  }, [searchQuery, searchType, isAuthorized, isFocused]);
 
   // Click outside to dismiss dropdowns
   useEffect(() => {
@@ -112,6 +113,7 @@ export default function HomeHero() {
       }
       if (searchContainerRef.current && !searchContainerRef.current.contains(event.target as Node)) {
         setShowSuggestions(false);
+        setIsFocused(false);
       }
     }
     document.addEventListener('mousedown', handleClickOutside);
@@ -364,6 +366,7 @@ export default function HomeHero() {
                       requireAuth(undefined, 'Quick Search 快速搜尋');
                       return;
                     }
+                    setIsFocused(true);
                     if (searchQuery.trim()) setShowSuggestions(true);
                   }}
                   onKeyDown={handleKeyDown}

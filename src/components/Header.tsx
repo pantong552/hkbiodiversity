@@ -91,8 +91,20 @@ export default function Header({ isHomePage: propIsHomePage }: HeaderProps = {})
       }
     };
 
-    // 掛載時同步一次當前 scrollY 狀態
-    setIsScrolled(window.scrollY > 20);
+    // 切換模式/頁面時，同步當前目標容器的 scrollY
+    const currentScrollY = isExpanded
+      ? (document.getElementById('species-panel-scroll-container')?.scrollTop || 0)
+      : (typeof window !== 'undefined' ? window.scrollY : 0);
+    
+    lastScrollYRef.current = currentScrollY;
+    setIsScrolled(currentScrollY > 20);
+
+    // 根據切換後的目標頁面/容器是否在頂部，自動決定顯示或隱藏 Header
+    if (currentScrollY > 50) {
+      setIsVisible(false);
+    } else {
+      setIsVisible(true);
+    }
 
     window.addEventListener('scroll', handleScroll, { passive: true });
     
