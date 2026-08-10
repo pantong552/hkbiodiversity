@@ -687,10 +687,7 @@ export default function HomeClient() {
         <div className="flex flex-col min-[1101px]:flex-row gap-0 min-[1101px]:gap-16">
 
           {/* Sidebar Area */}
-          <div className="shrink-0 min-[1101px]:w-[320px] space-y-6">
-            <div className="hidden min-[1101px]:block">
-              <TaxaGroupSwitcher activeType={taxaType} onChange={handleTaxaChange} />
-            </div>
+          <div className="shrink-0 min-[1101px]:w-[320px]">
             
             {taxaType === 'fauna' ? (
                 <SidebarFilter
@@ -717,6 +714,8 @@ export default function HomeClient() {
                                 setSearchQuery('');
                             }}
                             onSearchSubmit={setSearchQuery}
+                            activeTaxaType={taxaType}
+                            onTaxaChange={handleTaxaChange}
                         />
                     </div>
                 </div>

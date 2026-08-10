@@ -6,6 +6,7 @@ import { useLanguage } from '@/context/LanguageContext';
 import { PlantFilterState } from '@/types/plants';
 import MultiSelectDropdown from '@/components/ui/MultiSelectDropdown';
 import QuickFilterSearch from '@/components/ui/QuickFilterSearch';
+import TaxaGroupSwitcher, { TaxaType } from '../search/TaxaGroupSwitcher';
 
 interface Option {
   name: string;
@@ -22,6 +23,8 @@ interface PlantFilterPanelProps {
   onReset: () => void;
   onSearchSubmit?: (val: string) => void;
   hideTitle?: boolean;
+  activeTaxaType?: TaxaType;
+  onTaxaChange?: (type: TaxaType) => void;
 }
 
 const MONTHS = Array.from({ length: 12 }, (_, i) => i + 1);
@@ -34,7 +37,9 @@ export default function PlantFilterPanel({
   availableGenuses,
   onReset,
   onSearchSubmit,
-  hideTitle = false
+  hideTitle = false,
+  activeTaxaType,
+  onTaxaChange
 }: PlantFilterPanelProps) {
   const { language } = useLanguage();
 
@@ -58,25 +63,27 @@ export default function PlantFilterPanel({
 
   const toggleMonth = (month: number, type: 'flowering' | 'fruiting') => {
     const key = type === 'flowering' ? 'floweringMonths' : 'fruitingMonths';
-    setFilters(prev => ({
-      ...prev,
-      [key]: prev[key].includes(month)
-        ? prev[key].filter(m => m !== month)
-        : [...prev[key], month]
-    }));
+    setFilters(prev => {
+      const current = prev[key];
+      const next = current.includes(month)
+        ? current.filter(m => m !== month)
+        : [...current, month];
+      return { ...prev, [key]: next };
+    });
   };
 
   const t = {
-    category: language === 'zh' ? '植物類別' : 'Plant Category',
+    category: language === 'zh' ? '植物類別' : 'Category',
+    classification: language === 'zh' ? '分類階次' : 'Taxonomy',
     family: language === 'zh' ? '科 (Family)' : 'Family',
     genus: language === 'zh' ? '屬 (Genus)' : 'Genus',
-    origin: language === 'zh' ? '來源' : 'Origin',
-    flowering: language === 'zh' ? '花期' : 'Flowering',
-    fruiting: language === 'zh' ? '果期' : 'Fruiting',
-    protection: language === 'zh' ? '法律保護' : 'Protection',
-    rarity: language === 'zh' ? '保育狀態' : 'Rarity',
-    cap96: language === 'zh' ? '第 96 章' : 'Cap. 96',
-    cap586: language === 'zh' ? '第 586 章' : 'Cap. 586',
+    origin: language === 'zh' ? '產地來源' : 'Origin',
+    protection: language === 'zh' ? '保育與保護狀態' : 'Protection Status',
+    rarity: language === 'zh' ? '稀有度' : 'Rarity',
+    flowering: language === 'zh' ? '開花期' : 'Flowering Period',
+    fruiting: language === 'zh' ? '結果期' : 'Fruiting Period',
+    cap96: language === 'zh' ? '第96章' : 'Cap. 96',
+    cap586: language === 'zh' ? '第586章' : 'Cap. 586',
     isRare: language === 'zh' ? '稀有植物' : 'Rare',
     redBook: language === 'zh' ? '紅皮書' : 'Red Book',
     reset: language === 'zh' ? '重置' : 'Reset',
@@ -100,19 +107,26 @@ export default function PlantFilterPanel({
       
       {/* Title */}
       {!hideTitle && (
-        <div className="flex items-center justify-between">
-            <h2 className="text-2xl font-black text-emerald-900 flex items-center gap-3">
-                <Filter className="w-6 h-6 text-emerald-500" />
-                {language === 'zh' ? '植物篩選' : 'Plant Filter'}
-            </h2>
-            {activeCount > 0 && (
-              <button
-                onClick={onReset}
-                className="text-xs font-bold text-emerald-600 hover:text-emerald-700 bg-emerald-50 px-2 py-1 rounded-lg transition-colors"
-              >
-                {t.reset}
-              </button>
-            )}
+        <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2 min-w-0">
+                <Filter className="w-5 h-5 min-[1101px]:w-6 min-[1101px]:h-6 text-emerald-500 shrink-0" />
+                <h2 className="text-xl min-[1101px]:text-2xl font-black text-emerald-900 truncate">
+                    {language === 'zh' ? '植物篩選' : 'Plant Filter'}
+                </h2>
+            </div>
+            <div className="flex items-center gap-2 shrink-0">
+              {activeTaxaType && onTaxaChange && (
+                <TaxaGroupSwitcher activeType={activeTaxaType} onChange={onTaxaChange} variant="header" />
+              )}
+              {activeCount > 0 && (
+                <button
+                  onClick={onReset}
+                  className="text-xs font-bold text-emerald-600 hover:text-emerald-700 bg-emerald-50 px-2 py-1 rounded-lg transition-colors"
+                >
+                  {t.reset}
+                </button>
+              )}
+            </div>
         </div>
       )}
 

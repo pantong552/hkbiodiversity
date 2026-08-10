@@ -66,23 +66,21 @@ export default function MobilePlantFilter({
         overflow-y-auto scrollbar-thin scrollbar-thumb-slate-100 scrollbar-track-transparent
       `}>
         <div className="p-6 min-[1101px]:p-8">
-          {activeTaxaType && onTaxaChange && (
-            <div className="min-[1101px]:hidden mb-4">
-              <TaxaGroupSwitcher activeType={activeTaxaType} onChange={onTaxaChange} compact={true} />
-            </div>
-          )}
-
-          <div className="flex items-center justify-between mb-6">
-            <div className="flex items-center gap-3">
-              <Filter className="w-5 h-5 text-emerald-600" />
-              <h2 className="text-2xl font-black text-emerald-900 flex items-center gap-3">
+          <div className="flex items-center justify-between mb-6 gap-2">
+            <div className="flex items-center gap-2 min-w-0">
+              <Filter className="w-5 h-5 text-emerald-600 shrink-0" />
+              <h2 className="text-xl font-black text-emerald-900 truncate">
                 {language === 'zh' ? '植物篩選' : 'Plant Filter'}
               </h2>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 shrink-0">
+              {activeTaxaType && onTaxaChange && (
+                <TaxaGroupSwitcher activeType={activeTaxaType} onChange={onTaxaChange} variant="header" />
+              )}
               <button 
                 onClick={onClose}
                 className="p-2 bg-slate-50 hover:bg-slate-100 text-slate-400 hover:text-slate-600 rounded-xl transition-all"
+                aria-label="Close"
               >
                 <X className="w-5 h-5" />
               </button>
