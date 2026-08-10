@@ -55,7 +55,7 @@ export async function GET(req: NextRequest) {
       const { data: floraData, error: floraErr } = await supabase
         .from('plant_species')
         .select('taxa_id, id, common_name_chi, common_name_eng, scientific_name, category_eng, family_eng, genus_eng, inat_id')
-        .or(`common_name_chi.ilike.${searchPattern},common_name_eng.ilike.${searchPattern},scientific_name.ilike.${searchPattern}`)
+        .or(`common_name_chi.ilike.${searchPattern},common_name_eng.ilike.${searchPattern},scientific_name.ilike.${searchPattern},alias_common_name_chi.ilike.${searchPattern},alias_common_name_eng.ilike.${searchPattern},alias_scientific_name.ilike.${searchPattern}`)
         .limit(limit);
 
       if (!floraErr && floraData) {

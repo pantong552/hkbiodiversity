@@ -696,7 +696,6 @@ const floraFieldGroups = (t: any): FieldGroup[] => [
       { key: 'oid', labelChi: 'OID', labelEng: 'OID', type: 'number', readOnly: true },
       { key: 'inat_id', labelChi: 'iNaturalist ID', labelEng: 'iNaturalist ID', type: 'number' },
       { key: 'col_usage_id', labelChi: 'Catalogue of Life ID', labelEng: 'Catalogue of Life ID', type: 'text' },
-      { key: 'ebird_species_code', labelChi: 'eBird Species Code', labelEng: 'eBird Species Code', type: 'text' },
       { key: 'category_chi', labelChi: '植物類別 (中)', labelEng: 'Category (Chi)', type: 'text', readOnly: true },
       { key: 'category_eng', labelChi: '植物類別 (英)', labelEng: 'Category (Eng)', type: 'text' },
       { key: 'common_name_chi', labelChi: '中文俗名', labelEng: 'Common Name (Chi)', type: 'text' },
@@ -704,6 +703,9 @@ const floraFieldGroups = (t: any): FieldGroup[] => [
       { key: 'scientific_name', labelChi: '學名', labelEng: 'Scientific Name', type: 'text' },
       { key: 'author', labelChi: '命名者', labelEng: 'Author', type: 'text' },
       { key: 'origin', labelChi: '來源狀態', labelEng: 'Origin Status', type: 'text' },
+      { key: 'alias_scientific_name', labelChi: '學名別名', labelEng: 'Alias Scientific Name', type: 'text' },
+      { key: 'alias_common_name_chi', labelChi: '中文俗名別名', labelEng: 'Alias Common Name (Chi)', type: 'text' },
+      { key: 'alias_common_name_eng', labelChi: '英文俗名別名', labelEng: 'Alias Common Name (Eng)', type: 'text' },
     ]
   },
   {
@@ -716,7 +718,6 @@ const floraFieldGroups = (t: any): FieldGroup[] => [
       { key: 'family_eng', labelChi: '科 (英)', labelEng: 'Family (Eng)', type: 'text' },
       { key: 'genus_chi', labelChi: '屬 (中)', labelEng: 'Genus (Chi)', type: 'text', readOnly: true },
       { key: 'genus_eng', labelChi: '屬 (英)', labelEng: 'Genus (Eng)', type: 'text' },
-      { key: 'species_eng', labelChi: '種 (英)', labelEng: 'Species (Eng)', type: 'text' },
     ]
   },
   {
@@ -800,6 +801,9 @@ export default function SpeciesDetailEditor({ table, data, originalData, publish
     
     // 排除系統內建主鍵與索引、時間欄位
     const ignoredKeys = ['id', 'taxa_id', 'fts', 'created_at', 'updated_at', 'flowering_months', 'fruiting_months'];
+    if (table === 'plant_species') {
+      ignoredKeys.push('ebird_species_code', 'species_eng');
+    }
 
     const otherLabelMap: Record<string, { labelChi: string; labelEng: string }> = {
       profile_picture: { labelChi: '頭像圖片路徑', labelEng: 'Profile Picture' },

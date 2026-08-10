@@ -283,7 +283,7 @@ export default function HomeClient() {
             // 1. Search Logic
             const ps = (plantFilters.searchQuery || searchQuery || '').trim();
             if (ps) {
-                query = query.or(`scientific_name.ilike.%${ps}%,common_name_chi.ilike.%${ps}%,common_name_eng.ilike.%${ps}%`);
+                query = query.or(`scientific_name.ilike.%${ps}%,common_name_chi.ilike.%${ps}%,common_name_eng.ilike.%${ps}%,alias_scientific_name.ilike.%${ps}%,alias_common_name_chi.ilike.%${ps}%,alias_common_name_eng.ilike.%${ps}%`);
             }
             
             // 2. Taxonomy Filters (Sidebar Priority)
