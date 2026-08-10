@@ -189,6 +189,24 @@ export default function SidebarFilter({
               }
             });
 
+            // 確保「已選擇」的項目永遠保留在下拉列表中（即使被下級過濾條件關聯排除，數量計為 0）
+            const currentSelectedForLevel = selected.taxonomy[level] || [];
+            currentSelectedForLevel.forEach(selName => {
+              if (!uniqueItems.has(selName)) {
+                let chiName = selName;
+                if (language === 'zh') {
+                  const rank = level.replace('_eng', '') as any;
+                  const mappedChi = getTaxonomyChi(rank, 'fauna', selName);
+                  if (mappedChi !== selName) chiName = mappedChi;
+                }
+                uniqueItems.set(selName, {
+                  name: selName,
+                  display: language === 'zh' ? chiName : selName,
+                  count: 0
+                });
+              }
+            });
+
             newOptions[level] = Array.from(uniqueItems.values())
               .filter(opt => opt.name !== 'Unknown' && opt.display.trim() !== '')
               .sort((a, b) => b.count - a.count);
@@ -227,6 +245,49 @@ export default function SidebarFilter({
   const toggleExpand = (key: string) => {
     setExpanded(prev => ({ ...prev, [key]: !prev[key] }));
   };
+
+  // 計算推導出的父級名稱 (Inferred parent display label)
+  const inferredParents = useMemo(() => {
+    const inferred: Record<TaxonomyLevel, string | undefined> = {
+      phylum_eng: undefined,
+      class_eng: undefined,
+      order_eng: undefined,
+      family_eng: undefined,
+      genus_eng: undefined,
+      informal_group_eng: undefined,
+    };
+
+    const levels: TaxonomyLevel[] = ['phylum_eng', 'class_eng', 'order_eng', 'family_eng', 'genus_eng'];
+
+    // 檢查是否有任何分類階次（門、綱、目、科、屬）被選取
+    const hasTaxonomySelection = levels.some(lvl => selected.taxonomy[lvl]?.length > 0);
+
+    // 物種類群 (informal_group_eng) 自動推導
+    if (hasTaxonomySelection && (!selected.taxonomy.informal_group_eng || selected.taxonomy.informal_group_eng.length === 0) && taxonomyOptions.informal_group_eng?.length > 0) {
+      const opts = taxonomyOptions.informal_group_eng;
+      if (opts.length <= 3) {
+        inferred.informal_group_eng = opts.map(o => o.display).join(', ');
+      } else {
+        inferred.informal_group_eng = `${opts.length} ${language === 'zh' ? '項' : 'items'}`;
+      }
+    }
+
+    levels.forEach((level, idx) => {
+      // 只有當「更下級的層次（idx + 1 以後）」有手動選擇時，才向上推導父級標籤
+      const hasLowerSelection = levels.slice(idx + 1).some(lowerLevel => selected.taxonomy[lowerLevel]?.length > 0);
+
+      if (hasLowerSelection && (!selected.taxonomy[level] || selected.taxonomy[level].length === 0) && taxonomyOptions[level]?.length > 0) {
+        const opts = taxonomyOptions[level];
+        if (opts.length <= 3) {
+          inferred[level] = opts.map(o => o.display).join(', ');
+        } else {
+          inferred[level] = `${opts.length} ${language === 'zh' ? '項' : 'items'}`;
+        }
+      }
+    });
+
+    return inferred;
+  }, [selected.taxonomy, taxonomyOptions, language]);
 
   const handleTaxonomyChange = (level: TaxonomyLevel, values: string[]) => {
     const newSelected = { ...selected };
@@ -339,6 +400,8 @@ export default function SidebarFilter({
                     selectedValues={selected.taxonomy.informal_group_eng}
                     onChange={(values) => handleTaxonomyChange('informal_group_eng', values)}
                     placeholder={TAXONOMY_LABELS.informal_group_eng}
+                    inferredValue={inferredParents.informal_group_eng}
+                    getDisplayLabel={(val) => language === 'zh' ? getTaxonomyChi('informal_group' as any, 'fauna', val) : val}
                   />
                 </div>
               )}
@@ -357,16 +420,21 @@ export default function SidebarFilter({
                 <div className="space-y-3 pt-2">
                   {(Object.keys(TAXONOMY_LABELS) as TaxonomyLevel[])
                     .filter(level => level !== 'informal_group_eng')
-                    .map((level) => (
-                      <MultiSelectDropdown
-                        key={level}
-                        label={TAXONOMY_LABELS[level]}
-                        options={taxonomyOptions[level]}
-                        selectedValues={selected.taxonomy[level]}
-                        onChange={(values) => handleTaxonomyChange(level, values)}
-                        placeholder={TAXONOMY_LABELS[level]}
-                      />
-                    ))}
+                    .map((level) => {
+                      const rank = level.replace('_eng', '') as any;
+                      return (
+                        <MultiSelectDropdown
+                          key={level}
+                          label={TAXONOMY_LABELS[level]}
+                          options={taxonomyOptions[level]}
+                          selectedValues={selected.taxonomy[level]}
+                          onChange={(values) => handleTaxonomyChange(level, values)}
+                          placeholder={TAXONOMY_LABELS[level]}
+                          inferredValue={inferredParents[level]}
+                          getDisplayLabel={(val) => language === 'zh' ? getTaxonomyChi(rank, 'fauna', val) : val}
+                        />
+                      );
+                    })}
                 </div>
               )}
             </div>

@@ -143,16 +143,30 @@ export default function HomeClient() {
                         const items = level === 'categories' ? (data.categories || []) : (level === 'families' ? (data.families || []) : (data.genuses || []));
                         const rankKey = level === 'categories' ? 'category' : (level === 'families' ? 'family' : 'genus');
 
-                        newMeta[level] = items.map((i: any) => {
+                        const uniqueMap = new Map<string, { name: string; display: string; count: number }>();
+
+                        items.forEach((i: any) => {
                             const nameEng = i.en || i.name;
-                            return {
+                            uniqueMap.set(nameEng, {
                                 name: nameEng,
-                                display: language === 'zh' 
-                                    ? getTaxonomyChi(rankKey, 'flora', nameEng)
-                                    : nameEng,
+                                display: language === 'zh' ? getTaxonomyChi(rankKey, 'flora', nameEng) : nameEng,
                                 count: i.count
-                            };
-                        }).sort((a: any, b: any) => b.count - a.count);
+                            });
+                        });
+
+                        // 確保已選取項目即使被下級過濾排除，也保留在選單列表中
+                        const currentSelected = level === 'categories' ? (plantFilters.categories || []) : (level === 'families' ? (plantFilters.families || []) : (plantFilters.genuses || []));
+                        currentSelected.forEach((selName: string) => {
+                            if (!uniqueMap.has(selName)) {
+                                uniqueMap.set(selName, {
+                                    name: selName,
+                                    display: language === 'zh' ? getTaxonomyChi(rankKey, 'flora', selName) : selName,
+                                    count: 0
+                                });
+                            }
+                        });
+
+                        newMeta[level] = Array.from(uniqueMap.values()).sort((a: any, b: any) => b.count - a.count);
                     }
                 });
                 

@@ -1,12 +1,14 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Calendar, Shield, RotateCcw, Star, BookOpen, Filter, Search, ChevronDown, ChevronRight, CheckCircle2 } from 'lucide-react';
 import { useLanguage } from '@/context/LanguageContext';
 import { PlantFilterState } from '@/types/plants';
 import MultiSelectDropdown from '@/components/ui/MultiSelectDropdown';
 import QuickFilterSearch from '@/components/ui/QuickFilterSearch';
 import TaxaGroupSwitcher, { TaxaType } from '../search/TaxaGroupSwitcher';
+
+import { useTaxonomy } from '@/context/TaxonomyContext';
 
 interface Option {
   name: string;
@@ -42,6 +44,7 @@ export default function PlantFilterPanel({
   onTaxaChange
 }: PlantFilterPanelProps) {
   const { language } = useLanguage();
+  const { getTaxonomyChi } = useTaxonomy();
 
   const [expanded, setExpanded] = useState<Record<string, boolean>>({
     category: true,
@@ -55,6 +58,24 @@ export default function PlantFilterPanel({
   const toggleExpand = (key: string) => {
     setExpanded(prev => ({ ...prev, [key]: !prev[key] }));
   };
+
+  // 植物類別 (Category) 只有當更下級的「科」或「屬」有選取時，才向上推導標籤
+  const inferredCategory = useMemo(() => {
+    const hasLower = filters.families.length > 0 || filters.genuses.length > 0;
+    if (filters.categories.length > 0 || !hasLower || availableCategories.length === 0) return undefined;
+    if (availableCategories.length <= 3) return availableCategories.map(c => c.display).join(', ');
+    return `${availableCategories.length} ${language === 'zh' ? '項' : 'items'}`;
+  }, [filters.categories, filters.families, filters.genuses, availableCategories, language]);
+
+  // 科 (Family) 只有當更下級的「屬 (Genus)」有選取時，才向上推導標籤
+  const inferredFamily = useMemo(() => {
+    if (filters.families.length > 0 || filters.genuses.length === 0 || availableFamilies.length === 0) return undefined;
+    if (availableFamilies.length <= 3) return availableFamilies.map(f => f.display).join(', ');
+    return `${availableFamilies.length} ${language === 'zh' ? '項' : 'items'}`;
+  }, [filters.families, filters.genuses, availableFamilies, language]);
+
+  // 屬 (Genus) 下方已無更細的層級，不進行自動推導顯示
+  const inferredGenus = undefined;
 
   const handleSearchSubmit = (val: string) => {
     setFilters(prev => ({ ...prev, searchQuery: val }));
@@ -147,6 +168,8 @@ export default function PlantFilterPanel({
             selectedValues={filters.categories}
             onChange={(values) => setFilters(prev => ({ ...prev, categories: values }))}
             placeholder={t.category}
+            inferredValue={inferredCategory}
+            getDisplayLabel={(val) => language === 'zh' ? getTaxonomyChi('category', 'flora', val) : val}
           />
         )}
       </div>
@@ -168,6 +191,8 @@ export default function PlantFilterPanel({
                   selectedValues={filters.families}
                   onChange={(values) => setFilters(prev => ({ ...prev, families: values }))}
                   placeholder={t.family}
+                  inferredValue={inferredFamily}
+                  getDisplayLabel={(val) => language === 'zh' ? getTaxonomyChi('family', 'flora', val) : val}
               />
               <MultiSelectDropdown 
                   label={t.genus}
@@ -175,6 +200,8 @@ export default function PlantFilterPanel({
                   selectedValues={filters.genuses}
                   onChange={(values) => setFilters(prev => ({ ...prev, genuses: values }))}
                   placeholder={t.genus}
+                  inferredValue={inferredGenus}
+                  getDisplayLabel={(val) => language === 'zh' ? getTaxonomyChi('genus', 'flora', val) : val}
               />
           </div>
         )}

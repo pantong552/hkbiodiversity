@@ -22,6 +22,8 @@ interface MultiSelectDropdownProps {
   align?: 'left' | 'right';
   minWidth?: string;
   variant?: 'default' | 'minimal';
+  inferredValue?: string;
+  getDisplayLabel?: (val: string) => string;
 }
 
 export default function MultiSelectDropdown({
@@ -33,6 +35,8 @@ export default function MultiSelectDropdown({
   align = 'left',
   minWidth = '240px',
   variant = 'default',
+  inferredValue,
+  getDisplayLabel,
 }: MultiSelectDropdownProps) {
   const { language, t } = useLanguage();
   const [isOpen, setIsOpen] = useState(false);
@@ -153,19 +157,35 @@ export default function MultiSelectDropdown({
   const isSomeSelected = localSelected.length > 0 && localSelected.length < options.length;
   const displayPlaceholder = placeholder !== undefined ? placeholder : t('search.sidebar_placeholder');
 
+  const hasInferred = selectedCount === 0 && !!inferredValue;
+  const hasActiveSelection = selectedCount > 0 || hasInferred;
+
   const triggerLabel = useMemo(() => {
-    if (selectedCount === 0) return displayPlaceholder;
-    if (options.length > 0 && selectedValues.length >= options.length) return language === 'zh' ? "全部" : "All";
+    if (selectedCount === 0) {
+      if (inferredValue) return inferredValue;
+      return displayPlaceholder;
+    }
     
-    if (selectedCount <= 2) {
-      return options
-        .filter(o => selectedValues.includes(o.name))
-        .map(o => o.display)
-        .join(', ');
+    // 如果選取數量 <= 3（或列表選項數量 <= 5），直接列出選取的名稱（如「鞘翅目, 鱗翅目」），而非顯示「全部」
+    if (selectedCount <= 3 || options.length <= 5) {
+      const matchedMap = new Map(options.map(o => [o.name, o.display]));
+      const displayNames = selectedValues.map(val => {
+        const found = matchedMap.get(val);
+        if (found) return found;
+        if (getDisplayLabel) return getDisplayLabel(val);
+        return val;
+      });
+      if (displayNames.length > 0) {
+        return displayNames.join(', ');
+      }
+    }
+
+    if (options.length > 0 && selectedValues.length >= options.length) {
+      return language === 'zh' ? "全部" : "All";
     }
     
     return `${selectedCount} ${language === 'zh' ? (t('filter.selected') || '項') : 'items'}`;
-  }, [selectedCount, options, selectedValues, displayPlaceholder, t, language]);
+  }, [selectedCount, options, selectedValues, displayPlaceholder, inferredValue, getDisplayLabel, t, language]);
 
   return (
     <div className="relative w-full" ref={dropdownRef}>
@@ -175,20 +195,20 @@ export default function MultiSelectDropdown({
           if (!isOpen) updatePosition();
           setIsOpen(!isOpen);
         }}
-        className={`flex items-center justify-between transition-all group uppercase tracking-widest ${
+        className={`flex items-center justify-between transition-all group tracking-wide ${
           variant === 'minimal'
-            ? `px-1 py-0.5 rounded-md hover:bg-slate-100/50 ${selectedCount > 0 ? 'text-emerald-600' : 'text-slate-300'}`
+            ? `px-1 py-0.5 rounded-md hover:bg-slate-100/50 ${hasActiveSelection ? 'text-emerald-600' : 'text-slate-300'}`
             : `w-full px-3 py-1.5 rounded-xl text-[11px] font-black border ${
-                isOpen || selectedCount > 0 
+                isOpen || hasActiveSelection
                   ? 'bg-white border-emerald-200 shadow-xl shadow-emerald-50/50 ring-4 ring-emerald-50/30' 
                   : 'bg-slate-50/50 border-slate-100 text-slate-400 hover:bg-white hover:border-emerald-100'
               }`
         }`}
       >
         <div className="flex items-center gap-1.5 overflow-hidden">
-          <Filter className={`${variant === 'minimal' ? 'w-3 h-3' : 'w-3 h-3'} shrink-0 ${selectedCount > 0 ? 'text-emerald-500' : 'text-slate-300'}`} />
+          <Filter className={`${variant === 'minimal' ? 'w-3 h-3' : 'w-3 h-3'} shrink-0 ${hasActiveSelection ? 'text-emerald-500' : 'text-slate-300'}`} />
           {variant !== 'minimal' && (
-            <span className={`truncate text-[11px] font-black ${selectedCount > 0 ? 'text-slate-700' : ''}`}>{triggerLabel}</span>
+            <span className={`truncate text-[11px] font-black ${hasActiveSelection ? 'text-emerald-800' : ''}`}>{triggerLabel}</span>
           )}
           {variant === 'minimal' && selectedCount > 0 && (
             <span className="text-[10px] font-black">{selectedCount}</span>
