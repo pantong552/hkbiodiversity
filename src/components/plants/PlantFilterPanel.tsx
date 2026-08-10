@@ -107,26 +107,20 @@ export default function PlantFilterPanel({
       
       {/* Title */}
       {!hideTitle && (
-        <div className="flex items-center justify-between gap-2">
-            <div className="flex items-center gap-2 min-w-0">
-                <Filter className="w-5 h-5 min-[1101px]:w-6 min-[1101px]:h-6 text-emerald-500 shrink-0" />
-                <h2 className="text-xl min-[1101px]:text-2xl font-black text-emerald-900 truncate">
-                    {language === 'zh' ? '植物篩選' : 'Plant Filter'}
-                </h2>
+        <div className="flex items-center justify-between gap-3">
+            <div className="flex-1 min-w-0">
+                {activeTaxaType && onTaxaChange && (
+                    <TaxaGroupSwitcher activeType={activeTaxaType} onChange={onTaxaChange} variant="header" />
+                )}
             </div>
-            <div className="flex items-center gap-2 shrink-0">
-              {activeTaxaType && onTaxaChange && (
-                <TaxaGroupSwitcher activeType={activeTaxaType} onChange={onTaxaChange} variant="header" />
-              )}
-              {activeCount > 0 && (
-                <button
-                  onClick={onReset}
-                  className="text-xs font-bold text-emerald-600 hover:text-emerald-700 bg-emerald-50 px-2 py-1 rounded-lg transition-colors"
-                >
-                  {t.reset}
-                </button>
-              )}
-            </div>
+            {activeCount > 0 && (
+              <button
+                onClick={onReset}
+                className="text-xs font-bold text-emerald-600 hover:text-emerald-700 bg-emerald-50 hover:bg-emerald-100/80 px-3 py-2.5 rounded-xl transition-all cursor-pointer shrink-0"
+              >
+                {t.reset}
+              </button>
+            )}
         </div>
       )}
 

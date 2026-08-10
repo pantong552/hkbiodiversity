@@ -291,33 +291,27 @@ export default function SidebarFilter({
         scrollbar-thin scrollbar-thumb-slate-100 scrollbar-track-transparent
       `}>
         <div className="p-6 min-[1101px]:p-8">
-          <div className="flex items-center justify-between mb-6 gap-2">
-            <div className="flex items-center gap-2 min-w-0">
-              <Filter className="w-5 h-5 min-[1101px]:w-6 min-[1101px]:h-6 text-emerald-600 shrink-0" />
-              <h2 className="text-xl min-[1101px]:text-2xl font-black text-emerald-900 truncate">
-                {t('filter.title')}
-              </h2>
-            </div>
-            <div className="flex items-center gap-2 shrink-0">
+          <div className="flex items-center justify-between mb-6 gap-3">
+            <div className="flex-1 min-w-0">
               {activeTaxaType && onTaxaChange && (
                 <TaxaGroupSwitcher activeType={activeTaxaType} onChange={onTaxaChange} variant="header" />
               )}
-              {activeCount > 0 && (
-                <button
-                  onClick={clearFilters}
-                  className="text-xs font-bold text-emerald-600 hover:text-emerald-700 bg-emerald-50 px-2 py-1 rounded-lg transition-colors"
-                >
-                  {t('filter.reset')}
-                </button>
-              )}
-              <button 
+            </div>
+            {activeCount > 0 && (
+              <button
+                onClick={clearFilters}
+                className="text-xs font-bold text-emerald-600 hover:text-emerald-700 bg-emerald-50 hover:bg-emerald-100/80 px-3 py-2.5 rounded-xl transition-all cursor-pointer shrink-0"
+              >
+                {t('filter.reset')}
+              </button>
+            )}
+            <button 
                 onClick={onClose} 
                 className="min-[1101px]:hidden p-2 bg-slate-50 hover:bg-slate-100 text-slate-400 hover:text-slate-600 rounded-xl transition-all"
                 aria-label="Close"
               >
                 <X className="w-5 h-5" />
               </button>
-            </div>
           </div>
 
           <QuickFilterSearch

@@ -2,7 +2,7 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Dog, Leaf, ChevronDown, Check } from 'lucide-react';
+import { Filter, Dog, Leaf, ChevronDown, Check } from 'lucide-react';
 import { useLanguage } from '@/context/LanguageContext';
 
 export type TaxaType = 'fauna' | 'flora';
@@ -22,23 +22,17 @@ export default function TaxaGroupSwitcher({ activeType, onChange, compact = fals
   const options = [
     { 
       id: 'fauna' as const, 
-      label: language === 'zh' ? '動物 (Fauna)' : 'Fauna', 
-      shortLabel: language === 'zh' ? '動物' : 'Fauna',
+      label: language === 'zh' ? '動物 (Fauna)' : 'Fauna',
       icon: Dog,
-      bgColor: 'bg-amber-50',
-      textColor: 'text-amber-700',
       iconColor: 'text-amber-600',
-      ringColor: 'ring-amber-200'
+      activeBg: 'bg-amber-50 text-amber-900 border-amber-200/80',
     },
     { 
       id: 'flora' as const, 
-      label: language === 'zh' ? '植物 (Flora)' : 'Flora', 
-      shortLabel: language === 'zh' ? '植物' : 'Flora',
+      label: language === 'zh' ? '植物 (Flora)' : 'Flora',
       icon: Leaf,
-      bgColor: 'bg-emerald-50',
-      textColor: 'text-emerald-700',
       iconColor: 'text-emerald-600',
-      ringColor: 'ring-emerald-200'
+      activeBg: 'bg-emerald-50 text-emerald-950 border-emerald-200/80',
     },
   ];
 
@@ -56,29 +50,29 @@ export default function TaxaGroupSwitcher({ activeType, onChange, compact = fals
   }, []);
 
   return (
-    <div className="relative inline-block text-left" ref={dropdownRef}>
-      {/* Trigger Button */}
+    <div className="relative inline-block text-left w-full" ref={dropdownRef}>
+      {/* Prominent Header-style Trigger Button */}
       <button
         type="button"
         onClick={() => setIsOpen(!isOpen)}
         className={`
-          flex items-center justify-between gap-2 transition-all duration-200 cursor-pointer
-          ${variant === 'header'
-            ? 'px-3 py-1.5 bg-slate-50 hover:bg-slate-100 border border-slate-200/80 rounded-xl text-xs font-bold text-slate-700 shadow-sm active:scale-95'
-            : 'w-full px-4 py-2.5 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-2xl text-xs font-black text-slate-700 shadow-sm mb-4'
-          }
+          group w-full flex items-center justify-between gap-3 px-3.5 py-2.5
+          bg-white hover:bg-emerald-50/40 border-2 border-emerald-600/30 hover:border-emerald-600/60
+          rounded-2xl transition-all duration-200 cursor-pointer outline-none select-none shadow-sm hover:shadow-md active:scale-[0.99]
+          ${isOpen ? 'ring-4 ring-emerald-500/20 border-emerald-600 shadow-md bg-white' : ''}
         `}
       >
-        <div className="flex items-center gap-2 min-w-0">
-          <div className={`p-1 rounded-lg ${currentOption.bgColor} ${currentOption.textColor}`}>
-            <currentOption.icon className="w-3.5 h-3.5" />
+        <div className="flex items-center gap-2.5 min-w-0">
+          {/* Prominent Solid Filter Icon Badge */}
+          <div className="p-1.5 rounded-xl bg-emerald-600 text-white shadow-xs group-hover:scale-105 transition-transform shrink-0">
+            <Filter className="w-4 h-4" />
           </div>
-          <span className="truncate font-extrabold tracking-wide">
-            {variant === 'header' ? currentOption.shortLabel : currentOption.label}
+          <span className="text-sm font-black text-slate-900 tracking-tight truncate">
+            {currentOption.label}
           </span>
         </div>
         <ChevronDown 
-          className={`w-3.5 h-3.5 text-slate-400 transition-transform duration-300 ${isOpen ? 'rotate-180 text-emerald-600' : ''}`} 
+          className={`w-4 h-4 text-emerald-600 font-bold shrink-0 transition-transform duration-300 ${isOpen ? 'rotate-180 text-emerald-700' : 'group-hover:text-emerald-700'}`} 
         />
       </button>
 
@@ -86,16 +80,14 @@ export default function TaxaGroupSwitcher({ activeType, onChange, compact = fals
       <AnimatePresence>
         {isOpen && (
           <motion.div
-            initial={{ opacity: 0, scale: 0.95, y: -6 }}
+            initial={{ opacity: 0, scale: 0.96, y: -4 }}
             animate={{ opacity: 1, scale: 1, y: 4 }}
-            exit={{ opacity: 0, scale: 0.95, y: -6 }}
+            exit={{ opacity: 0, scale: 0.96, y: -4 }}
             transition={{ duration: 0.15, ease: 'easeOut' }}
-            className={`
-              absolute right-0 z-[120] w-44 p-1.5 bg-white/95 backdrop-blur-xl border border-slate-100 rounded-2xl shadow-xl ring-1 ring-black/5
-            `}
+            className="absolute left-0 right-0 z-[120] mt-1.5 p-1.5 bg-white/95 backdrop-blur-xl border border-slate-200/90 rounded-2xl shadow-2xl ring-1 ring-black/5"
           >
-            <div className="px-2 py-1 text-[10px] font-black uppercase tracking-wider text-slate-400 border-b border-slate-100 mb-1">
-              {language === 'zh' ? '選擇物種類別' : 'Select Taxa Group'}
+            <div className="px-3 py-1.5 text-[10px] font-black uppercase tracking-wider text-slate-400 border-b border-slate-100 mb-1">
+              {language === 'zh' ? '切換物種類別' : 'Switch Taxa Group'}
             </div>
             
             {options.map((option) => {
@@ -110,22 +102,20 @@ export default function TaxaGroupSwitcher({ activeType, onChange, compact = fals
                     setIsOpen(false);
                   }}
                   className={`
-                    w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-bold transition-all duration-150 cursor-pointer
+                    w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-black transition-all duration-150 cursor-pointer
                     ${isSelected 
-                      ? `${option.bgColor} ${option.textColor} font-black` 
+                      ? `${option.activeBg} border shadow-2xs` 
                       : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
                     }
                   `}
                 >
                   <div className="flex items-center gap-2.5">
-                    <div className={`p-1 rounded-lg ${isSelected ? 'bg-white shadow-xs' : 'bg-slate-100'}`}>
-                      <Icon className={`w-3.5 h-3.5 ${isSelected ? option.iconColor : 'text-slate-400'}`} />
-                    </div>
+                    <Icon className={`w-4 h-4 ${isSelected ? option.iconColor : 'text-slate-400'}`} />
                     <span>{option.label}</span>
                   </div>
 
                   {isSelected && (
-                    <Check className={`w-3.5 h-3.5 ${option.iconColor}`} />
+                    <Check className={`w-4 h-4 ${option.iconColor}`} />
                   )}
                 </button>
               );
@@ -136,5 +126,8 @@ export default function TaxaGroupSwitcher({ activeType, onChange, compact = fals
     </div>
   );
 }
+
+
+
 
 
