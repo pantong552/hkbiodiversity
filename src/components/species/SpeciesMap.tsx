@@ -655,6 +655,11 @@ export default function SpeciesMap({ taxonId, scientificName, chineseName, taxaG
         });
 
         console.log(`SpeciesMap: 數據聚合完成 (iNat 匹配點: ${totalInatCounted}, BGIS 總紀錄: ${realBgisTotal}, eBird 匹配紀錄: ${totalEbirdCounted})`);
+        setStageCounts({
+          inat: obs.length,
+          bgis: realBgisTotal,
+          ebird: ebirdPts.length
+        });
         setAllProcessedFeatures(geojson.features);
         setGridStatus('done');
       } catch (error) {
@@ -955,120 +960,128 @@ export default function SpeciesMap({ taxonId, scientificName, chineseName, taxaG
       </AnimatePresence>
 
       {/* Top Left Dataset Filter Control */}
-      {!isLoading && (
-        <div ref={filterRef} className="absolute top-3 left-3 z-30 flex items-center">
-          {/* Desktop Filter Bar (sm:flex) - Compact Glass Pill */}
-          <div className="hidden sm:flex bg-white/90 backdrop-blur-md border border-slate-200/80 shadow-md rounded-full p-1 items-center gap-1">
-            {/* iNaturalist Button */}
-            <button
-              onClick={() => setShowInat(!showInat)}
-              className={`px-2.5 py-1 rounded-full text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${showInat
-                ? 'bg-emerald-600 text-white shadow-xs ring-1 ring-emerald-500/30'
-                : 'bg-slate-100/80 text-slate-400 hover:bg-slate-200/70 hover:text-slate-600'
-                }`}
-            >
-              <span className={`w-1.5 h-1.5 rounded-full ${showInat ? 'bg-white animate-pulse' : 'bg-slate-300'}`} />
-              {t.filterInat}
-            </button>
+      {!isLoading && (() => {
+        const hasInatData = stageCounts.inat > 0;
+        const hasBgisData = stageCounts.bgis > 0;
+        const hasEbirdData = isBirdGroup && stageCounts.ebird > 0;
+        const hasAnyData = hasInatData || hasBgisData || hasEbirdData;
 
-            {/* BGIS Button */}
-            <button
-              onClick={() => setShowBgis(!showBgis)}
-              className={`px-2.5 py-1 rounded-full text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${showBgis
-                ? 'bg-teal-600 text-white shadow-xs ring-1 ring-teal-500/30'
-                : 'bg-slate-100/80 text-slate-400 hover:bg-slate-200/70 hover:text-slate-600'
-                }`}
-            >
-              <span className={`w-1.5 h-1.5 rounded-full ${showBgis ? 'bg-white animate-pulse' : 'bg-slate-300'}`} />
-              {t.filterBgis}
-            </button>
+        if (!hasAnyData) return null;
 
-            {/* eBird Button (Bird Only) */}
-            {isBirdGroup && (
-              <button
-                onClick={() => setShowEbird(!showEbird)}
-                className={`px-2.5 py-1 rounded-full text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${showEbird
-                  ? 'bg-sky-600 text-white shadow-xs ring-1 ring-sky-500/30'
-                  : 'bg-slate-100/80 text-slate-400 hover:bg-slate-200/70 hover:text-slate-600'
-                  }`}
-              >
-                <span className={`w-1.5 h-1.5 rounded-full ${showEbird ? 'bg-white animate-pulse' : 'bg-slate-300'}`} />
-                {t.filterEbird}
-              </button>
-            )}
-          </div>
-
-          {/* Mobile Dropdown Control (sm:hidden) */}
-          <div className="sm:hidden relative">
-            <button
-              onClick={() => setIsFilterDropdownOpen(!isFilterDropdownOpen)}
-              className="bg-white/95 backdrop-blur-md border border-slate-200/90 shadow-md rounded-2xl px-3 py-1.5 flex items-center gap-2 text-xs font-bold text-slate-800 cursor-pointer active:scale-95 transition-all"
-            >
-              <Filter className="w-3.5 h-3.5 text-emerald-600" />
-              <span className="text-[11px]">
-                {[showInat ? 'iNat' : null, showBgis ? 'BGIS' : null, (isBirdGroup && showEbird) ? 'eBird' : null].filter(Boolean).join(' + ') || (language === 'zh' ? '無選擇' : 'None')}
-              </span>
-              <ChevronDown className={`w-3.5 h-3.5 text-slate-400 transition-transform duration-200 ${isFilterDropdownOpen ? 'rotate-180' : ''}`} />
-            </button>
-
-            <AnimatePresence>
-              {isFilterDropdownOpen && (
-                <motion.div
-                  initial={{ opacity: 0, y: -8, scale: 0.95 }}
-                  animate={{ opacity: 1, y: 0, scale: 1 }}
-                  exit={{ opacity: 0, y: -8, scale: 0.95 }}
-                  transition={{ duration: 0.15 }}
-                  className="absolute top-10 left-0 w-44 bg-white/95 backdrop-blur-xl border border-slate-200 shadow-2xl rounded-2xl p-1.5 flex flex-col gap-1 z-50"
+        return (
+          <div ref={filterRef} className="absolute top-3 left-3 z-30 flex items-center">
+            {/* Desktop Filter Bar (sm:flex) - Compact Glass Pill */}
+            <div className="hidden sm:flex bg-white/90 backdrop-blur-md border border-slate-200/80 shadow-md rounded-full p-1 items-center gap-1">
+              {/* iNaturalist Button */}
+              {hasInatData && (
+                <button
+                  onClick={() => setShowInat(!showInat)}
+                  className={`px-2.5 py-1 rounded-full text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${showInat
+                    ? 'bg-emerald-600 text-white shadow-xs ring-1 ring-emerald-500/30'
+                    : 'bg-slate-100/80 text-slate-400 hover:bg-slate-200/70 hover:text-slate-600'
+                    }`}
                 >
-                  <button
-                    onClick={() => {
-                      setShowInat(!showInat);
-                    }}
-                    className={`flex items-center justify-between px-3 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${showInat ? 'bg-emerald-50 text-emerald-800' : 'text-slate-500 hover:bg-slate-50'
-                      }`}
-                  >
-                    <div className="flex items-center gap-2">
-                      <span className={`w-2 h-2 rounded-full ${showInat ? 'bg-emerald-500 animate-pulse' : 'bg-slate-300'}`} />
-                      <span>{t.filterInat}</span>
-                    </div>
-                    {showInat && <Check className="w-3.5 h-3.5 text-emerald-600" />}
-                  </button>
-
-                  <button
-                    onClick={() => {
-                      setShowBgis(!showBgis);
-                    }}
-                    className={`flex items-center justify-between px-3 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${showBgis ? 'bg-teal-50 text-teal-800' : 'text-slate-500 hover:bg-slate-50'
-                      }`}
-                  >
-                    <div className="flex items-center gap-2">
-                      <span className={`w-2 h-2 rounded-full ${showBgis ? 'bg-teal-500 animate-pulse' : 'bg-slate-300'}`} />
-                      <span>{t.filterBgis}</span>
-                    </div>
-                    {showBgis && <Check className="w-3.5 h-3.5 text-teal-600" />}
-                  </button>
-
-                  {isBirdGroup && (
-                    <button
-                      onClick={() => {
-                        setShowEbird(!showEbird);
-                      }}
-                      className={`flex items-center justify-between px-3 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${showEbird ? 'bg-sky-50 text-sky-800' : 'text-slate-500 hover:bg-slate-50'
-                        }`}
-                    >
-                      <div className="flex items-center gap-2">
-                        <span className={`w-2 h-2 rounded-full ${showEbird ? 'bg-sky-500 animate-pulse' : 'bg-slate-300'}`} />
-                        <span>{t.filterEbird}</span>
-                      </div>
-                      {showEbird && <Check className="w-3.5 h-3.5 text-sky-600" />}
-                    </button>
-                  )}
-                </motion.div>
+                  <span className={`w-1.5 h-1.5 rounded-full ${showInat ? 'bg-white animate-pulse' : 'bg-slate-300'}`} />
+                  {t.filterInat}
+                </button>
               )}
-            </AnimatePresence>
+
+              {/* BGIS Button */}
+              {hasBgisData && (
+                <button
+                  onClick={() => setShowBgis(!showBgis)}
+                  className={`px-2.5 py-1 rounded-full text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${showBgis
+                    ? 'bg-teal-600 text-white shadow-xs ring-1 ring-teal-500/30'
+                    : 'bg-slate-100/80 text-slate-400 hover:bg-slate-200/70 hover:text-slate-600'
+                    }`}
+                >
+                  <span className={`w-1.5 h-1.5 rounded-full ${showBgis ? 'bg-white animate-pulse' : 'bg-slate-300'}`} />
+                  {t.filterBgis}
+                </button>
+              )}
+
+              {/* eBird Button (Bird Only) */}
+              {hasEbirdData && (
+                <button
+                  onClick={() => setShowEbird(!showEbird)}
+                  className={`px-2.5 py-1 rounded-full text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${showEbird
+                    ? 'bg-sky-600 text-white shadow-xs ring-1 ring-sky-500/30'
+                    : 'bg-slate-100/80 text-slate-400 hover:bg-slate-200/70 hover:text-slate-600'
+                    }`}
+                >
+                  <span className={`w-1.5 h-1.5 rounded-full ${showEbird ? 'bg-white animate-pulse' : 'bg-slate-300'}`} />
+                  {t.filterEbird}
+                </button>
+              )}
+            </div>
+
+            {/* Mobile Dropdown Control (sm:hidden) */}
+            <div className="sm:hidden relative">
+              <button
+                onClick={() => setIsFilterDropdownOpen(!isFilterDropdownOpen)}
+                className="bg-white/95 backdrop-blur-md border border-slate-200/90 shadow-md rounded-2xl px-3 py-1.5 flex items-center gap-2 text-xs font-bold text-slate-800 cursor-pointer active:scale-95 transition-all"
+              >
+                <Filter className="w-3.5 h-3.5 text-emerald-600" />
+                <span className="text-[11px]">
+                  {[(hasInatData && showInat) ? 'iNat' : null, (hasBgisData && showBgis) ? 'BGIS' : null, (hasEbirdData && showEbird) ? 'eBird' : null].filter(Boolean).join(' + ') || (language === 'zh' ? '無選擇' : 'None')}
+                </span>
+                <ChevronDown className={`w-3.5 h-3.5 text-slate-400 transition-transform duration-200 ${isFilterDropdownOpen ? 'rotate-180' : ''}`} />
+              </button>
+
+              <AnimatePresence>
+                {isFilterDropdownOpen && (
+                  <motion.div
+                    initial={{ opacity: 0, y: -8, scale: 0.95 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    exit={{ opacity: 0, y: -8, scale: 0.95 }}
+                    transition={{ duration: 0.15 }}
+                    className="absolute top-10 left-0 w-44 bg-white/95 backdrop-blur-xl border border-slate-200 shadow-2xl rounded-2xl p-1.5 flex flex-col gap-1 z-50"
+                  >
+                    {hasInatData && (
+                      <button
+                        onClick={() => setShowInat(!showInat)}
+                        className={`flex items-center justify-between px-3 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${showInat ? 'bg-emerald-50 text-emerald-800' : 'text-slate-500 hover:bg-slate-50'}`}
+                      >
+                        <div className="flex items-center gap-2">
+                          <span className={`w-2 h-2 rounded-full ${showInat ? 'bg-emerald-500 animate-pulse' : 'bg-slate-300'}`} />
+                          <span>{t.filterInat}</span>
+                        </div>
+                        {showInat && <Check className="w-3.5 h-3.5 text-emerald-600" />}
+                      </button>
+                    )}
+
+                    {hasBgisData && (
+                      <button
+                        onClick={() => setShowBgis(!showBgis)}
+                        className={`flex items-center justify-between px-3 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${showBgis ? 'bg-teal-50 text-teal-800' : 'text-slate-500 hover:bg-slate-50'}`}
+                      >
+                        <div className="flex items-center gap-2">
+                          <span className={`w-2 h-2 rounded-full ${showBgis ? 'bg-teal-500 animate-pulse' : 'bg-slate-300'}`} />
+                          <span>{t.filterBgis}</span>
+                        </div>
+                        {showBgis && <Check className="w-3.5 h-3.5 text-teal-600" />}
+                      </button>
+                    )}
+
+                    {hasEbirdData && (
+                      <button
+                        onClick={() => setShowEbird(!showEbird)}
+                        className={`flex items-center justify-between px-3 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${showEbird ? 'bg-sky-50 text-sky-800' : 'text-slate-500 hover:bg-slate-50'}`}
+                      >
+                        <div className="flex items-center gap-2">
+                          <span className={`w-2 h-2 rounded-full ${showEbird ? 'bg-sky-500 animate-pulse' : 'bg-slate-300'}`} />
+                          <span>{t.filterEbird}</span>
+                        </div>
+                        {showEbird && <Check className="w-3.5 h-3.5 text-sky-600" />}
+                      </button>
+                    )}
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       {/* Map View */}
       <Map

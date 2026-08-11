@@ -327,7 +327,8 @@ export default function SpeciesContent({ species, showBreadcrumb = true, refresh
               <SpeciesPhotoGallery 
                 taxaId={species.taxa_id || ''}
                 inatId={species.inat_id || ''} 
-                commonName={commonName || species.scientific_name} 
+                commonName={commonName} 
+                scientificName={species.scientific_name}
                 profilePicture={currentProfilePic}
                 onProfilePictureUpdate={setCurrentProfilePic}
               />

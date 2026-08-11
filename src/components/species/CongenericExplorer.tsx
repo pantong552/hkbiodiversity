@@ -147,7 +147,7 @@ const HorizontalSpeciesCard = ({ species, index, onOpenLightbox }: { species: Sp
       {/* Texts Area */}
       <div className="flex flex-col flex-1 min-w-0">
         <h4 className="text-[14px] font-black text-slate-800 line-clamp-1 group-hover:text-emerald-700 transition-colors leading-tight">
-          {commonName || species.scientific_name}
+          {commonName || formatScientificName(species.scientific_name)}
         </h4>
         {language === 'zh' && species.common_name_eng && (
           <p className="text-[9px] text-slate-400 font-bold truncate uppercase tracking-wider mt-1">
@@ -297,7 +297,7 @@ const MiniSpeciesCard = ({ species, index, onOpenLightbox }: { species: Species;
       
       <div className="flex flex-col min-w-0 flex-1 px-0.5">
         <h4 className="text-[13px] font-black text-slate-800 line-clamp-1 group-hover:text-emerald-700 transition-colors leading-snug">
-          {commonName || species.scientific_name}
+          {commonName || formatScientificName(species.scientific_name)}
         </h4>
         {language === 'zh' && species.common_name_eng && (
           <p className="text-[9px] text-slate-400 font-bold truncate uppercase tracking-tight mt-0.5">
@@ -593,6 +593,7 @@ export default function CongenericExplorer({ species, isMobile = false }: Congen
           currentIndex={0}
           onNavigate={() => {}}
           commonName={activeLightboxPhoto.commonName}
+          scientificName={activeLightboxPhoto.scientificName}
         />
       )}
     </div>

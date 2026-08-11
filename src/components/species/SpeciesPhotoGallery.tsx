@@ -33,6 +33,7 @@ interface SpeciesPhotoGalleryProps {
   taxaId: string; // 全局唯一 ID (如 fauna_123)
   inatId: number | string; // iNaturalist ID
   commonName?: string;
+  scientificName?: string;
   profilePicture?: string;
   onProfilePictureUpdate?: (newUrl: string) => void;
 }
@@ -41,6 +42,7 @@ export default function SpeciesPhotoGallery({
   taxaId,
   inatId, 
   commonName,
+  scientificName,
   profilePicture,
   onProfilePictureUpdate
 }: SpeciesPhotoGalleryProps) {
@@ -678,6 +680,7 @@ export default function SpeciesPhotoGallery({
         currentIndex={currentIndex}
         onNavigate={(index) => setCurrentIndex(index)}
         commonName={commonName}
+        scientificName={scientificName}
         taxaId={taxaId}
         currentProfilePicture={profilePicture}
         onProfilePictureUpdate={(newUrl) => {

@@ -30,6 +30,7 @@ import { useLanguage } from '@/context/LanguageContext';
 import Image from 'next/image';
 import { InatGalleryPhoto } from '@/hooks/useInaturalistSpeciesPhotos';
 import DeleteConfirmModal from './DeleteConfirmModal';
+import { formatScientificName } from '@/utils/formatters';
 
 interface EnrichedLightboxProps {
   isOpen: boolean;
@@ -38,6 +39,7 @@ interface EnrichedLightboxProps {
   currentIndex: number;
   onNavigate: (index: number) => void;
   commonName?: string;
+  scientificName?: string;
   taxaId?: string;
   currentProfilePicture?: string;
   onProfilePictureUpdate?: (newUrl: string) => void;
@@ -51,6 +53,7 @@ export default function EnrichedLightbox({
   currentIndex,
   onNavigate,
   commonName,
+  scientificName,
   taxaId,
   currentProfilePicture,
   onProfilePictureUpdate,
@@ -554,9 +557,18 @@ export default function EnrichedLightbox({
         >
           <div className="max-w-4xl mx-auto flex flex-col items-center gap-4">
              <div className="flex flex-col items-center gap-1.5 p-5 bg-black/40 backdrop-blur-2xl rounded-[2rem] border border-white/10 pointer-events-auto shadow-2xl">
-                <h3 className="text-white text-lg md:text-xl font-black tracking-tight flex items-center gap-3">
-                  {commonName}
-                  <span className="px-2 py-0.5 bg-emerald-500/20 text-emerald-400 text-[10px] rounded-lg border border-emerald-500/20">Research Grade</span>
+                <h3 className="text-white text-lg md:text-xl font-black tracking-tight flex items-center gap-2">
+                  <span className="inline-flex items-baseline gap-1">
+                    {(() => {
+                      const displayName = commonName || scientificName;
+                      // 若有學名且（沒有俗名，或者俗名與學名相同），使用 formatScientificName
+                      if (scientificName && (!commonName || commonName === scientificName)) {
+                        return formatScientificName(scientificName);
+                      }
+                      return displayName;
+                    })()}
+                  </span>
+                  <span className="px-2 py-0.5 bg-emerald-500/20 text-emerald-400 text-[10px] rounded-lg border border-emerald-500/20 ml-1">Research Grade</span>
                 </h3>
                 <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-2 text-white/50 text-xs font-medium">
                   <span className="flex items-center gap-2">
