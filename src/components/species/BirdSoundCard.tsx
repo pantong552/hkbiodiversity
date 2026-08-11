@@ -422,7 +422,11 @@ export default function BirdSoundCard({ scientificName, commonName }: BirdSoundC
       ) : (
         <div
           className={`space-y-3.5 overflow-y-auto pr-1 custom-scrollbar transition-all duration-300 ${
-            Object.values(spectroOpenMap).some(Boolean) ? 'max-h-[750px]' : 'max-h-[550px]'
+            expandedId !== null
+              ? 'max-h-[950px]'
+              : Object.values(spectroOpenMap).some(Boolean)
+              ? 'max-h-[750px]'
+              : 'max-h-[550px]'
           }`}
         >
           <div className="flex items-center justify-between text-[11px] text-slate-400 font-semibold px-1">

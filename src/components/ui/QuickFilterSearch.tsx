@@ -81,10 +81,27 @@ export default function QuickFilterSearch({
   const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
 
+  const activeSearchRef = useRef<string>(initialValue);
+
   // Sync with initialValue (e.g. when filters are reset globally)
   useEffect(() => {
     setLocalValue(initialValue);
+    activeSearchRef.current = initialValue;
   }, [initialValue]);
+
+  const handleInputChange = (newVal: string) => {
+    setLocalValue(newVal);
+    // 當使用者手動將字串清空 (delete/backspace 到 0 個字元) 且先前曾執行過搜尋時
+    if (newVal === '' && activeSearchRef.current !== '') {
+      activeSearchRef.current = '';
+      setShowSuggestions(false);
+      if (onClear) {
+        onClear();
+      } else {
+        onSubmit('');
+      }
+    }
+  };
 
   // Debounced Suggestion Fetching (限制：必須已登入且帳號 status 為 active 且輸入框處於 focus 狀態才會抓取建議)
   useEffect(() => {
@@ -148,6 +165,7 @@ export default function QuickFilterSearch({
       : (item.common_name_eng || item.scientific_name)) || localValue;
 
     setLocalValue(selectedName);
+    activeSearchRef.current = selectedName;
     onSubmit(selectedName);
     skipNextAutoCollapse();
     addSpecies(item.taxa_id);
@@ -173,11 +191,14 @@ export default function QuickFilterSearch({
       handleSelectSpecies(suggestions[selectedIndex]);
       return;
     }
-    onSubmit(localValue.trim());
+    const val = localValue.trim();
+    activeSearchRef.current = val;
+    onSubmit(val);
   };
 
   const handleReset = () => {
     setLocalValue('');
+    activeSearchRef.current = '';
     setShowSuggestions(false);
     setIsFocused(false);
     if (inputRef.current) inputRef.current.blur();
@@ -226,7 +247,7 @@ export default function QuickFilterSearch({
         type="text" 
         placeholder={placeholder || (language === 'zh' ? '快速搜尋...' : 'Quick search...')} 
         value={localValue}
-        onChange={(e) => setLocalValue(e.target.value)}
+        onChange={(e) => handleInputChange(e.target.value)}
         readOnly={!isAuthorized}
         inputMode={!isAuthorized ? 'none' : undefined}
         onClick={(e) => {
