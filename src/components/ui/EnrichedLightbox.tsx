@@ -534,17 +534,17 @@ export default function EnrichedLightbox({
                 initial={{ x: -20, opacity: 0 }}
                 animate={{ x: showUI ? 0 : -50, opacity: showUI ? 1 : 0 }}
                 onClick={handlePrev}
-                className="absolute left-4 md:left-8 p-4 md:p-6 bg-white/5 hover:bg-white/10 backdrop-blur-xl border border-white/5 rounded-full text-white/40 hover:text-white transition-all group z-[110]"
+                className="absolute left-2 sm:left-4 md:left-8 p-2.5 sm:p-4 md:p-6 bg-white/5 hover:bg-white/10 backdrop-blur-xl border border-white/5 rounded-full text-white/40 hover:text-white transition-all group z-[110]"
               >
-                <ChevronLeft className="w-8 h-8 group-hover:-translate-x-1 transition-transform" />
+                <ChevronLeft className="w-5 h-5 sm:w-6 sm:h-6 md:w-8 md:h-8 group-hover:-translate-x-1 transition-transform" />
               </motion.button>
               <motion.button 
                 initial={{ x: 20, opacity: 0 }}
                 animate={{ x: showUI ? 0 : 50, opacity: showUI ? 1 : 0 }}
                 onClick={handleNext}
-                className="absolute right-4 md:right-8 p-4 md:p-6 bg-white/5 hover:bg-white/10 backdrop-blur-xl border border-white/5 rounded-full text-white/40 hover:text-white transition-all group z-[110]"
+                className="absolute right-2 sm:right-4 md:right-8 p-2.5 sm:p-4 md:p-6 bg-white/5 hover:bg-white/10 backdrop-blur-xl border border-white/5 rounded-full text-white/40 hover:text-white transition-all group z-[110]"
               >
-                <ChevronRight className="w-8 h-8 group-hover:translate-x-1 transition-transform" />
+                <ChevronRight className="w-5 h-5 sm:w-6 sm:h-6 md:w-8 md:h-8 group-hover:translate-x-1 transition-transform" />
               </motion.button>
             </>
           )}

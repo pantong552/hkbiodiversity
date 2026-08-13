@@ -20,7 +20,9 @@ import CongenericExplorer from './CongenericExplorer';
 import SimilarSpeciesExplorer from './SimilarSpeciesExplorer';
 import BirdSoundCard from './BirdSoundCard';
 import SpeciesContributionCard from './SpeciesContributionCard';
+import { useSpeciesPanel } from '@/context/SpeciesPanelContext';
 import { useTaxonomy } from '@/context/TaxonomyContext';
+
 
 interface SpeciesContentProps {
   species: Species;
@@ -198,7 +200,9 @@ const SpeciesHeroBackground = ({ photos, defaultImage, isLoading }: { photos: In
 export default function SpeciesContent({ species, showBreadcrumb = true, refreshTrigger = 0 }: SpeciesContentProps) {
   const { language } = useLanguage();
   const { getTaxonomyChi } = useTaxonomy();
+  const { isLightboxOpen } = useSpeciesPanel();
   const { photos, isLoading } = useInaturalistSpeciesPhotos(species.inat_id);
+
   const [currentProfilePic, setCurrentProfilePic] = React.useState(species.profile_picture);
   const [refsList, setRefsList] = React.useState<any[]>([]);
   const [refsLoading, setRefsLoading] = React.useState(false);
@@ -291,7 +295,7 @@ export default function SpeciesContent({ species, showBreadcrumb = true, refresh
           isLoading={isLoading}
         />
         
-        <div className="absolute bottom-0 left-0 w-full p-8 md:p-12 z-20 pointer-events-none">
+        <div className={`absolute bottom-0 left-0 w-full p-8 md:p-12 z-20 pointer-events-none transition-opacity duration-300 ${isLightboxOpen ? 'opacity-0' : 'opacity-100'}`}>
           <div className="max-w-7xl mx-auto pointer-events-auto">
             <div className="flex flex-col mb-2">
               <h1 className="text-4xl md:text-5xl font-black text-white leading-tight">
@@ -308,6 +312,7 @@ export default function SpeciesContent({ species, showBreadcrumb = true, refresh
             </p>
           </div>
         </div>
+
       </div>
       {/* Main Content */}
       <div className="max-w-7xl mx-auto px-6 py-12">

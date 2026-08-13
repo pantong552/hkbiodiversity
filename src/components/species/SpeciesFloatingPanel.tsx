@@ -188,7 +188,9 @@ export default function SpeciesFloatingPanel() {
     isFilterOpen,
     isEditModalOpen,
     setIsEditModalOpen,
+    isLightboxOpen,
     skipAutoCollapseRef
+
   } = useSpeciesPanel();
   
   const { language, t } = useLanguage();
@@ -627,7 +629,8 @@ export default function SpeciesFloatingPanel() {
         </AnimatePresence>
       </motion.div>
 
-      <div className={`w-full flex justify-center pointer-events-auto relative overflow-visible ${isEditModalOpen ? 'hidden' : ''}`}>
+      <div className={`w-full flex justify-center pointer-events-auto relative overflow-visible ${isEditModalOpen || isLightboxOpen ? 'hidden' : ''}`}>
+
         {/* Global Tooltip Portal (Rendered here to escape internal Tab overflow) */}
         {openSpeciesIds.map(id => (
           <SpeciesTabPreview 
