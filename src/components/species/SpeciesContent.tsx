@@ -15,7 +15,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useRef } from 'react';
 import SpeciesMap from './SpeciesMap';
 import GbifGlobalMap from './GbifGlobalMap';
-import { formatScientificName } from '@/utils/formatters';
+import { formatScientificName, parseAliases } from '@/utils/formatters';
 import CongenericExplorer from './CongenericExplorer';
 import SimilarSpeciesExplorer from './SimilarSpeciesExplorer';
 import BirdSoundCard from './BirdSoundCard';
@@ -306,9 +306,9 @@ export default function SpeciesContent({ species, showBreadcrumb = true, refresh
             <p className="text-lg md:text-xl text-emerald-50 font-serif tracking-wide">
               {formatScientificName(species.scientific_name)} <span className="text-emerald-200/60 text-sm ml-2">{species.author}</span>
             </p>
-            </div>
           </div>
         </div>
+      </div>
       {/* Main Content */}
       <div className="max-w-7xl mx-auto px-6 py-12">
         <div className="grid grid-cols-1 xl:grid-cols-12 gap-12">

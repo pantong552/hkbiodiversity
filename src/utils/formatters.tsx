@@ -251,3 +251,15 @@ export function getSpeciesImageUrl(species: any, size: 'square' | 'medium' | 'la
 
   return url;
 }
+
+/**
+ * 自動拆分與清洗物種別名文字
+ * 相容的分隔符包括：' / ', '/', '；', ';', ', ', ',', '、', '\', 換行
+ */
+export function parseAliases(rawText?: string | null): string[] {
+  if (!rawText) return [];
+  const items = rawText.split(/[\/;；,、\\\n\r]+/g);
+  const cleaned = items.map(item => item.trim()).filter(Boolean);
+  return Array.from(new Set(cleaned));
+}
+

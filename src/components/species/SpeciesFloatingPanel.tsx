@@ -11,7 +11,7 @@ import SpeciesContent from './SpeciesContent';
 import { useShare } from '@/hooks/useShare';
 import { useInaturalistPhoto } from '@/hooks/useInaturalistPhoto';
 import { usePathname } from 'next/navigation';
-import { getSpeciesImageUrl } from '@/utils/formatters';
+import { getSpeciesImageUrl, parseAliases } from '@/utils/formatters';
 import { useTaxonomy } from '@/context/TaxonomyContext';
 import { useAuth } from '@/context/AuthContext';
 import { Sliders } from 'lucide-react';
@@ -144,6 +144,17 @@ function SpeciesTabPreview({
                   {species.scientific_name}
                 </p>
               )}
+              {species && (() => {
+                const chiAliases = parseAliases(species.alias_common_name_chi);
+                const engAliases = parseAliases(species.alias_common_name_eng);
+                const firstAlias = language === 'zh' ? (chiAliases[0] || engAliases[0]) : (engAliases[0] || chiAliases[0]);
+                if (!firstAlias) return null;
+                return (
+                  <p className="text-[9px] font-medium text-emerald-600 truncate mt-0.5">
+                    AKA: {firstAlias}
+                  </p>
+                );
+              })()}
                {species && (
                 <div className="mt-2 flex items-center gap-1.5 opacity-60">
                    <div className="w-1 h-1 rounded-full bg-slate-400" />
@@ -153,6 +164,7 @@ function SpeciesTabPreview({
                 </div>
               )}
             </div>
+
           </div>
           {/* Arrow - 指示位置需補償 shift 的位移以保持準確對齊 */}
           <div 
