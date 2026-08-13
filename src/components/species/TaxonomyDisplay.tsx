@@ -536,22 +536,23 @@ export default function TaxonomyDisplay({ species }: TaxonomyDisplayProps) {
                     </div>
                   </div>
                 )}
-                <div className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1 pb-4 text-[10px] font-medium text-slate-400">
-                  <div className="flex items-center gap-1.5">
+                <div className="flex flex-col sm:flex-row items-center justify-center gap-x-3 gap-y-1.5 pb-4 text-[10px] font-medium text-slate-400 text-center">
+                  <div className="flex flex-wrap items-center justify-center gap-1.5">
                     <span>Source: Catalogue of Life (COL)</span>
                     {fullData?.datasetVersion && (
-                      <span className="bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded font-mono font-bold">
+                      <span className="bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded font-mono font-bold whitespace-nowrap">
                         Release: {fullData.datasetVersion}
                       </span>
                     )}
                     {fullData?.datasetIssued && (
-                      <span className="text-slate-400">
+                      <span className="text-slate-400 whitespace-nowrap">
                         Issued: {fullData.datasetIssued}
                       </span>
                     )}
                   </div>
-                  <div className="flex items-center gap-1">
-                    <span>• Usage ID:</span>
+                  <div className="flex items-center justify-center gap-1">
+                    <span className="hidden sm:inline">•</span>
+                    <span>Usage ID:</span>
                     <code className="bg-slate-100 px-1.5 py-0.5 rounded text-emerald-600 font-mono">
                       {fullData?.usageId}
                     </code>

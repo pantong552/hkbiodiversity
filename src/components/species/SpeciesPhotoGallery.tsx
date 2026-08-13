@@ -471,7 +471,7 @@ export default function SpeciesPhotoGallery({
                   src={isMobile ? currentPhoto?.medium_url : currentPhoto?.large_url}
                   alt={commonName || 'Species observation'}
                   fill
-                  className="object-contain sm:object-cover"
+                  className="object-cover"
                   unoptimized={(isMobile ? currentPhoto?.medium_url : currentPhoto?.large_url)?.includes('/api/image/transform')}
                   sizes="(max-width: 768px) 100vw, (max-width: 1024px) 80vw, 1200px"
                 />
