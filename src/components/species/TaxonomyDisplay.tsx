@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Species } from '@/types/species';
 import { useLanguage } from '@/context/LanguageContext';
-import { Layers, ChevronDown, Dna, Search, Loader2, Sparkles, AlertCircle, Info, Tag, BookOpen } from 'lucide-react';
+import { Layers, ChevronDown, Dna, Search, Loader2, Sparkles, AlertCircle, Info, Tag, BookOpen, ExternalLink } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useSpeciesPanel } from '@/context/SpeciesPanelContext';
 import { formatScientificName, parseAliases } from '@/utils/formatters';
@@ -17,7 +17,12 @@ interface FullTaxonomyData {
   classification: { rank: string; name: string; id: string; authorship?: string }[];
   synonyms: string[];
   subspecies: string[];
+  datasetKey?: string;
+  datasetTitle?: string;
+  datasetVersion?: string;
+  datasetIssued?: string;
 }
+
 
 export default function TaxonomyDisplay({ species }: TaxonomyDisplayProps) {
   const { language } = useLanguage();
@@ -109,6 +114,8 @@ export default function TaxonomyDisplay({ species }: TaxonomyDisplayProps) {
         if (!response.ok) throw new Error('Failed to fetch taxonomy data');
         const data = await response.json();
         setFullData(data);
+
+
       } catch (err: any) {
         setError(err.message);
       } finally {
@@ -391,7 +398,7 @@ export default function TaxonomyDisplay({ species }: TaxonomyDisplayProps) {
       <div className="mt-4 sm:mt-8 pt-0">
         <button
           onClick={toggleFullTaxonomy}
-          className={`w-full flex items-center justify-between px-4 sm:px-6 py-3 sm:py-4 rounded-xl sm:rounded-2xl transition-all duration-500 group ${isExpanded ? 'bg-slate-900 text-white shadow-xl ring-4 ring-slate-100' : 'bg-slate-50 text-slate-600 hover:bg-emerald-50'}`}
+          className={`w-full flex items-center justify-between px-4 sm:px-6 py-3 sm:py-4 rounded-xl sm:rounded-2xl transition-all duration-500 group ${isExpanded ? 'bg-slate-900 text-white' : 'bg-slate-50 text-slate-600 hover:bg-emerald-50'}`}
         >
           <div className="flex items-center gap-4">
             <div className={`p-2 rounded-xl transition-colors ${isExpanded ? 'bg-white/10 text-emerald-400' : 'bg-white text-slate-400 shadow-sm'}`}>
@@ -432,14 +439,7 @@ export default function TaxonomyDisplay({ species }: TaxonomyDisplayProps) {
                 ) : fullData && (
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-stretch">
                     {/* Left: Classification Path */}
-                    <div className="bg-white rounded-[2rem] p-5 md:p-8 shadow-sm border border-slate-100 relative overflow-hidden group flex flex-col">
-                      <div className="absolute top-0 right-0 p-8 opacity-[0.03]">
-                        <Layers className="w-32 h-32 text-slate-900" />
-                      </div>
-                      <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-6 flex items-center gap-2 px-1">
-                        <div className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                        {language === 'zh' ? '完整階層路徑' : 'Full Hierarchy Path'}
-                      </h3>
+                    <div className="bg-white rounded-[2rem] p-5 md:p-8 shadow-sm border border-slate-100 flex flex-col">
                       <div className="space-y-1 relative flex-1 -mx-2 md:mx-0">
                         {fullData.classification.map((item, idx) => {
                           const rankLower = item.rank.toLowerCase();
@@ -450,7 +450,7 @@ export default function TaxonomyDisplay({ species }: TaxonomyDisplayProps) {
                             superorder: '總目', order: '目', suborder: '亞目', infraorder: '下目',
                             parvorder: '小目', superfamily: '總科', family: '科', subfamily: '亞科',
                             supertribe: '總族', tribe: '族', subtribe: '亞族', genus: '屬',
-                            subgenus: '亞屬', section: '節', subsection: '亞節', species: '種',
+                            subgenus: '亞節', section: '節', subsection: '亞節', species: '種',
                             subspecies: '亞種'
                           };
                           const rankChi = rankMap[rankLower] || '';
@@ -486,52 +486,88 @@ export default function TaxonomyDisplay({ species }: TaxonomyDisplayProps) {
 
                     {/* Right: Subspecies & Synonyms */}
                     <div className="flex flex-col gap-6">
-                      <div className="bg-emerald-50/50 rounded-[2rem] p-8 border border-emerald-100/50 relative overflow-hidden group">
-                        <h3 className="text-xs font-black text-emerald-600 uppercase tracking-widest mb-6 flex items-center gap-2">
-                          <Sparkles className="w-4 h-4" />
+                      {/* 已知亞種 Card - UI 與同物異名保持一致 */}
+                      <div className="bg-white rounded-[2rem] p-6 shadow-sm border border-slate-100 group flex flex-col overflow-hidden">
+                        <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-4 flex items-center gap-2">
+                          <Sparkles className="w-4 h-4 text-emerald-500" />
                           {language === 'zh' ? '已知亞種' : 'Known Subspecies'}
                         </h3>
-                        {fullData.subspecies.length > 0 ? (
-                          <div className="flex flex-wrap gap-2">
-                            {fullData.subspecies.map((sub, idx) => (
-                              <div key={idx} className="px-3 py-1.5 bg-white rounded-xl border border-emerald-100 text-[12px] text-emerald-800 shadow-sm">
-                                {formatScientificName(sub, true, true)}
-                              </div>
-                            ))}
-                          </div>
-                        ) : (
-                          <p className="text-sm font-bold text-emerald-600/40">{language === 'zh' ? '查無亞種資訊' : 'No subspecies recorded'}</p>
-                        )}
+                        <div className="flex-1 overflow-y-auto pr-2 scrollbar-thin scrollbar-thumb-slate-200">
+                          {fullData.subspecies.length > 0 ? (
+                            <div className="space-y-1.5">
+                              {fullData.subspecies.map((sub, idx) => (
+                                <div key={idx} className="text-[12px] font-bold text-slate-700 leading-snug py-0.5">
+                                  {formatScientificName(sub, true, true)}
+                                </div>
+                              ))}
+                            </div>
+                          ) : (
+                            <span className="text-slate-400 text-xs font-normal">-</span>
+                          )}
+                        </div>
                       </div>
 
+                      {/* 同物異名 Card */}
                       <div className="bg-white rounded-[2rem] p-6 shadow-sm border border-slate-100 group flex-1 flex flex-col overflow-hidden">
                         <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-4 flex items-center gap-2">
                           <Info className="w-4 h-4 text-emerald-500" />
                           {language === 'zh' ? '同物異名' : 'Synonyms'}
                         </h3>
                         <div className="flex-1 overflow-y-auto pr-2 scrollbar-thin scrollbar-thumb-slate-200">
-                          <div className="space-y-1.5">
-                            {fullData.synonyms.map((syn, idx) => (
-                              <div key={idx} className="text-[12px] font-bold text-slate-700 leading-snug py-0.5">
-                                {formatScientificName(syn, true, true)}
-                              </div>
-                            ))}
-                          </div>
+                          {fullData.synonyms.length > 0 ? (
+                            <div className="space-y-1.5">
+                              {fullData.synonyms.map((syn, idx) => (
+                                <div key={idx} className="text-[12px] font-bold text-slate-700 leading-snug py-0.5">
+                                  {formatScientificName(syn, true, true)}
+                                </div>
+                              ))}
+                            </div>
+                          ) : (
+                            <span className="text-slate-400 text-xs font-normal">-</span>
+                          )}
                         </div>
                       </div>
                     </div>
                   </div>
                 )}
-                <div className="flex justify-center pb-4">
-                  <p className="text-[10px] font-medium text-slate-400 flex items-center gap-2">
-                    Source: Catalogue of Life (COL) • Usage ID: <code className="bg-slate-100 px-1.5 py-0.5 rounded text-emerald-600 font-mono">{fullData?.usageId}</code>
-                  </p>
+                <div className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1 pb-4 text-[10px] font-medium text-slate-400">
+                  <div className="flex items-center gap-1.5">
+                    <span>Source: Catalogue of Life (COL)</span>
+                    {fullData?.datasetVersion && (
+                      <span className="bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded font-mono font-bold">
+                        Release: {fullData.datasetVersion}
+                      </span>
+                    )}
+                    {fullData?.datasetIssued && (
+                      <span className="text-slate-400">
+                        Issued: {fullData.datasetIssued}
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <span>• Usage ID:</span>
+                    <code className="bg-slate-100 px-1.5 py-0.5 rounded text-emerald-600 font-mono">
+                      {fullData?.usageId}
+                    </code>
+                    {fullData?.usageId && (
+                      <a
+                        href={`https://www.checklistbank.org/dataset/${fullData.datasetKey || '3LXR'}/taxon/${fullData.usageId}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="p-1 hover:bg-slate-200 rounded transition-colors text-slate-500 hover:text-emerald-600 inline-flex items-center"
+                        title="View on Catalogue of Life (ChecklistBank)"
+                      >
+                        <ExternalLink className="w-3 h-3" />
+                      </a>
+                    )}
+                  </div>
                 </div>
               </div>
             </motion.div>
           )}
         </AnimatePresence>
       </div>
+
     </div>
   );
 }
