@@ -96,8 +96,13 @@ export default function TaxonomyDisplay({ species }: TaxonomyDisplayProps) {
 
     setPendingTaxonomyFilter({ level: levelId, value: searchValue });
     toggleExpand(false);
-    router.push('/');
+
+    if (window.location.pathname !== '/database') {
+      router.push('/database');
+    }
   };
+
+
 
   const toggleFullTaxonomy = async () => {
     if (isExpanded) {
@@ -357,9 +362,10 @@ export default function TaxonomyDisplay({ species }: TaxonomyDisplayProps) {
                       className={`flex-1 py-2 px-3.5 rounded-xl border transition-all ${
                         level.isCurrent 
                           ? 'bg-emerald-50/90 border-emerald-200 shadow-sm ring-1 ring-emerald-500/20' 
-                          : 'bg-white border-slate-100 hover:border-slate-200'
+                          : 'bg-white border-slate-100 hover:border-emerald-300 hover:bg-emerald-50/40 hover:shadow-sm cursor-pointer'
                       }`}
                     >
+
                       <div className="flex items-center gap-3">
                         <div className={`shrink-0 ${language === 'zh' ? 'w-7' : 'w-[68px]'} flex items-center justify-start`}>
                           <div className={`flex items-center justify-center ${language === 'zh' ? 'w-7 h-5 rounded-md' : 'w-full h-5 px-1 rounded-md'} border text-center ${level.isCurrent ? 'bg-emerald-600 border-emerald-500 shadow-sm' : 'bg-slate-100 border-slate-200'}`}>

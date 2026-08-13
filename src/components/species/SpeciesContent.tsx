@@ -20,8 +20,10 @@ import CongenericExplorer from './CongenericExplorer';
 import SimilarSpeciesExplorer from './SimilarSpeciesExplorer';
 import BirdSoundCard from './BirdSoundCard';
 import SpeciesContributionCard from './SpeciesContributionCard';
+import { useRouter } from 'next/navigation';
 import { useSpeciesPanel } from '@/context/SpeciesPanelContext';
 import { useTaxonomy } from '@/context/TaxonomyContext';
+
 
 
 interface SpeciesContentProps {
@@ -200,8 +202,23 @@ const SpeciesHeroBackground = ({ photos, defaultImage, isLoading }: { photos: In
 export default function SpeciesContent({ species, showBreadcrumb = true, refreshTrigger = 0 }: SpeciesContentProps) {
   const { language } = useLanguage();
   const { getTaxonomyChi } = useTaxonomy();
-  const { isLightboxOpen } = useSpeciesPanel();
+  const { isLightboxOpen, setPendingTaxonomyFilter, toggleExpand } = useSpeciesPanel();
+  const router = useRouter();
   const { photos, isLoading } = useInaturalistSpeciesPhotos(species.inat_id);
+
+  const handleBreadcrumbClick = (levelId: string, value: string, chiValue?: string) => {
+    const isPlantSpecies = species.taxa_group === 'FLORA' || (!species.phylum_eng && !!(species as any).family_chi);
+    const searchValue = isPlantSpecies ? (chiValue || value) : value;
+    if (!searchValue) return;
+
+    setPendingTaxonomyFilter({ level: levelId, value: searchValue });
+    toggleExpand(false);
+
+    if (typeof window !== 'undefined' && window.location.pathname !== '/database') {
+      router.push('/database');
+    }
+  };
+
 
   const [currentProfilePic, setCurrentProfilePic] = React.useState(species.profile_picture);
   const [refsList, setRefsList] = React.useState<any[]>([]);
@@ -265,22 +282,52 @@ export default function SpeciesContent({ species, showBreadcrumb = true, refresh
       {/* Breadcrumb Area - Inside Content but below Tabs */}
       {showBreadcrumb && (
         <div className="bg-white/60 backdrop-blur-sm border-b border-slate-100 px-8 py-3">
-          <div className="max-w-7xl mx-auto flex items-center gap-2 text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+          <div className="max-w-7xl mx-auto flex items-center gap-2 text-[10px] font-bold text-slate-400 uppercase tracking-widest flex-wrap">
             {isPlant ? (
               <>
-                <span className="text-emerald-600">{language === 'zh' ? getTaxonomyChi('family', taxaType, (species as any).family_eng) : (species as any).family_eng}</span>
+                <span 
+                  onClick={() => handleBreadcrumbClick('families', (species as any).family_eng, (species as any).family_chi)}
+                  className="text-emerald-600 hover:text-emerald-700 hover:underline cursor-pointer transition-colors"
+                >
+                  {language === 'zh' ? getTaxonomyChi('family', taxaType, (species as any).family_eng) : (species as any).family_eng}
+                </span>
                 <span>/</span>
-                <span>{language === 'zh' ? getTaxonomyChi('genus', taxaType, (species as any).genus_eng) : (species as any).genus_eng}</span>
+                <span 
+                  onClick={() => handleBreadcrumbClick('genuses', (species as any).genus_eng, (species as any).genus_chi)}
+                  className="hover:text-emerald-600 hover:underline cursor-pointer transition-colors"
+                >
+                  {language === 'zh' ? getTaxonomyChi('genus', taxaType, (species as any).genus_eng) : (species as any).genus_eng}
+                </span>
               </>
             ) : (
               <>
-                <span>{language === 'zh' ? getTaxonomyChi('phylum', taxaType, species.phylum_eng) : species.phylum_eng}</span>
+                <span 
+                  onClick={() => handleBreadcrumbClick('phylum_eng', species.phylum_eng)}
+                  className="hover:text-emerald-600 hover:underline cursor-pointer transition-colors"
+                >
+                  {language === 'zh' ? getTaxonomyChi('phylum', taxaType, species.phylum_eng) : species.phylum_eng}
+                </span>
                 <span>/</span>
-                <span>{language === 'zh' ? getTaxonomyChi('class', taxaType, species.class_eng) : species.class_eng}</span>
+                <span 
+                  onClick={() => handleBreadcrumbClick('class_eng', species.class_eng)}
+                  className="hover:text-emerald-600 hover:underline cursor-pointer transition-colors"
+                >
+                  {language === 'zh' ? getTaxonomyChi('class', taxaType, species.class_eng) : species.class_eng}
+                </span>
                 <span>/</span>
-                <span>{language === 'zh' ? getTaxonomyChi('order', taxaType, species.order_eng) : species.order_eng}</span>
+                <span 
+                  onClick={() => handleBreadcrumbClick('order_eng', species.order_eng)}
+                  className="hover:text-emerald-600 hover:underline cursor-pointer transition-colors"
+                >
+                  {language === 'zh' ? getTaxonomyChi('order', taxaType, species.order_eng) : species.order_eng}
+                </span>
                 <span>/</span>
-                <span className="text-emerald-600">{language === 'zh' ? getTaxonomyChi('family', taxaType, species.family_eng) : species.family_eng}</span>
+                <span 
+                  onClick={() => handleBreadcrumbClick('family_eng', species.family_eng)}
+                  className="text-emerald-600 hover:text-emerald-700 hover:underline cursor-pointer transition-colors"
+                >
+                  {language === 'zh' ? getTaxonomyChi('family', taxaType, species.family_eng) : species.family_eng}
+                </span>
               </>
             )}
           </div>
