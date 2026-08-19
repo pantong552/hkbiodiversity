@@ -16,7 +16,8 @@ import {
   X, 
   Info,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
+  User
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -26,7 +27,12 @@ interface Reference {
   zh: string;
   en: string;
   url?: string;
+  created_by?: string;
+  updated_by?: string;
   created_at: string;
+  updated_at?: string;
+  creator?: { username: string | null } | null;
+  updater?: { username: string | null } | null;
 }
 
 // APA 7 生成器型態
@@ -78,13 +84,52 @@ export default function ReferenceManager() {
   const fetchReferences = async () => {
     setLoading(true);
     try {
-      const { data, error } = await supabase
+      // 1. 抓取所有 references
+      const { data: refData, error: refError } = await supabase
         .from('references')
         .select('*')
         .order('code', { ascending: true });
         
-      if (error) throw error;
-      setReferences(data || []);
+      if (refError) throw refError;
+
+      if (!refData || refData.length === 0) {
+        setReferences([]);
+        return;
+      }
+
+      // 2. 收集所有相關的 user id (created_by 及 updated_by)
+      const userIds = Array.from(
+        new Set(
+          refData
+            .flatMap((r: any) => [r.created_by, r.updated_by])
+            .filter(Boolean)
+        )
+      );
+
+      // 3. 若有 user id，查詢 profiles 取得 username
+      let profileMap: Record<string, string> = {};
+      if (userIds.length > 0) {
+        const { data: profileData } = await supabase
+          .from('profiles')
+          .select('id, username')
+          .in('id', userIds);
+
+        if (profileData) {
+          profileMap = profileData.reduce((acc: Record<string, string>, p: any) => {
+            if (p.id) acc[p.id] = p.username || '';
+            return acc;
+          }, {} as Record<string, string>);
+        }
+      }
+
+      // 4. 將 username 合併回 references 列表
+      const enrichedRefs = refData.map((r: any) => ({
+        ...r,
+        creator: r.created_by && profileMap[r.created_by] ? { username: profileMap[r.created_by] } : null,
+        updater: r.updated_by && profileMap[r.updated_by] ? { username: profileMap[r.updated_by] } : null
+      }));
+
+      setReferences(enrichedRefs);
     } catch (err) {
       console.error('Error fetching references:', err);
     } finally {
@@ -99,7 +144,9 @@ export default function ReferenceManager() {
     return references.filter(ref => 
       ref.code.toLowerCase().includes(q) ||
       ref.zh.toLowerCase().includes(q) ||
-      ref.en.toLowerCase().includes(q)
+      ref.en.toLowerCase().includes(q) ||
+      (ref.creator?.username && ref.creator.username.toLowerCase().includes(q)) ||
+      (ref.updater?.username && ref.updater.username.toLowerCase().includes(q))
     );
   }, [references, searchQuery]);
 
@@ -167,6 +214,9 @@ export default function ReferenceManager() {
     setFormError('');
 
     try {
+      const { data: authData } = await supabase.auth.getUser();
+      const currentUserId = authData?.user?.id || null;
+
       if (editingRef) {
         // 更新
         const { error } = await supabase
@@ -176,19 +226,14 @@ export default function ReferenceManager() {
             zh: formZh.trim(),
             en: formEn.trim(),
             url: formUrl.trim() || null,
+            updated_by: currentUserId,
             updated_at: new Date().toISOString()
           })
           .eq('id', editingRef.id);
 
         if (error) throw error;
         
-        setReferences(references.map(r => r.id === editingRef.id ? { 
-          ...r, 
-          code: formCode.trim(), 
-          zh: formZh.trim(), 
-          en: formEn.trim(),
-          url: formUrl.trim() || undefined
-        } : r));
+        await fetchReferences();
       } else {
         // 新增
         const { data, error } = await supabase
@@ -197,7 +242,9 @@ export default function ReferenceManager() {
             code: formCode.trim(),
             zh: formZh.trim(),
             en: formEn.trim(),
-            url: formUrl.trim() || null
+            url: formUrl.trim() || null,
+            created_by: currentUserId,
+            updated_by: currentUserId
           })
           .select()
           .single();
@@ -209,9 +256,7 @@ export default function ReferenceManager() {
           throw error;
         }
         
-        if (data) {
-          setReferences([...references, data].sort((a, b) => a.code.localeCompare(b.code)));
-        }
+        await fetchReferences();
       }
       setIsModalOpen(false);
     } catch (err: any) {
@@ -296,38 +341,42 @@ export default function ReferenceManager() {
             <Search className="w-4 h-4 text-slate-400 mr-2.5" />
             <input 
               type="text" 
-              placeholder={language === 'zh' ? '搜尋文獻編碼、內容...' : 'Search reference code, content...'}
+              placeholder={language === 'zh' ? '搜尋文獻編碼、內容、建立者...' : 'Search code, content, user...'}
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full bg-transparent border-none outline-none text-slate-700 text-xs font-semibold placeholder:text-slate-400"
+              className="w-full bg-transparent border-none outline-none text-xs font-semibold text-slate-700 placeholder:text-slate-400"
             />
+            {searchQuery && (
+              <button 
+                onClick={() => setSearchQuery('')}
+                className="p-1 text-slate-400 hover:text-slate-600 transition-colors"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            )}
           </div>
         </div>
 
-        <div className="flex items-center gap-3">
-          <div className="px-3 py-2 bg-white/50 border border-white rounded-xl text-[10px] font-black text-slate-500 shadow-sm">
-            Total: <span className="text-emerald-600 ml-0.5">{filteredReferences.length}</span>
-          </div>
-
-          <button
-            onClick={handleOpenAddModal}
-            className="flex items-center gap-1.5 px-4 py-2.5 bg-emerald-600 text-white rounded-2xl text-xs font-black shadow-lg shadow-emerald-600/20 hover:bg-emerald-700 transition-all hover:scale-[1.02] active:scale-95 cursor-pointer shrink-0"
-          >
-            <Plus className="w-3.5 h-3.5" />
-            <span>{language === 'zh' ? '新增文獻' : 'Add Reference'}</span>
-          </button>
-        </div>
+        <button
+          onClick={handleOpenAddModal}
+          className="flex items-center justify-center gap-2 px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-2xl font-bold text-xs shadow-lg shadow-emerald-600/20 hover:shadow-emerald-600/30 transition-all hover:scale-[1.02] active:scale-[0.98] cursor-pointer shrink-0"
+        >
+          <Plus className="w-4 h-4" />
+          <span>{language === 'zh' ? '新增參考文獻' : 'Add Reference'}</span>
+        </button>
       </div>
 
-      {/* 資料展示區 */}
+      {/* 資料列表區域 */}
       {loading ? (
-        <div className="flex-1 flex flex-col items-center justify-center py-20">
-          <Loader2 className="w-8 h-8 text-emerald-500 animate-spin mb-3" />
-          <p className="text-slate-400 text-xs font-bold animate-pulse">Loading Reference Database...</p>
+        <div className="flex-1 flex flex-col items-center justify-center min-h-[300px]">
+          <Loader2 className="w-8 h-8 text-emerald-500 animate-spin mb-2" />
+          <p className="text-slate-400 text-xs font-bold">
+            {language === 'zh' ? '正在載入參考文獻資料...' : 'Loading references...'}
+          </p>
         </div>
       ) : filteredReferences.length === 0 ? (
-        <div className="flex-1 flex flex-col items-center justify-center py-20 border border-dashed border-slate-200 rounded-[2rem] bg-white/20">
-          <BookOpen className="w-12 h-12 text-slate-300 mb-2" />
+        <div className="flex-1 flex flex-col items-center justify-center min-h-[300px] bg-white/30 rounded-3xl border border-dashed border-slate-200">
+          <BookOpen className="w-10 h-10 text-slate-300 mb-2" />
           <p className="text-slate-400 text-xs font-bold">
             {language === 'zh' ? '沒有找到任何參考文獻資料' : 'No references found'}
           </p>
@@ -339,70 +388,92 @@ export default function ReferenceManager() {
             <table className="w-full text-left border-collapse">
               <thead>
                 <tr className="bg-slate-50 border-b border-slate-100/80 sticky top-0 z-10">
-                  <th className="px-5 py-3.5 text-[9px] font-black text-slate-400 uppercase tracking-widest w-1/6">
-                    {language === 'zh' ? '文獻編碼 (Code)' : 'Code'}
+                  <th className="px-5 py-3.5 text-[9px] font-black text-slate-400 uppercase tracking-widest w-[110px]">
+                    {language === 'zh' ? '文獻編碼' : 'Code'}
                   </th>
-                  <th className="px-5 py-3.5 text-[9px] font-black text-slate-400 uppercase tracking-widest w-5/12">
+                  <th className="px-5 py-3.5 text-[9px] font-black text-slate-400 uppercase tracking-widest min-w-[200px]">
                     {language === 'zh' ? '中文 APA 7 格式' : 'Chinese APA 7th'}
                   </th>
-                  <th className="px-5 py-3.5 text-[9px] font-black text-slate-400 uppercase tracking-widest w-5/12">
+                  <th className="px-5 py-3.5 text-[9px] font-black text-slate-400 uppercase tracking-widest min-w-[200px]">
                     {language === 'zh' ? '英文 APA 7 格式' : 'English APA 7th'}
                   </th>
-                  <th className="px-5 py-3.5 text-[9px] font-black text-slate-400 uppercase tracking-widest text-right w-[100px]">
+                  <th className="px-5 py-3.5 text-[9px] font-black text-slate-400 uppercase tracking-widest w-[140px]">
+                    {language === 'zh' ? '建立者 / 修改者' : 'User (Created / Updated)'}
+                  </th>
+                  <th className="px-5 py-3.5 text-[9px] font-black text-slate-400 uppercase tracking-widest text-right w-[90px]">
                     {language === 'zh' ? '操作' : 'Actions'}
                   </th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100/50">
-                {paginatedReferences.map((ref) => (
-                  <tr 
-                    key={ref.id}
-                    className="hover:bg-emerald-50/30 transition-colors duration-200 group"
-                  >
-                    <td className="px-5 py-3 text-xs font-bold text-slate-700">
-                      <div className="flex items-center gap-1.5">
-                        <span className="font-mono text-emerald-700 bg-emerald-50 border border-emerald-100 rounded-md px-2 py-0.5 select-all">
-                          {ref.code}
-                        </span>
-                        <button
-                          onClick={() => handleCopyCode(ref.code)}
-                          className="p-1 text-slate-400 hover:text-emerald-600 rounded-md transition-colors"
-                          title="Copy Code"
-                        >
-                          {copiedCode === ref.code ? (
-                            <Check className="w-3.5 h-3.5 text-emerald-500" />
-                          ) : (
-                            <Copy className="w-3.5 h-3.5" />
+                {paginatedReferences.map((ref) => {
+                  const creatorName = ref.creator?.username || (language === 'zh' ? '系統' : 'System');
+                  const updaterName = ref.updater?.username;
+
+                  return (
+                    <tr 
+                      key={ref.id}
+                      className="hover:bg-emerald-50/30 transition-colors duration-200 group"
+                    >
+                      <td className="px-5 py-3 text-xs font-bold text-slate-700 align-top">
+                        <div className="flex items-center gap-1.5">
+                          <span className="font-mono text-emerald-700 bg-emerald-50 border border-emerald-100 rounded-md px-2 py-0.5 select-all">
+                            {ref.code}
+                          </span>
+                          <button
+                            onClick={() => handleCopyCode(ref.code)}
+                            className="p-1 text-slate-400 hover:text-emerald-600 rounded-md transition-colors cursor-pointer"
+                            title="Copy Code"
+                          >
+                            {copiedCode === ref.code ? (
+                              <Check className="w-3.5 h-3.5 text-emerald-500" />
+                            ) : (
+                              <Copy className="w-3.5 h-3.5" />
+                            )}
+                          </button>
+                        </div>
+                      </td>
+                      <td className="px-5 py-3 text-xs text-slate-600 leading-relaxed font-semibold align-top">
+                        {ref.zh}
+                      </td>
+                      <td className="px-5 py-3 text-xs text-slate-600 leading-relaxed font-semibold align-top">
+                        {ref.en}
+                      </td>
+                      <td className="px-5 py-3 text-xs text-slate-500 align-top">
+                        <div className="flex flex-col gap-1 text-[11px]">
+                          <div className="flex items-center gap-1.5" title={language === 'zh' ? '建立者' : 'Created by'}>
+                            <span className="text-[9px] font-bold text-slate-400 uppercase tracking-tight">C:</span>
+                            <span className="font-bold text-slate-700 truncate max-w-[90px]">{creatorName}</span>
+                          </div>
+                          {updaterName && updaterName !== creatorName && (
+                            <div className="flex items-center gap-1.5 text-emerald-700" title={language === 'zh' ? '最後更新者' : 'Updated by'}>
+                              <span className="text-[9px] font-bold text-emerald-500 uppercase tracking-tight">U:</span>
+                              <span className="font-bold truncate max-w-[90px]">{updaterName}</span>
+                            </div>
                           )}
-                        </button>
-                      </div>
-                    </td>
-                    <td className="px-5 py-3 text-xs text-slate-600 leading-relaxed font-semibold">
-                      {ref.zh}
-                    </td>
-                    <td className="px-5 py-3 text-xs text-slate-600 leading-relaxed font-semibold">
-                      {ref.en}
-                    </td>
-                    <td className="px-5 py-3 text-right">
-                      <div className="flex items-center justify-end gap-1.5">
-                        <button 
-                          onClick={() => handleOpenEditModal(ref)}
-                          className="p-2 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-xl transition-all active:scale-95 cursor-pointer"
-                          title="Edit"
-                        >
-                          <Edit2 className="w-3.5 h-3.5" />
-                        </button>
-                        <button 
-                          onClick={() => setDeleteTarget(ref)}
-                          className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all active:scale-95 cursor-pointer"
-                          title="Delete"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
+                        </div>
+                      </td>
+                      <td className="px-5 py-3 text-right align-top">
+                        <div className="flex items-center justify-end gap-1.5">
+                          <button 
+                            onClick={() => handleOpenEditModal(ref)}
+                            className="p-2 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-xl transition-all active:scale-95 cursor-pointer"
+                            title="Edit"
+                          >
+                            <Edit2 className="w-3.5 h-3.5" />
+                          </button>
+                          <button 
+                            onClick={() => setDeleteTarget(ref)}
+                            className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all active:scale-95 cursor-pointer"
+                            title="Delete"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>

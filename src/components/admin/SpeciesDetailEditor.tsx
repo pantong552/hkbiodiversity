@@ -20,7 +20,9 @@ import {
   Search,
   BookOpen,
   ChevronDown,
-  Check
+  Check,
+  Sparkles,
+  Info
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -338,6 +340,8 @@ function CustomSelect({ value, onChange, options, isFieldDirty, language }: Cust
   );
 }
 
+type SourceType = 'journal' | 'book' | 'web';
+
 interface ReferencePickerProps {
   value: string;
   onChange: (value: string) => void;
@@ -352,6 +356,27 @@ function ReferencePicker({ value, onChange, supabase, language }: ReferencePicke
   const [showDropdown, setShowDropdown] = useState(false);
   const containerRef = React.useRef<HTMLDivElement>(null);
 
+  // 新增參考文獻 Modal 狀態
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [formCode, setFormCode] = useState('');
+  const [formZh, setFormZh] = useState('');
+  const [formEn, setFormEn] = useState('');
+  const [formUrl, setFormUrl] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const [formError, setFormError] = useState('');
+
+  // APA Helper 狀態
+  const [showHelper, setShowHelper] = useState(false);
+  const [helperType, setHelperType] = useState<SourceType>('web');
+  const [helperAuthor, setHelperAuthor] = useState('');
+  const [helperYear, setHelperYear] = useState('');
+  const [helperTitle, setHelperTitle] = useState('');
+  const [helperSource, setHelperSource] = useState('');
+  const [helperVolIssue, setHelperVolIssue] = useState('');
+  const [helperPages, setHelperPages] = useState('');
+  const [helperUrl, setHelperUrl] = useState('');
+  const [helperPreview, setHelperPreview] = useState('');
+
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
       if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
@@ -362,18 +387,60 @@ function ReferencePicker({ value, onChange, supabase, language }: ReferencePicke
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  useEffect(() => {
-    async function loadAllReferences() {
-      setIsSearching(true);
-      const { data, error } = await supabase
+  const loadAllReferences = async () => {
+    setIsSearching(true);
+    try {
+      const { data: refData, error: refError } = await supabase
         .from('references')
-        .select('code, zh, en')
+        .select('*')
         .order('code', { ascending: true });
-      if (!error && data) {
-        setAllReferences(data);
+        
+      if (refError) throw refError;
+
+      if (!refData || refData.length === 0) {
+        setAllReferences([]);
+        return;
       }
+
+      // 收集 user ids
+      const userIds = Array.from(
+        new Set(
+          refData
+            .flatMap((r: any) => [r.created_by, r.updated_by])
+            .filter(Boolean)
+        )
+      );
+
+      let profileMap: Record<string, string> = {};
+      if (userIds.length > 0) {
+        const { data: profileData } = await supabase
+          .from('profiles')
+          .select('id, username')
+          .in('id', userIds);
+
+        if (profileData) {
+          profileMap = profileData.reduce((acc: Record<string, string>, p: any) => {
+            if (p.id) acc[p.id] = p.username || '';
+            return acc;
+          }, {} as Record<string, string>);
+        }
+      }
+
+      const enrichedRefs = refData.map((r: any) => ({
+        ...r,
+        creator: r.created_by && profileMap[r.created_by] ? { username: profileMap[r.created_by] } : null,
+        updater: r.updated_by && profileMap[r.updated_by] ? { username: profileMap[r.updated_by] } : null
+      }));
+
+      setAllReferences(enrichedRefs);
+    } catch (err) {
+      console.error('Error loading references:', err);
+    } finally {
       setIsSearching(false);
     }
+  };
+
+  useEffect(() => {
     loadAllReferences();
   }, [supabase]);
 
@@ -433,71 +500,202 @@ function ReferencePicker({ value, onChange, supabase, language }: ReferencePicke
     onChange(codes.join(', '));
   };
 
+  // 開啟新增參考文獻 Modal
+  const handleOpenAddModal = () => {
+    // 自動計算最小未使用的 ref_N 代碼 (包含重用空置代碼)
+    const numbers = allReferences
+      .map(r => {
+        const match = r.code.match(/^ref_(\d+)$/i);
+        return match ? parseInt(match[1], 10) : null;
+      })
+      .filter((n): n is number => n !== null);
+      
+    let nextNum = 1;
+    while (numbers.includes(nextNum)) {
+      nextNum++;
+    }
+    
+    setFormCode(`ref_${nextNum}`);
+    setFormZh('');
+    setFormEn('');
+    setFormUrl('');
+    setFormError('');
+    setShowHelper(false);
+    setIsModalOpen(true);
+  };
+
+  // 提交新增參考文獻
+  const handleCreateReference = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!formCode.trim() || !formZh.trim() || !formEn.trim()) {
+      setFormError(language === 'zh' ? '請填寫所有必要欄位' : 'Please fill in all required fields');
+      return;
+    }
+
+    setSubmitting(true);
+    setFormError('');
+
+    try {
+      const { data: authData } = await supabase.auth.getUser();
+      const currentUserId = authData?.user?.id || null;
+
+      const { data, error } = await supabase
+        .from('references')
+        .insert({
+          code: formCode.trim(),
+          zh: formZh.trim(),
+          en: formEn.trim(),
+          url: formUrl.trim() || null,
+          created_by: currentUserId,
+          updated_by: currentUserId
+        })
+        .select()
+        .single();
+
+      if (error) {
+        if (error.code === '23505') {
+          throw new Error(language === 'zh' ? '編碼已存在，請使用不同的編碼' : 'Code already exists. Please use a unique code.');
+        }
+        throw error;
+      }
+      
+      if (data) {
+        // 更新本地參考文獻清單
+        setAllReferences(prev => [...prev, data].sort((a, b) => a.code.localeCompare(b.code)));
+        // 自動選取新增的文獻
+        handleSelect(data.code);
+      }
+      setIsModalOpen(false);
+    } catch (err: any) {
+      console.error('Error saving reference:', err);
+      setFormError(err.message || (language === 'zh' ? '儲存失敗，請重試' : 'Failed to save reference. Please try again.'));
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  // APA 7 格式即時預覽生成邏輯
+  useEffect(() => {
+    if (!showHelper) return;
+    
+    const authorStr = helperAuthor.trim() || 'Author';
+    const yearStr = helperYear.trim() ? `(${helperYear.trim()})` : '(n.d.)';
+    const titleStr = helperTitle.trim() ? `*${helperTitle.trim()}*` : 'Title';
+    const sourceStr = helperSource.trim();
+    const urlStr = helperUrl.trim();
+    
+    let preview = '';
+    
+    if (helperType === 'journal') {
+      const volIssueStr = helperVolIssue.trim() ? `, *${helperVolIssue.trim()}*` : '';
+      const pagesStr = helperPages.trim() ? `, ${helperPages.trim()}` : '';
+      preview = `${authorStr}. ${yearStr}. ${helperTitle.trim() || 'Title'}. ${sourceStr ? `*${sourceStr}*` : 'Journal'}${volIssueStr}${pagesStr}.${urlStr ? ` ${urlStr}` : ''}`;
+    } else if (helperType === 'book') {
+      preview = `${authorStr}. ${yearStr}. ${titleStr}. ${sourceStr || 'Publisher'}.${urlStr ? ` ${urlStr}` : ''}`;
+    } else { // web
+      preview = `${authorStr}. ${yearStr}. ${helperTitle.trim() || 'Title'}. ${sourceStr ? `${sourceStr}.` : ''} ${language === 'zh' ? '擷取自' : 'Retrieved from'} ${urlStr || 'URL'}`;
+    }
+    
+    setHelperPreview(preview);
+  }, [helperType, helperAuthor, helperYear, helperTitle, helperSource, helperVolIssue, helperPages, helperUrl, showHelper, language]);
+
+  const handleApplyHelper = (lang: 'zh' | 'en') => {
+    if (lang === 'zh') {
+      setFormZh(helperPreview);
+    } else {
+      setFormEn(helperPreview);
+    }
+    setHelperAuthor('');
+    setHelperYear('');
+    setHelperTitle('');
+    setHelperSource('');
+    setHelperVolIssue('');
+    setHelperPages('');
+    setHelperUrl('');
+    setShowHelper(false);
+  };
+
   return (
     <div ref={containerRef} className="relative flex flex-col gap-3 w-full bg-slate-50/30 border border-slate-100/80 rounded-2xl p-4">
-      <div className="relative">
-        <div className="flex items-center bg-white border border-slate-200 focus-within:border-emerald-500 focus-within:ring-1 focus-within:ring-emerald-500/20 rounded-xl px-3 py-2 transition-all shadow-sm">
-          <Search className="w-4 h-4 text-slate-400 mr-2 shrink-0" />
-          <input
-            type="text"
-            placeholder={language === 'zh' ? '搜尋文獻代碼、內容...' : 'Search reference code, content...'}
-            value={searchQuery}
-            onChange={(e) => {
-              setSearchQuery(e.target.value);
-              setShowDropdown(true);
-            }}
-            onFocus={() => setShowDropdown(true)}
-            onClick={() => setShowDropdown(true)}
-            className="w-full bg-transparent border-none outline-none text-xs font-semibold text-slate-700 placeholder:text-slate-400"
-          />
-          {searchQuery && (
-            <button
-              onClick={() => {
-                setSearchQuery('');
+      {/* 搜尋與新增按鈕區域 */}
+      <div className="flex items-center gap-2">
+        <div className="relative flex-1">
+          <div className="flex items-center bg-white border border-slate-200 focus-within:border-emerald-500 focus-within:ring-1 focus-within:ring-emerald-500/20 rounded-xl px-3 py-2 transition-all shadow-sm">
+            <Search className="w-4 h-4 text-slate-400 mr-2 shrink-0" />
+            <input
+              type="text"
+              placeholder={language === 'zh' ? '搜尋文獻代碼、內容...' : 'Search reference code, content...'}
+              value={searchQuery}
+              onChange={(e) => {
+                setSearchQuery(e.target.value);
+                setShowDropdown(true);
               }}
-              className="text-slate-400 hover:text-slate-600 transition-colors p-0.5 cursor-pointer"
-            >
-              <X className="w-3.5 h-3.5" />
-            </button>
-          )}
+              onFocus={() => setShowDropdown(true)}
+              onClick={() => setShowDropdown(true)}
+              className="w-full bg-transparent border-none outline-none text-xs font-semibold text-slate-700 placeholder:text-slate-400"
+            />
+            {searchQuery && (
+              <button
+                type="button"
+                onClick={() => {
+                  setSearchQuery('');
+                }}
+                className="text-slate-400 hover:text-slate-600 transition-colors p-0.5 cursor-pointer"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            )}
+          </div>
+
+          <AnimatePresence>
+            {showDropdown && (
+              <motion.div
+                initial={{ opacity: 0, y: -5 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -5 }}
+                className="absolute z-50 left-0 right-0 mt-1 bg-white/95 backdrop-blur-md border border-slate-100 rounded-xl shadow-xl max-h-60 overflow-y-auto custom-scrollbar"
+              >
+                {isSearching ? (
+                  <div className="p-3 text-center text-xs text-slate-400 font-bold flex items-center justify-center gap-1.5">
+                    <Loader2 className="w-3.5 h-3.5 animate-spin text-emerald-500" />
+                    <span>{language === 'zh' ? '載入中...' : 'Loading...'}</span>
+                  </div>
+                ) : dropdownResults.length === 0 ? (
+                  <div className="p-3 text-center text-xs text-slate-400 font-bold">
+                    {language === 'zh' ? '未找到符合的文獻' : 'No matching references found'}
+                  </div>
+                ) : (
+                  dropdownResults.map((item) => (
+                    <button
+                      key={item.code}
+                      type="button"
+                      onClick={() => handleSelect(item.code)}
+                      className="w-full text-left px-4 py-2.5 hover:bg-emerald-50/50 flex flex-col transition-colors border-b border-slate-50 last:border-0 cursor-pointer"
+                    >
+                      <span className="text-xs font-bold text-slate-700">
+                        [{item.code}]
+                      </span>
+                      <span className="text-[10px] text-slate-400 truncate mt-0.5">
+                        {language === 'zh' ? item.zh : item.en}
+                      </span>
+                    </button>
+                  ))
+                )}
+              </motion.div>
+            )}
+          </AnimatePresence>
         </div>
 
-        <AnimatePresence>
-          {showDropdown && (
-            <motion.div
-              initial={{ opacity: 0, y: -5 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -5 }}
-              className="absolute z-50 left-0 right-0 mt-1 bg-white/95 backdrop-blur-md border border-slate-100 rounded-xl shadow-xl max-h-60 overflow-y-auto custom-scrollbar"
-            >
-              {isSearching ? (
-                <div className="p-3 text-center text-xs text-slate-400 font-bold flex items-center justify-center gap-1.5">
-                  <Loader2 className="w-3.5 h-3.5 animate-spin text-emerald-500" />
-                  <span>{language === 'zh' ? '載入中...' : 'Loading...'}</span>
-                </div>
-              ) : dropdownResults.length === 0 ? (
-                <div className="p-3 text-center text-xs text-slate-400 font-bold">
-                  {language === 'zh' ? '未找到符合的文獻' : 'No matching references found'}
-                </div>
-              ) : (
-                dropdownResults.map((item) => (
-                  <button
-                    key={item.code}
-                    onClick={() => handleSelect(item.code)}
-                    className="w-full text-left px-4 py-2.5 hover:bg-emerald-50/50 flex flex-col transition-colors border-b border-slate-50 last:border-0 cursor-pointer"
-                  >
-                    <span className="text-xs font-bold text-slate-700">
-                      [{item.code}]
-                    </span>
-                    <span className="text-[10px] text-slate-400 truncate mt-0.5">
-                      {language === 'zh' ? item.zh : item.en}
-                    </span>
-                  </button>
-                ))
-              )}
-            </motion.div>
-          )}
-        </AnimatePresence>
+        {/* 新增參考文獻按鈕 */}
+        <button
+          type="button"
+          onClick={handleOpenAddModal}
+          className="flex items-center gap-1.5 px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow-xs hover:shadow-md transition-all shrink-0 cursor-pointer"
+          title={language === 'zh' ? '新增參考文獻' : 'Add Reference'}
+        >
+          <Plus className="w-4 h-4" />
+          <span>{language === 'zh' ? '新增參考文獻' : 'Add Reference'}</span>
+        </button>
       </div>
 
       <div className="flex flex-col gap-1.5">
@@ -512,6 +710,9 @@ function ReferencePicker({ value, onChange, supabase, language }: ReferencePicke
           <div className="flex flex-col gap-2">
             {selectedRefs.map((item, idx) => {
               const text = language === 'zh' ? item.zh : item.en;
+              const creatorName = item.creator?.username;
+              const updaterName = item.updater?.username;
+
               return (
                 <motion.div
                   key={item.code}
@@ -519,15 +720,28 @@ function ReferencePicker({ value, onChange, supabase, language }: ReferencePicke
                   className="flex items-center justify-between gap-3 p-3 bg-white border border-slate-100 rounded-xl shadow-sm hover:border-emerald-200 transition-colors"
                 >
                   <div className="flex flex-col min-w-0">
-                    <span className="text-[10px] font-mono font-bold text-emerald-700 bg-emerald-50 border border-emerald-100 rounded px-1.5 py-0.5 w-max">
-                      {item.code}
-                    </span>
+                    <div className="flex items-center gap-2">
+                      <span className="text-[10px] font-mono font-bold text-emerald-700 bg-emerald-50 border border-emerald-100 rounded px-1.5 py-0.5 w-max">
+                        {item.code}
+                      </span>
+                      {creatorName && (
+                        <span className="text-[9px] font-bold text-slate-400 bg-slate-50 border border-slate-100 rounded px-1.5 py-0.2" title={language === 'zh' ? `建立者: ${creatorName}` : `Created by: ${creatorName}`}>
+                          @{creatorName}
+                        </span>
+                      )}
+                      {updaterName && updaterName !== creatorName && (
+                        <span className="text-[9px] font-bold text-emerald-600 bg-emerald-50/50 border border-emerald-100 rounded px-1.5 py-0.2" title={language === 'zh' ? `最後修改: ${updaterName}` : `Updated by: ${updaterName}`}>
+                          ✎ {updaterName}
+                        </span>
+                      )}
+                    </div>
                     <span className="text-xs font-semibold text-slate-600 leading-relaxed mt-1.5">
                       {text}
                     </span>
                   </div>
                   <div className="flex items-center gap-1 shrink-0">
                     <button
+                      type="button"
                       onClick={() => handleMoveUp(idx)}
                       disabled={idx === 0}
                       className="p-1 rounded-lg text-slate-450 hover:text-emerald-600 hover:bg-slate-50 transition-colors disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer"
@@ -538,6 +752,7 @@ function ReferencePicker({ value, onChange, supabase, language }: ReferencePicke
                       </svg>
                     </button>
                     <button
+                      type="button"
                       onClick={() => handleMoveDown(idx)}
                       disabled={idx === selectedRefs.length - 1}
                       className="p-1 rounded-lg text-slate-450 hover:text-emerald-600 hover:bg-slate-50 transition-colors disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer"
@@ -548,6 +763,7 @@ function ReferencePicker({ value, onChange, supabase, language }: ReferencePicke
                       </svg>
                     </button>
                     <button
+                      type="button"
                       onClick={() => handleRemove(item.code)}
                       className="p-1 rounded-lg text-slate-400 hover:text-red-500 hover:bg-red-50 transition-all cursor-pointer hover:scale-105"
                       title={language === 'zh' ? '移除' : 'Remove'}
@@ -561,6 +777,322 @@ function ReferencePicker({ value, onChange, supabase, language }: ReferencePicke
           </div>
         )}
       </div>
+
+      {/* 新增參考文獻 Modal */}
+      <AnimatePresence>
+        {isModalOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            {/* Overlay */}
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setIsModalOpen(false)}
+              className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm"
+            />
+            
+            {/* Modal Body */}
+            <motion.div 
+              initial={{ scale: 0.95, opacity: 0, y: 15 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.95, opacity: 0, y: 15 }}
+              className="relative w-full max-w-4xl bg-white/95 backdrop-blur-2xl border border-slate-100 rounded-[2.5rem] shadow-2xl p-6 md:p-8 flex flex-col md:flex-row gap-6 max-h-[90vh] overflow-hidden z-10"
+            >
+              {/* 左側：表單編輯區域 */}
+              <div className="flex-1 flex flex-col min-h-0 overflow-y-auto custom-scrollbar pr-1">
+                <div className="flex items-center gap-2 mb-4 shrink-0">
+                  <div className="p-2 bg-emerald-50 text-emerald-600 rounded-xl">
+                    <BookOpen className="w-4 h-4" />
+                  </div>
+                  <h3 className="text-md font-black text-slate-800">
+                    {language === 'zh' ? '新增參考文獻' : 'Add Reference'}
+                  </h3>
+                </div>
+
+                <form onSubmit={handleCreateReference} className="flex-1 flex flex-col gap-4">
+                  {/* Code */}
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider flex items-center justify-between">
+                      <span>{language === 'zh' ? '文獻唯一代碼 (Code)' : 'Unique Code'}</span>
+                      <span className="text-[9px] text-slate-300 font-mono">(自動生成 / Auto-generated)</span>
+                    </label>
+                    <input 
+                      type="text"
+                      required
+                      readOnly
+                      value={formCode}
+                      className="w-full bg-slate-100 border border-slate-200 text-slate-400 rounded-xl px-4 py-2.5 text-xs font-semibold cursor-not-allowed outline-none select-none"
+                    />
+                  </div>
+
+                  {/* 中文 */}
+                  <div className="flex flex-col gap-1.5">
+                    <div className="flex items-center justify-between">
+                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider">
+                        {language === 'zh' ? '中文 APA 7th 格式內容' : 'Chinese APA 7th Content'}
+                      </label>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setHelperType('web');
+                          setShowHelper(!showHelper);
+                        }}
+                        className="text-[9px] font-black text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 px-2 py-1 rounded-lg transition-colors flex items-center gap-1 cursor-pointer"
+                      >
+                        <Sparkles className="w-3 h-3" />
+                        <span>APA 產生器</span>
+                      </button>
+                    </div>
+                    <textarea 
+                      required
+                      rows={3}
+                      placeholder={language === 'zh' ? '請輸入符合 APA 第 7 版格式的中文文獻內容...' : 'Enter reference in APA 7th format...'}
+                      value={formZh}
+                      onChange={(e) => setFormZh(e.target.value)}
+                      className="w-full bg-slate-50 border border-slate-100 hover:border-slate-200 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500/20 rounded-xl px-4 py-3 text-sm font-semibold text-slate-700 outline-none transition-all custom-scrollbar leading-relaxed"
+                    />
+                  </div>
+
+                  {/* 英文 */}
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider">
+                      {language === 'zh' ? '英文 APA 7th 格式內容' : 'English APA 7th Content'}
+                    </label>
+                    <textarea 
+                      required
+                      rows={3}
+                      placeholder={language === 'zh' ? '請輸入符合 APA 第 7 版格式的英文文獻內容...' : 'Enter reference in APA 7th format...'}
+                      value={formEn}
+                      onChange={(e) => setFormEn(e.target.value)}
+                      className="w-full bg-slate-50 border border-slate-100 hover:border-slate-200 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500/20 rounded-xl px-4 py-3 text-sm font-semibold text-slate-700 outline-none transition-all custom-scrollbar leading-relaxed"
+                    />
+                  </div>
+
+                  {/* 超連結 */}
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider">
+                      {language === 'zh' ? '文獻超連結 / Hyperlink (URL)' : 'Hyperlink (URL)'}
+                    </label>
+                    <input 
+                      type="url"
+                      placeholder="e.g. https://www.example.com"
+                      value={formUrl}
+                      onChange={(e) => setFormUrl(e.target.value)}
+                      className="w-full bg-slate-50 border border-slate-100 hover:border-slate-200 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500/20 rounded-xl px-4 py-2.5 text-xs font-semibold text-slate-700 outline-none transition-all"
+                    />
+                  </div>
+
+                  {formError && (
+                    <div className="p-3 bg-red-50 border border-red-100 text-red-600 rounded-xl text-xs font-bold flex items-start gap-1.5">
+                      <Info className="w-4 h-4 shrink-0" />
+                      <span>{formError}</span>
+                    </div>
+                  )}
+
+                  {/* Actions */}
+                  <div className="flex justify-end gap-3 mt-4 shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => setIsModalOpen(false)}
+                      className="px-4 py-2 border border-slate-200 text-slate-600 rounded-xl text-xs font-bold hover:bg-slate-50 transition-all cursor-pointer"
+                    >
+                      {language === 'zh' ? '取消' : 'Cancel'}
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={submitting}
+                      className="flex items-center gap-1.5 px-4 py-2 bg-emerald-600 text-white rounded-xl text-xs font-bold shadow-md hover:bg-emerald-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+                    >
+                      {submitting ? (
+                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      ) : (
+                        language === 'zh' ? '儲存並選取' : 'Save & Select'
+                      )}
+                    </button>
+                  </div>
+                </form>
+              </div>
+
+              {/* 右側：APA 7th Formatter Helper 區域 */}
+              <AnimatePresence>
+                {showHelper && (
+                  <motion.div 
+                    initial={{ width: 0, opacity: 0 }}
+                    animate={{ width: 340, opacity: 1 }}
+                    exit={{ width: 0, opacity: 0 }}
+                    className="w-[340px] shrink-0 border-l border-slate-100 pl-6 flex flex-col min-h-0 overflow-y-auto custom-scrollbar justify-between"
+                  >
+                    <div className="space-y-4">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-black text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-md flex items-center gap-1">
+                          <Sparkles className="w-3.5 h-3.5 text-emerald-500" />
+                          {language === 'zh' ? 'APA 產生輔助器' : 'APA Generator Helper'}
+                        </span>
+                        <button 
+                          type="button"
+                          onClick={() => setShowHelper(false)}
+                          className="p-1 hover:bg-slate-50 rounded-lg text-slate-400 cursor-pointer"
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
+                      </div>
+
+                      {/* 類型選擇 */}
+                      <div className="flex border border-slate-200 rounded-xl overflow-hidden text-xs font-bold shrink-0">
+                        {(['web', 'journal', 'book'] as const).map(type => (
+                          <button
+                            key={type}
+                            type="button"
+                            onClick={() => setHelperType(type)}
+                            className={`flex-1 py-2 transition-colors cursor-pointer ${helperType === type ? 'bg-emerald-600 text-white' : 'bg-slate-50 text-slate-500 hover:bg-slate-100'}`}
+                          >
+                            {type === 'web' 
+                              ? (language === 'zh' ? '網頁/資料庫' : 'Web/Database') 
+                              : type === 'journal' 
+                              ? (language === 'zh' ? '期刊' : 'Journal') 
+                              : (language === 'zh' ? '圖書' : 'Book')}
+                          </button>
+                        ))}
+                      </div>
+
+                      {/* 產生器欄位 */}
+                      <div className="space-y-3.5">
+                        <div className="flex flex-col gap-1.5">
+                          <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider">
+                            {language === 'zh' ? '作者 (Authors)' : 'Authors'}
+                          </label>
+                          <input 
+                            type="text"
+                            placeholder={language === 'zh' ? 'e.g. 葉國樑 或 Yip, K. L.' : 'e.g. Yip, K. L. or AFCD'}
+                            value={helperAuthor}
+                            onChange={(e) => setHelperAuthor(e.target.value)}
+                            className="w-full bg-slate-50 border border-slate-100 rounded-xl px-3 py-2 text-xs font-semibold text-slate-700 outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500/10"
+                          />
+                        </div>
+
+                        <div className="flex flex-col gap-1.5">
+                          <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider">
+                            {language === 'zh' ? '出版年份 (Year)' : 'Year'}
+                          </label>
+                          <input 
+                            type="text"
+                            placeholder="e.g. 2010"
+                            value={helperYear}
+                            onChange={(e) => setHelperYear(e.target.value)}
+                            className="w-full bg-slate-50 border border-slate-100 rounded-xl px-3 py-2 text-xs font-semibold text-slate-700 outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500/10"
+                          />
+                        </div>
+
+                        <div className="flex flex-col gap-1.5">
+                          <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider">
+                            {language === 'zh' ? '標題 (Title)' : 'Title'}
+                          </label>
+                          <input 
+                            type="text"
+                            placeholder={language === 'zh' ? 'e.g. 香港蝴蝶圖誌' : 'e.g. Butterflies of HK'}
+                            value={helperTitle}
+                            onChange={(e) => setHelperTitle(e.target.value)}
+                            className="w-full bg-slate-50 border border-slate-100 rounded-xl px-3 py-2 text-xs font-semibold text-slate-700 outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500/10"
+                          />
+                        </div>
+
+                        <div className="flex flex-col gap-1.5">
+                          <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider">
+                            {helperType === 'journal' 
+                              ? (language === 'zh' ? '期刊名稱 (Journal)' : 'Journal Name') 
+                              : helperType === 'book' 
+                              ? (language === 'zh' ? '出版社 (Publisher)' : 'Publisher') 
+                              : (language === 'zh' ? '網站名稱 (Website)' : 'Website Name')}
+                          </label>
+                          <input 
+                            type="text"
+                            placeholder={helperType === 'journal' 
+                              ? (language === 'zh' ? 'e.g. 香港學報' : 'e.g. Journal of Ecology') 
+                              : helperType === 'book' 
+                              ? (language === 'zh' ? 'e.g. 郊野公園之友會' : 'e.g. Friends of Country Parks') 
+                              : (language === 'zh' ? 'e.g. 漁農自然護理署' : 'e.g. AFCD')}
+                            value={helperSource}
+                            onChange={(e) => setHelperSource(e.target.value)}
+                            className="w-full bg-slate-50 border border-slate-100 rounded-xl px-3 py-2 text-xs font-semibold text-slate-700 outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500/10"
+                          />
+                        </div>
+
+                        {helperType === 'journal' && (
+                          <div className="grid grid-cols-2 gap-3">
+                            <div className="flex flex-col gap-1.5">
+                              <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider">
+                                {language === 'zh' ? '卷期 (Vol/Issue)' : 'Vol/Issue'}
+                              </label>
+                              <input 
+                                type="text"
+                                placeholder="e.g. 1(2)"
+                                value={helperVolIssue}
+                                onChange={(e) => setHelperVolIssue(e.target.value)}
+                                className="w-full bg-slate-50 border border-slate-100 rounded-xl px-3 py-2 text-xs font-semibold text-slate-700 outline-none"
+                              />
+                            </div>
+                            <div className="flex flex-col gap-1.5">
+                              <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider">
+                                {language === 'zh' ? '頁碼 (Pages)' : 'Pages'}
+                              </label>
+                              <input 
+                                type="text"
+                                placeholder="e.g. 10-15"
+                                value={helperPages}
+                                onChange={(e) => setHelperPages(e.target.value)}
+                                className="w-full bg-slate-50 border border-slate-100 rounded-xl px-3 py-2 text-xs font-semibold text-slate-700 outline-none"
+                              />
+                            </div>
+                          </div>
+                        )}
+
+                        <div className="flex flex-col gap-1.5">
+                          <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider">
+                            {language === 'zh' ? '連結網址 (URL / DOI)' : 'URL / DOI'}
+                          </label>
+                          <input 
+                            type="text"
+                            placeholder="e.g. https://..."
+                            value={helperUrl}
+                            onChange={(e) => setHelperUrl(e.target.value)}
+                            className="w-full bg-slate-50 border border-slate-100 rounded-xl px-3 py-2 text-xs font-semibold text-slate-700 outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500/10"
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Preview & Apply */}
+                    <div className="mt-4 pt-3.5 border-t border-slate-100 bg-slate-50/50 p-3 rounded-xl space-y-3 shrink-0">
+                      <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider">
+                        {language === 'zh' ? 'APA 格式即時預覽：' : 'APA Live Preview:'}
+                      </span>
+                      <p className="text-xs font-bold text-slate-700 bg-white border border-slate-100 p-2.5 rounded-xl leading-relaxed select-all">
+                        {helperPreview}
+                      </p>
+                      <div className="flex gap-2">
+                        <button
+                          type="button"
+                          onClick={() => handleApplyHelper('zh')}
+                          className="flex-1 py-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 rounded-xl text-xs font-bold border border-emerald-100 transition-colors cursor-pointer"
+                        >
+                          {language === 'zh' ? '帶入中文' : 'Apply to Zh'}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleApplyHelper('en')}
+                          className="flex-1 py-2 bg-slate-900 hover:bg-black text-white rounded-xl text-xs font-bold transition-colors cursor-pointer"
+                        >
+                          {language === 'zh' ? '帶入英文' : 'Apply to En'}
+                        </button>
+                      </div>
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
