@@ -16,12 +16,12 @@ export default function ConservationStatus({ species }: ConservationStatusProps)
 
   // Helper formatting for Cap 96/586 Boolean-like values
   const formatYesNo = (val: any) => {
-    if (!val || val === 'No' || val === '沒有列入' || val === '非' || val === 'N' || val === 'n' || val === 'False' || val === false) return '-';
+    if (!val || val === 'No' || val === '沒有列入' || val === '非' || val === 'N' || val === 'n' || val === 'False' || val === false) return null;
     if (val === 'Y' || val === true || val === 'Yes' || val === 'y' || val === 'True') return language === 'zh' ? '是' : 'Yes';
     return val;
   };
 
-  const statuses = isPlant ? [
+  const rawStatuses = isPlant ? [
     {
       labelChi: '林務條例 (第96章) 保育類',
       labelEng: 'Forests and Countryside Ordinance (Cap. 96)',
@@ -37,13 +37,13 @@ export default function ConservationStatus({ species }: ConservationStatusProps)
     {
       labelChi: '香港稀有及珍貴植物',
       labelEng: 'HK Rare and Precious Plants',
-      value: (species as any).hk_rare_precious_note === 'No' ? '-' : (species as any).hk_rare_precious_note,
+      value: (species as any).hk_rare_precious_note === 'No' || !(species as any).hk_rare_precious_note ? null : (species as any).hk_rare_precious_note,
       isHkbws: false
     },
     {
       labelChi: '中國植物紅皮書',
       labelEng: 'China Plant Red Data Book',
-      value: (species as any).china_red_data_book_note === '沒有列入' || (species as any).china_red_data_book_note === 'Not Listed' ? '-' : (species as any).china_red_data_book_note,
+      value: (species as any).china_red_data_book_note === '沒有列入' || (species as any).china_red_data_book_note === 'Not Listed' || !(species as any).china_red_data_book_note ? null : (species as any).china_red_data_book_note,
       isHkbws: false
     }
   ] : [
@@ -80,7 +80,7 @@ export default function ConservationStatus({ species }: ConservationStatusProps)
     { 
       labelChi: '香港原生概況', 
       labelEng: 'HK Native Status', 
-      value: formatNativeStatus(species.native_status, language),
+      value: species.native_status ? formatNativeStatus(species.native_status, language) : null,
       isHkbws: false
     },
     ...(species.class_eng === 'Aves' ? [{ 
@@ -97,6 +97,14 @@ export default function ConservationStatus({ species }: ConservationStatusProps)
     }] : []),
   ];
 
+  // 過濾掉沒有值或為 '-' 的項目
+  const validStatuses = rawStatuses.filter(s => s.value && s.value !== '-' && String(s.value).trim() !== '');
+
+  // 若所有 field 都沒有值且沒有 endemic 資訊，整個卡片都不顯示
+  if (validStatuses.length === 0 && !species.endemic) {
+    return null;
+  }
+
   return (
     <div className="bg-white p-5 sm:p-8 rounded-[2rem] sm:rounded-[2.5rem] shadow-sm border border-slate-100 w-full mb-6 sm:mb-12">
       <h2 className="text-xl sm:text-2xl font-black text-slate-800 mb-4 sm:mb-8 flex items-center gap-2.5 sm:gap-3">
@@ -105,7 +113,7 @@ export default function ConservationStatus({ species }: ConservationStatusProps)
       </h2>
       
       <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-6">
-        {statuses.map((status, idx) => (
+        {validStatuses.map((status, idx) => (
           <div key={idx} className="flex flex-col group h-full">
             <span className="text-[11px] sm:text-xs font-bold text-slate-500 tracking-tight mb-1.5 sm:mb-3 transition-colors group-hover:text-emerald-600 sm:min-h-[32px] flex items-end">
               <span className="inline-flex items-center">
@@ -113,13 +121,8 @@ export default function ConservationStatus({ species }: ConservationStatusProps)
                 {status.isHkbws && <HkbwsCategoryInfoModal />}
               </span>
             </span>
-            <div className={`
-              text-xs sm:text-base font-bold sm:font-black px-3 sm:px-5 py-2 sm:py-3.5 rounded-xl sm:rounded-2xl transition-all flex items-center justify-center text-center leading-tight
-              ${status.value && status.value !== '-' 
-                ? 'bg-emerald-50 text-emerald-700 border border-emerald-200 group-hover:bg-emerald-100 group-hover:border-emerald-300 shadow-sm' 
-                : 'bg-slate-50 text-slate-400 border border-slate-100'}
-            `}>
-              {status.value || '-'}
+            <div className="text-xs sm:text-base font-bold sm:font-black px-3 sm:px-5 py-2 sm:py-3.5 rounded-xl sm:rounded-2xl transition-all flex items-center justify-center text-center leading-tight bg-emerald-50 text-emerald-700 border border-emerald-200 group-hover:bg-emerald-100 group-hover:border-emerald-300 shadow-sm">
+              {status.value}
             </div>
           </div>
         ))}
