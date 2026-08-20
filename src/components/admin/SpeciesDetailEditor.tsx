@@ -25,6 +25,7 @@ import {
   Info
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { formatScientificName, parseAliases, renderFormattedText } from '@/utils/formatters';
 
 interface SimilarSpeciesPickerProps {
   value: string;
@@ -736,7 +737,7 @@ function ReferencePicker({ value, onChange, supabase, language }: ReferencePicke
                       )}
                     </div>
                     <span className="text-xs font-semibold text-slate-600 leading-relaxed mt-1.5">
-                      {text}
+                      {renderFormattedText(text)}
                     </span>
                   </div>
                   <div className="flex items-center gap-1 shrink-0">

@@ -263,3 +263,46 @@ export function parseAliases(rawText?: string | null): string[] {
   return Array.from(new Set(cleaned));
 }
 
+/**
+ * 將包含 Markdown 格式（*斜體*、**粗體**）或 HTML 標籤（<i>、<em>、<b>、<strong>）的字串解析為 React 元素
+ * 特別適用於參考文獻 (APA 7th)、學名等需要支援斜體排版的文本
+ */
+export function renderFormattedText(text: string | undefined | null): React.ReactNode {
+  if (!text) return null;
+
+  // 1. 先處理 HTML 標籤 <i>, <em>, <b>, <strong> 轉為統一的 token 或標記
+  // 簡易且安全的 Markdown + HTML 混合解析器
+  const parts: React.ReactNode[] = [];
+  
+  // 正規表達式匹配：**粗體**、*斜體*、<i>斜體</i>、<em>斜體</em>、<b>粗體</b>、<strong>粗體</strong>
+  const regex = /(\*\*.*?\*\*|\*[^*]+?\*|<i>.*?<\/i>|<em>.*?<\/em>|<b>.*?<\/b>|<strong>.*?<\/strong>)/gi;
+  const segments = text.split(regex);
+
+  segments.forEach((segment, idx) => {
+    if (!segment) return;
+
+    if (segment.startsWith('**') && segment.endsWith('**') && segment.length >= 4) {
+      parts.push(<strong key={idx} className="font-bold">{segment.slice(2, -2)}</strong>);
+    } else if (segment.startsWith('*') && segment.endsWith('*') && segment.length >= 2) {
+      parts.push(<em key={idx} className="italic not-sr-only font-serif">{segment.slice(1, -1)}</em>);
+    } else if (/^<i>(.*?)<\/i>$/i.test(segment)) {
+      const match = segment.match(/^<i>(.*?)<\/i>$/i);
+      parts.push(<em key={idx} className="italic font-serif">{match ? match[1] : segment}</em>);
+    } else if (/^<em>(.*?)<\/em>$/i.test(segment)) {
+      const match = segment.match(/^<em>(.*?)<\/em>$/i);
+      parts.push(<em key={idx} className="italic font-serif">{match ? match[1] : segment}</em>);
+    } else if (/^<b>(.*?)<\/b>$/i.test(segment)) {
+      const match = segment.match(/^<b>(.*?)<\/b>$/i);
+      parts.push(<strong key={idx} className="font-bold">{match ? match[1] : segment}</strong>);
+    } else if (/^<strong>(.*?)<\/strong>$/i.test(segment)) {
+      const match = segment.match(/^<strong>(.*?)<\/strong>$/i);
+      parts.push(<strong key={idx} className="font-bold">{match ? match[1] : segment}</strong>);
+    } else {
+      parts.push(<span key={idx}>{segment}</span>);
+    }
+  });
+
+  return <>{parts}</>;
+}
+
+

@@ -15,7 +15,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useRef } from 'react';
 import SpeciesMap from './SpeciesMap';
 import GbifGlobalMap from './GbifGlobalMap';
-import { formatScientificName, parseAliases } from '@/utils/formatters';
+import { formatScientificName, parseAliases, renderFormattedText } from '@/utils/formatters';
 import CongenericExplorer from './CongenericExplorer';
 import SimilarSpeciesExplorer from './SimilarSpeciesExplorer';
 import BirdSoundCard from './BirdSoundCard';
@@ -534,7 +534,7 @@ export default function SpeciesContent({ species, showBreadcrumb = true, refresh
                   <ul className="space-y-4 text-xs leading-relaxed opacity-80 list-disc pl-5">
                     {refsList.map((ref, idx) => (
                       <li key={idx} className="leading-relaxed">
-                        <span className="align-middle">{language === 'zh' ? ref.zh : ref.en}</span>
+                        <span className="align-middle">{renderFormattedText(language === 'zh' ? ref.zh : ref.en)}</span>
                         {ref.url && (
                           <a
                             href={ref.url}
