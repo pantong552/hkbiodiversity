@@ -436,13 +436,7 @@ export default function HomeClient() {
         p_genus: (tableFilters.genus?.length > 0) ? tableFilters.genus : (plantFilters.genuses || []),
         p_scientific_name: tableFilters.scientific_name || [],
         p_common_name: tableFilters.common_name || [],
-        p_native_status: (tableFilters.native_status?.length > 0) ? tableFilters.native_status : (plantFilters.origins || []),
-        p_is_cap96: plantFilters.isCap96 || false,
-        p_is_cap586: plantFilters.isCap586 || false,
-        p_is_rare: plantFilters.isRare || false,
-        p_is_china_red_book: plantFilters.isInChinaRedBook || false,
-        p_flowering_months: plantFilters.floweringMonths || [],
-        p_fruiting_months: plantFilters.fruitingMonths || []
+        p_native_status: (tableFilters.native_status?.length > 0) ? tableFilters.native_status : (plantFilters.origins || [])
       };
 
       try {
@@ -888,50 +882,49 @@ export default function HomeClient() {
 
             {/* Results Grid */}
             <div className="min-h-[400px]">
-              {isLoading ? (
+              {displayMode === 'table' ? (
+                <SpeciesTable
+                  taxaType={taxaType}
+                  species={species}
+                  sortBy={sortBy}
+                  sortOrder={sortOrder}
+                  filters={tableFilters}
+                  metadata={tableMetadata}
+                  onFilterChange={setTableFilters}
+                  isLoading={isLoading}
+                  onSort={(field) => {
+                    if (sortBy === field) {
+                      setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
+                    } else {
+                      setSortBy(field);
+                      setSortOrder('asc');
+                    }
+                  }}
+                />
+              ) : isLoading ? (
                 <div className="flex flex-col items-center justify-center py-40">
                   <Loader2 className="w-12 h-12 text-emerald-500 animate-spin mb-4" />
                   <p className="text-slate-400 font-black uppercase tracking-widest text-[10px]">載入中...</p>
                 </div>
               ) : (
                 <>
-                   {displayMode === 'table' ? (
-                        <SpeciesTable
-                            taxaType={taxaType}
-                            species={species}
-                            sortBy={sortBy}
-                            sortOrder={sortOrder}
-                            filters={tableFilters}
-                            metadata={tableMetadata}
-                            onFilterChange={setTableFilters}
-                            onSort={(field) => {
-                            if (sortBy === field) {
-                                setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
-                            } else {
-                                setSortBy(field);
-                                setSortOrder('asc');
-                            }
-                            }}
-                        />
-                   ) : (
-                        <div className={`
-                            grid gap-6 animate-in fade-in duration-700
-                            ${displayMode === 'photo'
-                                ? 'grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 min-[1101px]:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5'
-                                : 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 min-[1101px]:grid-cols-3 xl:grid-cols-3 2xl:grid-cols-4'}
-                        `}>
-                            {species.map((item, idx) => (
-                            <SpeciesCard 
-                                key={item.id} 
-                                species={item} 
-                                isPlant={taxaType === 'flora'} 
-                                mode={displayMode}
-                                priority={idx < 4}
-                                onTaxonomyClick={handleTaxonomyClick}
-                            />
-                            ))}
-                        </div>
-                   )}
+                  <div className={`
+                      grid gap-6 animate-in fade-in duration-700
+                      ${displayMode === 'photo'
+                          ? 'grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 min-[1101px]:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5'
+                          : 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 min-[1101px]:grid-cols-3 xl:grid-cols-3 2xl:grid-cols-4'}
+                  `}>
+                      {species.map((item, idx) => (
+                      <SpeciesCard 
+                          key={item.id} 
+                          species={item} 
+                          isPlant={taxaType === 'flora'} 
+                          mode={displayMode}
+                          priority={idx < 4}
+                          onTaxonomyClick={handleTaxonomyClick}
+                      />
+                      ))}
+                  </div>
 
                   {species.length === 0 && (
                     <div className="flex flex-col items-center justify-center py-32 text-center">

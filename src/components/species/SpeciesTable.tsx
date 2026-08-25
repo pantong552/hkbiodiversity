@@ -21,6 +21,7 @@ interface SpeciesTableProps {
   metadata: Record<string, any[]>;
   onFilterChange: (filters: Record<string, any>) => void;
   onSort: (field: string) => void;
+  isLoading?: boolean;
 }
 
 export default function SpeciesTable({ 
@@ -31,20 +32,20 @@ export default function SpeciesTable({
   filters,
   metadata,
   onFilterChange,
-  onSort 
+  onSort,
+  isLoading = false
 }: SpeciesTableProps) {
   const { language, t } = useLanguage();
   const { getTaxonomyChi } = useTaxonomy();
   const { addSpecies } = useSpeciesPanel();
-  const [isChanging, setIsChanging] = useState(false);
   const isPlant = taxaType === 'flora';
+  const [loadSession, setLoadSession] = useState(0);
 
-  // 監聽類型切換，防止佈局閃爍
   useEffect(() => {
-    setIsChanging(true);
-    const timer = setTimeout(() => setIsChanging(false), 50);
-    return () => clearTimeout(timer);
-  }, [taxaType]);
+    if (isLoading) {
+      setLoadSession(s => s + 1);
+    }
+  }, [isLoading]);
 
   const handleSelectChange = (key: string, value: string | string[]) => {
     onFilterChange({ ...filters, [key]: value });
@@ -88,11 +89,36 @@ export default function SpeciesTable({
   }, [isPlant, language, t]);
 
   return (
-    <div className={`
-      w-full bg-white rounded-[1.25rem] border border-slate-100 shadow-xl shadow-slate-200/50 overflow-hidden 
-      transition-all duration-300 min-h-[400px]
-      ${isChanging ? 'opacity-0 scale-[0.99]' : 'opacity-100 scale-100'}
-    `}>
+    <div className="relative w-full bg-white rounded-[1.25rem] border border-slate-100 shadow-xl shadow-slate-200/50 overflow-hidden transition-all duration-300 min-h-[350px]">
+      {/* Top Continuous Linear Rolling Progress Bar (Resets to leftmost on every loading trigger) */}
+      <div 
+        className={`absolute top-0 left-0 right-0 h-[3px] bg-emerald-100/40 z-20 overflow-hidden pointer-events-none transition-opacity duration-200 ${
+          isLoading ? 'opacity-100' : 'opacity-0'
+        }`}
+      >
+        {isLoading && (
+          <div 
+            key={loadSession}
+            className="h-full w-[35%] bg-gradient-to-r from-transparent via-emerald-500 to-transparent shadow-[0_0_10px_rgba(16,185,129,0.8)] rounded-full animate-constant-rolling" 
+          />
+        )}
+      </div>
+
+      <style jsx>{`
+        @keyframes constantRolling {
+          0% {
+            transform: translateX(-100%);
+          }
+          100% {
+            transform: translateX(350%);
+          }
+        }
+        .animate-constant-rolling {
+          animation: constantRolling 1.4s linear infinite;
+          will-change: transform;
+        }
+      `}</style>
+
       <div className="overflow-x-auto scrollbar-thin scrollbar-thumb-slate-100">
         <table className="w-full text-left border-collapse min-w-full md:min-w-[1000px]">
           <thead>
@@ -184,7 +210,7 @@ export default function SpeciesTable({
             </tr>
           </thead>
           
-          <tbody className="divide-y divide-slate-50">
+          <tbody className={`divide-y divide-slate-50 transition-opacity duration-200 ${isLoading ? 'opacity-40 pointer-events-none' : 'opacity-100'}`}>
             {species.map((item) => {
               const faunaItem = item as Species;
               const floraItem = item as PlantSpecies;
@@ -265,9 +291,14 @@ export default function SpeciesTable({
         </table>
       </div>
       
-      {species.length === 0 && (
+      {species.length === 0 && !isLoading && (
         <div className="py-20 text-center">
           <p className="text-slate-400 font-medium">找不到符合條件的物種</p>
+        </div>
+      )}
+      {species.length === 0 && isLoading && (
+        <div className="py-20 text-center">
+          <p className="text-slate-400 font-medium animate-pulse">載入中...</p>
         </div>
       )}
     </div>
