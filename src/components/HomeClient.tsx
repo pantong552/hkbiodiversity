@@ -421,10 +421,14 @@ export default function HomeClient() {
         p_class: (tableFilters.class?.length > 0) ? tableFilters.class : (selectedFilters.taxonomy?.class_eng || []),
         p_order: (tableFilters.order?.length > 0) ? tableFilters.order : (selectedFilters.taxonomy?.order_eng || []),
         p_family: (tableFilters.family?.length > 0) ? tableFilters.family : (selectedFilters.taxonomy?.family_eng || []),
+        p_genus: (tableFilters.genus?.length > 0) ? tableFilters.genus : (selectedFilters.taxonomy?.genus_eng || []),
+        p_informal_group: (tableFilters.informal_group?.length > 0) ? tableFilters.informal_group : (selectedFilters.taxonomy?.informal_group_eng || []),
         p_scientific_name: tableFilters.scientific_name || [],
         p_common_name: tableFilters.common_name || [],
         p_iucn: (tableFilters.iucn?.length > 0) ? tableFilters.iucn : (selectedFilters.iucn || []),
-        p_native_status: (tableFilters.native_status?.length > 0) ? tableFilters.native_status : ((selectedFilters as any).status?.native_status || [])
+        p_native_status: (tableFilters.native_status?.length > 0) ? tableFilters.native_status : ((selectedFilters as any).status?.native_status || []),
+        p_is_cap170: selectedFilters.isCap170 || false,
+        p_is_cap586: selectedFilters.isCap586 || false
       } : {
         p_search: currentSearch,
         p_categories: (tableFilters.category?.length > 0) ? tableFilters.category : (plantFilters.categories || []),
@@ -432,7 +436,13 @@ export default function HomeClient() {
         p_genus: (tableFilters.genus?.length > 0) ? tableFilters.genus : (plantFilters.genuses || []),
         p_scientific_name: tableFilters.scientific_name || [],
         p_common_name: tableFilters.common_name || [],
-        p_native_status: (tableFilters.native_status?.length > 0) ? tableFilters.native_status : (plantFilters.origins || [])
+        p_native_status: (tableFilters.native_status?.length > 0) ? tableFilters.native_status : (plantFilters.origins || []),
+        p_is_cap96: plantFilters.isCap96 || false,
+        p_is_cap586: plantFilters.isCap586 || false,
+        p_is_rare: plantFilters.isRare || false,
+        p_is_china_red_book: plantFilters.isInChinaRedBook || false,
+        p_flowering_months: plantFilters.floweringMonths || [],
+        p_fruiting_months: plantFilters.fruitingMonths || []
       };
 
       try {
@@ -461,6 +471,13 @@ export default function HomeClient() {
 
     fetchTableMetadata();
   }, [taxaType, searchQuery, selectedFilters, plantFilters, tableFilters, isAuthLoading]);
+  // Handle Display Mode Change (Always reset to lowest per-page option for that mode)
+  const handleDisplayModeChange = (mode: 'detail' | 'photo' | 'table') => {
+    setDisplayMode(mode);
+    setItemsPerPage(PAGE_SIZE_OPTIONS[mode][0]);
+    setCurrentPage(1);
+  };
+
   // Handle Sort Change
   const handleSort = (field: string) => {
     if (sortBy === field) {
@@ -813,7 +830,7 @@ export default function HomeClient() {
                         ].map((mode) => (
                           <button
                             key={mode.id}
-                            onClick={() => setDisplayMode(mode.id as any)}
+                            onClick={() => handleDisplayModeChange(mode.id as any)}
                             title={mode.title}
                             className={`p-1.5 rounded-md transition-all ${displayMode === mode.id ? 'bg-emerald-600 text-white shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
                           >
@@ -863,7 +880,7 @@ export default function HomeClient() {
               itemsPerPage={itemsPerPage}
               onItemsPerPageChange={setItemsPerPage}
               displayMode={displayMode}
-              onDisplayModeChange={setDisplayMode}
+              onDisplayModeChange={handleDisplayModeChange}
               pageSizeOptions={PAGE_SIZE_OPTIONS[displayMode]}
               totalCount={totalResultCount}
               onFilterOpen={() => setIsFilterOpen(true)}

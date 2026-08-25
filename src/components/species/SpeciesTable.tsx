@@ -102,7 +102,7 @@ export default function SpeciesTable({
                 <th 
                   key={col.key} 
                   className={`
-                    px-3 py-3 md:px-6 md:py-5 text-[10px] md:text-[11px] font-black uppercase tracking-widest text-slate-400 whitespace-nowrap
+                    px-3 py-2.5 md:px-6 md:py-3.5 text-[10px] md:text-[11px] font-black uppercase tracking-widest text-slate-400 whitespace-nowrap
                     ${!col.mobile ? 'hidden md:table-cell' : ''}
                     ${col.key === 'order' || col.key === 'family' || col.key === 'genus' ? 'md:w-[140px]' : ''}
                     ${col.key === 'scientific_name' || col.key === 'common_name' ? 'w-auto' : ''}
@@ -130,7 +130,7 @@ export default function SpeciesTable({
             {/* Header Filters Row */}
             <tr className="bg-white border-b border-slate-50">
               {columns.map((col) => (
-                <th key={col.key} className={`px-2 py-2 md:px-4 md:py-3 ${!col.mobile ? 'hidden md:table-cell' : ''}`}>
+                <th key={col.key} className={`px-2 py-1.5 md:px-4 md:py-2 ${!col.mobile ? 'hidden md:table-cell' : ''}`}>
                   <div className="px-1">
                     {col.key === 'native_status' ? (
                       <MultiSelectDropdown
@@ -200,7 +200,7 @@ export default function SpeciesTable({
                 >
                   {/* fauna Order only */}
                   {!isPlant && (
-                    <td className="px-3 py-2.5 md:px-6 md:py-4 hidden md:table-cell w-[120px]">
+                    <td className="px-3 py-2 md:px-6 md:py-2.5 hidden md:table-cell w-[120px]">
                       <span className="text-[12px] md:text-[13px] font-bold text-slate-600 line-clamp-1">
                         {language === 'zh' ? getTaxonomyChi('order', taxaTypeVal, faunaItem.order_eng) : faunaItem.order_eng}
                       </span>
@@ -208,7 +208,7 @@ export default function SpeciesTable({
                   )}
                   
                   {/* Family (Both) */}
-                  <td className="px-3 py-2.5 md:px-6 md:py-4 hidden md:table-cell w-[120px]">
+                  <td className="px-3 py-2 md:px-6 md:py-2.5 hidden md:table-cell w-[120px]">
                     <span className="text-[12px] md:text-[13px] font-medium text-slate-500 line-clamp-1">
                       {language === 'zh' 
                         ? getTaxonomyChi('family', taxaTypeVal, faunaItem.family_eng || floraItem.family_eng) 
@@ -218,7 +218,7 @@ export default function SpeciesTable({
 
                   {/* flora Genus only */}
                   {isPlant && (
-                    <td className="px-3 py-2.5 md:px-6 md:py-4 hidden md:table-cell w-[120px]">
+                    <td className="px-3 py-2 md:px-6 md:py-2.5 hidden md:table-cell w-[120px]">
                       <span className="text-[12px] md:text-[13px] font-medium text-slate-400 line-clamp-1">
                         {language === 'zh' ? getTaxonomyChi('genus', taxaTypeVal, floraItem.genus_eng) : floraItem.genus_eng}
                       </span>
@@ -226,34 +226,34 @@ export default function SpeciesTable({
                   )}
 
                   {/* Scientific Name */}
-                  <td className="px-3 py-2.5 md:px-6 md:py-4 max-w-[150px] md:max-w-none">
+                  <td className="px-3 py-2 md:px-6 md:py-2.5 max-w-[150px] md:max-w-none">
                     <span className="text-[13px] md:text-[14px] font-bold text-slate-900 group-hover:text-emerald-700 transition-colors line-clamp-2 md:whitespace-nowrap">
                       {formatScientificName(item.scientific_name)}
                     </span>
                   </td>
 
                   {/* Common Name */}
-                  <td className="px-3 py-2.5 md:px-6 md:py-4 max-w-[140px] md:max-w-none">
+                  <td className="px-3 py-2 md:px-6 md:py-2.5 max-w-[140px] md:max-w-none">
                     <span className="text-[13px] md:text-[14px] font-black text-slate-900 line-clamp-2 md:whitespace-nowrap">
                       {language === 'zh' ? (faunaItem.common_name_chi || floraItem.common_name_chi) : (faunaItem.common_name_eng || floraItem.common_name_eng)}
                     </span>
                   </td>
 
                   {/* Native Status */}
-                  <td className="px-3 py-2.5 md:px-6 md:py-4 hidden md:table-cell text-center">
-                    <span className={`px-2 md:px-2.5 py-0.5 md:py-1 rounded-lg text-[9px] md:text-[10px] font-bold uppercase tracking-wider ${faunaItem.native_status?.includes('Native') || floraItem.origin?.includes('Native') || floraItem.origin?.includes('原生') ? 'bg-emerald-50 text-emerald-600' : 'bg-slate-50 text-slate-500'}`}>
+                  <td className="px-3 py-2 md:px-6 md:py-2.5 hidden md:table-cell text-center">
+                    <span className={`px-2 md:px-2.5 py-0.5 md:py-0.5 rounded-lg text-[9px] md:text-[10px] font-bold uppercase tracking-wider ${faunaItem.native_status?.includes('Native') || floraItem.origin?.includes('Native') || floraItem.origin?.includes('原生') ? 'bg-emerald-50 text-emerald-600' : 'bg-slate-50 text-slate-500'}`}>
                       {formatNativeStatus(floraItem.origin || faunaItem.native_status, language)}
                     </span>
                   </td>
 
                   {/* Status (IUCN or Rarity) */}
-                  <td className="px-3 py-2.5 md:px-6 md:py-4 whitespace-nowrap text-center">
+                  <td className="px-3 py-2 md:px-6 md:py-2.5 whitespace-nowrap text-center">
                     {isPlant ? (
-                       <span className={`px-2 py-0.5 md:px-3 md:py-1 rounded-lg md:rounded-xl text-[9px] md:text-[10px] font-black uppercase tracking-widest border shadow-sm ${floraItem.hk_rare_precious_note && floraItem.hk_rare_precious_note !== 'No' ? 'bg-rose-50 text-rose-600 border-rose-100' : 'bg-slate-50 text-slate-400 border-slate-100'}`}>
+                       <span className={`px-2 py-0.5 md:px-3 md:py-0.5 rounded-lg md:rounded-xl text-[9px] md:text-[10px] font-black uppercase tracking-widest border shadow-sm ${floraItem.hk_rare_precious_note && floraItem.hk_rare_precious_note !== 'No' ? 'bg-rose-50 text-rose-600 border-rose-100' : 'bg-slate-50 text-slate-400 border-slate-100'}`}>
                         {floraItem.hk_rare_precious_note || 'N/A'}
                       </span>
                     ) : (
-                      <span className={`px-2 py-0.5 md:px-3 md:py-1 rounded-lg md:rounded-xl text-[9px] md:text-[10px] font-black uppercase tracking-widest border shadow-sm ${iucnConfig?.styles}`}>
+                      <span className={`px-2 py-0.5 md:px-3 md:py-0.5 rounded-lg md:rounded-xl text-[9px] md:text-[10px] font-black uppercase tracking-widest border shadow-sm ${iucnConfig?.styles}`}>
                         {iucnConfig?.label.en}
                       </span>
                     )}
