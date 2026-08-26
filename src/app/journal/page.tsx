@@ -897,7 +897,7 @@ export default function JournalPage() {
               {/* Search & Tag Clear Filter Bar */}
               <div className="flex flex-col sm:flex-row items-center gap-4">
                 <div className="relative flex-1 w-full">
-                  <Search className="absolute left-4 top-1/2 -translate-y-12 w-4 h-4 text-slate-400" />
+                  <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
                   <input
                     type="text"
                     suppressHydrationWarning
