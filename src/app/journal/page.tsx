@@ -8,6 +8,11 @@ import Header from '@/components/Header';
 import JournalEditorModal from '@/components/journal/JournalEditorModal';
 import CategoryAdminModal from '@/components/journal/CategoryAdminModal';
 import RejectModal from '@/components/journal/RejectModal';
+import NovelReaderControlPanel, {
+  NovelReaderSettings,
+  DEFAULT_NOVEL_SETTINGS,
+  NOVEL_THEMES
+} from '@/components/journal/NovelReaderControlPanel';
 import { EcoArticle, EcoCategory } from '@/types/journal';
 import { supabase } from '@/lib/supabase';
 import ReactMarkdown from 'react-markdown';
@@ -66,6 +71,55 @@ export default function JournalPage() {
 
   // Reading progress
   const [scrollProgress, setScrollProgress] = useState(0);
+
+  // 生態文創小說閱讀控制面板設定
+  const [novelSettings, setNovelSettings] = useState<NovelReaderSettings>(DEFAULT_NOVEL_SETTINGS);
+  const [isNovelControlPanelOpen, setIsNovelControlPanelOpen] = useState(false);
+
+  // 判定目前開啟的文章是否屬於「生態文創」
+  const isSelectedArticleNovel = Boolean(
+    selectedArticle && (
+      selectedArticle.eco_categories?.name_chi?.includes('文創') ||
+      selectedArticle.eco_categories?.name_chi?.includes('小說') ||
+      selectedArticle.eco_categories?.name_eng?.toLowerCase().includes('creative') ||
+      selectedArticle.eco_categories?.name_eng?.toLowerCase().includes('novel') ||
+      selectedArticle.eco_categories?.slug?.includes('creative') ||
+      selectedArticle.eco_categories?.slug?.includes('novel')
+    )
+  );
+
+  // 從 LocalStorage 載入小說偏好設定
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem('hkbio_novel_reader_settings');
+      if (saved) {
+        setNovelSettings(prev => ({ ...prev, ...JSON.parse(saved) }));
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  }, []);
+
+  const handleUpdateNovelSettings = (newSettings: Partial<NovelReaderSettings>) => {
+    setNovelSettings(prev => {
+      const updated = { ...prev, ...newSettings };
+      try {
+        localStorage.setItem('hkbio_novel_reader_settings', JSON.stringify(updated));
+      } catch (e) {}
+      return updated;
+    });
+  };
+
+  // 自動閱讀滾動效果
+  useEffect(() => {
+    let interval: any;
+    if (isSelectedArticleNovel && novelSettings.autoScroll) {
+      interval = setInterval(() => {
+        window.scrollBy({ top: 2, behavior: 'smooth' });
+      }, 50);
+    }
+    return () => clearInterval(interval);
+  }, [isSelectedArticleNovel, novelSettings.autoScroll]);
 
   const fetchData = async () => {
     setLoading(true);
@@ -189,7 +243,18 @@ export default function JournalPage() {
     if (art.article_language === 'zh') raw = art.content_chi || art.content_eng;
     else if (art.article_language === 'en') raw = art.content_eng || art.content_chi;
     else raw = language === 'zh' ? (art.content_chi || art.content_eng) : (art.content_eng || art.content_chi);
-    return (raw || '').replace(/\\n/g, '\n');
+    
+    let cleaned = (raw || '').replace(/\\n/g, '\n');
+    
+    // 若為小說模式，過濾掉 Quill 產生的 inline color / background / font-size 樣式，防止深色背景下字體變黑
+    if (isSelectedArticleNovel) {
+      cleaned = cleaned
+        .replace(/style="[^"]*color:[^"]*"/gi, '')
+        .replace(/style="[^"]*background[^"]*"/gi, '')
+        .replace(/<font[^>]*>/gi, '')
+        .replace(/<\/font>/gi, '');
+    }
+    return cleaned;
   };
 
   // Estimated reading time calculation (approx 250 words per min)
@@ -486,52 +551,141 @@ export default function JournalPage() {
               </div>
             )}
 
-            {/* Article Content Body (Editorial Rich Typography) */}
-            <div className="text-slate-800 text-base sm:text-lg leading-relaxed mb-12">
+            {/* Article Content Body (Editorial Rich Typography with Novel Mode Support) */}
+            <div 
+              id="novel-page-reader-content"
+              key={`novel-reader-${selectedArticle.id}-${novelSettings.theme}-${novelSettings.lineHeight}-${novelSettings.fontSize}`}
+              className={`rounded-3xl p-4 sm:p-8 transition-all duration-300 ${
+                isSelectedArticleNovel
+                  ? 'border border-current/10 shadow-sm font-serif [&_p]:indent-8'
+                  : 'text-slate-800'
+              } text-base sm:text-lg leading-relaxed mb-12`}
+              style={
+                isSelectedArticleNovel
+                  ? {
+                      backgroundColor: NOVEL_THEMES[novelSettings.theme]?.bg || '#F5ECD7',
+                      color: NOVEL_THEMES[novelSettings.theme]?.color || '#3E2723',
+                      fontSize: `${novelSettings.fontSize}px`,
+                      lineHeight: novelSettings.lineHeight === 'compact' ? 1.5 : (novelSettings.lineHeight === 'spacious' ? 2.7 : 2.0),
+                    }
+                  : undefined
+              }
+            >
+              {isSelectedArticleNovel && (
+                <style jsx global>{`
+                  #novel-page-reader-content,
+                  #novel-page-reader-content * {
+                    color: ${NOVEL_THEMES[novelSettings.theme]?.color || '#3E2723'} !important;
+                    line-height: ${novelSettings.lineHeight === 'compact' ? 1.5 : (novelSettings.lineHeight === 'spacious' ? 2.7 : 2.0)} !important;
+                  }
+                  #novel-page-reader-content p,
+                  #novel-page-reader-content div {
+                    font-size: ${novelSettings.fontSize}px !important;
+                    line-height: ${novelSettings.lineHeight === 'compact' ? 1.5 : (novelSettings.lineHeight === 'spacious' ? 2.7 : 2.0)} !important;
+                    margin-bottom: ${novelSettings.lineHeight === 'compact' ? '0.75rem' : (novelSettings.lineHeight === 'spacious' ? '1.85rem' : '1.25rem')} !important;
+                    text-indent: 2em !important;
+                    color: ${NOVEL_THEMES[novelSettings.theme]?.color || '#3E2723'} !important;
+                  }
+                `}</style>
+              )}
               <ReactMarkdown
                 rehypePlugins={[rehypeRaw, [rehypeExternalLinks, { target: '_blank' }]]}
                 remarkPlugins={[remarkBreaks]}
                 components={{
                   h1: ({ children }) => (
-                    <h1 className="text-2xl sm:text-3xl font-bold font-serif text-slate-900 mt-8 mb-4 border-b border-slate-200 pb-3">
+                    <h1 
+                      style={isSelectedArticleNovel ? { color: NOVEL_THEMES[novelSettings.theme]?.color, lineHeight: novelSettings.lineHeight === 'compact' ? 1.4 : (novelSettings.lineHeight === 'spacious' ? 2.2 : 1.7) } : undefined}
+                      className={`text-2xl sm:text-3xl font-bold font-serif ${isSelectedArticleNovel ? 'border-current/20' : 'text-slate-900 border-slate-200'} mt-8 mb-4 border-b pb-3`}
+                    >
                       {children}
                     </h1>
                   ),
                   h2: ({ children }) => (
-                    <h2 className="text-xl sm:text-2xl font-bold font-serif text-slate-900 mt-6 mb-3">
+                    <h2 
+                      style={isSelectedArticleNovel ? { color: NOVEL_THEMES[novelSettings.theme]?.color, lineHeight: novelSettings.lineHeight === 'compact' ? 1.4 : (novelSettings.lineHeight === 'spacious' ? 2.2 : 1.7) } : undefined}
+                      className={`text-xl sm:text-2xl font-bold font-serif ${isSelectedArticleNovel ? '' : 'text-slate-900'} mt-6 mb-3`}
+                    >
                       {children}
                     </h2>
                   ),
                   h3: ({ children }) => (
-                    <h3 className="text-lg sm:text-xl font-bold font-serif text-slate-800 mt-5 mb-2">
+                    <h3 
+                      style={isSelectedArticleNovel ? { color: NOVEL_THEMES[novelSettings.theme]?.color, lineHeight: novelSettings.lineHeight === 'compact' ? 1.4 : (novelSettings.lineHeight === 'spacious' ? 2.2 : 1.7) } : undefined}
+                      className={`text-lg sm:text-xl font-bold font-serif ${isSelectedArticleNovel ? '' : 'text-slate-800'} mt-5 mb-2`}
+                    >
                       {children}
                     </h3>
                   ),
                   p: ({ children }) => (
-                    <p className="my-4 text-slate-800 leading-relaxed text-base sm:text-lg">
+                    <p 
+                      style={
+                        isSelectedArticleNovel
+                          ? {
+                              fontSize: `${novelSettings.fontSize}px`,
+                              lineHeight: novelSettings.lineHeight === 'compact' ? 1.5 : (novelSettings.lineHeight === 'spacious' ? 2.7 : 2.0),
+                              color: NOVEL_THEMES[novelSettings.theme]?.color,
+                              marginBottom: novelSettings.lineHeight === 'compact' ? '0.75rem' : (novelSettings.lineHeight === 'spacious' ? '1.85rem' : '1.25rem'),
+                              textIndent: '2em',
+                            }
+                          : undefined
+                      }
+                      className={`my-4 ${isSelectedArticleNovel ? '' : 'text-slate-800 leading-relaxed'}`}
+                    >
                       {children}
                     </p>
                   ),
+                  span: ({ children }) => (
+                    <span style={isSelectedArticleNovel ? { color: NOVEL_THEMES[novelSettings.theme]?.color } : undefined}>
+                      {children}
+                    </span>
+                  ),
+                  strong: ({ children }) => (
+                    <strong style={isSelectedArticleNovel ? { color: NOVEL_THEMES[novelSettings.theme]?.color, fontWeight: 'bold' } : undefined}>
+                      {children}
+                    </strong>
+                  ),
+                  em: ({ children }) => (
+                    <em style={isSelectedArticleNovel ? { color: NOVEL_THEMES[novelSettings.theme]?.color } : undefined}>
+                      {children}
+                    </em>
+                  ),
                   ul: ({ children }) => (
-                    <ul className="list-disc list-outside ml-6 my-4 space-y-2 text-slate-800">
+                    <ul 
+                      style={isSelectedArticleNovel ? { color: NOVEL_THEMES[novelSettings.theme]?.color } : undefined}
+                      className={`list-disc list-outside ml-6 my-4 space-y-2 ${isSelectedArticleNovel ? '' : 'text-slate-800'}`}
+                    >
                       {children}
                     </ul>
                   ),
                   ol: ({ children }) => (
-                    <ol className="list-decimal list-outside ml-6 my-4 space-y-2 text-slate-800">
+                    <ol 
+                      style={isSelectedArticleNovel ? { color: NOVEL_THEMES[novelSettings.theme]?.color } : undefined}
+                      className={`list-decimal list-outside ml-6 my-4 space-y-2 ${isSelectedArticleNovel ? '' : 'text-slate-800'}`}
+                    >
                       {children}
                     </ol>
                   ),
                   li: ({ children }) => (
-                    <li className="pl-1 leading-relaxed">{children}</li>
+                    <li 
+                      style={isSelectedArticleNovel ? { color: NOVEL_THEMES[novelSettings.theme]?.color, lineHeight: novelSettings.lineHeight === 'compact' ? 1.5 : (novelSettings.lineHeight === 'spacious' ? 2.7 : 2.0) } : undefined}
+                      className="pl-1 leading-relaxed"
+                    >
+                      {children}
+                    </li>
                   ),
                   blockquote: ({ children }) => (
-                    <blockquote className="border-l-4 border-emerald-600 pl-5 py-3 my-6 bg-emerald-50/60 rounded-r-2xl italic text-slate-700 font-serif">
+                    <blockquote 
+                      style={isSelectedArticleNovel ? { color: NOVEL_THEMES[novelSettings.theme]?.color } : undefined}
+                      className={`border-l-4 ${isSelectedArticleNovel ? 'border-amber-600 bg-black/10' : 'border-emerald-600 bg-emerald-50/60 text-slate-700'} pl-5 py-3 my-6 rounded-r-2xl italic font-serif`}
+                    >
                       {children}
                     </blockquote>
                   ),
                   code: ({ children }) => (
-                    <code className="px-2 py-1 bg-slate-100 border border-slate-200 rounded-lg font-mono text-xs text-emerald-800">
+                    <code 
+                      style={isSelectedArticleNovel ? { color: NOVEL_THEMES[novelSettings.theme]?.color } : undefined}
+                      className={`px-2 py-1 ${isSelectedArticleNovel ? 'bg-black/20 border border-current/20' : 'bg-slate-100 border border-slate-200 text-emerald-800'} rounded-lg font-mono text-xs`}
+                    >
                       {children}
                     </code>
                   ),
@@ -540,7 +694,7 @@ export default function JournalPage() {
                       href={href}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="text-emerald-700 font-semibold underline underline-offset-4 hover:text-emerald-900 transition-colors"
+                      className={`${isSelectedArticleNovel ? 'text-amber-500' : 'text-emerald-700'} font-semibold underline underline-offset-4 hover:opacity-80 transition-colors`}
                     >
                       {children}
                     </a>
@@ -564,6 +718,16 @@ export default function JournalPage() {
                 {getArticleContent(selectedArticle)}
               </ReactMarkdown>
             </div>
+
+            {/* 生態文創專屬：閱讀控制面板 (Control Panel) */}
+            {isSelectedArticleNovel && (
+              <NovelReaderControlPanel
+                isOpen={isNovelControlPanelOpen}
+                onToggle={() => setIsNovelControlPanelOpen(!isNovelControlPanelOpen)}
+                settings={novelSettings}
+                onUpdateSettings={handleUpdateNovelSettings}
+              />
+            )}
 
             {/* Tags Footer */}
             {selectedArticle.tags && selectedArticle.tags.length > 0 && (
