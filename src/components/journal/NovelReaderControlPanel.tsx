@@ -16,6 +16,7 @@ import {
   BookOpen
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useLanguage } from '@/context/LanguageContext';
 
 export interface NovelReaderSettings {
   brightness: number; // 30 - 100
@@ -29,6 +30,8 @@ export interface NovelReaderSettings {
 export const NOVEL_THEMES = {
   sepia: {
     id: 'sepia',
+    name_zh: '羊皮紙',
+    name_en: 'Sepia',
     name: '羊皮紙',
     bg: '#F5ECD7',
     color: '#3E2723',
@@ -38,6 +41,8 @@ export const NOVEL_THEMES = {
   },
   green: {
     id: 'green',
+    name_zh: '豆沙綠',
+    name_en: 'Sage Green',
     name: '豆沙綠',
     bg: '#DDEEDD',
     color: '#183827',
@@ -47,6 +52,8 @@ export const NOVEL_THEMES = {
   },
   blue: {
     id: 'blue',
+    name_zh: '靜謐藍',
+    name_en: 'Serene Blue',
     name: '靜謐藍',
     bg: '#DCE8F5',
     color: '#1E293B',
@@ -56,6 +63,8 @@ export const NOVEL_THEMES = {
   },
   pink: {
     id: 'pink',
+    name_zh: '淡櫻粉',
+    name_en: 'Blush Pink',
     name: '淡櫻粉',
     bg: '#F4DFDF',
     color: '#4A2E35',
@@ -65,6 +74,8 @@ export const NOVEL_THEMES = {
   },
   white: {
     id: 'white',
+    name_zh: '純淨白',
+    name_en: 'Pure White',
     name: '純淨白',
     bg: '#FFFFFF',
     color: '#1E293B',
@@ -74,6 +85,8 @@ export const NOVEL_THEMES = {
   },
   dark: {
     id: 'dark',
+    name_zh: '深邃灰',
+    name_en: 'Night Gray',
     name: '深邃灰',
     bg: '#181C22',
     color: '#F1F5F9', // 極高可讀性灰白色
@@ -105,6 +118,8 @@ export default function NovelReaderControlPanel({
   settings,
   onUpdateSettings,
 }: NovelReaderControlPanelProps) {
+  const { t, language } = useLanguage();
+
   return (
     <>
       {/* 亮度遮罩層 (當亮度小於 100% 時覆蓋螢幕以降低刺眼度) */}
@@ -125,15 +140,15 @@ export default function NovelReaderControlPanel({
           animate={{ scale: 1, opacity: 1 }}
           exit={{ scale: 0, opacity: 0 }}
           onClick={onToggle}
-          aria-label="打開閱讀設定面板"
+          aria-label={t('novel.settings_title')}
           className="fixed bottom-6 right-6 z-[95] w-12 h-12 rounded-full shadow-2xl bg-white/95 text-slate-800 hover:text-emerald-600 hover:scale-110 active:scale-90 backdrop-blur-md border border-slate-200 shadow-slate-900/10 transition-all flex items-center justify-center cursor-pointer group"
-          title="小說排版設定"
+          title={t('novel.settings_title')}
         >
           <Sliders className="w-5 h-5 text-slate-700 group-hover:text-emerald-600 transition-colors" />
         </motion.button>
       )}
 
-      {/* 控制面板主體 (現代化 Light Style 底部抽屜 - 在 Mobile 與 Tablet 維持精準緊湊排版) */}
+      {/* 控制面板主體 (現代化 Light Style 底部抽屜 - 支援多語言) */}
       <AnimatePresence>
         {isOpen && (
           <>
@@ -159,12 +174,12 @@ export default function NovelReaderControlPanel({
                 }
               }}
               transition={{ type: 'spring', damping: 25, stiffness: 280 }}
-              className="fixed bottom-0 left-0 right-0 z-[99] max-w-md sm:max-w-lg mx-auto bg-white/98 backdrop-blur-2xl rounded-t-[2rem] shadow-2xl border-t border-slate-200/90 px-5 py-4 pb-7 text-slate-800 select-none space-y-4 touch-manipulation cursor-grab active:cursor-grabbing"
+              className="fixed bottom-0 left-0 right-0 z-[99] max-w-sm sm:max-w-md mx-auto bg-white/98 backdrop-blur-2xl rounded-t-[2rem] shadow-2xl border-t border-slate-200/90 px-4 sm:px-5 py-3.5 pb-6 text-slate-800 select-none space-y-3.5 touch-manipulation cursor-grab active:cursor-grabbing"
               onClick={(e) => e.stopPropagation()}
             >
               {/* 頂部收合拖拉條指示器 */}
               <div 
-                className="w-full flex justify-center -mt-2 pb-1.5 cursor-grab active:cursor-grabbing touch-none"
+                className="w-full flex justify-center -mt-1.5 pb-1 cursor-grab active:cursor-grabbing touch-none"
                 onClick={onToggle}
               >
                 <div className="w-10 h-1 bg-slate-200 rounded-full hover:bg-slate-300 transition-colors" />
@@ -172,10 +187,10 @@ export default function NovelReaderControlPanel({
 
               {/* 第一行：亮度與自動閱讀 (Brightness & Auto Read) */}
               <div className="flex items-center justify-between gap-3">
-                <div className="flex items-center gap-2.5 flex-1">
-                  <span className="text-xs font-bold text-slate-500 shrink-0">亮度</span>
+                <div className="flex items-center gap-2 flex-1 min-w-0">
+                  <span className="text-xs font-bold text-slate-500 shrink-0 min-w-[32px] sm:min-w-[40px]">{t('novel.brightness')}</span>
                   <Sun className="w-4 h-4 text-slate-400 shrink-0" />
-                  <div className="relative flex-1 flex items-center">
+                  <div className="relative flex-1 flex items-center min-w-0">
                     <input
                       type="range"
                       min="30"
@@ -185,16 +200,16 @@ export default function NovelReaderControlPanel({
                       className="w-full h-1.5 bg-slate-100 rounded-lg appearance-none cursor-pointer accent-emerald-600"
                     />
                   </div>
-                  <Sun className="w-5 h-5 text-slate-600 shrink-0" />
+                  <Sun className="w-4 h-4 text-slate-600 shrink-0" />
                 </div>
 
-                <div className="h-5 w-px bg-slate-200 mx-0.5" />
+                <div className="h-5 w-px bg-slate-200 shrink-0" />
 
                 {/* 自動閱讀開關按鈕 (Light Style) */}
                 <button
                   type="button"
                   onClick={() => onUpdateSettings({ autoScroll: !settings.autoScroll })}
-                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer shrink-0 ${
                     settings.autoScroll
                       ? 'bg-emerald-600 text-white shadow-md shadow-emerald-600/20'
                       : 'bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200'
@@ -203,29 +218,29 @@ export default function NovelReaderControlPanel({
                   {settings.autoScroll ? (
                     <>
                       <Pause className="w-3.5 h-3.5 fill-current" />
-                      <span>暫停閱讀</span>
+                      <span>{t('novel.pause')}</span>
                     </>
                   ) : (
                     <>
                       <Play className="w-3.5 h-3.5 fill-current text-emerald-600" />
-                      <span>自動閱讀</span>
+                      <span>{t('novel.auto_read')}</span>
                     </>
                   )}
                 </button>
               </div>
 
-              {/* 第二行：字號調節 (Font Size Adjuster - Light Style) */}
+              {/* 第二行：字號調節 (Font Size Adjuster - 填滿寬度) */}
               <div className="flex items-center justify-between gap-3">
-                <span className="text-xs font-bold text-slate-500 shrink-0">字號</span>
+                <span className="text-xs font-bold text-slate-500 shrink-0 min-w-[32px] sm:min-w-[40px]">{t('novel.font_size')}</span>
                 
-                <div className="flex items-center gap-2.5 flex-1 max-w-[280px]">
+                <div className="flex items-center gap-2 flex-1 min-w-0">
                   <div className="flex items-center bg-slate-50 rounded-2xl p-0.5 border border-slate-200 flex-1 justify-between shadow-inner">
                     <button
                       type="button"
                       onClick={() => onUpdateSettings({ fontSize: Math.max(14, settings.fontSize - 2) })}
                       disabled={settings.fontSize <= 14}
-                      className="w-9 h-7 rounded-xl flex items-center justify-center text-slate-700 hover:bg-white hover:text-emerald-700 shadow-sm transition-all disabled:opacity-30 cursor-pointer"
-                      title="縮小字體"
+                      className="w-8 h-7 rounded-xl flex items-center justify-center text-slate-700 hover:bg-white hover:text-emerald-700 shadow-sm transition-all disabled:opacity-30 cursor-pointer"
+                      title={language === 'zh' ? '縮小字體' : 'Decrease font size'}
                     >
                       <Minus className="w-3.5 h-3.5" />
                     </button>
@@ -238,38 +253,40 @@ export default function NovelReaderControlPanel({
                       type="button"
                       onClick={() => onUpdateSettings({ fontSize: Math.min(32, settings.fontSize + 2) })}
                       disabled={settings.fontSize >= 32}
-                      className="w-9 h-7 rounded-xl flex items-center justify-center text-slate-700 hover:bg-white hover:text-emerald-700 shadow-sm transition-all disabled:opacity-30 cursor-pointer"
-                      title="放大字體"
+                      className="w-8 h-7 rounded-xl flex items-center justify-center text-slate-700 hover:bg-white hover:text-emerald-700 shadow-sm transition-all disabled:opacity-30 cursor-pointer"
+                      title={language === 'zh' ? '放大字體' : 'Increase font size'}
                     >
                       <Plus className="w-3.5 h-3.5" />
                     </button>
                   </div>
 
+                  {/* 預設按鈕：重設全部閱讀設定為 DEFAULT_NOVEL_SETTINGS */}
                   <button
                     type="button"
-                    onClick={() => onUpdateSettings({ fontSize: DEFAULT_NOVEL_SETTINGS.fontSize })}
+                    onClick={() => onUpdateSettings(DEFAULT_NOVEL_SETTINGS)}
                     className="px-3 py-1.5 rounded-xl text-xs font-bold text-slate-600 hover:text-emerald-700 hover:bg-emerald-50 border border-slate-200 transition-colors cursor-pointer shrink-0"
+                    title={language === 'zh' ? '重設全部設定為預設值' : 'Reset all settings to default'}
                   >
-                    預設
+                    {t('novel.reset_default')}
                   </button>
                 </div>
               </div>
 
-              {/* 第三行：行距排版 (Line-Height Spacing - Light Style) */}
+              {/* 第三行：行距排版 (Line-Height Spacing - 填滿寬度) */}
               <div className="flex items-center justify-between gap-3">
-                <span className="text-xs font-bold text-slate-500 shrink-0">間距</span>
+                <span className="text-xs font-bold text-slate-500 shrink-0 min-w-[32px] sm:min-w-[40px]">{t('novel.spacing')}</span>
                 
-                <div className="flex items-center gap-2 flex-1 max-w-[280px]">
+                <div className="flex items-center gap-2 flex-1 min-w-0">
                   {/* 緊湊 */}
                   <button
                     type="button"
                     onClick={() => onUpdateSettings({ lineHeight: 'compact' })}
-                    className={`flex-1 py-1.5 px-3 rounded-2xl border text-xs font-bold flex items-center justify-center transition-all cursor-pointer ${
+                    className={`flex-1 py-1.5 px-2 rounded-2xl border text-xs font-bold flex items-center justify-center transition-all cursor-pointer ${
                       settings.lineHeight === 'compact'
                         ? 'border-emerald-600 bg-emerald-50 text-emerald-800 shadow-sm ring-1 ring-emerald-500'
                         : 'border-slate-200 bg-slate-50 text-slate-600 hover:bg-slate-100'
                     }`}
-                    title="緊湊行高 (1.5x)"
+                    title={t('novel.spacing_compact')}
                   >
                     <div className="flex flex-col gap-0.5 items-center w-4">
                       <div className="w-full h-0.5 bg-current rounded-full" />
@@ -283,12 +300,12 @@ export default function NovelReaderControlPanel({
                   <button
                     type="button"
                     onClick={() => onUpdateSettings({ lineHeight: 'normal' })}
-                    className={`flex-1 py-1.5 px-3 rounded-2xl border text-xs font-bold flex items-center justify-center transition-all cursor-pointer ${
+                    className={`flex-1 py-1.5 px-2 rounded-2xl border text-xs font-bold flex items-center justify-center transition-all cursor-pointer ${
                       settings.lineHeight === 'normal'
                         ? 'border-emerald-600 bg-emerald-50 text-emerald-800 shadow-sm ring-1 ring-emerald-500'
                         : 'border-slate-200 bg-slate-50 text-slate-600 hover:bg-slate-100'
                     }`}
-                    title="標準行高 (2.0x)"
+                    title={t('novel.spacing_normal')}
                   >
                     <div className="flex flex-col gap-1 items-center w-4">
                       <div className="w-full h-0.5 bg-current rounded-full" />
@@ -301,12 +318,12 @@ export default function NovelReaderControlPanel({
                   <button
                     type="button"
                     onClick={() => onUpdateSettings({ lineHeight: 'spacious' })}
-                    className={`flex-1 py-1.5 px-3 rounded-2xl border text-xs font-bold flex items-center justify-center transition-all cursor-pointer ${
+                    className={`flex-1 py-1.5 px-2 rounded-2xl border text-xs font-bold flex items-center justify-center transition-all cursor-pointer ${
                       settings.lineHeight === 'spacious'
                         ? 'border-emerald-600 bg-emerald-50 text-emerald-800 shadow-sm ring-1 ring-emerald-500'
                         : 'border-slate-200 bg-slate-50 text-slate-600 hover:bg-slate-100'
                     }`}
-                    title="寬鬆行高 (2.7x)"
+                    title={t('novel.spacing_spacious')}
                   >
                     <div className="flex flex-col gap-1.5 items-center w-4">
                       <div className="w-full h-0.5 bg-current rounded-full" />
@@ -316,25 +333,26 @@ export default function NovelReaderControlPanel({
                 </div>
               </div>
 
-              {/* 第四行：六款護眼主題背景配色 (Theme Backgrounds) */}
+              {/* 第四行：六款護眼主題背景配色 (Theme Backgrounds - 均勻填滿) */}
               <div className="flex items-center justify-between gap-3 pt-0.5">
-                <span className="text-xs font-bold text-slate-500 shrink-0">背景</span>
+                <span className="text-xs font-bold text-slate-500 shrink-0 min-w-[32px] sm:min-w-[40px]">{t('novel.background')}</span>
                 
-                <div className="flex items-center gap-2.5 flex-1 justify-between max-w-[280px]">
+                <div className="flex items-center justify-between flex-1 gap-1.5 min-w-0">
                   {Object.values(NOVEL_THEMES).map((theme) => {
                     const isSelected = settings.theme === theme.id;
+                    const themeName = language === 'zh' ? theme.name_zh : theme.name_en;
                     return (
                       <button
                         key={theme.id}
                         type="button"
                         onClick={() => onUpdateSettings({ theme: theme.id as any })}
-                        className={`relative w-8 h-8 sm:w-9 sm:h-9 rounded-xl transition-all shadow-sm border flex items-center justify-center cursor-pointer ${
+                        className={`relative flex-1 aspect-square max-w-[40px] rounded-xl transition-all shadow-sm border flex items-center justify-center cursor-pointer ${
                           isSelected
                             ? 'ring-2 ring-emerald-600 ring-offset-2 scale-105 shadow-md border-emerald-600'
                             : 'border-slate-200 hover:scale-105'
                         }`}
                         style={{ backgroundColor: theme.previewBg }}
-                        title={theme.name}
+                        title={themeName}
                       >
                         {isSelected && (
                           <Check className={`w-3.5 h-3.5 stroke-[3] ${theme.id === 'dark' ? 'text-white' : 'text-emerald-800'}`} />

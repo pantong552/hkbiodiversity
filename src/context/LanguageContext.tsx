@@ -233,7 +233,25 @@ const translations: Record<Language, Record<string, string>> = {
     'journal.category_name_eng': '分類英文名稱',
     'journal.category_slug': 'Slug 標籤',
     'journal.add_category': '新增分類',
-    'journal.related_articles': '延伸閱讀'
+    'journal.related_articles': '延伸閱讀',
+    // Novel Reader Control Panel Keys
+    'novel.settings_title': '小說排版設定',
+    'novel.brightness': '亮度',
+    'novel.auto_read': '自動閱讀',
+    'novel.pause': '暫停',
+    'novel.font_size': '字號',
+    'novel.reset_default': '預設',
+    'novel.spacing': '間距',
+    'novel.spacing_compact': '緊湊行高 (1.5x)',
+    'novel.spacing_normal': '標準行高 (2.0x)',
+    'novel.spacing_spacious': '寬鬆行高 (2.7x)',
+    'novel.background': '背景',
+    'novel.theme_sepia': '羊皮紙',
+    'novel.theme_green': '豆沙綠',
+    'novel.theme_blue': '靜謐藍',
+    'novel.theme_pink': '淡櫻粉',
+    'novel.theme_white': '純淨白',
+    'novel.theme_dark': '深邃灰'
   },
   en: {
     'nav.home': 'Home',
@@ -457,7 +475,25 @@ const translations: Record<Language, Record<string, string>> = {
     'journal.category_name_eng': 'Category English Name',
     'journal.category_slug': 'Slug Identifier',
     'journal.add_category': 'Add Category',
-    'journal.related_articles': 'Related Articles'
+    'journal.related_articles': 'Related Articles',
+    // Novel Reader Control Panel Keys
+    'novel.settings_title': 'Typography Settings',
+    'novel.brightness': 'Brightness',
+    'novel.auto_read': 'Auto Read',
+    'novel.pause': 'Pause',
+    'novel.font_size': 'Size',
+    'novel.reset_default': 'Default',
+    'novel.spacing': 'Spacing',
+    'novel.spacing_compact': 'Compact Line Height (1.5x)',
+    'novel.spacing_normal': 'Normal Line Height (2.0x)',
+    'novel.spacing_spacious': 'Spacious Line Height (2.7x)',
+    'novel.background': 'Theme',
+    'novel.theme_sepia': 'Sepia',
+    'novel.theme_green': 'Sage Green',
+    'novel.theme_blue': 'Serene Blue',
+    'novel.theme_pink': 'Blush Pink',
+    'novel.theme_white': 'Pure White',
+    'novel.theme_dark': 'Night Gray'
   }
 };
 
