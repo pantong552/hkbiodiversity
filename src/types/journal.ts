@@ -32,6 +32,9 @@ export interface EcoArticle {
   article_language: ArticleLanguage;
   title_chi: string;
   title_eng: string;
+  chapter_number?: number | null;
+  chapter_title_chi?: string | null;
+  chapter_title_eng?: string | null;
   summary_chi?: string | null;
   summary_eng?: string | null;
   content_chi: string;

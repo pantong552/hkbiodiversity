@@ -51,6 +51,18 @@ BEGIN
   IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='eco_articles' AND column_name='last_edited_by_name') THEN
     ALTER TABLE eco_articles ADD COLUMN last_edited_by_name TEXT;
   END IF;
+
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='eco_articles' AND column_name='chapter_number') THEN
+    ALTER TABLE eco_articles ADD COLUMN chapter_number INT;
+  END IF;
+
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='eco_articles' AND column_name='chapter_title_chi') THEN
+    ALTER TABLE eco_articles ADD COLUMN chapter_title_chi TEXT;
+  END IF;
+
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='eco_articles' AND column_name='chapter_title_eng') THEN
+    ALTER TABLE eco_articles ADD COLUMN chapter_title_eng TEXT;
+  END IF;
 END $$;
 
 -- 預設分類預填數據

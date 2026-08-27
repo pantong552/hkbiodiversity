@@ -98,6 +98,9 @@ export default function JournalEditorModal({
 
   const [titleChi, setTitleChi] = useState('');
   const [titleEng, setTitleEng] = useState('');
+  const [chapterNumber, setChapterNumber] = useState<string>('');
+  const [chapterTitleChi, setChapterTitleChi] = useState('');
+  const [chapterTitleEng, setChapterTitleEng] = useState('');
   const [categoryId, setCategoryId] = useState('');
   const [summaryChi, setSummaryChi] = useState('');
   const [summaryEng, setSummaryEng] = useState('');
@@ -201,6 +204,9 @@ export default function JournalEditorModal({
       setActiveTab(lang === 'en' ? 'en' : 'zh');
       setTitleChi(articleToEdit.title_chi || '');
       setTitleEng(articleToEdit.title_eng || '');
+      setChapterNumber(articleToEdit.chapter_number !== undefined && articleToEdit.chapter_number !== null ? String(articleToEdit.chapter_number) : '');
+      setChapterTitleChi(articleToEdit.chapter_title_chi || '');
+      setChapterTitleEng(articleToEdit.chapter_title_eng || '');
       setCategoryId(articleToEdit.category_id || (categories[0]?.id || ''));
       setSummaryChi(articleToEdit.summary_chi || '');
       setSummaryEng(articleToEdit.summary_eng || '');
@@ -223,6 +229,9 @@ export default function JournalEditorModal({
       setActiveTab('zh');
       setTitleChi('');
       setTitleEng('');
+      setChapterNumber('');
+      setChapterTitleChi('');
+      setChapterTitleEng('');
       setCategoryId(categories[0]?.id || '');
       setSummaryChi('');
       setSummaryEng('');
@@ -319,6 +328,9 @@ export default function JournalEditorModal({
         article_language: articleLanguage,
         title_chi: articleLanguage === 'en' ? '' : titleChi.trim(),
         title_eng: articleLanguage === 'zh' ? '' : titleEng.trim(),
+        chapter_number: isNovelCategory && chapterNumber.trim() ? parseInt(chapterNumber.trim(), 10) : null,
+        chapter_title_chi: isNovelCategory && articleLanguage !== 'en' ? (chapterTitleChi.trim() || null) : null,
+        chapter_title_eng: isNovelCategory && articleLanguage !== 'zh' ? (chapterTitleEng.trim() || null) : null,
         summary_chi: articleLanguage === 'en' ? null : (summaryChi.trim() || null),
         summary_eng: articleLanguage === 'zh' ? null : (summaryEng.trim() || null),
         content_chi: articleLanguage === 'en' ? '' : contentChi,
@@ -576,10 +588,44 @@ export default function JournalEditorModal({
                     suppressHydrationWarning
                     value={titleChi}
                     onChange={(e) => setTitleChi(e.target.value)}
-                    placeholder="例如：米埔濕地水鳥遷徙與全球保育挑戰"
+                    placeholder="例如：森人大冒險（1）仲夏之聲"
                     className="w-full px-4 py-3 rounded-2xl border border-slate-200 focus:border-emerald-500 outline-none text-slate-800 font-bold bg-slate-50/50"
                   />
                 </div>
+
+                {/* 生態文創小說專屬：章節編號與章節標題 (中文) */}
+                {isNovelCategory && (
+                  <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/20 grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <div>
+                      <label className="block text-xs font-bold uppercase tracking-wider text-amber-900 mb-1.5 flex items-center gap-1">
+                        <BookOpen className="w-3.5 h-3.5 text-amber-700" />
+                        {language === 'zh' ? '章節編號 Chapter Number' : 'Chapter Number'}
+                      </label>
+                      <input
+                        type="number"
+                        min="1"
+                        step="1"
+                        value={chapterNumber}
+                        onChange={(e) => setChapterNumber(e.target.value)}
+                        placeholder="例如：1"
+                        className="w-full px-3.5 py-2.5 rounded-xl border border-amber-300/80 focus:border-amber-600 outline-none text-slate-800 font-bold bg-white text-sm"
+                      />
+                    </div>
+                    <div className="sm:col-span-2">
+                      <label className="block text-xs font-bold uppercase tracking-wider text-amber-900 mb-1.5">
+                        {language === 'zh' ? '章節標題 Chapter Title (Chinese)' : 'Chapter Title (Chinese)'}
+                      </label>
+                      <input
+                        type="text"
+                        value={chapterTitleChi}
+                        onChange={(e) => setChapterTitleChi(e.target.value)}
+                        placeholder="例如：第1章 仲夏之聲"
+                        className="w-full px-3.5 py-2.5 rounded-xl border border-amber-300/80 focus:border-amber-600 outline-none text-slate-800 font-bold bg-white text-sm"
+                      />
+                    </div>
+                  </div>
+                )}
+
                 <div>
                   <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-2">
                     {language === 'zh' ? '中文摘要 Summary (Chinese)' : 'Summary (Chinese)'}
@@ -613,10 +659,44 @@ export default function JournalEditorModal({
                     suppressHydrationWarning
                     value={titleEng}
                     onChange={(e) => setTitleEng(e.target.value)}
-                    placeholder="e.g. Migratory Waterbirds and Conservation at Mai Po"
+                    placeholder="e.g. Forest Adventurers (1) Voice of Midsummer"
                     className="w-full px-4 py-3 rounded-2xl border border-slate-200 focus:border-emerald-500 outline-none text-slate-800 font-bold bg-slate-50/50"
                   />
                 </div>
+
+                {/* 生態文創小說專屬：章節編號與章節標題 (英文) */}
+                {isNovelCategory && (
+                  <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/20 grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <div>
+                      <label className="block text-xs font-bold uppercase tracking-wider text-amber-900 mb-1.5 flex items-center gap-1">
+                        <BookOpen className="w-3.5 h-3.5 text-amber-700" />
+                        {language === 'zh' ? '章節編號 Chapter Number' : 'Chapter Number'}
+                      </label>
+                      <input
+                        type="number"
+                        min="1"
+                        step="1"
+                        value={chapterNumber}
+                        onChange={(e) => setChapterNumber(e.target.value)}
+                        placeholder="e.g. 1"
+                        className="w-full px-3.5 py-2.5 rounded-xl border border-amber-300/80 focus:border-amber-600 outline-none text-slate-800 font-bold bg-white text-sm"
+                      />
+                    </div>
+                    <div className="sm:col-span-2">
+                      <label className="block text-xs font-bold uppercase tracking-wider text-amber-900 mb-1.5">
+                        {language === 'zh' ? '英文章節標題 Chapter Title (English)' : 'Chapter Title (English)'}
+                      </label>
+                      <input
+                        type="text"
+                        value={chapterTitleEng}
+                        onChange={(e) => setChapterTitleEng(e.target.value)}
+                        placeholder="e.g. Chapter 1: Voice of Midsummer"
+                        className="w-full px-3.5 py-2.5 rounded-xl border border-amber-300/80 focus:border-amber-600 outline-none text-slate-800 font-bold bg-white text-sm"
+                      />
+                    </div>
+                  </div>
+                )}
+
                 <div>
                   <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-2">
                     {language === 'zh' ? '英文摘要 Summary (English)' : 'Summary (English)'}
@@ -698,8 +778,12 @@ export default function JournalEditorModal({
                 >
                   {/* 手機模擬器框頂部裝飾 */}
                   <div className="w-full max-w-md flex items-center justify-between text-[11px] opacity-70 pb-3 mb-4 border-b border-current/15 font-sans">
-                    <span className="font-semibold">{activeTab === 'zh' ? (titleChi || '第1章 生態篇章') : (titleEng || 'Chapter 1')}</span>
-                    <div className="flex items-center gap-2">
+                    <span className="font-semibold truncate max-w-[280px]">
+                      {activeTab === 'zh'
+                        ? (chapterTitleChi || (chapterNumber ? `第${chapterNumber}章 ${titleChi || ''}` : (titleChi || '第1章 生態篇章')))
+                        : (chapterTitleEng || (chapterNumber ? `Chapter ${chapterNumber}: ${titleEng || ''}` : (titleEng || 'Chapter 1')))}
+                    </span>
+                    <div className="flex items-center gap-2 shrink-0">
                       <span className="text-amber-600 dark:text-amber-400 font-bold">+12 金幣</span>
                       <div className="w-3.5 h-3.5 rounded-full bg-amber-500 text-white flex items-center justify-center text-[9px] font-bold">¥</div>
                     </div>
@@ -733,9 +817,9 @@ export default function JournalEditorModal({
 
                         // 將動態行高與文字顏色直接套用到所有 <p> 標籤
                         const transformed = cleaned
-                          .replace(/<p([^>]*)>/gi, `<p style="font-size: ${currentFs} !important; line-height: ${currentLh} !important; margin-bottom: ${currentMb} !important; color: ${currentColor} !important; text-indent: 2em !important;"$1>`)
+                          .replace(/<p([^>]*)>/gi, `<p style="font-size: ${currentFs} !important; line-height: ${currentLh} !important; margin-bottom: ${currentMb} !important; color: ${currentColor} !important; text-indent: 0 !important;"$1>`)
                           .replace(/<span([^>]*)>/gi, `<span style="font-size: ${currentFs} !important; line-height: ${currentLh} !important; color: ${currentColor} !important;"$1>`)
-                          .replace(/<div([^>]*)>/gi, `<div style="font-size: ${currentFs} !important; line-height: ${currentLh} !important; margin-bottom: ${currentMb} !important; color: ${currentColor} !important;"$1>`);
+                          .replace(/<div([^>]*)>/gi, `<div style="font-size: ${currentFs} !important; line-height: ${currentLh} !important; margin-bottom: ${currentMb} !important; color: ${currentColor} !important; text-indent: 0 !important;"$1>`);
 
                         return transformed;
                       })()
@@ -1233,7 +1317,7 @@ export default function JournalEditorModal({
         #novel-mobile-reader-content p,
         #novel-mobile-reader-content div {
           margin-bottom: ${novelSettings.lineHeight === 'compact' ? '0.75rem' : (novelSettings.lineHeight === 'spacious' ? '1.85rem' : '1.25rem')} !important;
-          text-indent: 2em !important;
+          text-indent: 0 !important;
         }
       `}</style>
     </AnimatePresence>

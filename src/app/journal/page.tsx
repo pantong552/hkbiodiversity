@@ -40,7 +40,10 @@ import {
   ChevronRight,
   Filter,
   ShieldCheck,
-  AlertTriangle
+  AlertTriangle,
+  List,
+  ChevronDown,
+  X
 } from 'lucide-react';
 
 const ITEMS_PER_PAGE = 8;
@@ -225,17 +228,62 @@ export default function JournalPage() {
     return filteredArticles.slice(start, start + ITEMS_PER_PAGE);
   }, [filteredArticles, currentPage]);
 
-  // Helper methods to get language-aware text based on article_language field
+  // 取得當前閱讀小說文章的「同一標題（作品）」的所有章節清單，並依章節編號升序排序
+  const sameTitleNovelChapters = useMemo(() => {
+    if (!selectedArticle || !isSelectedArticleNovel) return [];
+    
+    // 取得當前文章的乾淨主標題
+    const currentBaseTitle = (selectedArticle.title_chi || selectedArticle.title_eng || '').trim().toLowerCase();
+    if (!currentBaseTitle) return [];
+
+    return articles
+      .filter((art) => {
+        // 必須可公開存取 (已發佈或自身建立/管理員)
+        if (!isAdmin && art.status !== 'published' && art.author_id !== user?.id) return false;
+        
+        // 必須是相同作品主標題
+        const artBaseTitle = (art.title_chi || art.title_eng || '').trim().toLowerCase();
+        return artBaseTitle === currentBaseTitle;
+      })
+      .sort((a, b) => {
+        const numA = a.chapter_number !== undefined && a.chapter_number !== null ? Number(a.chapter_number) : 999999;
+        const numB = b.chapter_number !== undefined && b.chapter_number !== null ? Number(b.chapter_number) : 999999;
+        if (numA !== numB) return numA - numB;
+        return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
+      });
+  }, [articles, selectedArticle, isSelectedArticleNovel, isAdmin, user]);
+
+  // 當前章節在同系列作品中的索引以及上一章、下一章
+  const currentNovelChapterIndex = useMemo(() => {
+    if (!selectedArticle || sameTitleNovelChapters.length === 0) return -1;
+    return sameTitleNovelChapters.findIndex((c) => c.id === selectedArticle.id);
+  }, [selectedArticle, sameTitleNovelChapters]);
+
+  const prevNovelChapter = currentNovelChapterIndex > 0 ? sameTitleNovelChapters[currentNovelChapterIndex - 1] : null;
+  const nextNovelChapter = currentNovelChapterIndex >= 0 && currentNovelChapterIndex < sameTitleNovelChapters.length - 1 
+    ? sameTitleNovelChapters[currentNovelChapterIndex + 1] 
+    : null;
+
+  const [isChapterDrawerOpen, setIsChapterDrawerOpen] = useState(false);
+
   const getArticleTitle = (art: EcoArticle) => {
     if (art.article_language === 'zh') return art.title_chi || art.title_eng;
     if (art.article_language === 'en') return art.title_eng || art.title_chi;
     return language === 'zh' ? (art.title_chi || art.title_eng) : (art.title_eng || art.title_chi);
   };
 
+  const getArticleChapterTitle = (art: EcoArticle) => {
+    if (art.article_language === 'zh') return art.chapter_title_chi || art.chapter_title_eng;
+    if (art.article_language === 'en') return art.chapter_title_eng || art.chapter_title_chi;
+    return language === 'zh' ? (art.chapter_title_chi || art.chapter_title_eng) : (art.chapter_title_eng || art.chapter_title_chi);
+  };
+
   const getArticleSummary = (art: EcoArticle) => {
-    if (art.article_language === 'zh') return art.summary_chi || art.summary_eng || '';
-    if (art.article_language === 'en') return art.summary_eng || art.summary_chi || '';
-    return language === 'zh' ? (art.summary_chi || art.summary_eng || '') : (art.summary_eng || art.summary_chi || '');
+    let raw = '';
+    if (art.article_language === 'zh') raw = art.summary_chi || art.summary_eng || '';
+    else if (art.article_language === 'en') raw = art.summary_eng || art.summary_chi || '';
+    else raw = language === 'zh' ? (art.summary_chi || art.summary_eng || '') : (art.summary_eng || art.summary_chi || '');
+    return (raw || '').replace(/\\n/g, '\n');
   };
 
   const getArticleContent = (art: EcoArticle) => {
@@ -454,26 +502,55 @@ export default function JournalPage() {
               </div>
             )}
 
-            {/* Category & Status Badge */}
-            <div className="flex flex-wrap items-center gap-3 mb-4">
-              {selectedArticle.eco_categories && (
-                <span className="px-3.5 py-1 rounded-full bg-emerald-100/80 text-emerald-800 font-semibold text-xs border border-emerald-200">
-                  {language === 'zh'
-                    ? selectedArticle.eco_categories.name_chi
-                    : selectedArticle.eco_categories.name_eng}
-                </span>
-              )}
-              {selectedArticle.status !== 'published' && (
-                <span className="px-3 py-1 rounded-full bg-amber-100 text-amber-800 text-xs font-bold border border-amber-200">
-                  {t(`journal.status_${selectedArticle.status}`)}
-                </span>
-              )}
-            </div>
+            {/* Compact Integrated Title Header with Chapter Switcher */}
+            <div className="mb-6 space-y-2.5">
+              {/* Category & Status & Chapter TOC Buttons */}
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div className="flex flex-wrap items-center gap-2">
+                  {selectedArticle.eco_categories && (
+                    <span className="px-3 py-0.5 rounded-full bg-emerald-100/90 text-emerald-900 font-bold text-xs border border-emerald-200">
+                      {language === 'zh'
+                        ? selectedArticle.eco_categories.name_chi
+                        : selectedArticle.eco_categories.name_eng}
+                    </span>
+                  )}
+                  {selectedArticle.chapter_number !== undefined && selectedArticle.chapter_number !== null && (
+                    <span className="px-3 py-0.5 rounded-full bg-amber-100/90 text-amber-950 font-bold text-xs border border-amber-300 flex items-center gap-1">
+                      <BookOpen className="w-3.5 h-3.5 text-amber-700" />
+                      {language === 'zh' ? `第 ${selectedArticle.chapter_number} 章` : `Chapter ${selectedArticle.chapter_number}`}
+                    </span>
+                  )}
+                  {selectedArticle.status !== 'published' && (
+                    <span className="px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-800 text-xs font-bold border border-amber-200">
+                      {t(`journal.status_${selectedArticle.status}`)}
+                    </span>
+                  )}
+                </div>
 
-            {/* Title */}
-            <h1 className="text-3xl sm:text-4xl lg:text-5xl font-black font-serif text-slate-900 tracking-tight leading-tight mb-6">
-              {getArticleTitle(selectedArticle)}
-            </h1>
+                {/* 生態文創專屬：作品章節目錄快速展開按鈕 */}
+                {isSelectedArticleNovel && sameTitleNovelChapters.length > 1 && (
+                  <button
+                    type="button"
+                    onClick={() => setIsChapterDrawerOpen(true)}
+                    className="px-3 py-1 rounded-xl bg-amber-50 hover:bg-amber-100/80 text-amber-900 border border-amber-200 text-xs font-bold transition-all flex items-center gap-1.5 shadow-sm active:scale-95 cursor-pointer"
+                  >
+                    <List className="w-3.5 h-3.5 text-amber-700" />
+                    <span>{t('journal.all_chapters')} ({sameTitleNovelChapters.length})</span>
+                  </button>
+                )}
+              </div>
+
+              {/* Title & Chapter Title (緊湊自然流暢合併) */}
+              <h1 className="text-2xl sm:text-3xl lg:text-4xl font-black font-serif text-slate-900 tracking-tight leading-snug flex flex-wrap items-baseline gap-x-3 gap-y-1">
+                <span>{getArticleTitle(selectedArticle)}</span>
+                {getArticleChapterTitle(selectedArticle) && (
+                  <span className="text-lg sm:text-xl font-bold font-serif text-amber-800 flex items-baseline gap-1.5">
+                    <span className="text-amber-500 opacity-60 font-normal">·</span>
+                    <span>{getArticleChapterTitle(selectedArticle)}</span>
+                  </span>
+                )}
+              </h1>
+            </div>
 
             {/* Article Meta Bar (Author, Date, Reading Time, Views) */}
             <div className="flex flex-wrap items-center justify-between gap-4 py-4 border-y border-slate-200 mb-8 text-xs sm:text-sm text-slate-600">
@@ -542,12 +619,29 @@ export default function JournalPage() {
 
             {/* Cover Image */}
             {selectedArticle.cover_image && (
-              <div className="relative rounded-3xl overflow-hidden mb-10 shadow-xl border border-slate-200 max-h-[450px]">
+              <div className="relative rounded-3xl overflow-hidden mb-8 shadow-xl border border-slate-200 max-h-[450px]">
                 <img
                   src={selectedArticle.cover_image}
                   alt="Article Cover"
                   className="w-full h-full object-cover"
                 />
+              </div>
+            )}
+
+            {/* Article Summary Lead Paragraph (摘要區塊 - 保留原有分行分段) */}
+            {getArticleSummary(selectedArticle) && (
+              <div className={`mb-8 p-5 sm:p-6 rounded-3xl border transition-all ${
+                isSelectedArticleNovel
+                  ? 'bg-amber-900/5 border-amber-900/15 text-slate-800'
+                  : 'bg-emerald-50/50 border-emerald-200/80 text-slate-700'
+              }`}>
+                <div className="flex items-center gap-2 mb-3 font-bold text-xs tracking-wider uppercase opacity-70">
+                  <span className={`w-2 h-2 rounded-full ${isSelectedArticleNovel ? 'bg-amber-600' : 'bg-emerald-600'}`} />
+                  <span>{language === 'zh' ? '文章摘要' : 'Summary'}</span>
+                </div>
+                <div className="text-base sm:text-lg leading-relaxed font-serif italic opacity-90 whitespace-pre-line space-y-3">
+                  {getArticleSummary(selectedArticle)}
+                </div>
               </div>
             )}
 
@@ -557,7 +651,7 @@ export default function JournalPage() {
               key={`novel-reader-${selectedArticle.id}-${novelSettings.theme}-${novelSettings.lineHeight}-${novelSettings.fontSize}`}
               className={`rounded-3xl p-4 sm:p-8 transition-all duration-300 ${
                 isSelectedArticleNovel
-                  ? 'border border-current/10 shadow-sm font-serif [&_p]:indent-8'
+                  ? 'border border-current/10 shadow-sm font-serif'
                   : 'text-slate-800'
               } text-base sm:text-lg leading-relaxed mb-12`}
               style={
@@ -583,7 +677,7 @@ export default function JournalPage() {
                     font-size: ${novelSettings.fontSize}px !important;
                     line-height: ${novelSettings.lineHeight === 'compact' ? 1.5 : (novelSettings.lineHeight === 'spacious' ? 2.7 : 2.0)} !important;
                     margin-bottom: ${novelSettings.lineHeight === 'compact' ? '0.75rem' : (novelSettings.lineHeight === 'spacious' ? '1.85rem' : '1.25rem')} !important;
-                    text-indent: 2em !important;
+                    text-indent: 0 !important;
                     color: ${NOVEL_THEMES[novelSettings.theme]?.color || '#3E2723'} !important;
                   }
                 `}</style>
@@ -625,7 +719,7 @@ export default function JournalPage() {
                               lineHeight: novelSettings.lineHeight === 'compact' ? 1.5 : (novelSettings.lineHeight === 'spacious' ? 2.7 : 2.0),
                               color: NOVEL_THEMES[novelSettings.theme]?.color,
                               marginBottom: novelSettings.lineHeight === 'compact' ? '0.75rem' : (novelSettings.lineHeight === 'spacious' ? '1.85rem' : '1.25rem'),
-                              textIndent: '2em',
+                              textIndent: '0',
                             }
                           : undefined
                       }
@@ -719,6 +813,62 @@ export default function JournalPage() {
               </ReactMarkdown>
             </div>
 
+            {/* 生態文創專屬：正文末尾「上一章 / 下一章」快捷翻頁導航 */}
+            {isSelectedArticleNovel && sameTitleNovelChapters.length > 1 && (
+              <div className="my-8 p-4 sm:p-5 rounded-3xl bg-amber-500/10 border border-amber-500/20 flex flex-col sm:flex-row items-center justify-between gap-3">
+                {prevNovelChapter ? (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSelectedArticle(prevNovelChapter);
+                      window.scrollTo({ top: 0, behavior: 'smooth' });
+                    }}
+                    className="w-full sm:w-auto px-4 py-2.5 rounded-2xl bg-white hover:bg-amber-50 text-amber-950 border border-amber-200 text-xs font-bold transition-all flex items-center justify-center sm:justify-start gap-2 shadow-sm cursor-pointer"
+                  >
+                    <ChevronDown className="w-4 h-4 rotate-90 text-amber-700" />
+                    <div className="text-left">
+                      <div className="text-[10px] text-amber-700 uppercase font-semibold">{t('journal.prev_chapter')}</div>
+                      <div className="truncate max-w-[200px]">
+                        {language === 'zh' ? `第${prevNovelChapter.chapter_number || ''}章` : `Ch.${prevNovelChapter.chapter_number || ''}`} {getArticleChapterTitle(prevNovelChapter) || ''}
+                      </div>
+                    </div>
+                  </button>
+                ) : (
+                  <div className="hidden sm:block" />
+                )}
+
+                <button
+                  type="button"
+                  onClick={() => setIsChapterDrawerOpen(true)}
+                  className="px-4 py-2 rounded-xl bg-amber-900/10 hover:bg-amber-900/15 text-amber-950 text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer"
+                >
+                  <List className="w-3.5 h-3.5 text-amber-700" />
+                  <span>{t('journal.all_chapters')} ({currentNovelChapterIndex + 1}/{sameTitleNovelChapters.length})</span>
+                </button>
+
+                {nextNovelChapter ? (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSelectedArticle(nextNovelChapter);
+                      window.scrollTo({ top: 0, behavior: 'smooth' });
+                    }}
+                    className="w-full sm:w-auto px-4 py-2.5 rounded-2xl bg-amber-600 hover:bg-amber-700 text-white border border-amber-600 text-xs font-bold transition-all flex items-center justify-center sm:justify-end gap-2 shadow-sm shadow-amber-600/20 cursor-pointer"
+                  >
+                    <div className="text-right">
+                      <div className="text-[10px] text-amber-100 uppercase font-semibold">{t('journal.next_chapter')}</div>
+                      <div className="truncate max-w-[200px]">
+                        {language === 'zh' ? `第${nextNovelChapter.chapter_number || ''}章` : `Ch.${nextNovelChapter.chapter_number || ''}`} {getArticleChapterTitle(nextNovelChapter) || ''}
+                      </div>
+                    </div>
+                    <ChevronDown className="w-4 h-4 -rotate-90" />
+                  </button>
+                ) : (
+                  <div className="hidden sm:block" />
+                )}
+              </div>
+            )}
+
             {/* 生態文創專屬：閱讀控制面板 (Control Panel) */}
             {isSelectedArticleNovel && (
               <NovelReaderControlPanel
@@ -728,6 +878,99 @@ export default function JournalPage() {
                 onUpdateSettings={handleUpdateNovelSettings}
               />
             )}
+
+            {/* 生態文創專屬：作品完整章節目錄抽屜 (Mobile / Desktop 優化) */}
+            <AnimatePresence>
+              {isChapterDrawerOpen && isSelectedArticleNovel && (
+                <>
+                  <motion.div
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    onClick={() => setIsChapterDrawerOpen(false)}
+                    className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[110]"
+                  />
+                  <motion.div
+                    initial={{ y: '100%', opacity: 0 }}
+                    animate={{ y: 0, opacity: 1 }}
+                    exit={{ y: '100%', opacity: 0 }}
+                    transition={{ type: 'spring', damping: 25, stiffness: 260 }}
+                    className="fixed bottom-0 left-0 right-0 z-[115] max-w-lg mx-auto bg-white rounded-t-[2.5rem] shadow-2xl border-t border-slate-200 p-6 max-h-[80vh] flex flex-col text-slate-800 select-none"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    {/* Drawer Header */}
+                    <div className="flex items-center justify-between pb-4 border-b border-slate-100">
+                      <div className="flex items-center gap-2.5">
+                        <div className="p-2 rounded-2xl bg-amber-100 text-amber-900">
+                          <BookOpen className="w-5 h-5" />
+                        </div>
+                        <div>
+                          <h3 className="font-bold font-serif text-slate-900 text-base">
+                            {getArticleTitle(selectedArticle)}
+                          </h3>
+                          <p className="text-xs text-slate-500 font-sans">
+                            {t('journal.all_chapters')} · {language === 'zh' ? `共 ${sameTitleNovelChapters.length} 章` : `Total ${sameTitleNovelChapters.length} Chapters`}
+                          </p>
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setIsChapterDrawerOpen(false)}
+                        className="p-2 rounded-full hover:bg-slate-100 text-slate-400 hover:text-slate-700 transition-colors"
+                      >
+                        <X className="w-5 h-5" />
+                      </button>
+                    </div>
+
+                    {/* Chapter List Scroll Area */}
+                    <div className="flex-1 overflow-y-auto py-3 space-y-2 divide-y divide-slate-50">
+                      {sameTitleNovelChapters.map((chap, idx) => {
+                        const isCurrent = chap.id === selectedArticle.id;
+                        const chapNum = chap.chapter_number !== undefined && chap.chapter_number !== null ? chap.chapter_number : idx + 1;
+                        const chapSub = getArticleChapterTitle(chap);
+                        return (
+                          <button
+                            key={chap.id}
+                            type="button"
+                            onClick={() => {
+                              setSelectedArticle(chap);
+                              setIsChapterDrawerOpen(false);
+                              window.scrollTo({ top: 0, behavior: 'smooth' });
+                            }}
+                            className={`w-full p-3.5 rounded-2xl text-left transition-all flex items-center justify-between gap-3 cursor-pointer ${
+                              isCurrent
+                                ? 'bg-amber-500/15 text-amber-950 font-bold border border-amber-300'
+                                : 'hover:bg-slate-50 text-slate-700'
+                            }`}
+                          >
+                            <div className="flex items-center gap-3 min-w-0">
+                              <span className={`w-8 h-8 rounded-xl flex items-center justify-center text-xs font-mono shrink-0 ${
+                                isCurrent ? 'bg-amber-600 text-white font-bold' : 'bg-slate-100 text-slate-600'
+                              }`}>
+                                {chapNum}
+                              </span>
+                              <div className="min-w-0">
+                                <div className="text-sm truncate">
+                                  {chapSub || (language === 'zh' ? `第 ${chapNum} 章` : `Chapter ${chapNum}`)}
+                                </div>
+                                <div className="text-[11px] text-slate-400">
+                                  {new Date(chap.published_at || chap.created_at).toLocaleDateString()}
+                                </div>
+                              </div>
+                            </div>
+                            {isCurrent && (
+                              <span className="px-2 py-0.5 rounded-md bg-amber-600 text-white text-[10px] font-bold shrink-0">
+                                {language === 'zh' ? '正在閱讀' : 'Reading'}
+                              </span>
+                            )}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </motion.div>
+                </>
+              )}
+            </AnimatePresence>
 
             {/* Tags Footer */}
             {selectedArticle.tags && selectedArticle.tags.length > 0 && (
@@ -978,18 +1221,30 @@ export default function JournalPage() {
                     {/* Card Body */}
                     <div className="p-6 flex-1 flex flex-col justify-between">
                       <div>
-                        {/* Status Tag for Admin or Author */}
-                        {art.status !== 'published' && (
-                          <div className="mb-2">
+                        {/* Status Tag & Chapter Badge */}
+                        <div className="flex flex-wrap items-center gap-1.5 mb-2">
+                          {art.status !== 'published' && (
                             <span className="px-2.5 py-0.5 rounded-md bg-amber-100 text-amber-800 text-[10px] font-bold">
                               {t(`journal.status_${art.status}`)}
                             </span>
-                          </div>
-                        )}
+                          )}
+                          {art.chapter_number !== undefined && art.chapter_number !== null && (
+                            <span className="px-2 py-0.5 rounded-md bg-amber-50 text-amber-900 text-[10px] font-bold border border-amber-200/80 flex items-center gap-1">
+                              <BookOpen className="w-2.5 h-2.5 text-amber-600" />
+                              {language === 'zh' ? `第 ${art.chapter_number} 章` : `Ch. ${art.chapter_number}`}
+                            </span>
+                          )}
+                        </div>
 
-                        <h3 className="text-xl font-bold font-serif text-slate-900 group-hover:text-emerald-700 transition-colors line-clamp-2 mb-2 leading-snug">
+                        <h3 className="text-xl font-bold font-serif text-slate-900 group-hover:text-emerald-700 transition-colors line-clamp-2 mb-1 leading-snug">
                           {getArticleTitle(art)}
                         </h3>
+
+                        {getArticleChapterTitle(art) && (
+                          <div className="text-xs font-semibold text-amber-800 mb-2 truncate">
+                            {getArticleChapterTitle(art)}
+                          </div>
+                        )}
 
                         <p className="text-xs text-slate-600 line-clamp-3 font-normal leading-relaxed mb-4">
                           {getArticleSummary(art) || getArticleContent(art).substring(0, 120)}
