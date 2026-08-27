@@ -300,46 +300,65 @@ export default function TaxonomyMappingsManager({ mode, onRequestConfirm }: Taxo
       const targetTable = mode === 'fauna' ? 'species' : 'plant_species';
       const dbField = RANK_FIELD_MAP[mode][item.rank];
 
+      const newNameEng = (editValues.name_eng !== undefined ? editValues.name_eng : item.name_eng).trim();
+      const newNameChi = (editValues.name_chi !== undefined ? editValues.name_chi : item.name_chi).trim();
+      const oldNameEng = item.name_eng.trim();
+
+      let savedId = item.id;
+
       // 1. Sync with taxonomy_mappings table
-      if (item.id) {
-        // Update existing mapping
-        const { error } = await supabase
+      if (savedId) {
+        // Update existing mapping by ID
+        const { data: updatedData, error } = await supabase
           .from('taxonomy_mappings')
           .update({
-            name_eng: editValues.name_eng,
-            name_chi: editValues.name_chi
+            name_eng: newNameEng,
+            name_chi: newNameChi
           })
-          .eq('id', item.id);
+          .eq('id', savedId)
+          .select('id')
+          .single();
         if (error) throw error;
-      } else if (editValues.name_chi) {
-        // Create new mapping if Chinese name is provided for a missing one
-        const { error } = await supabase.from('taxonomy_mappings').insert({
-          rank: item.rank,
-          taxa_type: taxaType,
-          name_eng: item.name_eng,
-          name_chi: editValues.name_chi
-        });
+        if (updatedData) savedId = updatedData.id;
+      } else if (newNameChi || newNameEng) {
+        // Create new mapping or upsert if key exists
+        const { data: insertedData, error } = await supabase
+          .from('taxonomy_mappings')
+          .upsert(
+            {
+              rank: item.rank,
+              taxa_type: taxaType,
+              name_eng: newNameEng,
+              name_chi: newNameChi
+            },
+            { onConflict: 'rank,taxa_type,name_eng' }
+          )
+          .select('id')
+          .single();
         if (error) throw error;
+        if (insertedData) savedId = insertedData.id;
       }
 
       // 2. Sync with species/plant_species table if name_eng changed
-      if (dbField && editValues.name_eng && editValues.name_eng.trim() !== item.name_eng.trim()) {
+      if (dbField && newNameEng && newNameEng !== oldNameEng) {
         const { error: syncError } = await supabase
           .from(targetTable)
-          .update({ [dbField]: editValues.name_eng.trim() })
-          .eq(dbField, item.name_eng);
+          .update({ [dbField]: newNameEng })
+          .eq(dbField, oldNameEng);
         if (syncError) throw syncError;
       }
 
       // 3. Update local state immediately for instant feedback
       setData(prev => prev.map(d => {
-        // Find all rows that match the original name and rank to keep them in sync
-        if (d.rank === item.rank && d.name_eng === item.name_eng) {
+        // Find matching row to keep in sync
+        const isTarget = (savedId && d.id === savedId) || (d.rank === item.rank && d.name_eng.trim() === oldNameEng);
+        if (isTarget) {
           return { 
             ...d, 
-            name_eng: editValues.name_eng || d.name_eng, 
-            name_chi: editValues.name_chi || d.name_chi,
-            is_from_mappings: true // Since it now definitely has a mapping (new or updated)
+            id: savedId || d.id,
+            name_eng: newNameEng || d.name_eng, 
+            name_chi: newNameChi,
+            is_from_mappings: true
           };
         }
         return d;
@@ -368,7 +387,10 @@ export default function TaxonomyMappingsManager({ mode, onRequestConfirm }: Taxo
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Escape') {
       handleExitAttempt();
-    } else if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+    } else if (e.key === 'Enter') {
+      // 避免中文輸入法選字 (IME Composing) 時誤觸發儲存
+      if (e.nativeEvent.isComposing) return;
+      e.preventDefault();
       saveEdit();
     }
   };

@@ -428,7 +428,10 @@ export default function SpeciesManager() {
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Escape') {
       handleExitAttempt();
-    } else if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+    } else if (e.key === 'Enter') {
+      // 避免中文輸入法選字 (IME Composing) 時誤觸發儲存
+      if (e.nativeEvent.isComposing) return;
+      e.preventDefault();
       saveEdit();
     }
   };
