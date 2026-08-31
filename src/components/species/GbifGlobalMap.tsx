@@ -11,11 +11,14 @@ interface GbifGlobalMapProps {
   scientificName: string;
 }
 
+const CARTO_API_KEY = process.env.NEXT_PUBLIC_CARTO_API_KEY || '';
+const CARTO_KEY_PARAM = CARTO_API_KEY ? `?key=${CARTO_API_KEY}` : '';
+
 const MAP_SOURCES = {
   osm: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
   esri: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
-  cartoLight: 'https://a.basemaps.cartocdn.com/light_all/{z}/{x}/{y}@2x.png',
-  cartoDark: 'https://a.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}@2x.png',
+  cartoLight: `https://a.basemaps.cartocdn.com/light_all/{z}/{x}/{y}@2x.png${CARTO_KEY_PARAM}`,
+  cartoDark: `https://a.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}@2x.png${CARTO_KEY_PARAM}`,
   googleStreets: 'https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}',
   googleSatellite: 'https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}',
   googleHybrid: 'https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}',
@@ -46,14 +49,14 @@ const BASEMAPS = [
   {
     id: 'carto-light',
     name: { zh: 'Carto 亮色', en: 'Carto Light' },
-    preview: 'https://a.basemaps.cartocdn.com/light_all/13/6694/3574.png',
+    preview: `https://a.basemaps.cartocdn.com/light_all/13/6694/3574.png${CARTO_KEY_PARAM}`,
     attributionText: '© CARTO | MapLibre',
     style: createRasterStyle([{ id: 'carto-light', tiles: [MAP_SOURCES.cartoLight] }])
   },
   {
     id: 'carto-dark',
     name: { zh: 'Carto 深色', en: 'Carto Dark' },
-    preview: 'https://a.basemaps.cartocdn.com/dark_all/13/6694/3574.png',
+    preview: `https://a.basemaps.cartocdn.com/dark_all/13/6694/3574.png${CARTO_KEY_PARAM}`,
     attributionText: '© CARTO | MapLibre',
     style: createRasterStyle([{ id: 'carto-dark', tiles: [MAP_SOURCES.cartoDark] }])
   },
