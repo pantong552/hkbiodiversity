@@ -5,7 +5,27 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Filter, Dog, Leaf, ChevronDown, Check } from 'lucide-react';
 import { useLanguage } from '@/context/LanguageContext';
 
-export type TaxaType = 'fauna' | 'flora';
+export type TaxaType = 'fauna' | 'flora' | 'fungi';
+
+function MushroomIcon({ className }: { className?: string }) {
+  return (
+    <svg 
+      viewBox="0 0 24 24" 
+      fill="none" 
+      stroke="currentColor" 
+      strokeWidth="2" 
+      strokeLinecap="round" 
+      strokeLinejoin="round" 
+      className={className}
+    >
+      <path d="M12 3C6.5 3 2.5 7.5 2.5 12.5c0 .3.2.5.5.5h18c.3 0 .5-.2.5-.5C21.5 7.5 17.5 3 12 3z" />
+      <path d="M10 13v6a2 2 0 0 0 4 0v-6" />
+      <circle cx="7.5" cy="8" r="1" fill="currentColor" />
+      <circle cx="16.5" cy="8" r="1" fill="currentColor" />
+      <circle cx="12" cy="6" r="1" fill="currentColor" />
+    </svg>
+  );
+}
 
 interface TaxaGroupSwitcherProps {
   activeType: TaxaType;
@@ -33,6 +53,13 @@ export default function TaxaGroupSwitcher({ activeType, onChange, compact = fals
       icon: Leaf,
       iconColor: 'text-emerald-600',
       activeBg: 'bg-emerald-50 text-emerald-950 border-emerald-200/80',
+    },
+    { 
+      id: 'fungi' as const, 
+      label: language === 'zh' ? '真菌 (Fungi)' : 'Fungi',
+      icon: MushroomIcon,
+      iconColor: 'text-purple-600',
+      activeBg: 'bg-purple-50 text-purple-950 border-purple-200/80',
     },
   ];
 

@@ -216,7 +216,7 @@ export default function SpeciesTable({
               const floraItem = item as PlantSpecies;
               const itemIUCN = !isPlant ? (faunaItem.iucn || 'NE') : null;
               const iucnConfig = !isPlant ? getIUCNConfig(itemIUCN!) : null;
-              const taxaTypeVal = isPlant ? 'flora' : 'fauna';
+              const taxaTypeVal = isPlant ? 'flora' : (taxaType === 'fungi' ? 'fungi' : 'fauna');
               
               return (
                 <tr 

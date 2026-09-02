@@ -159,7 +159,7 @@ function SpeciesTabPreview({
                 <div className="mt-2 flex items-center gap-1.5 opacity-60">
                    <div className="w-1 h-1 rounded-full bg-slate-400" />
                    <span className="text-[8px] font-bold uppercase tracking-widest">
-                     {language === 'zh' ? getTaxonomyChi('family', species.taxa_group === 'FLORA' ? 'flora' : 'fauna', species.family_eng) : species.family_eng}
+                     {language === 'zh' ? getTaxonomyChi('family', species.taxa_group === 'FLORA' ? 'flora' : species.taxa_group === 'FUNGI' ? 'fungi' : 'fauna', species.family_eng) : species.family_eng}
                    </span>
                 </div>
               )}
@@ -213,7 +213,7 @@ export default function SpeciesFloatingPanel() {
 
   const handleApproveDraft = async (draft: SpeciesDraft, updatedData?: any) => {
     if (!activeSpecies || !profile) return;
-    const targetTable = activeSpecies.taxa_group === 'FLORA' || (activeSpecies as any).category_chi ? 'plant_species' : 'species';
+    const targetTable = activeSpecies.taxa_group === 'FLORA' || (activeSpecies as any).category_chi ? 'plant_species' : activeSpecies.taxa_group === 'FUNGI' || String(activeSpecies.taxa_id || '').startsWith('fungi_') ? 'fungi_species' : 'species';
     const finalData = updatedData || draft.draft_data;
 
     // 1. 更新正式物種表
@@ -249,7 +249,7 @@ export default function SpeciesFloatingPanel() {
 
   const handleRejectDraft = async (draft: SpeciesDraft, reason: string) => {
     if (!profile || !activeSpecies) return;
-    const targetTable = activeSpecies.taxa_group === 'FLORA' || (activeSpecies as any).category_chi ? 'plant_species' : 'species';
+    const targetTable = activeSpecies.taxa_group === 'FLORA' || (activeSpecies as any).category_chi ? 'plant_species' : activeSpecies.taxa_group === 'FUNGI' || String(activeSpecies.taxa_id || '').startsWith('fungi_') ? 'fungi_species' : 'species';
     
     const { error } = await supabase
       .from('species_drafts')
@@ -443,6 +443,7 @@ export default function SpeciesFloatingPanel() {
         try {
           const isFauna = id.startsWith('fauna_');
           const isFlora = id.startsWith('flora_');
+          const isFungi = id.startsWith('fungi_');
           
           let data: any = null;
 
@@ -488,6 +489,19 @@ export default function SpeciesFloatingPanel() {
                     china_red_data_book_note: plantData.china_red_data_book_note,
                 };
 
+            }
+          } else if (isFungi) {
+              const { data: fungiData } = await supabase
+                .from('fungi_species')
+                .select('*')
+                .eq('taxa_id', id)
+                .maybeSingle();
+            
+            if (fungiData) {
+                data = {
+                    ...fungiData,
+                    taxa_group: 'FUNGI'
+                };
             }
           }
           
@@ -598,11 +612,11 @@ export default function SpeciesFloatingPanel() {
                 <>
                   <AdminDraftReviewBanner
                     speciesId={String(speciesData[activeSpeciesId].id || speciesData[activeSpeciesId].taxa_id || activeSpeciesId)}
-                    tableName={speciesData[activeSpeciesId].taxa_group === 'FLORA' || (speciesData[activeSpeciesId] as any).category_chi ? 'plant_species' : 'species'}
+                    tableName={speciesData[activeSpeciesId].taxa_group === 'FLORA' || (speciesData[activeSpeciesId] as any).category_chi ? 'plant_species' : speciesData[activeSpeciesId].taxa_group === 'FUNGI' || String(speciesData[activeSpeciesId].taxa_id || '').startsWith('fungi_') ? 'fungi_species' : 'species'}
                     refreshTrigger={bannerRefreshKey}
                     onApproved={async () => {
                       // 重新載入物種資料
-                      const targetTable = speciesData[activeSpeciesId].taxa_group === 'FLORA' || (speciesData[activeSpeciesId] as any).category_chi ? 'plant_species' : 'species';
+                      const targetTable = speciesData[activeSpeciesId].taxa_group === 'FLORA' || (speciesData[activeSpeciesId] as any).category_chi ? 'plant_species' : speciesData[activeSpeciesId].taxa_group === 'FUNGI' || String(speciesData[activeSpeciesId].taxa_id || '').startsWith('fungi_') ? 'fungi_species' : 'species';
                       const { data } = await supabase.from(targetTable).select('*').eq('id', speciesData[activeSpeciesId].id).maybeSingle();
                       if (data) {
                         setSpeciesData(prev => ({ ...prev, [activeSpeciesId]: data as Species }));
@@ -820,13 +834,13 @@ export default function SpeciesFloatingPanel() {
             setReviewDraft(null);
           }}
           species={activeSpecies}
-          tableName={activeSpecies.taxa_group === 'FLORA' || (activeSpecies as any).category_chi ? 'plant_species' : 'species'}
+          tableName={activeSpecies.taxa_group === 'FLORA' || (activeSpecies as any).category_chi ? 'plant_species' : activeSpecies.taxa_group === 'FUNGI' || String(activeSpecies.taxa_id || '').startsWith('fungi_') ? 'fungi_species' : 'species'}
           reviewDraft={reviewDraft}
           onApproveDraft={handleApproveDraft}
           onRejectDraft={handleRejectDraft}
           onSuccess={async () => {
             if (activeSpeciesId) {
-              const targetTable = activeSpecies.taxa_group === 'FLORA' || (activeSpecies as any).category_chi ? 'plant_species' : 'species';
+              const targetTable = activeSpecies.taxa_group === 'FLORA' || (activeSpecies as any).category_chi ? 'plant_species' : activeSpecies.taxa_group === 'FUNGI' || String(activeSpecies.taxa_id || '').startsWith('fungi_') ? 'fungi_species' : 'species';
               const { data } = await supabase.from(targetTable).select('*').eq('id', activeSpecies.id).maybeSingle();
               if (data) {
                 setSpeciesData(prev => ({ ...prev, [activeSpeciesId]: data as Species }));

@@ -57,7 +57,7 @@ export default function HomeHero() {
   
   // Search state
   const [searchQuery, setSearchQuery] = useState('');
-  const [searchType, setSearchType] = useState<'fauna' | 'flora'>('fauna');
+  const [searchType, setSearchType] = useState<'fauna' | 'flora' | 'fungi'>('fauna');
   const [showTypeDropdown, setShowTypeDropdown] = useState(false);
   
   // Suggestions state
@@ -307,7 +307,7 @@ export default function HomeHero() {
                   className="flex items-center gap-1.5 md:gap-2 px-3 md:px-6 py-3 md:py-3.5 bg-slate-50 hover:bg-slate-100 text-slate-700 rounded-[2rem] transition-all font-black text-[10px] md:text-xs uppercase tracking-widest border border-slate-100"
                 >
                   <span className="truncate max-w-[50px] md:max-w-none">
-                    {searchType === 'fauna' ? t('home.fauna') : t('home.flora')}
+                    {searchType === 'fauna' ? t('home.fauna') : searchType === 'flora' ? t('home.flora') : t('home.fungi')}
                   </span>
                   <ChevronDown className={`w-3 h-3 md:w-4 md:h-4 transition-transform duration-300 ${showTypeDropdown ? 'rotate-180' : ''}`} />
                 </button>
@@ -335,6 +335,14 @@ export default function HomeHero() {
                       >
                         <div className={`w-1.5 h-1.5 md:w-2 md:h-2 rounded-full ${searchType === 'flora' ? 'bg-white' : 'bg-emerald-50'}`} />
                         <span className="text-[11px] md:text-sm">{t('home.flora')}</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => { setSearchType('fungi'); setShowTypeDropdown(false); }}
+                        className={`w-full flex items-center gap-2 md:gap-3 px-3 py-2.5 md:px-4 md:py-3 rounded-2xl text-left transition-all ${searchType === 'fungi' ? 'bg-emerald-600 text-white font-black' : 'hover:bg-slate-50 text-slate-600 font-bold'}`}
+                      >
+                        <div className={`w-1.5 h-1.5 md:w-2 md:h-2 rounded-full ${searchType === 'fungi' ? 'bg-white' : 'bg-emerald-50'}`} />
+                        <span className="text-[11px] md:text-sm">{t('home.fungi')}</span>
                       </button>
                     </motion.div>
                   )}
@@ -416,7 +424,7 @@ export default function HomeHero() {
                       {t('search.suggestions_title')}
                     </span>
                     <span>
-                      {searchType === 'fauna' ? t('home.fauna') : t('home.flora')}
+                      {searchType === 'fauna' ? t('home.fauna') : searchType === 'flora' ? t('home.flora') : t('home.fungi')}
                     </span>
                   </div>
 

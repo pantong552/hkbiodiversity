@@ -17,8 +17,8 @@ interface SidebarFilterProps {
   onSearchSubmit: (value: string) => void;
   searchQuery?: string;
   selectedFilters?: SelectedFilters;
-  activeTaxaType?: 'fauna' | 'flora';
-  onTaxaChange?: (type: 'fauna' | 'flora') => void;
+  activeTaxaType?: 'fauna' | 'flora' | 'fungi';
+  onTaxaChange?: (type: 'fauna' | 'flora' | 'fungi') => void;
 }
 
 export interface SelectedFilters {
@@ -104,15 +104,26 @@ export default function SidebarFilter({
   const [iucnCounts, setIucnCounts] = useState<Record<string, number>>({});
   const fetchIdRef = useRef(0);
 
+  // 當 activeTaxaType 改變時，立即重設選項以避免殘留上一物種群組的資料
+  useEffect(() => {
+    setTaxonomyOptions({
+      phylum_eng: [], class_eng: [], order_eng: [], family_eng: [], genus_eng: [], informal_group_eng: []
+    });
+    setIucnCounts({});
+  }, [activeTaxaType]);
+
   useEffect(() => {
     async function fetchStats() {
       const currentFetchId = ++fetchIdRef.current;
       const levels: TaxonomyLevel[] = ['phylum_eng', 'class_eng', 'order_eng', 'family_eng', 'genus_eng', 'informal_group_eng'];
 
       try {
+        const isFungi = activeTaxaType === 'fungi';
+        const rpcName = isFungi ? 'get_fungi_species_stats' : 'get_species_stats';
+
         // 為每個層級獨立獲取統計，排除該層級自身的選取值
         const levelPromises = levels.map(async (level) => {
-          const rpcParams = {
+          const rpcParams: any = {
             p_phylum_eng: level === 'phylum_eng' ? [] : selected.taxonomy.phylum_eng,
             p_class_eng: level === 'class_eng' ? [] : selected.taxonomy.class_eng,
             p_order_eng: level === 'order_eng' ? [] : selected.taxonomy.order_eng,
@@ -121,15 +132,41 @@ export default function SidebarFilter({
             p_informal_group_eng: level === 'informal_group_eng' ? [] : selected.taxonomy.informal_group_eng,
             p_iucn: selected.iucn,
             p_search: searchQuery,
-            p_is_cap170: selected.isCap170 || null,
-            p_is_cap586: selected.isCap586 || null,
           };
-          const { data, error } = await supabase.rpc('get_species_stats', rpcParams);
-          return { level, data, error };
+
+          if (!isFungi) {
+            rpcParams.p_is_cap170 = selected.isCap170 || null;
+            rpcParams.p_is_cap586 = selected.isCap586 || null;
+          }
+
+          let res = await supabase.rpc(rpcName, rpcParams);
+          // Fallback: 如果是真菌且 RPC 發生錯誤或無結果，直接從 fungi_species 表統計
+          if (isFungi && (res.error || !res.data || !res.data[level])) {
+            try {
+              const { data: dbData } = await supabase
+                .from('fungi_species')
+                .select(level);
+              if (dbData) {
+                const countMap = new Map<string, number>();
+                dbData.forEach((row: any) => {
+                  const val = (row[level] as string || '').trim();
+                  if (val) countMap.set(val, (countMap.get(val) || 0) + 1);
+                });
+                const fakeLevelData = Array.from(countMap.entries()).map(([name, count]) => ({ name, count }));
+                res = {
+                  data: { ...(res.data || {}), [level]: fakeLevelData },
+                  error: null
+                } as any;
+              }
+            } catch (fbErr) {
+              console.warn('Fallback failed for', level, fbErr);
+            }
+          }
+          return { level, data: res.data, error: res.error };
         });
 
         // IUCN 仍然使用全過濾統計
-        const iucnPromise = supabase.rpc('get_species_stats', {
+        const iucnParams: any = {
           p_phylum_eng: selected.taxonomy.phylum_eng,
           p_class_eng: selected.taxonomy.class_eng,
           p_order_eng: selected.taxonomy.order_eng,
@@ -138,9 +175,14 @@ export default function SidebarFilter({
           p_informal_group_eng: selected.taxonomy.informal_group_eng,
           p_iucn: selected.iucn,
           p_search: searchQuery,
-          p_is_cap170: selected.isCap170 || null,
-          p_is_cap586: selected.isCap586 || null,
-        });
+        };
+
+        if (!isFungi) {
+          iucnParams.p_is_cap170 = selected.isCap170 || null;
+          iucnParams.p_is_cap586 = selected.isCap586 || null;
+        }
+
+        const iucnPromise = supabase.rpc(rpcName, iucnParams);
 
         const [levelResults, iucnResult] = await Promise.all([
           Promise.all(levelPromises),
@@ -165,7 +207,7 @@ export default function SidebarFilter({
               let chiName = item.chi || name;
               if (language === 'zh') {
                 const rank = level.replace('_eng', '') as any;
-                const mappedChi = getTaxonomyChi(rank, 'fauna', name);
+                const mappedChi = getTaxonomyChi(rank, activeTaxaType === 'fungi' ? 'fungi' : 'fauna', name);
                 if (mappedChi !== name) {
                   chiName = mappedChi;
                 }
@@ -196,7 +238,7 @@ export default function SidebarFilter({
                 let chiName = selName;
                 if (language === 'zh') {
                   const rank = level.replace('_eng', '') as any;
-                  const mappedChi = getTaxonomyChi(rank, 'fauna', selName);
+                  const mappedChi = getTaxonomyChi(rank, activeTaxaType === 'fungi' ? 'fungi' : 'fauna', selName);
                   if (mappedChi !== selName) chiName = mappedChi;
                 }
                 uniqueItems.set(selName, {
@@ -226,7 +268,7 @@ export default function SidebarFilter({
     }
 
     fetchStats();
-  }, [selected, language, searchQuery, getTaxonomyChi]);
+  }, [selected, language, searchQuery, getTaxonomyChi, activeTaxaType]);
 
   const filterOptions = taxonomyOptions;
 
@@ -378,7 +420,7 @@ export default function SidebarFilter({
           <QuickFilterSearch
             initialValue={searchQuery}
             onSubmit={onSearchSubmit}
-            taxaType="fauna"
+            taxaType={activeTaxaType || 'fauna'}
             className="mb-6"
           />
 
@@ -401,7 +443,7 @@ export default function SidebarFilter({
                     onChange={(values) => handleTaxonomyChange('informal_group_eng', values)}
                     placeholder={TAXONOMY_LABELS.informal_group_eng}
                     inferredValue={inferredParents.informal_group_eng}
-                    getDisplayLabel={(val) => language === 'zh' ? getTaxonomyChi('informal_group' as any, 'fauna', val) : val}
+                    getDisplayLabel={(val) => language === 'zh' ? getTaxonomyChi('informal_group' as any, activeTaxaType === 'fungi' ? 'fungi' : 'fauna', val) : val}
                   />
                 </div>
               )}
@@ -431,7 +473,7 @@ export default function SidebarFilter({
                           onChange={(values) => handleTaxonomyChange(level, values)}
                           placeholder={TAXONOMY_LABELS[level]}
                           inferredValue={inferredParents[level]}
-                          getDisplayLabel={(val) => language === 'zh' ? getTaxonomyChi(rank, 'fauna', val) : val}
+                          getDisplayLabel={(val) => language === 'zh' ? getTaxonomyChi(rank, activeTaxaType === 'fungi' ? 'fungi' : 'fauna', val) : val}
                         />
                       );
                     })}
@@ -439,68 +481,71 @@ export default function SidebarFilter({
               )}
             </div>
 
-            <div className="space-y-4">
-              <button
-                onClick={() => toggleExpand('protection')}
-                className="w-full flex items-center justify-between text-sm font-black uppercase tracking-widest text-slate-400 hover:text-emerald-700 transition-colors"
-              >
-                {language === 'zh' ? '法律保護' : 'Protection'}
-                {expanded.protection ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
-              </button>
+            {/* 法律保護 (Cap. 170 & Cap. 586) - 僅在 Fauna 顯示，Fungi 依需求隱藏 */}
+            {activeTaxaType !== 'fungi' && (
+              <div className="space-y-4">
+                <button
+                  onClick={() => toggleExpand('protection')}
+                  className="w-full flex items-center justify-between text-sm font-black uppercase tracking-widest text-slate-400 hover:text-emerald-700 transition-colors"
+                >
+                  {language === 'zh' ? '法律保護' : 'Protection'}
+                  {expanded.protection ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+                </button>
 
-              {expanded.protection && (
-                <div className="pt-2">
-                  {/* Desktop Grid with Icons */}
-                  <div className="hidden min-[1101px]:grid grid-cols-2 gap-2">
-                    {[
-                      { id: 'isCap170', label: language === 'zh' ? '第 170 章' : 'Cap. 170', icon: Shield },
-                      { id: 'isCap586', label: language === 'zh' ? '第 586 章' : 'Cap. 586', icon: Shield },
-                    ].map(item => {
-                      const isSelected = selected[item.id as 'isCap170' | 'isCap586'] === true;
-                      return (
-                        <button
-                          key={item.id}
-                          onClick={() => handleCapToggle(item.id as 'isCap170' | 'isCap586')}
-                          className={`flex flex-col items-center justify-center gap-1.5 p-3 rounded-2xl text-[11px] font-black transition-all border ${
-                            isSelected
-                              ? 'bg-emerald-600 border-emerald-600 text-white shadow-md'
-                              : 'bg-white border-slate-100 text-slate-400 hover:bg-slate-50'
-                          }`}
-                        >
-                          <item.icon className="w-3.5 h-3.5" />
-                          {item.label}
-                        </button>
-                      );
-                    })}
-                  </div>
+                {expanded.protection && (
+                  <div className="pt-2">
+                    {/* Desktop Grid with Icons */}
+                    <div className="hidden min-[1101px]:grid grid-cols-2 gap-2">
+                      {[
+                        { id: 'isCap170', label: language === 'zh' ? '第 170 章' : 'Cap. 170', icon: Shield },
+                        { id: 'isCap586', label: language === 'zh' ? '第 586 章' : 'Cap. 586', icon: Shield },
+                      ].map(item => {
+                        const isSelected = selected[item.id as 'isCap170' | 'isCap586'] === true;
+                        return (
+                          <button
+                            key={item.id}
+                            onClick={() => handleCapToggle(item.id as 'isCap170' | 'isCap586')}
+                            className={`flex flex-col items-center justify-center gap-1.5 p-3 rounded-2xl text-[11px] font-black transition-all border ${
+                              isSelected
+                                ? 'bg-emerald-600 border-emerald-600 text-white shadow-md'
+                                : 'bg-white border-slate-100 text-slate-400 hover:bg-slate-50'
+                            }`}
+                          >
+                            <item.icon className="w-3.5 h-3.5" />
+                            {item.label}
+                          </button>
+                        );
+                      })}
+                    </div>
 
-                  {/* Mobile Compact Pills */}
-                  <div className="min-[1101px]:hidden flex flex-wrap gap-2">
-                    {[
-                      { id: 'isCap170', label: language === 'zh' ? '第 170 章' : 'Cap. 170' },
-                      { id: 'isCap586', label: language === 'zh' ? '第 586 章' : 'Cap. 586' },
-                    ].map(item => {
-                      const isSelected = selected[item.id as 'isCap170' | 'isCap586'] === true;
-                      return (
-                        <button
-                          key={item.id}
-                          onClick={() => handleCapToggle(item.id as 'isCap170' | 'isCap586')}
-                          className={`
-                            px-3 py-1.5 rounded-xl text-[11px] font-black transition-all border shadow-sm flex items-center gap-1.5 uppercase tracking-wider
-                            ${isSelected
-                              ? 'bg-emerald-600 border-emerald-600 text-white shadow-md scale-105 ring-2 ring-emerald-500/20'
-                              : 'bg-white border-slate-200 text-slate-600 hover:border-emerald-200 hover:bg-slate-50'}
-                          `}
-                        >
-                          {isSelected && <CheckCircle2 className="w-3 h-3" />}
-                          {item.label}
-                        </button>
-                      );
-                    })}
+                    {/* Mobile Horizontal Capsule Layout */}
+                    <div className="flex min-[1101px]:hidden gap-2">
+                      {[
+                        { id: 'isCap170', label: language === 'zh' ? '第 170 章' : 'Cap. 170' },
+                        { id: 'isCap586', label: language === 'zh' ? '第 586 章' : 'Cap. 586' },
+                      ].map(item => {
+                        const isSelected = selected[item.id as 'isCap170' | 'isCap586'] === true;
+                        return (
+                          <button
+                            key={item.id}
+                            onClick={() => handleCapToggle(item.id as 'isCap170' | 'isCap586')}
+                            className={`
+                              px-3 py-1.5 rounded-xl text-[11px] font-black transition-all border shadow-sm flex items-center gap-1.5 uppercase tracking-wider
+                              ${isSelected
+                                ? 'bg-emerald-600 border-emerald-600 text-white shadow-md scale-105 ring-2 ring-emerald-500/20'
+                                : 'bg-white border-slate-200 text-slate-600 hover:border-emerald-200 hover:bg-slate-50'}
+                            `}
+                          >
+                            {isSelected && <CheckCircle2 className="w-3 h-3" />}
+                            {item.label}
+                          </button>
+                        );
+                      })}
+                    </div>
                   </div>
-                </div>
-              )}
-            </div>
+                )}
+              </div>
+            )}
 
             <div className="space-y-4">
               <button

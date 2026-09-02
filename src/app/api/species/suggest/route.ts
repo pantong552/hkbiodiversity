@@ -7,7 +7,7 @@ export interface SuggestionItem {
   common_name_chi?: string;
   common_name_eng?: string;
   scientific_name: string;
-  taxa_group: 'FAUNA' | 'FLORA';
+  taxa_group: 'FAUNA' | 'FLORA' | 'FUNGI';
   category?: string;
   family_eng?: string;
   order_eng?: string;
@@ -19,7 +19,7 @@ export interface SuggestionItem {
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
   const q = searchParams.get('q')?.trim() || '';
-  const type = searchParams.get('type') || 'all'; // fauna, flora, all
+  const type = searchParams.get('type') || 'all'; // fauna, flora, fungi, all
   const limit = Math.min(parseInt(searchParams.get('limit') || '8', 10), 20);
 
   if (!q || q.length === 0) {
@@ -32,6 +32,7 @@ export async function GET(req: NextRequest) {
 
     let faunaResults: SuggestionItem[] = [];
     let floraResults: SuggestionItem[] = [];
+    let fungiResults: SuggestionItem[] = [];
 
     // 1. 檢索 Fauna (動物)
     if (type === 'fauna' || type === 'all') {
@@ -72,9 +73,35 @@ export async function GET(req: NextRequest) {
       }
     }
 
-    // 3. 依據相關度進行簡單排序（精確開頭匹配優先）
+    // 3. 檢索 Fungi (真菌)
+    if (type === 'fungi' || type === 'all') {
+      try {
+        const { data: fungiData, error: fungiErr } = await supabase
+          .from('fungi_species')
+          .select('taxa_id, id, common_name_chi, common_name_eng, scientific_name, class_eng, family_eng, order_eng, inat_id')
+          .or(`common_name_chi.ilike.${searchPattern},common_name_eng.ilike.${searchPattern},scientific_name.ilike.${searchPattern},alias_common_name_chi.ilike.${searchPattern},alias_scientific_name.ilike.${searchPattern}`)
+          .limit(limit);
+
+        if (!fungiErr && fungiData) {
+          fungiResults = fungiData.map((item: any) => ({
+            taxa_id: item.taxa_id || `fungi_${item.id}`,
+            id: item.id,
+            common_name_chi: item.common_name_chi,
+            common_name_eng: item.common_name_eng,
+            scientific_name: item.scientific_name,
+            taxa_group: 'FUNGI' as const,
+            category: item.order_eng || item.family_eng || 'Fungi',
+            inat_id: item.inat_id,
+          }));
+        }
+      } catch (e) {
+        // Safe ignore if table not created yet
+      }
+    }
+
+    // 4. 依據相關度進行排序
     const qLower = q.toLowerCase();
-    const combined = [...faunaResults, ...floraResults];
+    const combined = [...faunaResults, ...floraResults, ...fungiResults];
 
     combined.sort((a, b) => {
       const aExactChi = a.common_name_chi?.toLowerCase().startsWith(qLower) ? 0 : 1;

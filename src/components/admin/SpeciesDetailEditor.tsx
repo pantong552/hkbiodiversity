@@ -1289,6 +1289,84 @@ const floraFieldGroups = (t: any): FieldGroup[] => [
   }
 ];
 
+// 3. 真菌 (fungi_species) 欄位組配置 (排除 hkbws_cat, afcd, china_vertebrates_red_list, cites, ebird_species_code, cap170, cap586)
+const fungiFieldGroups = (t: any): FieldGroup[] => [
+  {
+    id: 'basic',
+    nameChi: '基本資訊',
+    nameEng: 'Basic Info',
+    icon: <FileText className="w-4 h-4" />,
+    fields: [
+      { key: 'taxa_id', labelChi: '物種 ID', labelEng: 'Taxa ID', type: 'text', readOnly: true },
+      { key: 'inat_id', labelChi: 'iNaturalist ID', labelEng: 'iNaturalist ID', type: 'number' },
+      { key: 'col_usage_id', labelChi: 'Catalogue of Life ID', labelEng: 'Catalogue of Life ID', type: 'text' },
+      { key: 'taxa_group', labelChi: '物種分類群', labelEng: 'Taxa Group', type: 'text' },
+      { key: 'informal_group_eng', labelChi: '非正式群組 (英)', labelEng: 'Informal Group (Eng)', type: 'text' },
+      { key: 'common_name_chi', labelChi: '中文俗名', labelEng: 'Common Name (Chi)', type: 'text' },
+      { key: 'common_name_eng', labelChi: '英文俗名', labelEng: 'Common Name (Eng)', type: 'text' },
+      { key: 'scientific_name', labelChi: '學名', labelEng: 'Scientific Name', type: 'text' },
+      { key: 'author', labelChi: '命名者', labelEng: 'Author', type: 'text' },
+      { key: 'alias_scientific_name', labelChi: '學名別名', labelEng: 'Alias Scientific Name', type: 'text' },
+      { key: 'alias_common_name_chi', labelChi: '中文俗名別名', labelEng: 'Alias Common Name (Chi)', type: 'text' },
+      { key: 'alias_common_name_eng', labelChi: '英文俗名別名', labelEng: 'Alias Common Name (Eng)', type: 'text' },
+    ]
+  },
+  {
+    id: 'taxonomy',
+    nameChi: '分類學資訊',
+    nameEng: 'Taxonomy',
+    icon: <Layers className="w-4 h-4" />,
+    fields: [
+      { key: 'phylum_eng', labelChi: '門 (英)', labelEng: 'Phylum (Eng)', type: 'text' },
+      { key: 'phylum_chi', labelChi: '門 (中)', labelEng: 'Phylum (Chi)', type: 'text', readOnly: true },
+      { key: 'class_eng', labelChi: '綱 (英)', labelEng: 'Class (Eng)', type: 'text' },
+      { key: 'class_chi', labelChi: '綱 (中)', labelEng: 'Class (Chi)', type: 'text', readOnly: true },
+      { key: 'order_eng', labelChi: '目 (英)', labelEng: 'Order (Eng)', type: 'text' },
+      { key: 'order_chi', labelChi: '目 (中)', labelEng: 'Order (Chi)', type: 'text', readOnly: true },
+      { key: 'family_eng', labelChi: '科 (英)', labelEng: 'Family (Eng)', type: 'text' },
+      { key: 'family_chi', labelChi: '科 (中)', labelEng: 'Family (Chi)', type: 'text', readOnly: true },
+      { key: 'genus_eng', labelChi: '屬 (英)', labelEng: 'Genus (Eng)', type: 'text' },
+      { key: 'genus_chi', labelChi: '屬 (中)', labelEng: 'Genus (Chi)', type: 'text', readOnly: true },
+      { key: 'species_eng', labelChi: '種 (英)', labelEng: 'Species (Eng)', type: 'text' },
+      { key: 'sub_species_eng', labelChi: '亞種 (英)', labelEng: 'Sub-species (Eng)', type: 'text' },
+    ]
+  },
+  {
+    id: 'conservation',
+    nameChi: '保護與生存狀態',
+    nameEng: 'Conservation',
+    icon: <ShieldAlert className="w-4 h-4" />,
+    fields: [
+      { key: 'iucn', labelChi: 'IUCN 評級', labelEng: 'IUCN Status', type: 'select', options: ['LC', 'NT', 'VU', 'EN', 'CR', 'EW', 'EX', 'DD', 'NE'] },
+      { key: 'endemic', labelChi: '特有種', labelEng: 'Endemicity', type: 'text' },
+      { key: 'native_status', labelChi: '原生概況', labelEng: 'Native Status', type: 'select', options: ['Native', 'Exotic', 'Reintroduced', 'Uncertain'] },
+      { key: 'restrictedness', labelChi: '受限度/稀有度', labelEng: 'Restrictedness', type: 'text' },
+    ]
+  },
+  {
+    id: 'descriptions',
+    nameChi: '描述與分布',
+    nameEng: 'Descriptions',
+    icon: <MapPin className="w-4 h-4" />,
+    fields: [
+      { key: 'introduction_chi', labelChi: '物種簡介 (中)', labelEng: 'Introduction (Chi)', type: 'textarea' },
+      { key: 'introduction_eng', labelChi: '物種簡介 (英)', labelEng: 'Introduction (Eng)', type: 'textarea' },
+      { key: 'description_chi', labelChi: '形態特徵 (中)', labelEng: 'Description (Chi)', type: 'textarea' },
+      { key: 'description_eng', labelChi: '形態特徵 (英)', labelEng: 'Description (Eng)', type: 'textarea' },
+      { key: 'habitat_chi', labelChi: '生境 (中)', labelEng: 'Habitat (Chi)', type: 'textarea' },
+      { key: 'habitat_eng', labelChi: '生境 (英)', labelEng: 'Habitat (Eng)', type: 'textarea' },
+      { key: 'microhabitat_chi', labelChi: '微生境 (中)', labelEng: 'Microhabitat (Chi)', type: 'textarea' },
+      { key: 'microhabitat_eng', labelChi: '微生境 (英)', labelEng: 'Microhabitat (Eng)', type: 'textarea' },
+      { key: 'hk_distribution_chi', labelChi: '香港分布 (中)', labelEng: 'HK Distribution (Chi)', type: 'textarea' },
+      { key: 'hk_distribution_eng', labelChi: '香港分布 (英)', labelEng: 'HK Distribution (Eng)', type: 'textarea' },
+      { key: 'global_distribution_chi', labelChi: '全球分布 (中)', labelEng: 'Global Distribution (Chi)', type: 'textarea' },
+      { key: 'global_distribution_eng', labelChi: '全球分布 (英)', labelEng: 'Global Distribution (Eng)', type: 'textarea' },
+      { key: 'remarks_chi', labelChi: '備註 (中)', labelEng: 'Remarks (Chi)', type: 'textarea' },
+      { key: 'remarks_eng', labelChi: '備註 (英)', labelEng: 'Remarks (Eng)', type: 'textarea' },
+    ]
+  }
+];
+
 export default function SpeciesDetailEditor({ table, data, originalData, publishedOriginal: propPublishedOriginal, onSave, onCancel, onDirtyChange, saveButtonLabel, hideHeader, onRegisterSave, disableDirectDatabaseUpdate }: SpeciesDetailEditorProps) {
   const { language, t } = useLanguage();
   const { profile } = useAuth();
@@ -1323,7 +1401,11 @@ export default function SpeciesDetailEditor({ table, data, originalData, publish
 
   // 2. 獲取當前資料表預定義的分組
   const baseGroups = useMemo(() => {
-    return table === 'plant_species' ? floraFieldGroups(t) : faunaFieldGroups(t);
+    return table === 'plant_species' 
+      ? floraFieldGroups(t) 
+      : table === 'fungi_species'
+        ? fungiFieldGroups(t)
+        : faunaFieldGroups(t);
   }, [table, t]);
 
   // 3. 收集所有未在預定義分組中列出的欄位 (Others Tab) -> 保證擴展性
@@ -1336,6 +1418,9 @@ export default function SpeciesDetailEditor({ table, data, originalData, publish
     const ignoredKeys = ['id', 'taxa_id', 'fts', 'created_at', 'updated_at', 'flowering_months', 'fruiting_months'];
     if (table === 'plant_species') {
       ignoredKeys.push('ebird_species_code', 'species_eng');
+    }
+    if (table === 'fungi_species') {
+      ignoredKeys.push('hkbws_cat', 'afcd', 'china_vertebrates_red_list', 'cites', 'ebird_species_code', 'cap170', 'cap586');
     }
 
     const otherLabelMap: Record<string, { labelChi: string; labelEng: string }> = {

@@ -22,6 +22,7 @@ import UsersManager from '@/components/admin/UsersManager';
 import TaxonomyMappingsManager from '@/components/admin/TaxonomyMappingsManager';
 import SpeciesManager from '@/components/admin/SpeciesManager';
 import PlantSpeciesManager from '@/components/admin/PlantSpeciesManager';
+import FungiSpeciesManager from '@/components/admin/FungiSpeciesManager';
 import ReferenceManager from '@/components/admin/ReferenceManager';
 import DraftManager from '@/components/admin/DraftManager';
 import LanguageSwitcher from '@/components/admin/LanguageSwitcher';
@@ -29,7 +30,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import AlertModal from '@/components/ui/AlertModal';
 import { FileEdit } from 'lucide-react';
 
-type AdminTab = 'users' | 'drafts' | 'taxonomy-fauna' | 'taxonomy-flora' | 'species-fauna' | 'species-flora' | 'references';
+type AdminTab = 'users' | 'drafts' | 'taxonomy-fauna' | 'taxonomy-flora' | 'taxonomy-fungi' | 'species-fauna' | 'species-flora' | 'species-fungi' | 'references';
 
 export default function MaintainPage() {
   const { profile, isLoading } = useAuth();
@@ -250,6 +251,23 @@ export default function MaintainPage() {
                       )}
                       {t('admin.taxa_flora')}
                     </button>
+                    <button 
+                      onClick={() => setActiveTab('taxonomy-fungi')}
+                      className={`relative text-left pl-6 pr-4 py-2.5 rounded-xl text-[11px] font-black uppercase tracking-wider transition-all duration-300 flex items-center ${
+                        activeTab === 'taxonomy-fungi' 
+                          ? 'text-emerald-700 bg-gradient-to-r from-emerald-50 to-transparent' 
+                          : 'text-slate-400 hover:text-emerald-600 hover:bg-emerald-50/30 hover:translate-x-1'
+                      }`}
+                    >
+                      {activeTab === 'taxonomy-fungi' && (
+                        <motion.div 
+                          layoutId="submenu-active-indicator"
+                          className="absolute left-[-1px] top-2 bottom-2 w-0.5 bg-emerald-500 rounded-full"
+                          transition={{ type: "spring", stiffness: 300, damping: 30 }}
+                        />
+                      )}
+                      {t('admin.taxa_fungi')}
+                    </button>
                   </motion.div>
                 )}
               </AnimatePresence>
@@ -319,6 +337,23 @@ export default function MaintainPage() {
                       )}
                       {t('admin.species_flora')}
                     </button>
+                    <button 
+                      onClick={() => setActiveTab('species-fungi')}
+                      className={`relative text-left pl-6 pr-4 py-2.5 rounded-xl text-[11px] font-black uppercase tracking-wider transition-all duration-300 flex items-center ${
+                        activeTab === 'species-fungi' 
+                          ? 'text-emerald-700 bg-gradient-to-r from-emerald-50 to-transparent' 
+                          : 'text-slate-400 hover:text-emerald-600 hover:bg-emerald-50/30 hover:translate-x-1'
+                      }`}
+                    >
+                      {activeTab === 'species-fungi' && (
+                        <motion.div 
+                          layoutId="submenu-active-indicator-species"
+                          className="absolute left-[-1px] top-2 bottom-2 w-0.5 bg-emerald-500 rounded-full"
+                          transition={{ type: "spring", stiffness: 300, damping: 30 }}
+                        />
+                      )}
+                      {t('admin.species_fungi')}
+                    </button>
                   </motion.div>
                 )}
               </AnimatePresence>
@@ -349,7 +384,15 @@ export default function MaintainPage() {
               <div className="flex items-center justify-between mb-4 flex-shrink-0">
                 <h2 className="text-xl font-black text-slate-800 tracking-tight flex items-center gap-2">
                   <div className="w-2 h-6 bg-emerald-500 rounded-full" />
-                  {activeTab === 'users' ? t('admin.users_manager') : activeTab === 'references' ? t('admin.reference_manager') : activeTab === 'taxonomy-fauna' ? t('admin.taxa_fauna') : activeTab === 'taxonomy-flora' ? t('admin.taxa_flora') : activeTab === 'species-fauna' ? t('admin.species_fauna') : activeTab === 'species-flora' ? t('admin.species_flora') : t('admin.taxa_manager')}
+                  {activeTab === 'users' ? t('admin.users_manager') 
+                    : activeTab === 'references' ? t('admin.reference_manager') 
+                    : activeTab === 'taxonomy-fauna' ? t('admin.taxa_fauna') 
+                    : activeTab === 'taxonomy-flora' ? t('admin.taxa_flora') 
+                    : activeTab === 'taxonomy-fungi' ? t('admin.taxa_fungi')
+                    : activeTab === 'species-fauna' ? t('admin.species_fauna') 
+                    : activeTab === 'species-flora' ? t('admin.species_flora') 
+                    : activeTab === 'species-fungi' ? t('admin.species_fungi')
+                    : t('admin.taxa_manager')}
                 </h2>
               </div>
               <div className="flex-1 min-h-0">
@@ -384,10 +427,22 @@ export default function MaintainPage() {
                       message: message || t('admin.confirm_remove')
                     })} 
                   />
+                ) : activeTab === 'taxonomy-fungi' ? (
+                  <TaxonomyMappingsManager 
+                    mode="fungi" 
+                    onRequestConfirm={(onConfirm, title, message) => setConfirmModal({ 
+                      isOpen: true, 
+                      onConfirm,
+                      title: title || t('admin.confirm_remove_title'),
+                      message: message || t('admin.confirm_remove')
+                    })} 
+                  />
                 ) : activeTab === 'species-fauna' ? (
                   <SpeciesManager />
                 ) : activeTab === 'species-flora' ? (
                   <PlantSpeciesManager />
+                ) : activeTab === 'species-fungi' ? (
+                  <FungiSpeciesManager />
                 ) : (
                   <ReferenceManager />
                 )}

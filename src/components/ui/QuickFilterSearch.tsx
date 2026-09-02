@@ -15,7 +15,7 @@ interface QuickFilterSearchProps {
   onSubmit: (value: string) => void;
   onClear?: () => void;
   className?: string;
-  taxaType?: 'fauna' | 'flora' | 'all';
+  taxaType?: 'fauna' | 'flora' | 'fungi' | 'all';
 }
 
 import { HighlightText } from '@/utils/formatters';
@@ -50,6 +50,8 @@ function SuggestionItemAvatar({ item, isSelected }: { item: SuggestionItem; isSe
         <Loader2 className="w-3.5 h-3.5 animate-spin text-emerald-500" />
       ) : item.taxa_group === 'FLORA' ? (
         <Leaf className="w-4 h-4" />
+      ) : item.taxa_group === 'FUNGI' ? (
+        <Sparkles className="w-4 h-4 text-purple-600" />
       ) : (
         <Bug className="w-4 h-4" />
       )}
@@ -304,7 +306,7 @@ export default function QuickFilterSearch({
                 {t('search.suggestions_title')}
               </span>
               <span>
-                {taxaType === 'flora' ? t('home.flora') : taxaType === 'fauna' ? t('home.fauna') : ''}
+                {taxaType === 'flora' ? t('home.flora') : taxaType === 'fungi' ? t('home.fungi') : taxaType === 'fauna' ? t('home.fauna') : ''}
               </span>
             </div>
 

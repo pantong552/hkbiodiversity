@@ -69,3 +69,8 @@ export interface Species {
 }
 
 export type TaxonomyLevel = 'phylum_eng' | 'class_eng' | 'order_eng' | 'family_eng' | 'genus_eng' | 'informal_group_eng';
+
+export type FungiSpecies = Omit<
+  Species,
+  'hkbws_cat' | 'afcd' | 'china_vertebrates_red_list' | 'cites' | 'ebird_species_code' | 'cap170' | 'cap586'
+>;

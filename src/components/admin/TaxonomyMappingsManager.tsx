@@ -25,7 +25,7 @@ import { useTaxonomy } from '@/context/TaxonomyContext';
 import AlertModal from '@/components/ui/AlertModal';
 
 interface TaxonomyMappingsManagerProps {
-  mode: 'fauna' | 'flora';
+  mode: 'fauna' | 'flora' | 'fungi';
   onRequestConfirm: (action: () => Promise<void>, title?: string, message?: string) => void;
 }
 
@@ -54,6 +54,13 @@ const RANK_FIELD_MAP = {
   } as Record<string, string>,
   flora: {
     category: 'category_eng',
+    family: 'family_eng',
+    genus: 'genus_eng'
+  } as Record<string, string>,
+  fungi: {
+    informal_group: 'informal_group_eng',
+    class: 'class_eng',
+    order: 'order_eng',
     family: 'family_eng',
     genus: 'genus_eng'
   } as Record<string, string>
@@ -182,8 +189,10 @@ export default function TaxonomyMappingsManager({ mode, onRequestConfirm }: Taxo
   useEffect(() => {
     if (mode === 'fauna') {
       setGroupFilters(['Amphibian']);
-    } else {
+    } else if (mode === 'flora') {
       setGroupFilters(['Angiosperms (Dicotyledons)']);
+    } else {
+      setGroupFilters([]);
     }
   }, [mode]);
 
@@ -194,13 +203,13 @@ export default function TaxonomyMappingsManager({ mode, onRequestConfirm }: Taxo
   const fetchData = async () => {
     setLoading(true);
     try {
-      const taxaType = mode === 'fauna' ? 'fauna' : 'flora';
-      const targetTable = mode === 'fauna' ? 'species' : 'plant_species';
-      const rankFields = RANK_FIELD_MAP[mode];
+      const taxaType = mode;
+      const targetTable = mode === 'fauna' ? 'species' : (mode === 'fungi' ? 'fungi_species' : 'plant_species');
+      const rankFields = RANK_FIELD_MAP[mode] || RANK_FIELD_MAP.fauna;
 
-      // 1. Fetch ALL taxonomy names from species/plant_species table (with pagination)
+      // 1. Fetch ALL taxonomy names from species/plant_species/fungi_species table (with pagination)
       const distinctPromises = Object.entries(rankFields).map(async ([rank, field]) => {
-        const selectFields = mode === 'fauna' ? `${field}, taxa_group` : `${field}, category_eng`;
+        const selectFields = (mode === 'fauna' || mode === 'fungi') ? `${field}, taxa_group` : `${field}, category_eng`;
         const uniqueMap = new Map<string, { group: string; count: number }>();
         let offset = 0;
         const limit = 1000;
@@ -296,9 +305,9 @@ export default function TaxonomyMappingsManager({ mode, onRequestConfirm }: Taxo
     try {
       const item = originalItem;
 
-      const taxaType = mode === 'fauna' ? 'fauna' : 'flora';
-      const targetTable = mode === 'fauna' ? 'species' : 'plant_species';
-      const dbField = RANK_FIELD_MAP[mode][item.rank];
+      const taxaType = mode;
+      const targetTable = mode === 'fauna' ? 'species' : (mode === 'fungi' ? 'fungi_species' : 'plant_species');
+      const dbField = (RANK_FIELD_MAP[mode] || RANK_FIELD_MAP.fauna)[item.rank];
 
       const newNameEng = (editValues.name_eng !== undefined ? editValues.name_eng : item.name_eng).trim();
       const newNameChi = (editValues.name_chi !== undefined ? editValues.name_chi : item.name_chi).trim();

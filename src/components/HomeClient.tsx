@@ -185,6 +185,11 @@ export default function HomeClient() {
     setCurrentPage(1);
     setSearchQuery('');
     setTableFilters({}); // 切換物種類型時清空表格篩選，以便 Metadata 重新初始化為全選
+    setSelectedFilters({
+      taxonomy: { phylum_eng: [], class_eng: [], order_eng: [], family_eng: [], genus_eng: [], informal_group_eng: [] },
+      iucn: []
+    });
+    setPlantFilters(INITIAL_PLANT_FILTERS);
   };
 
   // Handle Taxonomy Click from Species Card
@@ -239,16 +244,16 @@ export default function HomeClient() {
       setError(null);
 
       try {
-        const table = taxaType === 'fauna' ? 'species' : 'plant_species';
+        const table = taxaType === 'fauna' ? 'species' : (taxaType === 'fungi' ? 'fungi_species' : 'plant_species');
         let query = supabaseSingleton.from(table).select('*', { count: 'exact' });
 
         // Apply Global & Quick Search
         const currentSearch = searchQuery.trim();
-        if (currentSearch && taxaType === 'fauna') {
+        if (currentSearch && (taxaType === 'fauna' || taxaType === 'fungi')) {
             query = query.or(`common_name_chi.ilike.%${currentSearch}%,common_name_eng.ilike.%${currentSearch}%,scientific_name.ilike.%${currentSearch}%,alias_common_name_chi.ilike.%${currentSearch}%,alias_common_name_eng.ilike.%${currentSearch}%,alias_scientific_name.ilike.%${currentSearch}%`);
         }
 
-        if (taxaType === 'fauna') {
+        if (taxaType === 'fauna' || taxaType === 'fungi') {
             // 合併側邊欄與表格過濾器
             const finalTaxonomy = {
                 phylum_eng: (tableFilters.phylum?.length > 0) ? tableFilters.phylum : selectedFilters.taxonomy.phylum_eng,
@@ -277,12 +282,14 @@ export default function HomeClient() {
                 query = query.in('native_status', finalNative);
             }
 
-            // Protection Filters (Cap. 170 & Cap. 586)
-            if (selectedFilters.isCap170) {
-                query = query.eq('cap170', 'Y');
-            }
-            if (selectedFilters.isCap586) {
-                query = query.eq('cap586', 'Y');
+            // Protection Filters (Cap. 170 & Cap. 586) - 僅在動物類別生效
+            if (taxaType === 'fauna') {
+              if (selectedFilters.isCap170) {
+                  query = query.eq('cap170', 'Y');
+              }
+              if (selectedFilters.isCap586) {
+                  query = query.eq('cap586', 'Y');
+              }
             }
 
             // Scientific & Common Name Table Filters
@@ -347,10 +354,10 @@ export default function HomeClient() {
             const dbKey = key === 'common_name' 
               ? 'common_name_chi'
               : key === 'scientific_name' ? 'scientific_name'
-              : key === 'order' ? (taxaType === 'fauna' ? 'order_eng' : 'family_eng')
-              : key === 'family' ? (taxaType === 'fauna' ? 'family_eng' : 'family_eng')
-              : key === 'genus' ? (taxaType === 'fauna' ? 'genus_eng' : 'genus_eng')
-              : key === 'iucn' ? (taxaType === 'fauna' ? 'iucn' : 'hk_rare_precious_note')
+              : key === 'order' ? ((taxaType === 'fauna' || taxaType === 'fungi') ? 'order_eng' : 'family_eng')
+              : key === 'family' ? 'family_eng'
+              : key === 'genus' ? 'genus_eng'
+              : key === 'iucn' ? ((taxaType === 'fauna' || taxaType === 'fungi') ? 'iucn' : 'hk_rare_precious_note')
               : key;
 
             if (Array.isArray(value)) {
@@ -369,7 +376,7 @@ export default function HomeClient() {
           });
         }
 
-        const fieldMap: Record<string, string> = taxaType === 'fauna' ? {
+        const fieldMap: Record<string, string> = (taxaType === 'fauna' || taxaType === 'fungi') ? {
           'common_name': language === 'zh' ? 'common_name_chi' : 'common_name_eng',
           'scientific_name': 'scientific_name',
           'rarity': 'iucn',
@@ -412,8 +419,14 @@ export default function HomeClient() {
     const fetchTableMetadata = async () => {
       if (isAuthLoading) return;
       
-      const rpcName = taxaType === 'fauna' ? 'get_fauna_table_metadata' : 'get_flora_table_metadata';
-      const currentSearch = taxaType === 'fauna' ? searchQuery.trim() : (searchQuery.trim() || plantFilters.searchQuery.trim());
+      const rpcName = taxaType === 'fauna' 
+        ? 'get_fauna_table_metadata' 
+        : taxaType === 'fungi' 
+          ? 'get_fungi_table_metadata' 
+          : 'get_flora_table_metadata';
+      const currentSearch = (taxaType === 'fauna' || taxaType === 'fungi')
+        ? searchQuery.trim() 
+        : (searchQuery.trim() || plantFilters.searchQuery.trim());
       
       const params = taxaType === 'fauna' ? {
         p_search: currentSearch,
@@ -429,6 +442,15 @@ export default function HomeClient() {
         p_native_status: (tableFilters.native_status?.length > 0) ? tableFilters.native_status : ((selectedFilters as any).status?.native_status || []),
         p_is_cap170: selectedFilters.isCap170 || false,
         p_is_cap586: selectedFilters.isCap586 || false
+      } : taxaType === 'fungi' ? {
+        p_search: currentSearch,
+        p_order: (tableFilters.order?.length > 0) ? tableFilters.order : (selectedFilters.taxonomy?.order_eng || []),
+        p_family: (tableFilters.family?.length > 0) ? tableFilters.family : (selectedFilters.taxonomy?.family_eng || []),
+        p_genus: (tableFilters.genus?.length > 0) ? tableFilters.genus : (selectedFilters.taxonomy?.genus_eng || []),
+        p_scientific_name: tableFilters.scientific_name || [],
+        p_common_name: tableFilters.common_name || [],
+        p_iucn: (tableFilters.iucn?.length > 0) ? tableFilters.iucn : (selectedFilters.iucn || []),
+        p_native_status: (tableFilters.native_status?.length > 0) ? tableFilters.native_status : ((selectedFilters as any).status?.native_status || [])
       } : {
         p_search: currentSearch,
         p_categories: (tableFilters.category?.length > 0) ? tableFilters.category : (plantFilters.categories || []),
@@ -447,9 +469,8 @@ export default function HomeClient() {
         // Data 為一個包含了各個欄位統計資訊的 JSON 對象
         const metadata = data || {};
         
-        // 確保每個欄位都有一個空的 array 以免渲染崩潰
         const safeMetadata: Record<string, any[]> = {};
-        const keys = taxaType === 'fauna' 
+        const keys = (taxaType === 'fauna' || taxaType === 'fungi')
             ? ['order', 'family', 'scientific_name', 'common_name', 'iucn', 'native_status']
             : ['family', 'genus', 'scientific_name', 'common_name', 'iucn', 'native_status'];
         
@@ -459,7 +480,7 @@ export default function HomeClient() {
 
         setTableMetadata(safeMetadata);
       } catch (err) {
-        console.error("Error fetching table metadata via RPC", err);
+        console.warn("Could not fetch table metadata via RPC, falling back", err);
       }
     };
 
@@ -714,7 +735,7 @@ export default function HomeClient() {
           {/* Sidebar Area */}
           <div className="shrink-0 min-[1101px]:w-[320px]">
             
-            {taxaType === 'fauna' ? (
+            {taxaType === 'fauna' || taxaType === 'fungi' ? (
                 <SidebarFilter
                     isOpen={isFilterOpen}
                     onClose={() => setIsFilterOpen(false)}

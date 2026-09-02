@@ -36,9 +36,10 @@ export default function TaxonomyDisplay({ species }: TaxonomyDisplayProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // 判斷是否為植物 - 使用更明確的類群標記
+  // 判斷是否為植物或真菌
   const isPlant = species.taxa_group === 'FLORA' || (!species.phylum_eng && !!(species as any).family_chi);
-  const taxaType = isPlant ? 'flora' : 'fauna';
+  const isFungi = species.taxa_group === 'FUNGI' || String(species.taxa_id || '').startsWith('fungi_');
+  const taxaType = isPlant ? 'flora' : (isFungi ? 'fungi' : 'fauna');
 
   const levels = isPlant ? [
     {

@@ -5,7 +5,7 @@ import { X, Filter } from 'lucide-react';
 import { useLanguage } from '@/context/LanguageContext';
 import { PlantFilterState } from '@/types/plants';
 import PlantFilterPanel from './plants/PlantFilterPanel';
-import TaxaGroupSwitcher from './search/TaxaGroupSwitcher';
+import TaxaGroupSwitcher, { TaxaType } from './search/TaxaGroupSwitcher';
 
 interface MobilePlantFilterProps {
   isOpen: boolean;
@@ -17,8 +17,8 @@ interface MobilePlantFilterProps {
   availableGenuses: any[];
   onReset: () => void;
   onSearchSubmit?: (val: string) => void;
-  activeTaxaType?: 'fauna' | 'flora';
-  onTaxaChange?: (type: 'fauna' | 'flora') => void;
+  activeTaxaType?: TaxaType;
+  onTaxaChange?: (type: TaxaType) => void;
 }
 
 export default function MobilePlantFilter({

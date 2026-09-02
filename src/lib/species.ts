@@ -8,6 +8,7 @@ export async function getSpeciesById(id: string | number): Promise<Species | nul
   const inputId = String(id);
   const isFaunaId = inputId.startsWith('fauna_');
   const isFloraId = inputId.startsWith('flora_');
+  const isFungiId = inputId.startsWith('fungi_');
   const numericId = !isNaN(Number(inputId)) ? parseInt(inputId, 10) : null;
 
   // 1. 嘗試依照 taxa_id 格式進行精準查詢
@@ -21,6 +22,11 @@ export async function getSpeciesById(id: string | number): Promise<Species | nul
     if (plantData) return mapPlantToSpecies(plantData);
   }
 
+  if (isFungiId) {
+    const { data: fungiData } = await supabase.from('fungi_species').select('*').eq('taxa_id', inputId).maybeSingle();
+    if (fungiData) return fungiData as Species;
+  }
+
   // 2. 兼容性查詢 (舊版數字 ID)
   if (numericId !== null) {
     // 優先查動物表 (id 或 inat_id)
@@ -32,6 +38,11 @@ export async function getSpeciesById(id: string | number): Promise<Species | nul
     const { data: plantData } = await supabase.from('plant_species').select('*')
       .eq('inat_id', numericId).maybeSingle();
     if (plantData) return mapPlantToSpecies(plantData);
+
+    // 再查真菌表 (id 或 inat_id)
+    const { data: fungiData } = await supabase.from('fungi_species').select('*')
+      .or(`id.eq.${numericId},inat_id.eq.${numericId}`).maybeSingle();
+    if (fungiData) return fungiData as Species;
   }
 
   return null;
