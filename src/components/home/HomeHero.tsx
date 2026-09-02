@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef, useCallback, Fragment } from 'react';
 import { useRouter } from 'next/navigation';
-import { Search, ChevronRight, ChevronDown, Sparkles, Loader2, Leaf, Bug, ArrowRight, CornerDownLeft, Camera } from 'lucide-react';
+import { Search, ChevronRight, ChevronDown, Sparkles, Loader2, Leaf, Bug, ArrowRight, CornerDownLeft, Camera, Dog, Check } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useLanguage } from '@/context/LanguageContext';
 import { useAuth } from '@/context/AuthContext';
@@ -11,6 +11,26 @@ import { useInaturalistPhoto } from '@/hooks/useInaturalistPhoto';
 import { useSpeciesPanel } from '@/context/SpeciesPanelContext';
 
 import { HighlightText } from '@/utils/formatters';
+
+function MushroomIcon({ className }: { className?: string }) {
+  return (
+    <svg 
+      viewBox="0 0 24 24" 
+      fill="none" 
+      stroke="currentColor" 
+      strokeWidth="2" 
+      strokeLinecap="round" 
+      strokeLinejoin="round" 
+      className={className}
+    >
+      <path d="M12 3C6.5 3 2.5 7.5 2.5 12.5c0 .3.2.5.5.5h18c.3 0 .5-.2.5-.5C21.5 7.5 17.5 3 12 3z" />
+      <path d="M10 13v6a2 2 0 0 0 4 0v-6" />
+      <circle cx="7.5" cy="8" r="1" fill="currentColor" />
+      <circle cx="16.5" cy="8" r="1" fill="currentColor" />
+      <circle cx="12" cy="6" r="1" fill="currentColor" />
+    </svg>
+  );
+}
 
 // 建議物種頭像/縮圖組件 (動態獲取 iNaturalist 圖片)
 function SuggestionItemAvatar({ item, isSelected }: { item: SuggestionItem; isSelected: boolean }) {
@@ -59,6 +79,33 @@ export default function HomeHero() {
   const [searchQuery, setSearchQuery] = useState('');
   const [searchType, setSearchType] = useState<'fauna' | 'flora' | 'fungi'>('fauna');
   const [showTypeDropdown, setShowTypeDropdown] = useState(false);
+
+  const typeOptions = [
+    { 
+      id: 'fauna' as const, 
+      label: language === 'zh' ? '動物 (Fauna)' : 'Fauna',
+      icon: Dog,
+      iconColor: 'text-amber-600',
+      activeBg: 'bg-amber-50 text-amber-900 border-amber-200/80',
+    },
+    { 
+      id: 'flora' as const, 
+      label: language === 'zh' ? '植物 (Flora)' : 'Flora',
+      icon: Leaf,
+      iconColor: 'text-emerald-600',
+      activeBg: 'bg-emerald-50 text-emerald-950 border-emerald-200/80',
+    },
+    { 
+      id: 'fungi' as const, 
+      label: language === 'zh' ? '真菌 (Fungi)' : 'Fungi',
+      icon: MushroomIcon,
+      iconColor: 'text-purple-600',
+      activeBg: 'bg-purple-50 text-purple-950 border-purple-200/80',
+    },
+  ];
+
+  const currentTypeOption = typeOptions.find(o => o.id === searchType) || typeOptions[0];
+  const CurrentTypeIcon = currentTypeOption.icon;
   
   // Suggestions state
   const [suggestions, setSuggestions] = useState<SuggestionItem[]>([]);
@@ -304,46 +351,56 @@ export default function HomeHero() {
                 <button
                   type="button"
                   onClick={() => setShowTypeDropdown(!showTypeDropdown)}
-                  className="flex items-center gap-1.5 md:gap-2 px-3 md:px-6 py-3 md:py-3.5 bg-slate-50 hover:bg-slate-100 text-slate-700 rounded-[2rem] transition-all font-black text-[10px] md:text-xs uppercase tracking-widest border border-slate-100"
+                  className="flex items-center gap-1 sm:gap-1.5 md:gap-2 px-2.5 sm:px-4 md:px-5 py-2.5 md:py-3.5 bg-slate-50 hover:bg-slate-100 text-slate-700 rounded-[2rem] transition-all font-black text-[11px] md:text-xs uppercase tracking-wider border border-slate-100 cursor-pointer shrink-0"
+                  aria-label={currentTypeOption.label}
+                  title={currentTypeOption.label}
                 >
-                  <span className="truncate max-w-[50px] md:max-w-none">
-                    {searchType === 'fauna' ? t('home.fauna') : searchType === 'flora' ? t('home.flora') : t('home.fungi')}
+                  <CurrentTypeIcon className={`w-4 h-4 md:w-4 md:h-4 ${currentTypeOption.iconColor} shrink-0`} />
+                  <span className="hidden sm:inline truncate">
+                    {currentTypeOption.label}
                   </span>
-                  <ChevronDown className={`w-3 h-3 md:w-4 md:h-4 transition-transform duration-300 ${showTypeDropdown ? 'rotate-180' : ''}`} />
+                  <ChevronDown className={`w-3 h-3 md:w-4 md:h-4 text-slate-400 transition-transform duration-300 ${showTypeDropdown ? 'rotate-180' : ''}`} />
                 </button>
 
                 <AnimatePresence>
                   {showTypeDropdown && (
                     <motion.div
-                      initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                      initial={{ opacity: 0, y: 8, scale: 0.96 }}
                       animate={{ opacity: 1, y: 0, scale: 1 }}
-                      exit={{ opacity: 0, y: 10, scale: 0.95 }}
-                      className="absolute top-full left-0 mt-2 w-40 md:w-48 bg-white/95 backdrop-blur-xl rounded-3xl shadow-2xl border border-slate-100 overflow-hidden z-50 p-2"
+                      exit={{ opacity: 0, y: 6, scale: 0.96 }}
+                      transition={{ duration: 0.15, ease: 'easeOut' }}
+                      className="absolute top-full left-0 mt-2 w-52 bg-white/95 backdrop-blur-xl rounded-2xl shadow-2xl border border-slate-200/90 overflow-hidden z-50 p-1.5 ring-1 ring-black/5"
                     >
-                      <button
-                        type="button"
-                        onClick={() => { setSearchType('fauna'); setShowTypeDropdown(false); }}
-                        className={`w-full flex items-center gap-2 md:gap-3 px-3 py-2.5 md:px-4 md:py-3 rounded-2xl text-left transition-all ${searchType === 'fauna' ? 'bg-emerald-600 text-white font-black' : 'hover:bg-slate-50 text-slate-600 font-bold'}`}
-                      >
-                        <div className={`w-1.5 h-1.5 md:w-2 md:h-2 rounded-full ${searchType === 'fauna' ? 'bg-white' : 'bg-emerald-50'}`} />
-                        <span className="text-[11px] md:text-sm">{t('home.fauna')}</span>
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => { setSearchType('flora'); setShowTypeDropdown(false); }}
-                        className={`w-full flex items-center gap-2 md:gap-3 px-3 py-2.5 md:px-4 md:py-3 rounded-2xl text-left transition-all ${searchType === 'flora' ? 'bg-emerald-600 text-white font-black' : 'hover:bg-slate-50 text-slate-600 font-bold'}`}
-                      >
-                        <div className={`w-1.5 h-1.5 md:w-2 md:h-2 rounded-full ${searchType === 'flora' ? 'bg-white' : 'bg-emerald-50'}`} />
-                        <span className="text-[11px] md:text-sm">{t('home.flora')}</span>
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => { setSearchType('fungi'); setShowTypeDropdown(false); }}
-                        className={`w-full flex items-center gap-2 md:gap-3 px-3 py-2.5 md:px-4 md:py-3 rounded-2xl text-left transition-all ${searchType === 'fungi' ? 'bg-emerald-600 text-white font-black' : 'hover:bg-slate-50 text-slate-600 font-bold'}`}
-                      >
-                        <div className={`w-1.5 h-1.5 md:w-2 md:h-2 rounded-full ${searchType === 'fungi' ? 'bg-white' : 'bg-emerald-50'}`} />
-                        <span className="text-[11px] md:text-sm">{t('home.fungi')}</span>
-                      </button>
+                      <div className="px-3 py-1.5 text-[10px] font-black uppercase tracking-wider text-slate-400 border-b border-slate-100 mb-1">
+                        {language === 'zh' ? '切換物種類別' : 'Switch Taxa Group'}
+                      </div>
+                      {typeOptions.map((opt) => {
+                        const isSelected = opt.id === searchType;
+                        const Icon = opt.icon;
+                        return (
+                          <button
+                            key={opt.id}
+                            type="button"
+                            onClick={() => {
+                              setSearchType(opt.id);
+                              setShowTypeDropdown(false);
+                            }}
+                            className={`w-full flex items-center justify-between gap-2.5 px-3 py-2 rounded-xl text-left transition-all duration-150 cursor-pointer ${
+                              isSelected 
+                                ? `${opt.activeBg} font-black shadow-2xs border` 
+                                : 'hover:bg-slate-50 text-slate-700 font-bold border border-transparent'
+                            }`}
+                          >
+                            <div className="flex items-center gap-2.5">
+                              <Icon className={`w-4 h-4 ${isSelected ? '' : opt.iconColor}`} />
+                              <span className="text-xs">{opt.label}</span>
+                            </div>
+                            {isSelected && (
+                              <Check className="w-3.5 h-3.5 text-current shrink-0 stroke-[2.5]" />
+                            )}
+                          </button>
+                        );
+                      })}
                     </motion.div>
                   )}
                 </AnimatePresence>
@@ -424,7 +481,7 @@ export default function HomeHero() {
                       {t('search.suggestions_title')}
                     </span>
                     <span>
-                      {searchType === 'fauna' ? t('home.fauna') : searchType === 'flora' ? t('home.flora') : t('home.fungi')}
+                      {currentTypeOption.label}
                     </span>
                   </div>
 

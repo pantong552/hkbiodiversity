@@ -69,8 +69,9 @@ export default function SpeciesDetailClient({
 
   const handleApproveDraft = async (draft: SpeciesDraft) => {
     if (!species || !user) return;
+    const isFungi = species.taxa_group === 'FUNGI' || String(species.taxa_id || '').startsWith('fungi_');
     const isPlant = species.taxa_group === 'FLORA' || (species as any).category_chi || String(species.taxa_id || '').startsWith('flora_');
-    const targetTable = isPlant ? 'plant_species' : 'species';
+    const targetTable = isFungi ? 'fungi_species' : (isPlant ? 'plant_species' : 'species');
 
     // 1. 更新正式物種表
     let query = supabase.from(targetTable).update(draft.draft_data);
@@ -247,7 +248,13 @@ export default function SpeciesDetailClient({
             setReviewDraft(null);
           }}
           species={species}
-          tableName="species"
+          tableName={
+            species.taxa_group === 'FUNGI' || String(species.taxa_id || '').startsWith('fungi_')
+              ? 'fungi_species'
+              : species.taxa_group === 'FLORA' || (species as any).category_chi || String(species.taxa_id || '').startsWith('flora_')
+                ? 'plant_species'
+                : 'species'
+          }
           reviewDraft={reviewDraft}
           onApproveDraft={handleApproveDraft}
           onRejectDraft={handleRejectDraft}

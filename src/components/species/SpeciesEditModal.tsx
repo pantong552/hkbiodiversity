@@ -81,11 +81,12 @@ export default function SpeciesEditModal({
     async function loadLatestDraftAndPublished() {
       setLoadingDraft(true);
       try {
-        const isPlant = tableName === 'plant_species' || species?.taxa_group === 'FLORA' || (species as any)?.category_chi || String(speciesId).startsWith('flora_');
-        const targetTable = isPlant ? 'plant_species' : 'species';
+        const isFungi = tableName === 'fungi_species' || species?.taxa_group === 'FUNGI' || String(species?.taxa_id || '').startsWith('fungi_') || String(speciesId || '').startsWith('fungi_');
+        const isPlant = tableName === 'plant_species' || species?.taxa_group === 'FLORA' || (species as any)?.category_chi || String(species?.taxa_id || '').startsWith('flora_') || String(speciesId || '').startsWith('flora_');
+        const targetTable = isFungi ? 'fungi_species' : (isPlant ? 'plant_species' : 'species');
 
         // 1. 調用強健查詢函數抓取 Supabase 正式資料庫中最純淨的正本行數據
-        const pubData = await fetchSpeciesOrPlantRow(speciesId, tableName);
+        const pubData = await fetchSpeciesOrPlantRow(speciesId, targetTable);
         const basePub = pubData || species;
         setPublishedSpecies(basePub);
 
@@ -211,11 +212,12 @@ export default function SpeciesEditModal({
         return;
       }
 
+      const isFungi = tableName === 'fungi_species' || species?.taxa_group === 'FUNGI' || String(species?.taxa_id || '').startsWith('fungi_') || String(speciesId || '').startsWith('fungi_');
+      const isPlant = tableName === 'plant_species' || species?.taxa_group === 'FLORA' || (species as any)?.category_chi || String(species?.taxa_id || '').startsWith('flora_') || String(speciesId || '').startsWith('flora_');
+      const targetTable = isFungi ? 'fungi_species' : (isPlant ? 'plant_species' : 'species');
+
       if (isAdmin) {
-        // Admin: 直接更新正本 species / plant_species 表
-        const isPlant = tableName === 'plant_species' || species?.taxa_group === 'FLORA' || (species as any)?.category_chi || String(species?.taxa_id || '').startsWith('flora_');
-        const targetTable = isPlant ? 'plant_species' : 'species';
-        
+        // Admin: 直接更新正本 species / plant_species / fungi_species 表
         let query = supabase.from(targetTable).update(updatedData);
         if (species.id) {
           query = query.eq('id', species.id);
@@ -248,7 +250,6 @@ export default function SpeciesEditModal({
 
       } else {
         // Curator: 提交/更新草稿待 Admin 審核
-        const targetTable = tableName === 'plant_species' ? 'plant_species' : 'species';
         const nowIso = new Date().toISOString();
         const isUpdateMode = !!(activeDraft && activeDraft.status !== 'approved');
 
@@ -584,7 +585,13 @@ export default function SpeciesEditModal({
             </div>
           ) : (
             <SpeciesDetailEditor
-              table={tableName}
+              table={
+                tableName === 'fungi_species' || species?.taxa_group === 'FUNGI' || String(species?.taxa_id || '').startsWith('fungi_') || String(speciesId || '').startsWith('fungi_')
+                  ? 'fungi_species'
+                  : tableName === 'plant_species' || species?.taxa_group === 'FLORA' || (species as any)?.category_chi || String(species?.taxa_id || '').startsWith('flora_') || String(speciesId || '').startsWith('flora_')
+                    ? 'plant_species'
+                    : 'species'
+              }
               data={editorData}
               originalData={publishedSpecies || species}
               publishedOriginal={publishedSpecies || species}

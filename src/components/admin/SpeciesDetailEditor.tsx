@@ -1529,7 +1529,7 @@ export default function SpeciesDetailEditor({ table, data, originalData, publish
 
           // 處理新增：把目前物種 A 加到被新增物種 B 的 similar_species 中
           for (const targetId of added) {
-            const targetTable = targetId.startsWith('flora_') ? 'plant_species' : 'species';
+            const targetTable = targetId.startsWith('flora_') ? 'plant_species' : targetId.startsWith('fungi_') ? 'fungi_species' : 'species';
             const { data: targetData } = await supabase
               .from(targetTable)
               .select('similar_species')
@@ -1551,7 +1551,7 @@ export default function SpeciesDetailEditor({ table, data, originalData, publish
 
           // 處理移除：把目前物種 A 從被移除物種 C 的 similar_species 中刪除
           for (const targetId of removed) {
-            const targetTable = targetId.startsWith('flora_') ? 'plant_species' : 'species';
+            const targetTable = targetId.startsWith('flora_') ? 'plant_species' : targetId.startsWith('fungi_') ? 'fungi_species' : 'species';
             const { data: targetData } = await supabase
               .from(targetTable)
               .select('similar_species')

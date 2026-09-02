@@ -244,7 +244,14 @@ export default function CuratorDraftsSection() {
             setTargetSpecies(null);
           }}
           species={targetSpecies}
-          tableName={selectedDraft?.table_name || (targetSpecies.taxa_group === 'FLORA' ? 'plant_species' : 'species')}
+          tableName={
+            selectedDraft?.table_name || 
+            (targetSpecies.taxa_group === 'FUNGI' || String(targetSpecies.taxa_id || '').startsWith('fungi_')
+              ? 'fungi_species'
+              : targetSpecies.taxa_group === 'FLORA'
+                ? 'plant_species'
+                : 'species')
+          }
           reviewDraft={selectedDraft}
           onSuccess={() => {
             fetchMyDrafts();

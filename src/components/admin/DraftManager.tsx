@@ -390,11 +390,23 @@ export default function DraftManager() {
             setTargetSpecies(null);
           }}
           species={targetSpecies}
-          tableName={selectedDraft?.table_name || (targetSpecies.taxa_group === 'FLORA' ? 'plant_species' : 'species')}
+          tableName={
+            selectedDraft?.table_name || 
+            (targetSpecies.taxa_group === 'FUNGI' || String(targetSpecies.taxa_id || '').startsWith('fungi_')
+              ? 'fungi_species'
+              : targetSpecies.taxa_group === 'FLORA'
+                ? 'plant_species'
+                : 'species')
+          }
           reviewDraft={selectedDraft}
           onApproveDraft={async (draft, updatedData) => {
             if (!profile) return;
-            const targetTable = draft.table_name || 'species';
+            const targetTable = draft.table_name || 
+              (String(draft.species_id || '').startsWith('fungi_') 
+                ? 'fungi_species' 
+                : String(draft.species_id || '').startsWith('flora_') 
+                  ? 'plant_species' 
+                  : 'species');
             const finalData = updatedData || draft.draft_data;
             
             // 1. 取得物種實體資料以進行精準更新
