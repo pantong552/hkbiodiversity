@@ -147,9 +147,12 @@ export default function HomeClient() {
 
                         items.forEach((i: any) => {
                             const nameEng = i.en || i.name;
+                            const chi = getTaxonomyChi(rankKey, 'flora', nameEng);
+                            const hasChi = language === 'zh' && chi && chi !== nameEng && !chi.includes('\ufffd');
+                            const display = hasChi ? `${chi} (${nameEng})` : nameEng;
                             uniqueMap.set(nameEng, {
                                 name: nameEng,
-                                display: language === 'zh' ? getTaxonomyChi(rankKey, 'flora', nameEng) : nameEng,
+                                display: display,
                                 count: i.count
                             });
                         });
@@ -158,9 +161,12 @@ export default function HomeClient() {
                         const currentSelected = level === 'categories' ? (plantFilters.categories || []) : (level === 'families' ? (plantFilters.families || []) : (plantFilters.genuses || []));
                         currentSelected.forEach((selName: string) => {
                             if (!uniqueMap.has(selName)) {
+                                const chi = getTaxonomyChi(rankKey, 'flora', selName);
+                                const hasChi = language === 'zh' && chi && chi !== selName && !chi.includes('\ufffd');
+                                const display = hasChi ? `${chi} (${selName})` : selName;
                                 uniqueMap.set(selName, {
                                     name: selName,
-                                    display: language === 'zh' ? getTaxonomyChi(rankKey, 'flora', selName) : selName,
+                                    display: display,
                                     count: 0
                                 });
                             }

@@ -208,10 +208,14 @@ export default function SidebarFilter({
               if (language === 'zh') {
                 const rank = level.replace('_eng', '') as any;
                 const mappedChi = getTaxonomyChi(rank, activeTaxaType === 'fungi' ? 'fungi' : 'fauna', name);
-                if (mappedChi !== name) {
+                if (mappedChi && mappedChi !== name) {
                   chiName = mappedChi;
                 }
               }
+
+              // 專業現代化雙語顯示：當有中文時，以「中文 (英文/學名)」雙語呈現
+              const hasValidChi = language === 'zh' && chiName && chiName !== name && !chiName.includes('\ufffd');
+              const bilingualDisplay = hasValidChi ? `${chiName} (${name})` : name;
 
               const existing = uniqueItems.get(name);
               if (existing) {
@@ -220,12 +224,12 @@ export default function SidebarFilter({
                 const isCurrentGlitchy = existing.display.includes('\ufffd');
                 const isNewGlitchy = chiName.includes('\ufffd');
                 if ((isCurrentGlitchy && !isNewGlitchy) || (count > (existing.count - count) && !isNewGlitchy)) {
-                  existing.display = language === 'zh' ? chiName : name;
+                  existing.display = bilingualDisplay;
                 }
               } else {
                 uniqueItems.set(name, {
                   name: name,
-                  display: language === 'zh' ? chiName : name,
+                  display: bilingualDisplay,
                   count: count
                 });
               }
@@ -239,11 +243,14 @@ export default function SidebarFilter({
                 if (language === 'zh') {
                   const rank = level.replace('_eng', '') as any;
                   const mappedChi = getTaxonomyChi(rank, activeTaxaType === 'fungi' ? 'fungi' : 'fauna', selName);
-                  if (mappedChi !== selName) chiName = mappedChi;
+                  if (mappedChi && mappedChi !== selName) chiName = mappedChi;
                 }
+                const hasValidChi = language === 'zh' && chiName && chiName !== selName && !chiName.includes('\ufffd');
+                const bilingualDisplay = hasValidChi ? `${chiName} (${selName})` : selName;
+
                 uniqueItems.set(selName, {
                   name: selName,
-                  display: language === 'zh' ? chiName : selName,
+                  display: bilingualDisplay,
                   count: 0
                 });
               }
@@ -443,7 +450,11 @@ export default function SidebarFilter({
                     onChange={(values) => handleTaxonomyChange('informal_group_eng', values)}
                     placeholder={TAXONOMY_LABELS.informal_group_eng}
                     inferredValue={inferredParents.informal_group_eng}
-                    getDisplayLabel={(val) => language === 'zh' ? getTaxonomyChi('informal_group' as any, activeTaxaType === 'fungi' ? 'fungi' : 'fauna', val) : val}
+                    getDisplayLabel={(val) => {
+                      if (language !== 'zh') return val;
+                      const chi = getTaxonomyChi('informal_group' as any, activeTaxaType === 'fungi' ? 'fungi' : 'fauna', val);
+                      return chi && chi !== val && !chi.includes('\ufffd') ? `${chi} (${val})` : val;
+                    }}
                   />
                 </div>
               )}
@@ -473,7 +484,11 @@ export default function SidebarFilter({
                           onChange={(values) => handleTaxonomyChange(level, values)}
                           placeholder={TAXONOMY_LABELS[level]}
                           inferredValue={inferredParents[level]}
-                          getDisplayLabel={(val) => language === 'zh' ? getTaxonomyChi(rank, activeTaxaType === 'fungi' ? 'fungi' : 'fauna', val) : val}
+                          getDisplayLabel={(val) => {
+                            if (language !== 'zh') return val;
+                            const chi = getTaxonomyChi(rank, activeTaxaType === 'fungi' ? 'fungi' : 'fauna', val);
+                            return chi && chi !== val && !chi.includes('\ufffd') ? `${chi} (${val})` : val;
+                          }}
                         />
                       );
                     })}

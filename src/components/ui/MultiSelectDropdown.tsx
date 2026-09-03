@@ -283,13 +283,31 @@ export default function MultiSelectDropdown({
                               : 'text-slate-600 hover:bg-slate-50 hover:text-emerald-900'
                           }`}
                         >
-                          <div className="flex items-center gap-2 overflow-hidden">
+                          <div className="flex items-center gap-2 overflow-hidden flex-1 min-w-0">
                             <div className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 transition-all ${isSelected ? 'bg-emerald-600 border-emerald-600 text-white' : 'bg-white border-slate-200 text-transparent group-hover/item:border-emerald-300'}`}>
                               <Check className="w-3 h-3 stroke-[3px]" />
                             </div>
-                            <span className={`text-xs font-bold truncate ${isSelected ? 'text-emerald-700' : 'text-slate-700'}`}>
-                              {displayLabel}
-                            </span>
+                            {(() => {
+                              const bilingualMatch = typeof displayLabel === 'string' ? displayLabel.match(/^([^(]+)\s*\((.+)\)$/) : null;
+                              if (bilingualMatch) {
+                                const [, chi, en] = bilingualMatch;
+                                return (
+                                  <div className="flex items-baseline gap-1.5 truncate min-w-0">
+                                    <span className={`text-xs font-bold truncate ${isSelected ? 'text-emerald-800' : 'text-slate-800 group-hover/item:text-slate-900'}`}>
+                                      {chi.trim()}
+                                    </span>
+                                    <span className={`text-[11px] ${isSelected ? 'text-emerald-600/80 font-medium' : 'text-slate-400 font-normal'} italic tracking-tight truncate shrink-0`}>
+                                      ({en.trim()})
+                                    </span>
+                                  </div>
+                                );
+                              }
+                              return (
+                                <span className={`text-xs font-bold truncate ${isSelected ? 'text-emerald-700' : 'text-slate-700'}`}>
+                                  {displayLabel}
+                                </span>
+                              );
+                            })()}
                           </div>
                           <span className={`text-[9px] font-bold shrink-0 ${isSelected ? 'text-emerald-600/70' : 'text-slate-300'}`}>
                             {opt.count}
@@ -406,11 +424,29 @@ export default function MultiSelectDropdown({
                           : 'bg-white border-slate-50'
                       }`}
                     >
-                      <div className="flex items-center gap-3">
+                      <div className="flex items-center gap-3 min-w-0 flex-1">
                         <div className={`w-6 h-6 rounded-lg border-2 flex items-center justify-center shrink-0 transition-all ${isSelected ? 'bg-emerald-600 border-emerald-600 text-white' : 'bg-white border-slate-200 text-transparent'}`}>
                           <Check className="w-4 h-4 stroke-[3px]" />
                         </div>
-                        <span className={`font-black text-sm ${isSelected ? 'text-emerald-900' : 'text-slate-700'}`}>{displayValue}</span>
+                        {(() => {
+                          const bilingualMatch = typeof displayValue === 'string' ? displayValue.match(/^([^(]+)\s*\((.+)\)$/) : null;
+                          if (bilingualMatch) {
+                            const [, chi, en] = bilingualMatch;
+                            return (
+                              <div className="flex items-baseline gap-2 truncate min-w-0">
+                                <span className={`font-black text-sm ${isSelected ? 'text-emerald-950' : 'text-slate-800'}`}>
+                                  {chi.trim()}
+                                </span>
+                                <span className={`text-xs ${isSelected ? 'text-emerald-700/80 font-medium' : 'text-slate-400 font-normal'} italic tracking-tight truncate shrink-0`}>
+                                  ({en.trim()})
+                                </span>
+                              </div>
+                            );
+                          }
+                          return (
+                            <span className={`font-black text-sm ${isSelected ? 'text-emerald-900' : 'text-slate-700'}`}>{displayValue}</span>
+                          );
+                        })()}
                       </div>
                       <span className={`text-[10px] font-bold ${isSelected ? 'text-emerald-600/70' : 'text-slate-300'}`}>
                         {opt.count} {language === 'zh' ? '個結果' : 'results'}
