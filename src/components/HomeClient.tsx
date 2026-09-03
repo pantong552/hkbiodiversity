@@ -60,6 +60,11 @@ export default function HomeClient() {
   const [toolbarWidth, setToolbarWidth] = useState(0);
   const toolbarRef = useRef<HTMLDivElement>(null);
   const fetchIdRef = useRef(0); // 用於追踪請求序號以防止 Race Condition
+  const openSpeciesIdsRef = useRef(openSpeciesIds);
+  openSpeciesIdsRef.current = openSpeciesIds;
+  const isExpandedRef = useRef(isExpanded);
+  isExpandedRef.current = isExpanded;
+  const isFromSpeciesClickRef = useRef(false);
 
   // Dynamic width sensing for toolbar labels
   useEffect(() => {
@@ -409,7 +414,18 @@ export default function HomeClient() {
         setTotalResultCount(total);
 
         // 手機模式下，若結果太少不足以觸發出現 Scrollbar（例如少於 4 筆），直接開啟 mobile filter panel
-        if (typeof window !== 'undefined' && window.innerWidth <= 1100 && total <= 3) {
+        // 注意：若已有物種詳細浮動面板開啟 (openSpeciesIds.length > 0 或 isExpanded)，
+        // 或是由首頁 Quick Search 點選物種建議進入，絕不可自動彈出 sidebar
+        const hasOpenSpecies = openSpeciesIdsRef.current.length > 0 || isExpandedRef.current;
+        const isFromSpeciesClick = isFromSpeciesClickRef.current;
+
+        if (
+          typeof window !== 'undefined' && 
+          window.innerWidth <= 1100 && 
+          total <= 3 && 
+          !hasOpenSpecies && 
+          !isFromSpeciesClick
+        ) {
           setIsFilterOpen(true);
         }
       } catch (err: any) {
@@ -567,6 +583,10 @@ export default function HomeClient() {
       const internalSearch = sessionStorage.getItem('hkbc_quick_search');
       if (internalSearch) {
         const payload = JSON.parse(internalSearch);
+        if (payload.fromSpeciesClick) {
+          isFromSpeciesClickRef.current = true;
+          setIsFilterOpen(false);
+        }
         if (payload.q) {
           setSearchQuery(payload.q);
           if (payload.type === 'flora') {
@@ -582,7 +602,7 @@ export default function HomeClient() {
     } catch (err) {
       console.error('Failed to parse internal search payload', err);
     }
-  }, []); // 嚴格僅執行一次
+  }, [setIsFilterOpen]); // 嚴格僅執行一次
 
   // 2. 持續監聽 URL 參數 (species, taxonomy, type, q)
   useEffect(() => {

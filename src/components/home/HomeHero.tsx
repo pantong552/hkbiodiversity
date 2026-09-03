@@ -71,7 +71,7 @@ function SuggestionItemAvatar({ item, isSelected }: { item: SuggestionItem; isSe
 
 export default function HomeHero() {
   const { language, t } = useLanguage();
-  const { setAutoIdOpen } = useSpeciesPanel();
+  const { setAutoIdOpen, addSpecies, skipNextAutoCollapse, setIsFilterOpen } = useSpeciesPanel();
   const { isAuthorized, requireAuth } = useAuth();
   const router = useRouter();
   
@@ -167,8 +167,6 @@ export default function HomeHero() {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  const { addSpecies, skipNextAutoCollapse } = useSpeciesPanel();
-
   // Open species in Floating Panel AND navigate background to /database with keyword search
   const navigateToSpecies = useCallback((taxaId: string) => {
     if (!requireAuth(undefined, 'Quick Search 快速搜尋')) {
@@ -178,12 +176,13 @@ export default function HomeHero() {
 
     setShowSuggestions(false);
 
-    // 1. 儲存關鍵字搜尋條件於 sessionStorage
+    // 1. 儲存關鍵字搜尋條件於 sessionStorage (附帶 fromSpeciesClick 標記)
     const trimmed = searchQuery.trim();
     if (trimmed) {
       const payload = {
         q: trimmed,
-        type: searchType
+        type: searchType,
+        fromSpeciesClick: true
       };
       try {
         sessionStorage.setItem('hkbc_quick_search', JSON.stringify(payload));
@@ -195,12 +194,15 @@ export default function HomeHero() {
     // 2. 跳過本次導航的自動收合浮動面板
     skipNextAutoCollapse();
 
-    // 3. 切換背景頁面至 /database
+    // 3. 確保行動模式下不會開啟側邊欄 (Sidebar)
+    setIsFilterOpen(false);
+
+    // 4. 切換背景頁面至 /database
     router.push('/database');
 
-    // 4. 同時開啟浮動面板顯示選中的物種詳情
+    // 5. 同時開啟浮動面板顯示選中的物種詳情
     addSpecies(taxaId);
-  }, [searchQuery, searchType, router, addSpecies, skipNextAutoCollapse, requireAuth]);
+  }, [searchQuery, searchType, router, addSpecies, skipNextAutoCollapse, requireAuth, setIsFilterOpen]);
 
   const handleSearch = (e?: React.FormEvent) => {
     if (e) e.preventDefault();
