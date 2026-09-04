@@ -268,9 +268,19 @@ export default function TaxonomyDisplay({ species }: TaxonomyDisplayProps) {
                 <span className="text-[11px] font-bold text-slate-400 block leading-tight">
                   {language === 'zh' ? '英文俗名別名' : 'English Alias'}
                 </span>
-                <p className="text-sm font-bold text-slate-800 leading-snug">
-                  {engAliases.length > 0 ? engAliases.join(', ') : <span className="text-slate-400 font-normal">-</span>}
-                </p>
+                <div className="text-sm font-bold text-slate-800 leading-snug">
+                  {engAliases.length > 0 ? (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1">
+                      {engAliases.map((alias, idx) => (
+                        <div key={`eng-alias-${idx}`} className="break-words leading-snug py-0.5">
+                          {alias}
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <span className="text-slate-400 font-normal">-</span>
+                  )}
+                </div>
               </div>
 
               {/* 同物異名 */}
