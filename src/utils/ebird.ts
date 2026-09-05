@@ -103,6 +103,9 @@ export function getEbirdEvidenceLabel(evidence: string, lang: 'zh' | 'en' = 'en'
 }
 
 
+const ebirdStatsCache = new Map<string, { seasonality: { month: number; count: number }[]; history: { year: number; count: number }[] }>();
+const ebirdPendingPromises = new Map<string, Promise<{ seasonality: { month: number; count: number }[]; history: { year: number; count: number }[] }>>();
+
 /**
  * 獲取 eBird 的季節性 (1-12月) 及歷史年份觀察統計
  */
@@ -122,47 +125,65 @@ export async function fetchEbirdObservationStats(
     return emptyResult;
   }
 
-  const currentYear = new Date().getFullYear();
-  const startYear = 2012;
-  const yearList: number[] = [];
-  for (let y = startYear; y <= currentYear; y++) {
-    yearList.push(y);
+  const cacheKey = ebirdSpeciesCode.trim().toLowerCase();
+  if (ebirdStatsCache.has(cacheKey)) {
+    return ebirdStatsCache.get(cacheKey)!;
   }
 
-  const monthList = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
-
-  try {
-    const [seasonalityResults, historyResults] = await Promise.all([
-      // 1. Seasonality (12 months)
-      mode === 'history' ? Promise.resolve(emptyResult.seasonality) : Promise.all(
-        monthList.map(async (m) => {
-          try {
-            const pts = await fetchEbirdMapPoints(ebirdSpeciesCode, { bmo: m, emo: m });
-            return { month: m, count: pts.length };
-          } catch {
-            return { month: m, count: 0 };
-          }
-        })
-      ),
-      // 2. History (years)
-      mode === 'seasonality' ? Promise.resolve(emptyResult.history) : Promise.all(
-        yearList.map(async (y) => {
-          try {
-            const pts = await fetchEbirdMapPoints(ebirdSpeciesCode, { byr: y, eyr: y, yr: String(y) });
-            return { year: y, count: pts.length };
-          } catch {
-            return { year: y, count: 0 };
-          }
-        })
-      )
-    ]);
-
-    return {
-      seasonality: seasonalityResults,
-      history: historyResults
-    };
-  } catch (err) {
-    console.error('[eBird Stats] 獲取統計資料失敗:', err);
-    return emptyResult;
+  if (ebirdPendingPromises.has(cacheKey)) {
+    return ebirdPendingPromises.get(cacheKey)!;
   }
+
+  const promise = (async () => {
+    const currentYear = new Date().getFullYear();
+    const startYear = 2012;
+    const yearList: number[] = [];
+    for (let y = startYear; y <= currentYear; y++) {
+      yearList.push(y);
+    }
+
+    const monthList = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
+
+    try {
+      const [seasonalityResults, historyResults] = await Promise.all([
+        // 1. Seasonality (12 months)
+        Promise.all(
+          monthList.map(async (m) => {
+            try {
+              const pts = await fetchEbirdMapPoints(ebirdSpeciesCode, { bmo: m, emo: m });
+              return { month: m, count: pts.length };
+            } catch {
+              return { month: m, count: 0 };
+            }
+          })
+        ),
+        // 2. History (years)
+        Promise.all(
+          yearList.map(async (y) => {
+            try {
+              const pts = await fetchEbirdMapPoints(ebirdSpeciesCode, { byr: y, eyr: y, yr: String(y) });
+              return { year: y, count: pts.length };
+            } catch {
+              return { year: y, count: 0 };
+            }
+          })
+        )
+      ]);
+
+      const finalResult = {
+        seasonality: seasonalityResults,
+        history: historyResults
+      };
+      ebirdStatsCache.set(cacheKey, finalResult);
+      ebirdPendingPromises.delete(cacheKey);
+      return finalResult;
+    } catch (err) {
+      console.error('[eBird Stats] 獲取統計資料失敗:', err);
+      ebirdPendingPromises.delete(cacheKey);
+      return emptyResult;
+    }
+  })();
+
+  ebirdPendingPromises.set(cacheKey, promise);
+  return promise;
 }

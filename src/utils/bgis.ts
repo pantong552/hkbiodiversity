@@ -152,6 +152,9 @@ export async function fetchBgisSpeciesList(
   }
 }
 
+const bgisStatsCache = new Map<string, { seasonality: { month: number; count: number }[]; history: { year: number; count: number }[] }>();
+const bgisPendingPromises = new Map<string, Promise<{ seasonality: { month: number; count: number }[]; history: { year: number; count: number }[] }>>();
+
 /**
  * 獲取 BGIS / HKBIH 的季節性 (1-12月) 及歷史年份觀察統計
  */
@@ -172,140 +175,160 @@ export async function fetchBgisObservationStats(
     return emptyResult;
   }
 
-  const searchUrl = '/bgis-api/species/search';
-  const listUrl = '/bgis-api/occurrence/speciesList';
-  const keywordsToTry = [scientificName, chineseName].filter(Boolean) as string[];
+  const cacheKey = `${scientificName.trim().toLowerCase()}_${(chineseName || '').trim().toLowerCase()}`;
+  if (bgisStatsCache.has(cacheKey)) {
+    return bgisStatsCache.get(cacheKey)!;
+  }
 
-  let targetItem: BgisSearchRecord | null = null;
+  if (bgisPendingPromises.has(cacheKey)) {
+    return bgisPendingPromises.get(cacheKey)!;
+  }
 
-  for (const kw of keywordsToTry) {
-    try {
-      const searchRes = await fetch(searchUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json, text/plain, */*'
-        },
-        body: JSON.stringify({
-          action: "list_species",
-          type: "species",
-          kw: kw,
-          animal_group: 0,
-          dataset: [],
-          months: [],
-          years: [],
-          page: 1,
-          originMonthFilter: "",
-          originYearFilter: ""
-        })
-      });
+  const promise = (async () => {
+    const searchUrl = '/bgis-api/species/search';
+    const listUrl = '/bgis-api/occurrence/speciesList';
+    const keywordsToTry = [scientificName, chineseName].filter(Boolean) as string[];
 
-      if (!searchRes.ok) continue;
-      const searchData = await searchRes.json();
-      const records: BgisSearchRecord[] = searchData.records || [];
+    let targetItem: BgisSearchRecord | null = null;
 
-      if (records.length > 0) {
-        const exactMatch = records.find(
-          r => r.scientific_name?.toLowerCase() === scientificName?.toLowerCase()
-        );
-        targetItem = exactMatch || records[0];
-        break;
+    for (const kw of keywordsToTry) {
+      try {
+        const searchRes = await fetch(searchUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json, text/plain, */*'
+          },
+          body: JSON.stringify({
+            action: "list_species",
+            type: "species",
+            kw: kw,
+            animal_group: 0,
+            dataset: [],
+            months: [],
+            years: [],
+            page: 1,
+            originMonthFilter: "",
+            originYearFilter: ""
+          })
+        });
+
+        if (!searchRes.ok) continue;
+        const searchData = await searchRes.json();
+        const records: BgisSearchRecord[] = searchData.records || [];
+
+        if (records.length > 0) {
+          const exactMatch = records.find(
+            r => r.scientific_name?.toLowerCase() === scientificName?.toLowerCase()
+          );
+          targetItem = exactMatch || records[0];
+          break;
+        }
+      } catch (err) {
+        console.error(`[BGIS Stats] 搜尋錯誤:`, err);
       }
+    }
+
+    if (!targetItem) {
+      bgisStatsCache.set(cacheKey, emptyResult);
+      bgisPendingPromises.delete(cacheKey);
+      return emptyResult;
+    }
+
+    try {
+      const currentYear = new Date().getFullYear();
+      const startYear = 2012;
+      const yearList: number[] = [];
+      for (let y = startYear; y <= currentYear; y++) {
+        yearList.push(y);
+      }
+
+      const monthList = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
+
+      const [seasonalityResults, historyResults] = await Promise.all([
+        // 1. Seasonality (12 months)
+        Promise.all(
+          monthList.map(async (m) => {
+            try {
+              const res = await fetch(listUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  id: targetItem!.species_id,
+                  name: targetItem!.scientific_name,
+                  GRID_NO: [],
+                  dataset: [],
+                  month: [m],
+                  year: []
+                })
+              });
+              if (!res.ok) return { month: m, count: 0 };
+              const listData = await res.json();
+              let count = 0;
+              if (Array.isArray(listData)) {
+                listData.forEach((item: BgisGridRecord) => {
+                  const validDatasets = (item.dataset || []).filter(
+                    ds => ds.datasetID === 62 || ds.datasetID === 109 || ds.datasetID === 113
+                  );
+                  count += validDatasets.reduce((sum, ds) => sum + ds.count, 0);
+                });
+              }
+              return { month: m, count };
+            } catch {
+              return { month: m, count: 0 };
+            }
+          })
+        ),
+        // 2. History (years)
+        Promise.all(
+          yearList.map(async (y) => {
+            try {
+              const res = await fetch(listUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  id: targetItem!.species_id,
+                  name: targetItem!.scientific_name,
+                  GRID_NO: [],
+                  dataset: [],
+                  month: [],
+                  year: [y]
+                })
+              });
+              if (!res.ok) return { year: y, count: 0 };
+              const listData = await res.json();
+              let count = 0;
+              if (Array.isArray(listData)) {
+                listData.forEach((item: BgisGridRecord) => {
+                  const validDatasets = (item.dataset || []).filter(
+                    ds => ds.datasetID === 62 || ds.datasetID === 109 || ds.datasetID === 113
+                  );
+                  count += validDatasets.reduce((sum, ds) => sum + ds.count, 0);
+                });
+              }
+              return { year: y, count };
+            } catch {
+              return { year: y, count: 0 };
+            }
+          })
+        )
+      ]);
+
+      const finalResult = {
+        seasonality: seasonalityResults,
+        history: historyResults
+      };
+      bgisStatsCache.set(cacheKey, finalResult);
+      bgisPendingPromises.delete(cacheKey);
+      return finalResult;
     } catch (err) {
-      console.error(`[BGIS Stats] 搜尋錯誤:`, err);
+      console.error('[BGIS Stats] 獲取統計資料失敗:', err);
+      bgisPendingPromises.delete(cacheKey);
+      return emptyResult;
     }
-  }
+  })();
 
-  if (!targetItem) {
-    return emptyResult;
-  }
-
-  try {
-    const currentYear = new Date().getFullYear();
-    const startYear = 2012;
-    const yearList: number[] = [];
-    for (let y = startYear; y <= currentYear; y++) {
-      yearList.push(y);
-    }
-
-    const monthList = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
-
-    const [seasonalityResults, historyResults] = await Promise.all([
-      // 1. Seasonality (12 months)
-      mode === 'history' ? Promise.resolve(emptyResult.seasonality) : Promise.all(
-        monthList.map(async (m) => {
-          try {
-            const res = await fetch(listUrl, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                id: targetItem!.species_id,
-                name: targetItem!.scientific_name,
-                GRID_NO: [],
-                dataset: [],
-                month: [m],
-                year: []
-              })
-            });
-            if (!res.ok) return { month: m, count: 0 };
-            const listData = await res.json();
-            let count = 0;
-            if (Array.isArray(listData)) {
-              listData.forEach((item: BgisGridRecord) => {
-                const validDatasets = (item.dataset || []).filter(
-                  ds => ds.datasetID === 62 || ds.datasetID === 109 || ds.datasetID === 113
-                );
-                count += validDatasets.reduce((sum, ds) => sum + ds.count, 0);
-              });
-            }
-            return { month: m, count };
-          } catch {
-            return { month: m, count: 0 };
-          }
-        })
-      ),
-      // 2. History (years)
-      mode === 'seasonality' ? Promise.resolve(emptyResult.history) : Promise.all(
-        yearList.map(async (y) => {
-          try {
-            const res = await fetch(listUrl, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                id: targetItem!.species_id,
-                name: targetItem!.scientific_name,
-                GRID_NO: [],
-                dataset: [],
-                month: [],
-                year: [y]
-              })
-            });
-            if (!res.ok) return { year: y, count: 0 };
-            const listData = await res.json();
-            let count = 0;
-            if (Array.isArray(listData)) {
-              listData.forEach((item: BgisGridRecord) => {
-                const validDatasets = (item.dataset || []).filter(
-                  ds => ds.datasetID === 62 || ds.datasetID === 109 || ds.datasetID === 113
-                );
-                count += validDatasets.reduce((sum, ds) => sum + ds.count, 0);
-              });
-            }
-            return { year: y, count };
-          } catch {
-            return { year: y, count: 0 };
-          }
-        })
-      )
-    ]);
-
-    return {
-      seasonality: seasonalityResults,
-      history: historyResults
-    };
-  } catch (err) {
-    console.error('[BGIS Stats] 獲取統計資料失敗:', err);
-    return emptyResult;
-  }
+  bgisPendingPromises.set(cacheKey, promise);
+  return promise;
 }
 

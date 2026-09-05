@@ -175,10 +175,13 @@ function ObservationChart({
   language: 'zh' | 'en';
   enabled: boolean;
 }) {
+  const statsKey = `${scientificName || ''}|${chineseName || ''}|${ebirdSpeciesCode || ''}|${isBirdGroup}`;
+  const initialCache = observationStatsCache[statsKey];
   const [mode, setMode] = useState<'seasonality' | 'history'>('seasonality');
-  const [bgisStats, setBgisStats] = useState<ObservationStats>({ seasonality: [], history: [] });
-  const [ebirdStats, setEbirdStats] = useState<ObservationStats>({ seasonality: [], history: [] });
-  const [isLoading, setIsLoading] = useState(true);
+  const [bgisStats, setBgisStats] = useState<ObservationStats>(initialCache?.bgis || { seasonality: [], history: [] });
+  const [ebirdStats, setEbirdStats] = useState<ObservationStats>(initialCache?.ebird || { seasonality: [], history: [] });
+  const [isBgisLoading, setIsBgisLoading] = useState(!initialCache?.bgis && !!(scientificName || chineseName));
+  const [isEbirdLoading, setIsEbirdLoading] = useState(!initialCache?.ebird && isBirdGroup && !!ebirdSpeciesCode);
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
   const [activeSources, setActiveSources] = useState<Set<'inat' | 'bgis' | 'ebird'>>(new Set(['inat', 'bgis', 'ebird']));
   const containerRef = useRef<HTMLDivElement>(null);
@@ -186,30 +189,51 @@ function ObservationChart({
   useEffect(() => {
     if (!enabled) return;
     const statsKey = `${scientificName || ''}|${chineseName || ''}|${ebirdSpeciesCode || ''}|${isBirdGroup}`;
-    const cacheKey = `${statsKey}|${mode}`;
-    let cancelled = false;
-    const cachedStats = observationStatsCache[cacheKey];
+    const cachedStats = observationStatsCache[statsKey];
     if (cachedStats) {
       setBgisStats(cachedStats.bgis);
       setEbirdStats(cachedStats.ebird);
-      setIsLoading(false);
+      setIsBgisLoading(false);
+      setIsEbirdLoading(false);
       return;
     }
-    setIsLoading(true);
-    Promise.all([
-      fetchBgisObservationStats(scientificName || '', chineseName, mode),
-      isBirdGroup && ebirdSpeciesCode ? fetchEbirdObservationStats(ebirdSpeciesCode, mode) : Promise.resolve({ seasonality: [], history: [] })
-    ]).then(([nextBgis, nextEbird]) => {
-      if (cancelled) return;
-      setBgisStats(nextBgis);
-      setEbirdStats(nextEbird);
-      observationStatsCache[cacheKey] = { bgis: nextBgis, ebird: nextEbird };
-      setIsLoading(false);
-    }).catch(() => {
-      if (!cancelled) setIsLoading(false);
-    });
+
+    let cancelled = false;
+    if (scientificName || chineseName) {
+      setIsBgisLoading(true);
+      fetchBgisObservationStats(scientificName || '', chineseName)
+        .then(nextBgis => {
+          if (cancelled) return;
+          setBgisStats(nextBgis);
+          setIsBgisLoading(false);
+        })
+        .catch(() => {
+          if (!cancelled) setIsBgisLoading(false);
+        });
+    }
+
+    if (isBirdGroup && ebirdSpeciesCode) {
+      setIsEbirdLoading(true);
+      fetchEbirdObservationStats(ebirdSpeciesCode)
+        .then(nextEbird => {
+          if (cancelled) return;
+          setEbirdStats(nextEbird);
+          setIsEbirdLoading(false);
+        })
+        .catch(() => {
+          if (!cancelled) setIsEbirdLoading(false);
+        });
+    }
+
     return () => { cancelled = true; };
-  }, [scientificName, chineseName, ebirdSpeciesCode, isBirdGroup, enabled, mode]);
+  }, [scientificName, chineseName, ebirdSpeciesCode, isBirdGroup, enabled]);
+
+  useEffect(() => {
+    if (!isBgisLoading && !isEbirdLoading) {
+      const statsKey = `${scientificName || ''}|${chineseName || ''}|${ebirdSpeciesCode || ''}|${isBirdGroup}`;
+      observationStatsCache[statsKey] = { bgis: bgisStats, ebird: ebirdStats };
+    }
+  }, [isBgisLoading, isEbirdLoading, bgisStats, ebirdStats, scientificName, chineseName, ebirdSpeciesCode, isBirdGroup]);
 
   const toggleSource = (src: 'inat' | 'bgis' | 'ebird') => {
     setActiveSources(prev => {
@@ -327,7 +351,8 @@ function ObservationChart({
       bgColor: 'bg-emerald-500',
       lightBg: 'bg-emerald-50 text-emerald-700 border-emerald-200',
       fillId: 'inatGradient',
-      total: totalInat
+      total: totalInat,
+      isLoading: false
     },
     bgis: {
       name: language === 'zh' ? 'HKBIH 生物資料庫' : 'HKBIH (BGIS)',
@@ -337,7 +362,8 @@ function ObservationChart({
       bgColor: 'bg-teal-500',
       lightBg: 'bg-teal-50 text-teal-700 border-teal-200',
       fillId: 'bgisGradient',
-      total: totalBgis
+      total: totalBgis,
+      isLoading: isBgisLoading
     },
     ebird: {
       name: language === 'zh' ? 'eBird 鳥類紀錄' : 'eBird Observations',
@@ -347,7 +373,8 @@ function ObservationChart({
       bgColor: 'bg-sky-500',
       lightBg: 'bg-sky-50 text-sky-700 border-sky-200',
       fillId: 'ebirdGradient',
-      total: totalEbird
+      total: totalEbird,
+      isLoading: isEbirdLoading
     }
   };
 
@@ -370,9 +397,9 @@ function ObservationChart({
       {/* Top Banner & Header */}
       <div className="border-b border-slate-100 bg-gradient-to-r from-slate-50/80 via-white to-emerald-50/30 p-5 sm:p-6">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex items-start gap-3.5">
-            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-600 text-white shadow-md shadow-emerald-500/20">
-              <TrendingUp className="h-5 w-5" />
+          <div className="flex items-start gap-3 sm:gap-3.5">
+            <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl sm:rounded-2xl bg-emerald-50 border border-emerald-100/50 flex items-center justify-center text-emerald-600 shrink-0 shadow-xs">
+              <TrendingUp className="w-4 h-4 sm:w-5 sm:h-5 text-emerald-600" />
             </div>
             <div>
               <div className="flex items-center gap-2">
@@ -388,7 +415,7 @@ function ObservationChart({
               </div>
               <p className="mt-0.5 text-xs font-semibold text-slate-500">
                 {mode === 'seasonality'
-                  ? (language === 'zh' ? '按月份統計之歷史累積觀測頻率分佈' : 'Monthly cumulative seasonal frequency distribution')
+                  ? (language === 'zh' ? '按月份統計之歷史累積觀測頻率分布' : 'Monthly cumulative seasonal frequency distribution')
                   : (language === 'zh' ? '按年份統計之物種年度觀測歷史趨勢' : 'Annual historical trend across recorded years')}
               </p>
             </div>
@@ -450,8 +477,12 @@ function ObservationChart({
                     style={{ backgroundColor: isSelected ? cfg.color : '#94a3b8' }}
                   />
                   <span>{cfg.shortName}</span>
-                  <span className={`text-[10px] font-bold px-1.5 py-0.2 rounded-md ${isSelected ? 'bg-white/80 shadow-2xs' : 'bg-slate-200 text-slate-500'}`}>
-                    {cfg.total.toLocaleString()}
+                  <span className={`inline-flex items-center justify-center min-w-[20px] text-[10px] font-bold px-1.5 py-0.5 rounded-md ${isSelected ? 'bg-white/80 shadow-2xs' : 'bg-slate-200 text-slate-500'}`}>
+                    {cfg.isLoading ? (
+                      <Loader2 className="h-2.5 w-2.5 animate-spin text-slate-400" />
+                    ) : (
+                      cfg.total.toLocaleString()
+                    )}
                   </span>
                   {isSelected ? (
                     <Eye className="h-3 w-3 opacity-60" />
@@ -484,7 +515,7 @@ function ObservationChart({
 
       {/* Chart Body Area */}
       <div className="relative p-4 sm:p-6" ref={containerRef}>
-        {isLoading ? (
+        {(isBgisLoading && isEbirdLoading) && !hasData && observations.length === 0 ? (
           <div className="flex h-[280px] flex-col items-center justify-center gap-2 text-sm font-semibold text-slate-400">
             <Loader2 className="h-6 w-6 animate-spin text-emerald-500" />
             <span>{language === 'zh' ? '正在載入分佈趨勢資料...' : 'Loading trend data...'}</span>
@@ -742,11 +773,17 @@ function ObservationChart({
                             </div>
                             <div className="flex items-center gap-1.5">
                               <span className="font-mono font-black text-slate-900 text-[12px]">
-                                {val.toLocaleString()}
+                                {cfg.isLoading ? (
+                                  <Loader2 className="h-2.5 w-2.5 animate-spin text-slate-400 inline-block" />
+                                ) : (
+                                  val.toLocaleString()
+                                )}
                               </span>
-                              <span className="text-[10px] text-slate-400 font-medium">
-                                ({pct}%)
-                              </span>
+                              {!cfg.isLoading && (
+                                <span className="text-[10px] text-slate-400 font-medium">
+                                  ({pct}%)
+                                </span>
+                              )}
                             </div>
                           </div>
                         );
