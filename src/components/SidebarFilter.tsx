@@ -346,8 +346,11 @@ export default function SidebarFilter({
   };
 
   const handleIUCNToggle = (value: string) => {
+    const isSelected = selected.iucn.includes(value);
+    if ((iucnCounts[value] || 0) === 0 && !isSelected) return;
+
     const newSelected = { ...selected };
-    if (newSelected.iucn.includes(value)) {
+    if (isSelected) {
       newSelected.iucn = newSelected.iucn.filter(v => v !== value);
     } else {
       newSelected.iucn = [...newSelected.iucn, value];
@@ -579,20 +582,21 @@ export default function SidebarFilter({
                     const config = getIUCNConfig(status);
                     const label = language === 'zh' ? config.label.zh : config.label.en;
 
-                    // Always show for complete filter list, but dim if count is 0 and not selected
+                    // Always show for complete filter list, but dim and disable if count is 0 and not selected
                     const isEmpty = count === 0 && !isSelected;
 
                     return (
                       <button
                         key={status}
+                        disabled={isEmpty}
                         onClick={() => handleIUCNToggle(status)}
                         className={`
                           px-3 py-1.5 rounded-xl text-[11px] font-black transition-all border shadow-sm flex items-center gap-1.5 uppercase tracking-wider
                           ${isSelected
                             ? `${config.styles} shadow-md scale-105 ring-2 ring-emerald-500/20`
                             : isEmpty
-                              ? 'bg-slate-50 border-slate-100 text-slate-300 opacity-50 grayscale hover:grayscale-0 hover:opacity-100'
-                              : 'bg-white border-slate-200 text-slate-600 hover:border-emerald-200 hover:bg-slate-50'}
+                              ? 'bg-slate-50 border-slate-100 text-slate-300 opacity-40 grayscale cursor-not-allowed'
+                              : 'bg-white border-slate-200 text-slate-600 hover:border-emerald-200 hover:bg-slate-50 cursor-pointer'}
                         `}
                       >
                         {isSelected && <CheckCircle2 className="w-3 h-3" />}
