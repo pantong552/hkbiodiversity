@@ -35,7 +35,13 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: 'speciesCode is required' }, { status: 400 });
   }
 
-  const ebirdUrl = `https://ebird.org/map/points?speciesCode=${encodeURIComponent(speciesCode)}&byr=1900&eyr=2026&yr=all&bmo=1&emo=12&maxY=22.589236214522156&maxX=114.51671170162061&minY=22.116124821214388&ev=Z&excludeExX=false&excludeExAll=false&minX=113.76208828853467&continue`;
+  const byr = searchParams.get('byr') || '1900';
+  const eyr = searchParams.get('eyr') || '2026';
+  const yr = searchParams.get('yr') || 'all';
+  const bmo = searchParams.get('bmo') || '1';
+  const emo = searchParams.get('emo') || '12';
+
+  const ebirdUrl = `https://ebird.org/map/points?speciesCode=${encodeURIComponent(speciesCode)}&byr=${encodeURIComponent(byr)}&eyr=${encodeURIComponent(eyr)}&yr=${encodeURIComponent(yr)}&bmo=${encodeURIComponent(bmo)}&emo=${encodeURIComponent(emo)}&maxY=22.589236214522156&maxX=114.51671170162061&minY=22.116124821214388&ev=Z&excludeExX=false&excludeExAll=false&minX=113.76208828853467&continue`;
 
   try {
     // 1. 取得當前 Edge Config / Memory 中 active 的 Session ID

@@ -6,14 +6,14 @@ import 'maplibre-gl/dist/maplibre-gl.css';
 import * as turf from '@turf/turf';
 import { fetchAllInatObservations, InatObservation } from '@/utils/inaturalist';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Calendar, User, ExternalLink, MapPin, Loader2, Info, Bird, Maximize, MousePointer2, Layers, Shield, Link as LinkIcon, Filter, Building2, Camera, ChevronDown, Check, CheckCircle2, Database, Sparkles } from 'lucide-react';
+import { X, Calendar, User, ExternalLink, MapPin, Loader2, Info, Bird, Maximize, MousePointer2, Layers, Shield, Link as LinkIcon, Filter, Building2, Camera, ChevronDown, Check, CheckCircle2, Database, Sparkles, TrendingUp, BarChart3, Activity, Eye, EyeOff } from 'lucide-react';
 import Image from 'next/image';
 import { useLanguage } from '@/context/LanguageContext';
 import { useAuth } from '@/context/AuthContext';
 import { FullscreenControl, NavigationControl as MapNavControl, Popup } from 'react-map-gl/maplibre';
 
-import { fetchBgisSpeciesList, BgisGridRecord, BgisDatasetItem, BGIS_DATASETS } from '@/utils/bgis';
-import { fetchEbirdMapPoints, EbirdRecord, fetchEbirdLocInfo, EbirdLocInfo, getEbirdEvidenceLabel } from '@/utils/ebird';
+import { fetchBgisSpeciesList, fetchBgisObservationStats, BgisGridRecord, BgisDatasetItem, BGIS_DATASETS } from '@/utils/bgis';
+import { fetchEbirdMapPoints, fetchEbirdObservationStats, EbirdRecord, fetchEbirdLocInfo, EbirdLocInfo, getEbirdEvidenceLabel } from '@/utils/ebird';
 
 /**
  * 將 iNaturalist 圖片 URL 轉換為 Vercel External Rewrite 相對路徑（反向代理）與指定尺寸
@@ -55,6 +55,720 @@ interface GridFeatureProperties {
   bgisDataset?: BgisDatasetItem[];
   ebirdCount?: number;
   ebirdRecords?: EbirdRecord[];
+}
+
+type ObservationChartPoint = { label: string; inat: number; bgis: number; ebird: number };
+type ObservationStats = {
+  seasonality: { month: number; count: number }[];
+  history: { year: number; count: number }[];
+};
+
+type SpeciesMapCacheEntry = {
+  observations: InatObservation[];
+  bgisList: BgisGridRecord[];
+  ebirdRecords: EbirdRecord[];
+  processedFeatures: any[];
+  totalBgisCount: number;
+};
+
+const speciesMapCache: Record<string, SpeciesMapCacheEntry> = {};
+const observationStatsCache: Record<string, { bgis: ObservationStats; ebird: ObservationStats }> = {};
+
+function getSpeciesDataKey({ taxonId, scientificName, chineseName, taxaGroup, ebirdSpeciesCode }: SpeciesMapProps): string {
+  return [taxonId || 0, scientificName || '', chineseName || '', taxaGroup || '', ebirdSpeciesCode || ''].join('|');
+}
+
+function getMonotoneSplinePath(coords: { x: number; y: number }[], baseY: number, topY: number): string {
+  const n = coords.length;
+  if (n === 0) return '';
+  if (n === 1) return `M ${coords[0].x.toFixed(1)} ${coords[0].y.toFixed(1)}`;
+  if (n === 2) return `M ${coords[0].x.toFixed(1)} ${coords[0].y.toFixed(1)} L ${coords[1].x.toFixed(1)} ${coords[1].y.toFixed(1)}`;
+
+  const dx: number[] = new Array(n - 1);
+  const dy: number[] = new Array(n - 1);
+  const slopes: number[] = new Array(n - 1);
+
+  for (let i = 0; i < n - 1; i++) {
+    dx[i] = coords[i + 1].x - coords[i].x;
+    dy[i] = coords[i + 1].y - coords[i].y;
+    slopes[i] = dx[i] !== 0 ? dy[i] / dx[i] : 0;
+  }
+
+  const tangents: number[] = new Array(n);
+  tangents[0] = slopes[0];
+  for (let i = 1; i < n - 1; i++) {
+    if (slopes[i - 1] * slopes[i] <= 0) {
+      tangents[i] = 0;
+    } else {
+      tangents[i] = (slopes[i - 1] + slopes[i]) / 2;
+    }
+  }
+  tangents[n - 1] = slopes[n - 2];
+
+  for (let i = 0; i < n - 1; i++) {
+    if (slopes[i] === 0) {
+      tangents[i] = 0;
+      tangents[i + 1] = 0;
+    } else {
+      const alpha = tangents[i] / slopes[i];
+      const beta = tangents[i + 1] / slopes[i];
+      if (alpha < 0) tangents[i] = 0;
+      if (beta < 0) tangents[i + 1] = 0;
+      const magSq = alpha * alpha + beta * beta;
+      if (magSq > 9) {
+        const tau = 3 / Math.sqrt(magSq);
+        tangents[i] = tau * alpha * slopes[i];
+        tangents[i + 1] = tau * beta * slopes[i];
+      }
+    }
+  }
+
+  let d = `M ${coords[0].x.toFixed(1)} ${coords[0].y.toFixed(1)}`;
+  for (let i = 0; i < n - 1; i++) {
+    const p0 = coords[i];
+    const p1 = coords[i + 1];
+    const segDx = dx[i];
+
+    const cp1x = p0.x + segDx / 3;
+    let cp1y = p0.y + (tangents[i] * segDx) / 3;
+
+    const cp2x = p1.x - segDx / 3;
+    let cp2y = p1.y - (tangents[i + 1] * segDx) / 3;
+
+    // Strict clamping: never dip below baseY (0 count baseline) or above top of chart
+    cp1y = Math.min(baseY, Math.max(topY, cp1y));
+    cp2y = Math.min(baseY, Math.max(topY, cp2y));
+
+    if (Math.abs(p0.y - baseY) < 0.01 && Math.abs(p1.y - baseY) < 0.01) {
+      cp1y = baseY;
+      cp2y = baseY;
+    }
+
+    d += ` C ${cp1x.toFixed(1)} ${cp1y.toFixed(1)}, ${cp2x.toFixed(1)} ${cp2y.toFixed(1)}, ${p1.x.toFixed(1)} ${p1.y.toFixed(1)}`;
+  }
+
+  return d;
+}
+
+function getMonotoneAreaPath(coords: { x: number; y: number }[], baseY: number, topY: number): string {
+  if (coords.length === 0) return '';
+  const lineD = getMonotoneSplinePath(coords, baseY, topY);
+  const first = coords[0];
+  const last = coords[coords.length - 1];
+  return `${lineD} L ${last.x.toFixed(1)} ${baseY.toFixed(1)} L ${first.x.toFixed(1)} ${baseY.toFixed(1)} Z`;
+}
+
+function ObservationChart({
+  observations,
+  scientificName,
+  chineseName,
+  ebirdSpeciesCode,
+  isBirdGroup,
+  language,
+  enabled
+}: {
+  observations: InatObservation[];
+  scientificName?: string;
+  chineseName?: string;
+  ebirdSpeciesCode?: string;
+  isBirdGroup: boolean;
+  language: 'zh' | 'en';
+  enabled: boolean;
+}) {
+  const [mode, setMode] = useState<'seasonality' | 'history'>('seasonality');
+  const [bgisStats, setBgisStats] = useState<ObservationStats>({ seasonality: [], history: [] });
+  const [ebirdStats, setEbirdStats] = useState<ObservationStats>({ seasonality: [], history: [] });
+  const [isLoading, setIsLoading] = useState(true);
+  const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
+  const [activeSources, setActiveSources] = useState<Set<'inat' | 'bgis' | 'ebird'>>(new Set(['inat', 'bgis', 'ebird']));
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!enabled) return;
+    const statsKey = `${scientificName || ''}|${chineseName || ''}|${ebirdSpeciesCode || ''}|${isBirdGroup}`;
+    const cacheKey = `${statsKey}|${mode}`;
+    let cancelled = false;
+    const cachedStats = observationStatsCache[cacheKey];
+    if (cachedStats) {
+      setBgisStats(cachedStats.bgis);
+      setEbirdStats(cachedStats.ebird);
+      setIsLoading(false);
+      return;
+    }
+    setIsLoading(true);
+    Promise.all([
+      fetchBgisObservationStats(scientificName || '', chineseName, mode),
+      isBirdGroup && ebirdSpeciesCode ? fetchEbirdObservationStats(ebirdSpeciesCode, mode) : Promise.resolve({ seasonality: [], history: [] })
+    ]).then(([nextBgis, nextEbird]) => {
+      if (cancelled) return;
+      setBgisStats(nextBgis);
+      setEbirdStats(nextEbird);
+      observationStatsCache[cacheKey] = { bgis: nextBgis, ebird: nextEbird };
+      setIsLoading(false);
+    }).catch(() => {
+      if (!cancelled) setIsLoading(false);
+    });
+    return () => { cancelled = true; };
+  }, [scientificName, chineseName, ebirdSpeciesCode, isBirdGroup, enabled, mode]);
+
+  const toggleSource = (src: 'inat' | 'bgis' | 'ebird') => {
+    setActiveSources(prev => {
+      const next = new Set(prev);
+      if (next.has(src)) {
+        if (next.size > 1) next.delete(src);
+      } else {
+        next.add(src);
+      }
+      return next;
+    });
+  };
+
+  const inatSeasonality = Array.from({ length: 12 }, (_, index) => ({
+    month: index + 1,
+    count: observations.filter(observation => Number(observation.observed_on_details?.date?.slice(5, 7)) === index + 1).length
+  }));
+  const inatHistoryMap = observations.reduce<Record<number, number>>((counts, observation) => {
+    const year = Number(observation.observed_on_details?.date?.slice(0, 4));
+    if (year) counts[year] = (counts[year] || 0) + 1;
+    return counts;
+  }, {});
+  const historyYears = Array.from(new Set([
+    ...Object.keys(inatHistoryMap).map(Number),
+    ...bgisStats.history.map(point => point.year),
+    ...ebirdStats.history.map(point => point.year)
+  ])).sort((a, b) => a - b);
+  const points: ObservationChartPoint[] = mode === 'seasonality'
+    ? inatSeasonality.map((point, index) => ({
+      label: String(point.month),
+      inat: point.count,
+      bgis: bgisStats.seasonality[index]?.count || 0,
+      ebird: ebirdStats.seasonality[index]?.count || 0
+    }))
+    : historyYears.map(year => ({
+      label: String(year),
+      inat: inatHistoryMap[year] || 0,
+      bgis: bgisStats.history.find(point => point.year === year)?.count || 0,
+      ebird: ebirdStats.history.find(point => point.year === year)?.count || 0
+    }));
+  const visibleSources = (['inat', 'bgis', ...(isBirdGroup ? ['ebird' as const] : [])] as const).filter(s => activeSources.has(s));
+  const maxValue = Math.max(
+    1,
+    ...points.flatMap(point => visibleSources.map(s => point[s]))
+  );
+
+  const totalInat = points.reduce((sum, p) => sum + p.inat, 0);
+  const totalBgis = points.reduce((sum, p) => sum + p.bgis, 0);
+  const totalEbird = points.reduce((sum, p) => sum + p.ebird, 0);
+  const totalActive = points.reduce((sum, p) => {
+    let s = 0;
+    if (activeSources.has('inat')) s += p.inat;
+    if (activeSources.has('bgis')) s += p.bgis;
+    if (isBirdGroup && activeSources.has('ebird')) s += p.ebird;
+    return sum + s;
+  }, 0);
+
+  let peakIndex = -1;
+  let peakValue = -1;
+  points.forEach((p, idx) => {
+    let s = 0;
+    if (activeSources.has('inat')) s += p.inat;
+    if (activeSources.has('bgis')) s += p.bgis;
+    if (isBirdGroup && activeSources.has('ebird')) s += p.ebird;
+    if (s > peakValue && s > 0) {
+      peakValue = s;
+      peakIndex = idx;
+    }
+  });
+
+  const chartWidth = 780;
+  const chartHeight = 270;
+  const padding = { top: 26, right: 28, bottom: 42, left: 52 };
+  const plotWidth = chartWidth - padding.left - padding.right;
+  const plotHeight = chartHeight - padding.top - padding.bottom;
+  const baseY = padding.top + plotHeight;
+
+  const toX = (index: number) => padding.left + (points.length > 1 ? (index / (points.length - 1)) * plotWidth : plotWidth / 2);
+  const toY = (value: number) => padding.top + plotHeight - (maxValue > 0 ? (value / maxValue) * plotHeight : 0);
+
+  const yTicks = React.useMemo(() => {
+    if (maxValue <= 4) {
+      return Array.from({ length: maxValue + 1 }, (_, i) => i);
+    }
+    const step = Math.max(1, Math.ceil(maxValue / 4));
+    const ticks = [0];
+    for (let v = step; v < maxValue; v += step) {
+      ticks.push(v);
+    }
+    if (!ticks.includes(maxValue)) {
+      ticks.push(maxValue);
+    }
+    return ticks;
+  }, [maxValue]);
+
+  const getSourceCoords = (source: 'inat' | 'bgis' | 'ebird') => points.map((point, index) => ({
+    x: toX(index),
+    y: toY(point[source])
+  }));
+
+  const monthLabelsZh = ['1月', '2月', '3月', '4月', '5月', '6月', '7月', '8月', '9月', '10月', '11月', '12月'];
+  const monthNamesZhFull = ['一月', '二月', '三月', '四月', '五月', '六月', '七月', '八月', '九月', '十月', '十一月', '十二月'];
+  const monthLabelsEn = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  const monthNamesEnFull = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+  const monthLabels = language === 'zh' ? monthLabelsZh : monthLabelsEn;
+
+  const hasData = points.some(point => point.inat > 0 || point.bgis > 0 || point.ebird > 0);
+
+  const sourceConfig = {
+    inat: {
+      name: language === 'zh' ? 'iNaturalist 研究級' : 'iNaturalist Research Grade',
+      shortName: 'iNaturalist',
+      color: '#10b981',
+      strokeColor: '#059669',
+      bgColor: 'bg-emerald-500',
+      lightBg: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+      fillId: 'inatGradient',
+      total: totalInat
+    },
+    bgis: {
+      name: language === 'zh' ? 'HKBIH 生物資料庫' : 'HKBIH (BGIS)',
+      shortName: 'HKBIH',
+      color: '#0d9488',
+      strokeColor: '#0f766e',
+      bgColor: 'bg-teal-500',
+      lightBg: 'bg-teal-50 text-teal-700 border-teal-200',
+      fillId: 'bgisGradient',
+      total: totalBgis
+    },
+    ebird: {
+      name: language === 'zh' ? 'eBird 鳥類紀錄' : 'eBird Observations',
+      shortName: 'eBird',
+      color: '#0284c7',
+      strokeColor: '#0369a1',
+      bgColor: 'bg-sky-500',
+      lightBg: 'bg-sky-50 text-sky-700 border-sky-200',
+      fillId: 'ebirdGradient',
+      total: totalEbird
+    }
+  };
+
+  const getHoverLabel = (index: number) => {
+    if (mode === 'seasonality') {
+      return language === 'zh' ? `${monthNamesZhFull[index]} (${monthLabelsEn[index]})` : monthNamesEnFull[index];
+    }
+    return language === 'zh' ? `${points[index]?.label} 年` : points[index]?.label;
+  };
+
+  const hoveredPoint = hoveredIndex !== null && points[hoveredIndex] ? points[hoveredIndex] : null;
+  const hoveredTotal = hoveredPoint
+    ? (activeSources.has('inat') ? hoveredPoint.inat : 0) +
+      (activeSources.has('bgis') ? hoveredPoint.bgis : 0) +
+      (isBirdGroup && activeSources.has('ebird') ? hoveredPoint.ebird : 0)
+    : 0;
+
+  return (
+    <section className="relative overflow-hidden rounded-[2.5rem] border border-slate-200/90 bg-white shadow-sm transition-all hover:shadow-md">
+      {/* Top Banner & Header */}
+      <div className="border-b border-slate-100 bg-gradient-to-r from-slate-50/80 via-white to-emerald-50/30 p-5 sm:p-6">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-start gap-3.5">
+            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-600 text-white shadow-md shadow-emerald-500/20">
+              <TrendingUp className="h-5 w-5" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h3 className="text-lg font-black text-slate-900 tracking-tight">
+                  {language === 'zh' ? '時序與物種觀測趨勢' : 'Temporal Observation Trends'}
+                </h3>
+                {hasData && (
+                  <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100/70 px-2.5 py-0.5 text-[11px] font-bold text-emerald-800">
+                    <Activity className="h-3 w-3 text-emerald-600 animate-pulse" />
+                    {totalActive.toLocaleString()} {language === 'zh' ? '筆記錄' : 'records'}
+                  </span>
+                )}
+              </div>
+              <p className="mt-0.5 text-xs font-semibold text-slate-500">
+                {mode === 'seasonality'
+                  ? (language === 'zh' ? '按月份統計之歷史累積觀測頻率分佈' : 'Monthly cumulative seasonal frequency distribution')
+                  : (language === 'zh' ? '按年份統計之物種年度觀測歷史趨勢' : 'Annual historical trend across recorded years')}
+              </p>
+            </div>
+          </div>
+
+          {/* Mode Switcher */}
+          <div className="flex self-start sm:self-auto rounded-2xl border border-slate-200/80 bg-slate-100/90 p-1 shadow-inner">
+            {(['seasonality', 'history'] as const).map(chartMode => {
+              const isActive = mode === chartMode;
+              return (
+                <button
+                  key={chartMode}
+                  type="button"
+                  onClick={() => {
+                    setMode(chartMode);
+                    setHoveredIndex(null);
+                  }}
+                  className={`relative flex items-center gap-1.5 rounded-xl px-3.5 py-1.5 text-xs font-black transition-all cursor-pointer ${
+                    isActive ? 'bg-white text-emerald-700 shadow-sm' : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  {chartMode === 'seasonality' ? (
+                    <>
+                      <Calendar className="h-3.5 w-3.5" />
+                      {language === 'zh' ? '季節月份' : 'Seasonality'}
+                    </>
+                  ) : (
+                    <>
+                      <BarChart3 className="h-3.5 w-3.5" />
+                      {language === 'zh' ? '歷年趨勢' : 'History'}
+                    </>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Interactive Dataset Legend & Peak Badge */}
+        <div className="mt-4 flex flex-wrap items-center justify-between gap-3 pt-2">
+          <div className="flex flex-wrap items-center gap-2">
+            {(['inat', 'bgis', ...(isBirdGroup ? ['ebird' as const] : [])] as const).map(src => {
+              const cfg = sourceConfig[src];
+              const isSelected = activeSources.has(src);
+              return (
+                <button
+                  key={src}
+                  type="button"
+                  onClick={() => toggleSource(src)}
+                  className={`inline-flex items-center gap-2 rounded-xl border px-3 py-1.5 text-xs font-black transition-all cursor-pointer select-none ${
+                    isSelected
+                      ? `${cfg.lightBg} shadow-xs`
+                      : 'bg-slate-50 border-slate-200 text-slate-400 opacity-60 hover:opacity-100'
+                  }`}
+                  title={language === 'zh' ? '點擊切換顯示/隱藏' : 'Click to toggle line'}
+                >
+                  <span
+                    className="h-2.5 w-2.5 rounded-full transition-transform"
+                    style={{ backgroundColor: isSelected ? cfg.color : '#94a3b8' }}
+                  />
+                  <span>{cfg.shortName}</span>
+                  <span className={`text-[10px] font-bold px-1.5 py-0.2 rounded-md ${isSelected ? 'bg-white/80 shadow-2xs' : 'bg-slate-200 text-slate-500'}`}>
+                    {cfg.total.toLocaleString()}
+                  </span>
+                  {isSelected ? (
+                    <Eye className="h-3 w-3 opacity-60" />
+                  ) : (
+                    <EyeOff className="h-3 w-3 opacity-40" />
+                  )}
+                </button>
+              );
+            })}
+          </div>
+
+          {peakIndex !== -1 && peakValue > 0 && (
+            <div className="inline-flex items-center gap-1.5 rounded-xl bg-amber-50 border border-amber-200/80 px-2.5 py-1 text-[11px] font-bold text-amber-900">
+              <Sparkles className="h-3.5 w-3.5 text-amber-600" />
+              <span>
+                {language === 'zh'
+                  ? '觀測高峰期：'
+                  : (mode === 'seasonality' ? 'Peak Season: ' : 'Peak Year: ')}
+                <strong className="font-black text-amber-950">
+                  {mode === 'seasonality'
+                    ? (language === 'zh' ? monthLabelsZh[peakIndex] : monthNamesEnFull[peakIndex])
+                    : (language === 'zh' ? `${points[peakIndex]?.label} 年` : points[peakIndex]?.label)}
+                </strong>
+                {' '}({peakValue} {language === 'zh' ? '筆' : 'obs'})
+              </span>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Chart Body Area */}
+      <div className="relative p-4 sm:p-6" ref={containerRef}>
+        {isLoading ? (
+          <div className="flex h-[280px] flex-col items-center justify-center gap-2 text-sm font-semibold text-slate-400">
+            <Loader2 className="h-6 w-6 animate-spin text-emerald-500" />
+            <span>{language === 'zh' ? '正在載入分佈趨勢資料...' : 'Loading trend data...'}</span>
+          </div>
+        ) : !hasData ? (
+          <div className="flex h-[280px] flex-col items-center justify-center gap-2 text-sm font-semibold text-slate-400">
+            <Info className="h-6 w-6 text-slate-300" />
+            <span>{language === 'zh' ? '目前尚無此物種的時間記錄資料' : 'No observation date data available for this species'}</span>
+          </div>
+        ) : (
+          <div className="relative w-full select-none overflow-x-auto">
+            {/* SVG Chart */}
+            <svg
+              viewBox={`0 0 ${chartWidth} ${chartHeight}`}
+              className="h-auto w-full min-w-[640px] overflow-visible"
+              role="img"
+              aria-label={mode === 'seasonality' ? 'Observation seasonality chart' : 'Observation history chart'}
+              onMouseLeave={() => setHoveredIndex(null)}
+            >
+              <defs>
+                <linearGradient id="inatGradient" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor="#10b981" stopOpacity="0.28" />
+                  <stop offset="100%" stopColor="#10b981" stopOpacity="0.0" />
+                </linearGradient>
+                <linearGradient id="bgisGradient" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor="#0d9488" stopOpacity="0.25" />
+                  <stop offset="100%" stopColor="#0d9488" stopOpacity="0.0" />
+                </linearGradient>
+                <linearGradient id="ebirdGradient" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor="#0284c7" stopOpacity="0.25" />
+                  <stop offset="100%" stopColor="#0284c7" stopOpacity="0.0" />
+                </linearGradient>
+                <filter id="shadow" x="-10%" y="-10%" width="120%" height="130%">
+                  <feDropShadow dx="0" dy="3" stdDeviation="3" floodOpacity="0.15" />
+                </filter>
+              </defs>
+
+              {/* Background Grid Lines & Y-Axis Scale */}
+              {yTicks.map(val => {
+                const y = toY(val);
+                return (
+                  <g key={val} className="transition-opacity">
+                    <line
+                      x1={padding.left}
+                      x2={chartWidth - padding.right}
+                      y1={y}
+                      y2={y}
+                      stroke="#f1f5f9"
+                      strokeWidth="1.2"
+                      strokeDasharray={val === 0 ? 'none' : '4 4'}
+                    />
+                    <text
+                      x={padding.left - 10}
+                      y={y + 3.5}
+                      textAnchor="end"
+                      className="fill-slate-400 text-[10px] font-bold font-mono tracking-tight"
+                    >
+                      {val.toLocaleString()}
+                    </text>
+                  </g>
+                );
+              })}
+
+              {/* Hover Column Highlight Band */}
+              {hoveredIndex !== null && (
+                <rect
+                  x={toX(hoveredIndex) - (points.length > 1 ? plotWidth / (points.length - 1) / 2 : plotWidth / 2)}
+                  y={padding.top - 6}
+                  width={points.length > 1 ? plotWidth / (points.length - 1) : plotWidth}
+                  height={plotHeight + 12}
+                  fill="#f8fafc"
+                  rx="8"
+                  className="pointer-events-none transition-all"
+                />
+              )}
+
+              {/* Active Area Gradients */}
+              {visibleSources.map(source => {
+                const coords = getSourceCoords(source);
+                const cfg = sourceConfig[source];
+                return (
+                  <path
+                    key={`area-${source}`}
+                    d={getMonotoneAreaPath(coords, baseY, padding.top)}
+                    fill={`url(#${cfg.fillId})`}
+                    className="pointer-events-none transition-opacity duration-300"
+                  />
+                );
+              })}
+
+              {/* Spline Stroke Lines */}
+              {visibleSources.map(source => {
+                const coords = getSourceCoords(source);
+                const cfg = sourceConfig[source];
+                return (
+                  <path
+                    key={`line-${source}`}
+                    d={getMonotoneSplinePath(coords, baseY, padding.top)}
+                    fill="none"
+                    stroke={cfg.color}
+                    strokeWidth="3"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    filter="url(#shadow)"
+                    className="pointer-events-none transition-all duration-200"
+                  />
+                );
+              })}
+
+              {/* Vertical Crosshair Line on Hover */}
+              {hoveredIndex !== null && (
+                <line
+                  x1={toX(hoveredIndex)}
+                  x2={toX(hoveredIndex)}
+                  y1={padding.top}
+                  y2={baseY}
+                  stroke="#64748b"
+                  strokeWidth="1.5"
+                  strokeDasharray="3 3"
+                  className="pointer-events-none"
+                />
+              )}
+              {/* Data Point Markers on Curve */}
+              {points.map((point, index) => {
+                const isHovered = hoveredIndex === index;
+                const isPeak = index === peakIndex;
+                const x = toX(index);
+
+                return (
+                  <g key={`points-${index}`} className="pointer-events-none">
+                    {visibleSources.map(source => {
+                      const y = toY(point[source]);
+                      const cfg = sourceConfig[source];
+                      const val = point[source];
+                      if (val === 0 && !isHovered) return null;
+
+                      return (
+                        <circle
+                          key={`pt-${source}-${index}`}
+                          cx={x}
+                          cy={y}
+                          r={isHovered ? 5.5 : isPeak ? 4 : 3}
+                          fill="#ffffff"
+                          stroke={cfg.color}
+                          strokeWidth={isHovered ? 3 : 2}
+                          className="transition-all duration-150"
+                        />
+                      );
+                    })}
+                  </g>
+                );
+              })}
+
+              {/* X-Axis Labels */}
+              {points.map((point, index) => {
+                const isHovered = hoveredIndex === index;
+                const isPeak = index === peakIndex;
+                const x = toX(index);
+                const label = mode === 'seasonality' ? monthLabels[index] : point.label;
+
+                const shouldShowLabel = points.length <= 16 || index % 2 === 0 || isHovered || isPeak;
+
+                if (!shouldShowLabel) return null;
+
+                return (
+                  <text
+                    key={`label-${point.label}-${index}`}
+                    x={x}
+                    y={chartHeight - 12}
+                    textAnchor="middle"
+                    className={`text-[11px] font-bold font-mono transition-all duration-150 pointer-events-none ${
+                      isHovered
+                        ? 'fill-emerald-700 font-black text-[12px]'
+                        : isPeak
+                          ? 'fill-amber-700 font-black'
+                          : 'fill-slate-500'
+                    }`}
+                  >
+                    {label}
+                  </text>
+                );
+              })}
+
+              {/* Invisible Interactive Hit-Test Columns */}
+              {points.map((_, index) => {
+                const x = toX(index);
+                const colWidth = points.length > 1 ? plotWidth / (points.length - 1) : plotWidth;
+                return (
+                  <rect
+                    key={`hitbox-${index}`}
+                    x={Math.max(padding.left, x - colWidth / 2)}
+                    y={padding.top - 10}
+                    width={colWidth}
+                    height={plotHeight + 35}
+                    fill="transparent"
+                    className="cursor-pointer"
+                    onMouseEnter={() => setHoveredIndex(index)}
+                    onTouchStart={() => setHoveredIndex(index)}
+                  />
+                );
+              })}
+            </svg>
+
+            {/* Floating Tooltip Box */}
+            <AnimatePresence>
+              {hoveredIndex !== null && hoveredPoint && (() => {
+                const xPercent = (toX(hoveredIndex) / chartWidth) * 100;
+                const isRightSide = hoveredIndex > points.length * 0.55 || xPercent > 55;
+                const isLeftSide = hoveredIndex < points.length * 0.25 || xPercent < 25;
+
+                const styleProps: React.CSSProperties = isRightSide
+                  ? { right: `${Math.max(2, 100 - xPercent)}%`, top: '12px' }
+                  : { left: `${Math.max(2, xPercent)}%`, top: '12px' };
+
+                const xOffset = isRightSide ? -14 : isLeftSide ? 14 : '-50%';
+
+                return (
+                  <motion.div
+                    key="chart-tooltip"
+                    initial={{ opacity: 0, y: 6, x: xOffset, scale: 0.96 }}
+                    animate={{ opacity: 1, y: 0, x: xOffset, scale: 1 }}
+                    exit={{ opacity: 0, scale: 0.96 }}
+                    transition={{ duration: 0.15, ease: 'easeOut' }}
+                    style={styleProps}
+                    className="pointer-events-none absolute z-30 min-w-[210px] rounded-2xl border border-slate-200/90 bg-white/95 p-3.5 shadow-xl backdrop-blur-md"
+                  >
+                    {/* Tooltip Header */}
+                    <div className="flex items-center justify-between border-b border-slate-100 pb-2 mb-2">
+                      <div className="flex items-center gap-1.5 font-black text-slate-900 text-xs">
+                        <Calendar className="h-3.5 w-3.5 text-emerald-600" />
+                        <span>{getHoverLabel(hoveredIndex)}</span>
+                      </div>
+                      <span className="rounded-md bg-slate-100 px-1.5 py-0.5 text-[10px] font-black text-slate-700">
+                        {hoveredTotal.toLocaleString()} {language === 'zh' ? '筆' : 'total'}
+                      </span>
+                    </div>
+
+                    {/* Tooltip Data Breakdown */}
+                    <div className="space-y-1.5 text-xs">
+                      {visibleSources.map(src => {
+                        const cfg = sourceConfig[src];
+                        const val = hoveredPoint[src] || 0;
+                        const pct = hoveredTotal > 0 ? Math.round((val / hoveredTotal) * 100) : 0;
+
+                        return (
+                          <div key={`tt-${src}`} className="flex items-center justify-between gap-3">
+                            <div className="flex items-center gap-1.5">
+                              <span
+                                className="h-2 w-2 rounded-full shadow-2xs"
+                                style={{ backgroundColor: cfg.color }}
+                              />
+                              <span className="text-[11px] font-semibold text-slate-600">
+                                {cfg.shortName}
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-1.5">
+                              <span className="font-mono font-black text-slate-900 text-[12px]">
+                                {val.toLocaleString()}
+                              </span>
+                              <span className="text-[10px] text-slate-400 font-medium">
+                                ({pct}%)
+                              </span>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+
+                    {/* Peak Marker Badge in Tooltip */}
+                    {hoveredIndex === peakIndex && peakValue > 0 && (
+                      <div className="mt-2.5 flex items-center gap-1 rounded-lg bg-amber-500/10 border border-amber-500/20 px-2 py-1 text-[10px] font-bold text-amber-700">
+                        <Sparkles className="h-3 w-3 text-amber-600 shrink-0" />
+                        <span>{language === 'zh' ? '全時期最高觀測量' : 'Peak observation period'}</span>
+                      </div>
+                    )}
+                  </motion.div>
+                );
+              })()}
+            </AnimatePresence>
+          </div>
+        )}
+      </div>
+    </section>
+  );
 }
 
 const CARTO_API_KEY = process.env.NEXT_PUBLIC_CARTO_API_KEY || '';
@@ -523,7 +1237,7 @@ export default function SpeciesMap({ taxonId, scientificName, chineseName, taxaG
     });
   }, [allProcessedFeatures, showInat, showBgis, showEbird, isBirdGroup]);
 
-  // Initial Data Loading (Sequential iNaturalist -> BGIS -> eBird -> GeoJSON Grid Spatial Join)
+  // Load independent sources concurrently, then perform the spatial join.
   useEffect(() => {
     async function loadData() {
       setIsLoading(true);
@@ -537,13 +1251,49 @@ export default function SpeciesMap({ taxonId, scientificName, chineseName, taxaG
       console.log('SpeciesMap: 啟動分步載入程序...', { taxonId, scientificName, chineseName, ebirdSpeciesCode, isBirdGroup });
 
       try {
-        // Step 1: iNaturalist fetch
-        let obs: InatObservation[] = [];
-        if (taxonId && taxonId > 0) {
-          setInatStatus('loading');
-          obs = await fetchAllInatObservations(taxonId, (current, total) => {
-            setProgress({ current, total });
+        const speciesDataKey = getSpeciesDataKey({ taxonId, scientificName, chineseName, taxaGroup, ebirdSpeciesCode });
+        const cachedData = speciesMapCache[speciesDataKey];
+        if (cachedData) {
+          setObservations(cachedData.observations);
+          setEbirdRecords(cachedData.ebirdRecords);
+          setTotalBgisCount(cachedData.totalBgisCount);
+          setStageCounts({
+            inat: cachedData.observations.length,
+            bgis: cachedData.totalBgisCount,
+            ebird: cachedData.ebirdRecords.length
           });
+          setInatStatus(taxonId && taxonId > 0 ? 'done' : 'skipped');
+          setBgisStatus(scientificName || chineseName ? 'done' : 'skipped');
+          setEbirdStatus(isBirdGroup && ebirdSpeciesCode ? 'done' : 'skipped');
+          setGridStatus('done');
+          setAllProcessedFeatures(cachedData.processedFeatures);
+          setIsLoading(false);
+          return;
+        }
+
+        const inatPromise = taxonId && taxonId > 0
+          ? (setInatStatus('loading'), fetchAllInatObservations(taxonId, (current, total) => {
+            setProgress({ current, total });
+          }))
+          : Promise.resolve([] as InatObservation[]);
+
+        const bgisPromise = scientificName || chineseName
+          ? (setBgisStatus('loading'), fetchBgisSpeciesList(scientificName || '', chineseName))
+          : Promise.resolve([] as BgisGridRecord[]);
+
+        const ebirdPromise = isBirdGroup && ebirdSpeciesCode
+          ? (setEbirdStatus('loading'), fetchEbirdMapPoints(ebirdSpeciesCode))
+          : Promise.resolve([] as EbirdRecord[]);
+
+        const geoJsonPromise = fetch('/data/Common_1km_grid.geojson');
+        const [obs, bgisList, ebirdPts, response] = await Promise.all([
+          inatPromise,
+          bgisPromise,
+          ebirdPromise,
+          geoJsonPromise
+        ]);
+
+        if (taxonId && taxonId > 0) {
           setInatStatus('done');
           setObservations(obs);
           setStageCounts(prev => ({ ...prev, inat: obs.length }));
@@ -551,14 +1301,10 @@ export default function SpeciesMap({ taxonId, scientificName, chineseName, taxaG
           setInatStatus('skipped');
         }
 
-        // Step 2: BGIS fetch (按需求在 inat 完結後觸發)
-        let bgisList: BgisGridRecord[] = [];
         const bgisMap: Record<string, BgisGridRecord> = {};
         let realBgisTotal = 0;
 
         if (scientificName || chineseName) {
-          setBgisStatus('loading');
-          bgisList = await fetchBgisSpeciesList(scientificName || '', chineseName);
           setBgisStatus('done');
 
           bgisList.forEach(item => {
@@ -575,11 +1321,7 @@ export default function SpeciesMap({ taxonId, scientificName, chineseName, taxaG
           setBgisStatus('skipped');
         }
 
-        // Step 3: eBird fetch (按鳥類類群與 ebirdSpeciesCode 需求在 bgis 完結後觸發)
-        let ebirdPts: EbirdRecord[] = [];
         if (isBirdGroup && ebirdSpeciesCode) {
-          setEbirdStatus('loading');
-          ebirdPts = await fetchEbirdMapPoints(ebirdSpeciesCode);
           setEbirdStatus('done');
           setEbirdRecords(ebirdPts);
           setStageCounts(prev => ({ ...prev, ebird: ebirdPts.length }));
@@ -587,9 +1329,7 @@ export default function SpeciesMap({ taxonId, scientificName, chineseName, taxaG
           setEbirdStatus('skipped');
         }
 
-        // Step 4: GeoJSON & Turf 網格空間匹配
         setGridStatus('loading');
-        const response = await fetch('/data/Common_1km_grid.geojson');
         if (!response.ok) {
           console.error('SpeciesMap: 無法下載 GeoJSON:', response.status, response.statusText);
           setGridStatus('done');
@@ -663,6 +1403,13 @@ export default function SpeciesMap({ taxonId, scientificName, chineseName, taxaG
           bgis: realBgisTotal,
           ebird: ebirdPts.length
         });
+        speciesMapCache[speciesDataKey] = {
+          observations: obs,
+          bgisList,
+          ebirdRecords: ebirdPts,
+          processedFeatures: geojson.features,
+          totalBgisCount: realBgisTotal
+        };
         setAllProcessedFeatures(geojson.features);
         setGridStatus('done');
       } catch (error) {
@@ -762,6 +1509,7 @@ export default function SpeciesMap({ taxonId, scientificName, chineseName, taxaG
   };
 
   return (
+    <>
     <div ref={containerRef} id="map-container" className="relative w-full h-[550px] rounded-[2.5rem] overflow-hidden bg-slate-100 border border-slate-200 shadow-inner group">
       <style jsx global>{`
         .maplibregl-ctrl-top-right { margin-top: 12px; margin-right: 12px; }
@@ -1787,5 +2535,15 @@ export default function SpeciesMap({ taxonId, scientificName, chineseName, taxaG
         </div>
       )}
     </div>
+    <ObservationChart
+      observations={observations}
+      scientificName={scientificName}
+      chineseName={chineseName}
+      ebirdSpeciesCode={ebirdSpeciesCode}
+      isBirdGroup={isBirdGroup}
+      language={language === 'zh' ? 'zh' : 'en'}
+      enabled={!isLoading}
+    />
+    </>
   );
 }
