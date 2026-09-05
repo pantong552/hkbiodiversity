@@ -14,6 +14,8 @@ import {
   Leaf,
   Bug,
   Camera,
+  CameraOff,
+  SwitchCamera,
   Maximize2,
   ChevronRight,
   Info,
@@ -213,6 +215,16 @@ export default function SpeciesAutoIdModal() {
   });
 
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const cameraInputRef = useRef<HTMLInputElement>(null);
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const mediaStreamRef = useRef<MediaStream | null>(null);
+
+  // 拍照即時取景模式狀態
+  const [isCameraActive, setIsCameraActive] = useState(false);
+  const [cameraFacingMode, setCameraFacingMode] = useState<'environment' | 'user'>('environment');
+  const [cameraError, setCameraError] = useState<string | null>(null);
+  const [isStartingCamera, setIsStartingCamera] = useState(false);
+  const [hasMultipleCameras, setHasMultipleCameras] = useState(false);
 
   const isZh = language === 'zh';
 
@@ -320,12 +332,151 @@ export default function SpeciesAutoIdModal() {
     }
   };
 
+  // 停止相機預覽 Stream
+  const stopCameraStream = useCallback(() => {
+    if (mediaStreamRef.current) {
+      mediaStreamRef.current.getTracks().forEach((track) => track.stop());
+      mediaStreamRef.current = null;
+    }
+    if (videoRef.current) {
+      videoRef.current.srcObject = null;
+    }
+    setIsCameraActive(false);
+    setIsStartingCamera(false);
+  }, []);
+
+  // 開啟相機（支援 Mobile 授權提示 & getUserMedia WebRTC / 降級回原生 capture file input）
+  const startCamera = async (facing: 'environment' | 'user' = cameraFacingMode) => {
+    setCameraError(null);
+    setIsStartingCamera(true);
+
+    // 檢查瀏覽器是否支援 getUserMedia
+    if (!navigator?.mediaDevices?.getUserMedia) {
+      setIsStartingCamera(false);
+      // 若瀏覽器/WebView 完全不支援 WebRTC，直接調用 mobile 原生 capture 相機
+      if (cameraInputRef.current) {
+        cameraInputRef.current.click();
+      } else {
+        setCameraError(
+          isZh
+            ? '您的瀏覽器不支援相機即時視訊存取，請點擊「選擇相片」進行拍攝或上傳。'
+            : 'Camera live preview is not supported on this device/browser. Please choose photo directly.'
+        );
+      }
+      return;
+    }
+
+    // 嘗試停止既有串流
+    if (mediaStreamRef.current) {
+      mediaStreamRef.current.getTracks().forEach((track) => track.stop());
+      mediaStreamRef.current = null;
+    }
+
+    try {
+      const constraints: MediaStreamConstraints = {
+        audio: false,
+        video: {
+          facingMode: { ideal: facing },
+          width: { ideal: 1920 },
+          height: { ideal: 1080 },
+        },
+      };
+
+      const stream = await navigator.mediaDevices.getUserMedia(constraints);
+      mediaStreamRef.current = stream;
+      setIsCameraActive(true);
+
+      // 檢查鏡頭數量 (是否有多個鏡頭可翻轉)
+      try {
+        const devices = await navigator.mediaDevices.enumerateDevices();
+        const videoDevices = devices.filter((d) => d.kind === 'videoinput');
+        setHasMultipleCameras(videoDevices.length > 1);
+      } catch {
+        setHasMultipleCameras(true);
+      }
+
+      // 等候 videoRef 掛載後賦值播放
+      setTimeout(() => {
+        if (videoRef.current) {
+          videoRef.current.srcObject = stream;
+          videoRef.current.play().catch((err) => {
+            console.error('Video play error:', err);
+          });
+        }
+      }, 100);
+    } catch (err: any) {
+      console.warn('getUserMedia error:', err);
+      // 常見權限錯誤處理 (iOS Safari / Android Chrome 權限拒絕等)
+      let errorText = '';
+      if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
+        errorText = isZh
+          ? '相機權限已被拒絕。請於瀏覽器或系統設定中允許相機存取權限後再試，或使用系統相機拍照。'
+          : 'Camera permission was denied. Please allow camera access in your browser or device settings.';
+      } else if (err.name === 'NotFoundError' || err.name === 'DevicesNotFoundError') {
+        errorText = isZh
+          ? '未偵測到可用相機設備。'
+          : 'No camera device found.';
+      } else if (err.name === 'NotReadableError' || err.name === 'TrackStartError') {
+        errorText = isZh
+          ? '相機正被其他應用程式使用中，無法存取。'
+          : 'Camera is currently in use by another application.';
+      } else {
+        errorText = isZh
+          ? `無法開啟相機：${err.message || '請確認權限設定'}`
+          : `Failed to access camera: ${err.message || 'Please check permissions'}`;
+      }
+      setCameraError(errorText);
+      stopCameraStream();
+    } finally {
+      setIsStartingCamera(false);
+    }
+  };
+
+  // 切換前後鏡頭
+  const toggleCameraFacing = async () => {
+    const nextFacing = cameraFacingMode === 'environment' ? 'user' : 'environment';
+    setCameraFacingMode(nextFacing);
+    if (isCameraActive) {
+      await startCamera(nextFacing);
+    }
+  };
+
+  // 即時拍照擷取畫面幀
+  const capturePhoto = () => {
+    if (!videoRef.current) return;
+    const video = videoRef.current;
+    if (video.videoWidth === 0 || video.videoHeight === 0) return;
+
+    const canvas = document.createElement('canvas');
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    // 若為前置鏡頭鏡像翻轉繪製
+    if (cameraFacingMode === 'user') {
+      ctx.translate(canvas.width, 0);
+      ctx.scale(-1, 1);
+    }
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+    canvas.toBlob((blob) => {
+      if (blob) {
+        const photoFile = new File([blob], `photo_${Date.now()}.jpg`, { type: 'image/jpeg' });
+        stopCameraStream();
+        processImageFile(photoFile);
+      }
+    }, 'image/jpeg', 0.92);
+  };
+
   // 清除/重設所有引擎資料
   const handleReset = () => {
+    stopCameraStream();
     setSelectedFile(null);
     if (previewUrl) URL.revokeObjectURL(previewUrl);
     setPreviewUrl(null);
     setCompressedSize(null);
+    setCameraError(null);
     setEngineState({
       inaturalist: {
         resultsData: null,
@@ -347,6 +498,7 @@ export default function SpeciesAutoIdModal() {
   };
 
   const handleClose = () => {
+    stopCameraStream();
     setAutoIdOpen(false);
   };
 
@@ -636,45 +788,156 @@ export default function SpeciesAutoIdModal() {
               </button>
             </div>
 
-            {/* 上傳區域 (當尚未選擇圖片，或是可重新上傳時) */}
-            {!previewUrl ? (
-              <div
-                onDragOver={handleDragOver}
-                onDragLeave={handleDragLeave}
-                onDrop={handleDrop}
-                onClick={() => fileInputRef.current?.click()}
-                className={`relative border-2 border-dashed rounded-3xl p-8 text-center transition-all cursor-pointer flex flex-col items-center justify-center min-h-[220px] ${isDragOver
-                  ? 'border-emerald-500 bg-emerald-50/80 scale-[0.99]'
-                  : 'border-emerald-200 bg-white hover:border-emerald-400 hover:bg-emerald-50/30 hover:shadow-lg'
-                  }`}
-              >
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept="image/*"
-                  onChange={handleFileChange}
-                  className="hidden"
+            {/* 上傳或即時拍照取景區域 */}
+            {isCameraActive ? (
+              <div className="relative rounded-3xl overflow-hidden bg-black border-2 border-emerald-500 shadow-xl flex flex-col items-center justify-center min-h-[320px] sm:min-h-[380px]">
+                <video
+                  ref={videoRef}
+                  autoPlay
+                  playsInline
+                  muted
+                  className={`w-full max-h-[400px] object-cover bg-black ${cameraFacingMode === 'user' ? '-scale-x-100' : ''}`}
                 />
+                {/* 觀景窗對焦框 */}
+                <div className="absolute inset-6 sm:inset-10 border border-white/40 rounded-2xl pointer-events-none flex flex-col justify-between p-3">
+                  <div className="flex justify-between">
+                    <div className="w-5 h-5 border-t-2 border-l-2 border-emerald-400 rounded-tl"></div>
+                    <div className="w-5 h-5 border-t-2 border-r-2 border-emerald-400 rounded-tr"></div>
+                  </div>
+                  <div className="flex justify-between">
+                    <div className="w-5 h-5 border-b-2 border-l-2 border-emerald-400 rounded-bl"></div>
+                    <div className="w-5 h-5 border-b-2 border-r-2 border-emerald-400 rounded-br"></div>
+                  </div>
+                </div>
+                {/* 頂部操作列 */}
+                <div className="absolute top-3 inset-x-3 flex items-center justify-between z-10">
+                  <span className="px-2.5 py-1 rounded-full bg-black/60 backdrop-blur-md text-white text-[11px] font-medium border border-white/20 flex items-center gap-1.5 shadow">
+                    <span className="w-2 h-2 rounded-full bg-red-500 animate-ping"></span>
+                    {isZh ? '相機取景中' : 'Camera Live'}
+                  </span>
+                  <div className="flex items-center gap-2">
+                    {hasMultipleCameras && (
+                      <button
+                        type="button"
+                        onClick={toggleCameraFacing}
+                        className="p-2 rounded-full bg-black/60 hover:bg-black/80 backdrop-blur-md text-white text-xs border border-white/20 transition-all cursor-pointer shadow"
+                        title={isZh ? '切換前後鏡頭' : 'Switch Camera'}
+                      >
+                        <SwitchCamera className="w-4 h-4" />
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      onClick={stopCameraStream}
+                      className="p-2 rounded-full bg-black/60 hover:bg-black/80 backdrop-blur-md text-white text-xs border border-white/20 transition-all cursor-pointer shadow"
+                      title={isZh ? '關閉相機' : 'Close Camera'}
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+                {/* 底部拍攝拍照按鈕 */}
+                <div className="absolute bottom-4 inset-x-0 flex items-center justify-center z-10">
+                  <button
+                    type="button"
+                    onClick={capturePhoto}
+                    className="w-16 h-16 rounded-full bg-white hover:bg-slate-100 active:scale-95 transition-all p-1 shadow-2xl flex items-center justify-center cursor-pointer group"
+                    title={isZh ? '拍照' : 'Take Photo'}
+                  >
+                    <div className="w-full h-full rounded-full border-2 border-emerald-600 bg-white group-hover:bg-emerald-50 flex items-center justify-center">
+                      <Camera className="w-6 h-6 text-emerald-600" />
+                    </div>
+                  </button>
+                </div>
+              </div>
+            ) : !previewUrl ? (
+              <div className="space-y-3">
+                {cameraError && (
+                  <div className="p-3.5 rounded-2xl bg-amber-50 border border-amber-200/80 text-amber-800 text-xs flex items-start gap-2.5 shadow-sm">
+                    <AlertCircle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                    <div className="flex-1">
+                      <span className="font-semibold">{isZh ? '相機提示：' : 'Camera: '}</span>
+                      <span>{cameraError}</span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setCameraError(null)}
+                      className="text-amber-500 hover:text-amber-700 text-xs cursor-pointer ml-1"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                )}
+                <div
+                  onDragOver={handleDragOver}
+                  onDragLeave={handleDragLeave}
+                  onDrop={handleDrop}
+                  className={`relative border-2 border-dashed rounded-3xl p-6 sm:p-8 text-center transition-all flex flex-col items-center justify-center min-h-[220px] ${
+                    isDragOver
+                      ? 'border-emerald-500 bg-emerald-50/80 scale-[0.99]'
+                      : 'border-emerald-200 bg-white hover:border-emerald-400 hover:bg-emerald-50/20 shadow-sm'
+                  }`}
+                >
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/*"
+                    onChange={handleFileChange}
+                    className="hidden"
+                  />
+                  <input
+                    ref={cameraInputRef}
+                    type="file"
+                    accept="image/*"
+                    capture="environment"
+                    onChange={handleFileChange}
+                    className="hidden"
+                  />
 
-                <div className="w-16 h-16 rounded-2xl bg-emerald-100/80 text-emerald-600 flex items-center justify-center mb-4 shadow-sm group-hover:scale-110 transition-transform">
+                <div className="w-16 h-16 rounded-2xl bg-emerald-100/80 text-emerald-600 flex items-center justify-center mb-3 shadow-sm">
                   <UploadCloud className="w-8 h-8" />
                 </div>
 
                 <h4 className="text-base font-semibold text-slate-800 mb-1">
-                  {isZh ? '拖曳圖片至此，或點擊選擇圖片' : 'Drag and drop photo here, or click to browse'}
+                  {isZh ? '拖曳相片至此，或開啟相機 / 選擇圖片' : 'Drag photo here, or take photo / browse'}
                 </h4>
                 <p className="text-xs text-slate-500 max-w-xs mb-4">
                   {isZh ? '支援 JPG、PNG、WEBP 格式相片（系統將自動最佳化壓縮避免大圖過載）' : 'Supports JPG, PNG, WEBP. Automatic canvas compression included.'}
                 </p>
 
-                <button
-                  type="button"
-                  className="px-5 py-2.5 rounded-2xl bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white font-medium text-xs shadow-md shadow-emerald-600/20 flex items-center gap-2 transition-all cursor-pointer"
-                >
-                  <Camera className="w-4 h-4" />
-                  {isZh ? '選擇相片' : 'Select Photo'}
-                </button>
+                {/* 操作按鈕群：Take photo 即時拍攝 + Select photo 選擇相片 */}
+                <div className="flex flex-wrap items-center justify-center gap-3">
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      startCamera('environment');
+                    }}
+                    disabled={isStartingCamera}
+                    className="px-5 py-2.5 rounded-2xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 active:scale-95 text-white font-semibold text-xs shadow-md shadow-emerald-600/25 flex items-center gap-2 transition-all cursor-pointer disabled:opacity-50"
+                  >
+                    {isStartingCamera ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <Camera className="w-4 h-4" />
+                    )}
+                    <span>{isZh ? '即時拍攝 (Take Photo)' : 'Take Photo'}</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      fileInputRef.current?.click();
+                    }}
+                    className="px-4 py-2.5 rounded-2xl bg-slate-100 hover:bg-slate-200 active:bg-slate-300 text-slate-700 font-medium text-xs border border-slate-200/80 flex items-center gap-2 transition-all cursor-pointer"
+                  >
+                    <FileImage className="w-4 h-4 text-slate-500" />
+                    <span>{isZh ? '選擇相片' : 'Select Photo'}</span>
+                  </button>
+                </div>
               </div>
+            </div>
             ) : (
               /* 上傳後的縮圖與狀態卡片 */
               <div className="bg-white border border-slate-200/80 rounded-2xl p-4 shadow-sm flex flex-col sm:flex-row items-center gap-4">
@@ -704,6 +967,17 @@ export default function SpeciesAutoIdModal() {
                   </div>
 
                   <div className="flex items-center justify-center sm:justify-start gap-2">
+                    <button
+                      onClick={() => {
+                        handleReset();
+                        startCamera('environment');
+                      }}
+                      disabled={isLoading}
+                      className="px-3 py-1.5 rounded-xl border border-emerald-200 text-emerald-700 hover:bg-emerald-50 text-xs font-medium flex items-center gap-1.5 transition-colors disabled:opacity-50 cursor-pointer"
+                    >
+                      <Camera className="w-3.5 h-3.5" />
+                      {isZh ? '重拍相片' : 'Retake'}
+                    </button>
                     <button
                       onClick={() => fileInputRef.current?.click()}
                       disabled={isLoading}
