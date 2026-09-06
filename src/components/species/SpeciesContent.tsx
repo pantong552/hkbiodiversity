@@ -13,7 +13,7 @@ import SpeciesPhotoGallery from './SpeciesPhotoGallery';
 import { useInaturalistSpeciesPhotos, InatGalleryPhoto } from '@/hooks/useInaturalistSpeciesPhotos';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useRef } from 'react';
-import SpeciesMap from './SpeciesMap';
+import SpeciesMap, { ObservationChart } from './SpeciesMap';
 import GbifGlobalMap from './GbifGlobalMap';
 import { formatScientificName, parseAliases, renderFormattedText } from '@/utils/formatters';
 import CongenericExplorer from './CongenericExplorer';
@@ -389,12 +389,14 @@ export default function SpeciesContent({ species, showBreadcrumb = true, refresh
 
             {/* Description, Introduction, Habitat, Microhabitat, Host Plants */}
             {(introduction || description || habitat || microhabitat || hostPlants) && (
-              <section className="bg-white p-8 rounded-[2.5rem] shadow-sm border border-slate-100 divide-y divide-slate-50">
+              <section className="bg-white p-6 sm:p-8 rounded-[2.5rem] shadow-sm border border-slate-100 divide-y divide-slate-50">
                 {introduction && (
                   <div className="py-8 first:pt-0 last:pb-0">
-                    <h2 className="text-2xl font-black text-slate-800 mb-6 flex items-center gap-3">
-                      <Bookmark className="w-6 h-6 text-emerald-500" />
-                      {language === 'zh' ? '物種簡介' : 'Introduction'}
+                    <h2 className="text-xl sm:text-2xl font-black text-slate-800 mb-6 flex items-center gap-2 sm:gap-3">
+                      <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl sm:rounded-2xl bg-emerald-50 border border-emerald-100/50 flex items-center justify-center text-emerald-600 shrink-0 shadow-xs">
+                        <Bookmark className="w-4 h-4 sm:w-5 sm:h-5 text-emerald-600" />
+                      </div>
+                      <span>{language === 'zh' ? '物種簡介' : 'Introduction'}</span>
                     </h2>
                     <div className="prose prose-slate max-w-none text-slate-600 leading-relaxed">
                       <p>{introduction}</p>
@@ -404,9 +406,11 @@ export default function SpeciesContent({ species, showBreadcrumb = true, refresh
 
                 {description && (
                   <div className="py-8 first:pt-0 last:pb-0">
-                    <h2 className="text-2xl font-black text-slate-800 mb-6 flex items-center gap-3">
-                      <Bookmark className="w-6 h-6 text-emerald-500" />
-                      {language === 'zh' ? '形態特徵' : 'Description'}
+                    <h2 className="text-xl sm:text-2xl font-black text-slate-800 mb-6 flex items-center gap-2 sm:gap-3">
+                      <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl sm:rounded-2xl bg-emerald-50 border border-emerald-100/50 flex items-center justify-center text-emerald-600 shrink-0 shadow-xs">
+                        <Bookmark className="w-4 h-4 sm:w-5 sm:h-5 text-emerald-600" />
+                      </div>
+                      <span>{language === 'zh' ? '形態特徵' : 'Description'}</span>
                     </h2>
                     <div className="prose prose-slate max-w-none text-slate-600 leading-relaxed">
                       <p>{description}</p>
@@ -416,9 +420,11 @@ export default function SpeciesContent({ species, showBreadcrumb = true, refresh
 
                 {habitat && (
                   <div className="py-8 first:pt-0 last:pb-0">
-                    <h2 className="text-2xl font-black text-slate-800 mb-6 flex items-center gap-3">
-                      <Map className="w-6 h-6 text-emerald-500" />
-                      {language === 'zh' ? '棲息地' : 'Habitat'}
+                    <h2 className="text-xl sm:text-2xl font-black text-slate-800 mb-6 flex items-center gap-2 sm:gap-3">
+                      <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl sm:rounded-2xl bg-emerald-50 border border-emerald-100/50 flex items-center justify-center text-emerald-600 shrink-0 shadow-xs">
+                        <Map className="w-4 h-4 sm:w-5 sm:h-5 text-emerald-600" />
+                      </div>
+                      <span>{language === 'zh' ? '棲息地' : 'Habitat'}</span>
                     </h2>
                     <div className="prose prose-slate max-w-none text-slate-600 leading-relaxed">
                       <p>{habitat}</p>
@@ -428,9 +434,11 @@ export default function SpeciesContent({ species, showBreadcrumb = true, refresh
 
                 {microhabitat && (
                   <div className="py-8 first:pt-0 last:pb-0">
-                    <h2 className="text-2xl font-black text-slate-800 mb-6 flex items-center gap-3">
-                      <Compass className="w-6 h-6 text-emerald-500" />
-                      {language === 'zh' ? '微棲地' : 'Microhabitat'}
+                    <h2 className="text-xl sm:text-2xl font-black text-slate-800 mb-6 flex items-center gap-2 sm:gap-3">
+                      <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl sm:rounded-2xl bg-emerald-50 border border-emerald-100/50 flex items-center justify-center text-emerald-600 shrink-0 shadow-xs">
+                        <Compass className="w-4 h-4 sm:w-5 sm:h-5 text-emerald-600" />
+                      </div>
+                      <span>{language === 'zh' ? '微棲地' : 'Microhabitat'}</span>
                     </h2>
                     <div className="prose prose-slate max-w-none text-slate-600 leading-relaxed">
                       <p>{microhabitat}</p>
@@ -440,9 +448,11 @@ export default function SpeciesContent({ species, showBreadcrumb = true, refresh
 
                 {hostPlants && (
                   <div className="py-8 first:pt-0 last:pb-0">
-                    <h2 className="text-2xl font-black text-slate-800 mb-6 flex items-center gap-3">
-                      <Leaf className="w-6 h-6 text-emerald-500" />
-                      {language === 'zh' ? '寄主植物' : 'Host Plants'}
+                    <h2 className="text-xl sm:text-2xl font-black text-slate-800 mb-6 flex items-center gap-2 sm:gap-3">
+                      <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl sm:rounded-2xl bg-emerald-50 border border-emerald-100/50 flex items-center justify-center text-emerald-600 shrink-0 shadow-xs">
+                        <Leaf className="w-4 h-4 sm:w-5 sm:h-5 text-emerald-600" />
+                      </div>
+                      <span>{language === 'zh' ? '寄主植物' : 'Host Plants'}</span>
                     </h2>
                     <div className="prose prose-slate max-w-none text-slate-600 leading-relaxed">
                       <p>{hostPlants}</p>
@@ -466,9 +476,11 @@ export default function SpeciesContent({ species, showBreadcrumb = true, refresh
 
             {/* Distribution */}
             <section className="space-y-6">
-              <h2 className="text-2xl font-black text-slate-800 flex items-center gap-3">
-                <Map className="w-6 h-6 text-emerald-500" />
-                {language === 'zh' ? '地理分布' : 'Distribution'}
+              <h2 className="text-xl sm:text-2xl font-black text-slate-800 flex items-center gap-2 sm:gap-3">
+                <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl sm:rounded-2xl bg-emerald-50 border border-emerald-100/50 flex items-center justify-center text-emerald-600 shrink-0 shadow-xs">
+                  <Map className="w-4 h-4 sm:w-5 sm:h-5 text-emerald-600" />
+                </div>
+                <span>{language === 'zh' ? '地理分布' : 'Distribution'}</span>
               </h2>
               
               {species.inat_id || species.scientific_name || species.ebird_species_code ? (
@@ -502,7 +514,19 @@ export default function SpeciesContent({ species, showBreadcrumb = true, refresh
               </div>
             </section>
 
-            {/* Conservation Status - Back to original place */}
+            {/* Temporal Observation Trends Card - Placed above Conservation Status */}
+            {(species.inat_id || species.scientific_name || species.ebird_species_code) && (
+              <ObservationChart
+                taxonId={species.inat_id ?? 0}
+                scientificName={species.scientific_name}
+                chineseName={species.common_name_chi}
+                ebirdSpeciesCode={species.ebird_species_code}
+                isBirdGroup={String(species.taxa_group || '').trim().toUpperCase() === 'BIRD'}
+                language={language === 'zh' ? 'zh' : 'en'}
+              />
+            )}
+
+            {/* Conservation Status */}
             <ConservationStatus species={species} />
 
             {/* Bird Sound Recordings Card (Xeno-Canto) */}

@@ -107,9 +107,11 @@ export default function ConservationStatus({ species }: ConservationStatusProps)
 
   return (
     <div className="bg-white p-5 sm:p-8 rounded-[2rem] sm:rounded-[2.5rem] shadow-sm border border-slate-100 w-full mb-6 sm:mb-12">
-      <h2 className="text-xl sm:text-2xl font-black text-slate-800 mb-4 sm:mb-8 flex items-center gap-2.5 sm:gap-3">
-        <Shield className="w-5 h-5 sm:w-6 sm:h-6 text-emerald-500" />
-        {language === 'zh' ? '保育與現況' : 'Conservation Status'}
+      <h2 className="text-xl sm:text-2xl font-black text-slate-800 mb-4 sm:mb-8 flex items-center gap-2 sm:gap-3">
+        <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl sm:rounded-2xl bg-emerald-50 border border-emerald-100/50 flex items-center justify-center text-emerald-600 shrink-0 shadow-xs">
+          <Shield className="w-4 h-4 sm:w-5 sm:h-5 text-emerald-600" />
+        </div>
+        <span>{language === 'zh' ? '保育與現況' : 'Conservation Status'}</span>
       </h2>
       
       <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-6">

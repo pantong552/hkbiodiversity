@@ -158,23 +158,52 @@ function getMonotoneAreaPath(coords: { x: number; y: number }[], baseY: number, 
   return `${lineD} L ${last.x.toFixed(1)} ${baseY.toFixed(1)} L ${first.x.toFixed(1)} ${baseY.toFixed(1)} Z`;
 }
 
-function ObservationChart({
-  observations,
-  scientificName,
-  chineseName,
-  ebirdSpeciesCode,
-  isBirdGroup,
-  language,
-  enabled
-}: {
-  observations: InatObservation[];
+export interface ObservationChartProps {
+  taxonId?: number;
+  observations?: InatObservation[];
   scientificName?: string;
   chineseName?: string;
   ebirdSpeciesCode?: string;
-  isBirdGroup: boolean;
-  language: 'zh' | 'en';
-  enabled: boolean;
-}) {
+  isBirdGroup?: boolean;
+  language?: 'zh' | 'en';
+  enabled?: boolean;
+}
+
+export function ObservationChart({
+  taxonId,
+  observations: propObservations,
+  scientificName,
+  chineseName,
+  ebirdSpeciesCode,
+  isBirdGroup = false,
+  language = 'zh',
+  enabled = true
+}: ObservationChartProps) {
+  const [inatObservations, setInatObservations] = useState<InatObservation[]>(propObservations || []);
+
+  useEffect(() => {
+    if (propObservations && propObservations.length > 0) {
+      setInatObservations(propObservations);
+      return;
+    }
+    if (!taxonId || taxonId <= 0) return;
+
+    for (const key of Object.keys(speciesMapCache)) {
+      if (speciesMapCache[key]?.observations?.length) {
+        setInatObservations(speciesMapCache[key].observations);
+        return;
+      }
+    }
+
+    let cancelled = false;
+    fetchAllInatObservations(taxonId).then(obs => {
+      if (!cancelled) setInatObservations(obs);
+    }).catch(() => {});
+    return () => { cancelled = true; };
+  }, [taxonId, propObservations]);
+
+  const observations = propObservations || inatObservations;
+
   const statsKey = `${scientificName || ''}|${chineseName || ''}|${ebirdSpeciesCode || ''}|${isBirdGroup}`;
   const initialCache = observationStatsCache[statsKey];
   const [mode, setMode] = useState<'seasonality' | 'history'>('seasonality');
@@ -184,7 +213,26 @@ function ObservationChart({
   const [isEbirdLoading, setIsEbirdLoading] = useState(!initialCache?.ebird && isBirdGroup && !!ebirdSpeciesCode);
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
   const [activeSources, setActiveSources] = useState<Set<'inat' | 'bgis' | 'ebird'>>(new Set(['inat', 'bgis', 'ebird']));
+  const [isFilterDropdownOpen, setIsFilterDropdownOpen] = useState(false);
+  const [isModeDropdownOpen, setIsModeDropdownOpen] = useState(false);
+  const filterDropdownRef = useRef<HTMLDivElement>(null);
+  const modeDropdownRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (filterDropdownRef.current && !filterDropdownRef.current.contains(event.target as Node)) {
+        setIsFilterDropdownOpen(false);
+      }
+      if (modeDropdownRef.current && !modeDropdownRef.current.contains(event.target as Node)) {
+        setIsModeDropdownOpen(false);
+      }
+    };
+    if (isFilterDropdownOpen || isModeDropdownOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [isFilterDropdownOpen, isModeDropdownOpen]);
 
   useEffect(() => {
     if (!enabled) return;
@@ -247,6 +295,12 @@ function ObservationChart({
     });
   };
 
+  const selectedSourcesSummary = [
+    activeSources.has('inat') ? 'iNat' : null,
+    activeSources.has('bgis') ? 'BGIS' : null,
+    (isBirdGroup && activeSources.has('ebird')) ? 'eBird' : null
+  ].filter(Boolean).join(' + ') || (language === 'zh' ? '無選擇' : 'None');
+
   const inatSeasonality = Array.from({ length: 12 }, (_, index) => ({
     month: index + 1,
     count: observations.filter(observation => Number(observation.observed_on_details?.date?.slice(5, 7)) === index + 1).length
@@ -304,9 +358,9 @@ function ObservationChart({
     }
   });
 
-  const chartWidth = 780;
-  const chartHeight = 270;
-  const padding = { top: 26, right: 28, bottom: 42, left: 52 };
+  const chartWidth = 640;
+  const chartHeight = 310;
+  const padding = { top: 24, right: 14, bottom: 38, left: 30 };
   const plotWidth = chartWidth - padding.left - padding.right;
   const plotHeight = chartHeight - padding.top - padding.bottom;
   const baseY = padding.top + plotHeight;
@@ -407,7 +461,7 @@ function ObservationChart({
                   {language === 'zh' ? '時序與物種觀測趨勢' : 'Temporal Observation Trends'}
                 </h3>
                 {hasData && (
-                  <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100/70 px-2.5 py-0.5 text-[11px] font-bold text-emerald-800">
+                  <span className="hidden sm:inline-flex items-center gap-1 rounded-full bg-emerald-100/70 px-2.5 py-0.5 text-[11px] font-bold text-emerald-800">
                     <Activity className="h-3 w-3 text-emerald-600 animate-pulse" />
                     {totalActive.toLocaleString()} {language === 'zh' ? '筆記錄' : 'records'}
                   </span>
@@ -421,8 +475,8 @@ function ObservationChart({
             </div>
           </div>
 
-          {/* Mode Switcher */}
-          <div className="flex self-start sm:self-auto rounded-2xl border border-slate-200/80 bg-slate-100/90 p-1 shadow-inner">
+          {/* Mode Switcher (Desktop) */}
+          <div className="hidden sm:flex self-start sm:self-auto rounded-2xl border border-slate-200/80 bg-slate-100/90 p-1 shadow-inner">
             {(['seasonality', 'history'] as const).map(chartMode => {
               const isActive = mode === chartMode;
               return (
@@ -455,8 +509,147 @@ function ObservationChart({
         </div>
 
         {/* Interactive Dataset Legend & Peak Badge */}
-        <div className="mt-4 flex flex-wrap items-center justify-between gap-3 pt-2">
-          <div className="flex flex-wrap items-center gap-2">
+        <div className="mt-3.5 sm:mt-4 flex flex-wrap items-center justify-between gap-2.5 sm:gap-3 pt-1 sm:pt-2">
+          {/* Mobile Controls: Mode Dropdown + Dataset Filter Dropdown */}
+          <div className="sm:hidden flex flex-wrap items-center gap-2">
+            {/* Mode Filter Dropdown */}
+            <div className="relative" ref={modeDropdownRef}>
+              <button
+                type="button"
+                onClick={() => {
+                  setIsModeDropdownOpen(!isModeDropdownOpen);
+                  setIsFilterDropdownOpen(false);
+                }}
+                className="h-[34px] bg-white border border-slate-200/90 shadow-2xs rounded-2xl px-3 py-1.5 flex items-center gap-2 text-xs font-bold text-slate-800 cursor-pointer active:scale-95 transition-all"
+              >
+                {mode === 'seasonality' ? (
+                  <Calendar className="w-3.5 h-3.5 text-emerald-600" />
+                ) : (
+                  <BarChart3 className="w-3.5 h-3.5 text-emerald-600" />
+                )}
+                <span className="text-[11px] font-bold">
+                  {mode === 'seasonality'
+                    ? (language === 'zh' ? '季節月份' : 'Seasonality')
+                    : (language === 'zh' ? '歷年趨勢' : 'History')}
+                </span>
+                <ChevronDown className={`w-3.5 h-3.5 text-slate-400 transition-transform duration-200 ${isModeDropdownOpen ? 'rotate-180' : ''}`} />
+              </button>
+
+              <AnimatePresence>
+                {isModeDropdownOpen && (
+                  <motion.div
+                    initial={{ opacity: 0, y: -6, scale: 0.95 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    exit={{ opacity: 0, y: -6, scale: 0.95 }}
+                    transition={{ duration: 0.15 }}
+                    className="absolute top-10 left-0 w-40 bg-white/95 backdrop-blur-xl border border-slate-200 shadow-xl rounded-2xl p-1.5 flex flex-col gap-1 z-50"
+                  >
+                    {(['seasonality', 'history'] as const).map(chartMode => {
+                      const isSelected = mode === chartMode;
+                      return (
+                        <button
+                          key={chartMode}
+                          type="button"
+                          onClick={() => {
+                            setMode(chartMode);
+                            setHoveredIndex(null);
+                            setIsModeDropdownOpen(false);
+                          }}
+                          className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                            isSelected
+                              ? 'bg-emerald-50 text-emerald-800 font-black'
+                              : 'text-slate-600 hover:bg-slate-50'
+                          }`}
+                        >
+                          <div className="flex items-center gap-2">
+                            {chartMode === 'seasonality' ? (
+                              <Calendar className="w-3.5 h-3.5 text-emerald-600" />
+                            ) : (
+                              <BarChart3 className="w-3.5 h-3.5 text-emerald-600" />
+                            )}
+                            <span>
+                              {chartMode === 'seasonality'
+                                ? (language === 'zh' ? '季節月份' : 'Seasonality')
+                                : (language === 'zh' ? '歷年趨勢' : 'History')}
+                            </span>
+                          </div>
+                          {isSelected && <Check className="w-3.5 h-3.5 text-emerald-600 shrink-0" />}
+                        </button>
+                      );
+                    })}
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+
+            {/* Dataset Filter Dropdown */}
+            <div className="relative" ref={filterDropdownRef}>
+              <button
+                type="button"
+                onClick={() => {
+                  setIsFilterDropdownOpen(!isFilterDropdownOpen);
+                  setIsModeDropdownOpen(false);
+                }}
+                className="h-[34px] bg-white border border-slate-200/90 shadow-2xs rounded-2xl px-3 py-1.5 flex items-center gap-2 text-xs font-bold text-slate-800 cursor-pointer active:scale-95 transition-all"
+              >
+                <Filter className="w-3.5 h-3.5 text-emerald-600" />
+                <span className="text-[11px] font-bold">
+                  {selectedSourcesSummary}
+                </span>
+                <ChevronDown className={`w-3.5 h-3.5 text-slate-400 transition-transform duration-200 ${isFilterDropdownOpen ? 'rotate-180' : ''}`} />
+              </button>
+
+            <AnimatePresence>
+              {isFilterDropdownOpen && (
+                <motion.div
+                  initial={{ opacity: 0, y: -6, scale: 0.95 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  exit={{ opacity: 0, y: -6, scale: 0.95 }}
+                  transition={{ duration: 0.15 }}
+                  className="absolute top-10 left-0 w-52 bg-white/95 backdrop-blur-xl border border-slate-200 shadow-xl rounded-2xl p-1.5 flex flex-col gap-1 z-50"
+                >
+                  {(['inat', 'bgis', ...(isBirdGroup ? ['ebird' as const] : [])] as const).map(src => {
+                    const cfg = sourceConfig[src];
+                    const isSelected = activeSources.has(src);
+                    return (
+                      <button
+                        key={src}
+                        type="button"
+                        onClick={() => toggleSource(src)}
+                        className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                          isSelected
+                            ? `${cfg.lightBg}`
+                            : 'text-slate-500 hover:bg-slate-50'
+                        }`}
+                      >
+                        <div className="flex items-center gap-2 min-w-0">
+                          <span
+                            className="w-2 h-2 rounded-full shrink-0"
+                            style={{ backgroundColor: isSelected ? cfg.color : '#cbd5e1' }}
+                          />
+                          <span className="truncate">{cfg.shortName}</span>
+                        </div>
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          <span className={`text-[10px] font-bold px-1.5 py-0.2 rounded-md ${isSelected ? 'bg-white/80 shadow-2xs' : 'bg-slate-100 text-slate-400'}`}>
+                            {cfg.isLoading ? (
+                              <Loader2 className="h-2.5 w-2.5 animate-spin text-slate-400" />
+                            ) : (
+                              cfg.total.toLocaleString()
+                            )}
+                          </span>
+                          {isSelected && <Check className="w-3.5 h-3.5 shrink-0" style={{ color: cfg.strokeColor }} />}
+                        </div>
+                      </button>
+                    );
+                  })}
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
+        </div>
+
+          {/* Desktop Filter Pills */}
+          <div className="hidden sm:flex flex-wrap items-center gap-2">
             {(['inat', 'bgis', ...(isBirdGroup ? ['ebird' as const] : [])] as const).map(src => {
               const cfg = sourceConfig[src];
               const isSelected = activeSources.has(src);
@@ -495,7 +688,7 @@ function ObservationChart({
           </div>
 
           {peakIndex !== -1 && peakValue > 0 && (
-            <div className="inline-flex items-center gap-1.5 rounded-xl bg-amber-50 border border-amber-200/80 px-2.5 py-1 text-[11px] font-bold text-amber-900">
+            <div className="hidden sm:inline-flex items-center gap-1.5 rounded-xl bg-amber-50 border border-amber-200/80 px-2.5 py-1 text-[11px] font-bold text-amber-900">
               <Sparkles className="h-3.5 w-3.5 text-amber-600" />
               <span>
                 {language === 'zh'
@@ -514,23 +707,23 @@ function ObservationChart({
       </div>
 
       {/* Chart Body Area */}
-      <div className="relative p-4 sm:p-6" ref={containerRef}>
+      <div className="relative p-2.5 sm:p-6" ref={containerRef}>
         {(isBgisLoading && isEbirdLoading) && !hasData && observations.length === 0 ? (
-          <div className="flex h-[280px] flex-col items-center justify-center gap-2 text-sm font-semibold text-slate-400">
+          <div className="flex h-[260px] flex-col items-center justify-center gap-2 text-sm font-semibold text-slate-400">
             <Loader2 className="h-6 w-6 animate-spin text-emerald-500" />
             <span>{language === 'zh' ? '正在載入分佈趨勢資料...' : 'Loading trend data...'}</span>
           </div>
         ) : !hasData ? (
-          <div className="flex h-[280px] flex-col items-center justify-center gap-2 text-sm font-semibold text-slate-400">
+          <div className="flex h-[260px] flex-col items-center justify-center gap-2 text-sm font-semibold text-slate-400">
             <Info className="h-6 w-6 text-slate-300" />
             <span>{language === 'zh' ? '目前尚無此物種的時間記錄資料' : 'No observation date data available for this species'}</span>
           </div>
         ) : (
-          <div className="relative w-full select-none overflow-x-auto">
+          <div className={`relative w-full select-none ${points.length > 15 ? 'overflow-x-auto' : 'overflow-visible'}`}>
             {/* SVG Chart */}
             <svg
               viewBox={`0 0 ${chartWidth} ${chartHeight}`}
-              className="h-auto w-full min-w-[640px] overflow-visible"
+              className={`h-auto w-full ${points.length > 15 ? 'min-w-[500px]' : 'min-w-0'} overflow-visible`}
               role="img"
               aria-label={mode === 'seasonality' ? 'Observation seasonality chart' : 'Observation history chart'}
               onMouseLeave={() => setHoveredIndex(null)}
@@ -740,39 +933,39 @@ function ObservationChart({
                     exit={{ opacity: 0, scale: 0.96 }}
                     transition={{ duration: 0.15, ease: 'easeOut' }}
                     style={styleProps}
-                    className="pointer-events-none absolute z-30 min-w-[210px] rounded-2xl border border-slate-200/90 bg-white/95 p-3.5 shadow-xl backdrop-blur-md"
+                    className="pointer-events-none absolute z-30 min-w-[145px] sm:min-w-[195px] rounded-2xl border border-slate-200/90 bg-white/95 p-2 sm:p-3 shadow-xl backdrop-blur-md"
                   >
                     {/* Tooltip Header */}
-                    <div className="flex items-center justify-between border-b border-slate-100 pb-2 mb-2">
-                      <div className="flex items-center gap-1.5 font-black text-slate-900 text-xs">
-                        <Calendar className="h-3.5 w-3.5 text-emerald-600" />
+                    <div className="flex items-center justify-between border-b border-slate-100 pb-1.5 mb-1.5">
+                      <div className="flex items-center gap-1 font-black text-slate-900 text-[11px] sm:text-xs">
+                        <Calendar className="h-3 w-3 sm:h-3.5 sm:w-3.5 text-emerald-600" />
                         <span>{getHoverLabel(hoveredIndex)}</span>
                       </div>
-                      <span className="rounded-md bg-slate-100 px-1.5 py-0.5 text-[10px] font-black text-slate-700">
+                      <span className="rounded-md bg-slate-100 px-1.5 py-0.2 text-[9px] sm:text-[10px] font-black text-slate-700">
                         {hoveredTotal.toLocaleString()} {language === 'zh' ? '筆' : 'total'}
                       </span>
                     </div>
 
                     {/* Tooltip Data Breakdown */}
-                    <div className="space-y-1.5 text-xs">
+                    <div className="space-y-1 sm:space-y-1.5 text-xs">
                       {visibleSources.map(src => {
                         const cfg = sourceConfig[src];
                         const val = hoveredPoint[src] || 0;
                         const pct = hoveredTotal > 0 ? Math.round((val / hoveredTotal) * 100) : 0;
 
                         return (
-                          <div key={`tt-${src}`} className="flex items-center justify-between gap-3">
-                            <div className="flex items-center gap-1.5">
+                          <div key={`tt-${src}`} className="flex items-center justify-between gap-2 sm:gap-3">
+                            <div className="flex items-center gap-1.5 min-w-0">
                               <span
-                                className="h-2 w-2 rounded-full shadow-2xs"
+                                className="h-1.5 w-1.5 sm:h-2 sm:w-2 rounded-full shadow-2xs shrink-0"
                                 style={{ backgroundColor: cfg.color }}
                               />
-                              <span className="text-[11px] font-semibold text-slate-600">
+                              <span className="text-[10px] sm:text-[11px] font-semibold text-slate-600 truncate">
                                 {cfg.shortName}
                               </span>
                             </div>
-                            <div className="flex items-center gap-1.5">
-                              <span className="font-mono font-black text-slate-900 text-[12px]">
+                            <div className="flex items-center gap-1 shrink-0">
+                              <span className="font-mono font-black text-slate-900 text-[11px] sm:text-[12px]">
                                 {cfg.isLoading ? (
                                   <Loader2 className="h-2.5 w-2.5 animate-spin text-slate-400 inline-block" />
                                 ) : (
@@ -780,7 +973,7 @@ function ObservationChart({
                                 )}
                               </span>
                               {!cfg.isLoading && (
-                                <span className="text-[10px] text-slate-400 font-medium">
+                                <span className="text-[9px] sm:text-[10px] text-slate-400 font-medium">
                                   ({pct}%)
                                 </span>
                               )}
@@ -792,7 +985,7 @@ function ObservationChart({
 
                     {/* Peak Marker Badge in Tooltip */}
                     {hoveredIndex === peakIndex && peakValue > 0 && (
-                      <div className="mt-2.5 flex items-center gap-1 rounded-lg bg-amber-500/10 border border-amber-500/20 px-2 py-1 text-[10px] font-bold text-amber-700">
+                      <div className="mt-1.5 sm:mt-2.5 flex items-center gap-1 rounded-lg bg-amber-500/10 border border-amber-500/20 px-1.5 py-0.5 text-[9px] sm:text-[10px] font-bold text-amber-700">
                         <Sparkles className="h-3 w-3 text-amber-600 shrink-0" />
                         <span>{language === 'zh' ? '全時期最高觀測量' : 'Peak observation period'}</span>
                       </div>
@@ -1546,7 +1739,6 @@ export default function SpeciesMap({ taxonId, scientificName, chineseName, taxaG
   };
 
   return (
-    <>
     <div ref={containerRef} id="map-container" className="relative w-full h-[550px] rounded-[2.5rem] overflow-hidden bg-slate-100 border border-slate-200 shadow-inner group">
       <style jsx global>{`
         .maplibregl-ctrl-top-right { margin-top: 12px; margin-right: 12px; }
@@ -2572,15 +2764,5 @@ export default function SpeciesMap({ taxonId, scientificName, chineseName, taxaG
         </div>
       )}
     </div>
-    <ObservationChart
-      observations={observations}
-      scientificName={scientificName}
-      chineseName={chineseName}
-      ebirdSpeciesCode={ebirdSpeciesCode}
-      isBirdGroup={isBirdGroup}
-      language={language === 'zh' ? 'zh' : 'en'}
-      enabled={!isLoading}
-    />
-    </>
   );
 }

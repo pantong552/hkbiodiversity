@@ -233,8 +233,8 @@ export default function BirdSoundCard({ scientificName, commonName }: BirdSoundC
       {/* Header (無下劃分隔線與數字 Badge) */}
       <div>
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-2xl bg-emerald-50 flex items-center justify-center text-emerald-600 shadow-sm border border-emerald-100/50">
-            <Volume2 className="w-5 h-5" />
+          <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl sm:rounded-2xl bg-emerald-50 border border-emerald-100/50 flex items-center justify-center text-emerald-600 shrink-0 shadow-xs">
+            <Volume2 className="w-4 h-4 sm:w-5 sm:h-5 text-emerald-600" />
           </div>
           <div>
             <h2 className="text-xl font-black text-slate-900 leading-tight">
