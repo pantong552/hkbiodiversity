@@ -24,6 +24,8 @@ interface MultiSelectDropdownProps {
   variant?: 'default' | 'minimal';
   inferredValue?: string;
   getDisplayLabel?: (val: string) => string;
+  /** When false, bilingual English in parentheses is not italic (e.g. taxa group common names). Default true. */
+  italicizeEnglish?: boolean;
 }
 
 export default function MultiSelectDropdown({
@@ -37,6 +39,7 @@ export default function MultiSelectDropdown({
   variant = 'default',
   inferredValue,
   getDisplayLabel,
+  italicizeEnglish = true,
 }: MultiSelectDropdownProps) {
   const { language, t } = useLanguage();
   const [isOpen, setIsOpen] = useState(false);
@@ -296,7 +299,7 @@ export default function MultiSelectDropdown({
                                     <span className={`text-xs font-bold truncate ${isSelected ? 'text-emerald-800' : 'text-slate-800 group-hover/item:text-slate-900'}`}>
                                       {chi.trim()}
                                     </span>
-                                    <span className={`text-[11px] ${isSelected ? 'text-emerald-600/80 font-medium' : 'text-slate-400 font-normal'} italic tracking-tight truncate shrink-0`}>
+                                    <span className={`text-[11px] ${isSelected ? 'text-emerald-600/80 font-medium' : 'text-slate-400 font-normal'} ${italicizeEnglish ? 'italic' : 'not-italic'} tracking-tight truncate shrink-0`}>
                                       ({en.trim()})
                                     </span>
                                   </div>
@@ -437,7 +440,7 @@ export default function MultiSelectDropdown({
                                 <span className={`font-black text-sm ${isSelected ? 'text-emerald-950' : 'text-slate-800'}`}>
                                   {chi.trim()}
                                 </span>
-                                <span className={`text-xs ${isSelected ? 'text-emerald-700/80 font-medium' : 'text-slate-400 font-normal'} italic tracking-tight truncate shrink-0`}>
+                                <span className={`text-xs ${isSelected ? 'text-emerald-700/80 font-medium' : 'text-slate-400 font-normal'} ${italicizeEnglish ? 'italic' : 'not-italic'} tracking-tight truncate shrink-0`}>
                                   ({en.trim()})
                                 </span>
                               </div>

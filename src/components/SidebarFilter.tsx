@@ -453,6 +453,7 @@ export default function SidebarFilter({
                     onChange={(values) => handleTaxonomyChange('informal_group_eng', values)}
                     placeholder={TAXONOMY_LABELS.informal_group_eng}
                     inferredValue={inferredParents.informal_group_eng}
+                    italicizeEnglish={false}
                     getDisplayLabel={(val) => {
                       if (language !== 'zh') return val;
                       const chi = getTaxonomyChi('informal_group' as any, activeTaxaType === 'fungi' ? 'fungi' : 'fauna', val);
