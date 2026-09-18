@@ -5,6 +5,7 @@ import { createClient } from '@/utils/supabase/client';
 import { useLanguage } from '@/context/LanguageContext';
 import { useClickOutside } from '@/hooks/useClickOutside';
 import { Profile, UserRole, UserStatus } from '@/types/comments';
+import CuratorApplicationsManager from './CuratorApplicationsManager';
 import { 
   User, 
   Search, 
@@ -34,6 +35,7 @@ interface UsersManagerProps {
 
 type SortKey = 'username' | 'created_at' | 'last_online_at' | 'status';
 type SortDirection = 'asc' | 'desc';
+type ManagerTab = 'users' | 'applications';
 
 interface RoleSelectDropdownProps {
   currentRole: UserRole;
@@ -131,6 +133,7 @@ export default function UsersManager({ onRequestConfirm }: UsersManagerProps) {
   const { language, t } = useLanguage();
   const supabase = createClient();
   const [profiles, setProfiles] = useState<Profile[]>([]);
+  const [managerTab, setManagerTab] = useState<ManagerTab>('users');
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [actionLoading, setActionLoading] = useState<string | null>(null);
@@ -188,13 +191,40 @@ export default function UsersManager({ onRequestConfirm }: UsersManagerProps) {
   const handleRoleChange = async (userId: string, newRole: UserRole) => {
     setActionLoading(userId);
     try {
+      const currentProfile = profiles.find((profile) => profile.id === userId);
+      const shouldClearCuratorApplication = currentProfile?.role === 'curator' && newRole === 'guest';
+      const roleUpdate = shouldClearCuratorApplication
+        ? {
+            role: newRole,
+            curator_application_status: null,
+            curator_application_reason: null,
+            curator_application_submitted_at: null,
+            curator_application_reviewed_at: null,
+            curator_application_reviewed_by: null,
+            curator_application_rejection_reason: null,
+          }
+        : { role: newRole };
+
       const { error } = await supabase
         .from('profiles')
-        .update({ role: newRole })
+        .update(roleUpdate)
         .eq('id', userId);
 
       if (error) throw error;
-      setProfiles(profiles.map(p => p.id === userId ? { ...p, role: newRole } : p));
+      setProfiles(profiles.map(p => p.id === userId
+        ? {
+            ...p,
+            role: newRole,
+            ...(shouldClearCuratorApplication ? {
+              curator_application_status: null,
+              curator_application_reason: null,
+              curator_application_submitted_at: null,
+              curator_application_reviewed_at: null,
+              curator_application_reviewed_by: null,
+              curator_application_rejection_reason: null,
+            } : {}),
+          }
+        : p));
     } catch (err) {
       console.error('Error updating role:', err);
     } finally {
@@ -301,6 +331,26 @@ export default function UsersManager({ onRequestConfirm }: UsersManagerProps) {
 
   return (
     <div className="space-y-4">
+      <div className="flex items-center gap-1 rounded-2xl border border-white bg-white/50 p-1.5 shadow-sm" role="tablist" aria-label="Users manager sections">
+        <button type="button" role="tab" aria-selected={managerTab === 'users'} onClick={() => setManagerTab('users')} className={`flex-1 rounded-xl px-4 py-2.5 text-xs font-black transition-colors cursor-pointer ${managerTab === 'users' ? 'bg-white text-emerald-700 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}>
+          {language === 'zh' ? '所有使用者' : 'All Users'}
+        </button>
+        <button type="button" role="tab" aria-selected={managerTab === 'applications'} onClick={() => setManagerTab('applications')} className={`flex-1 rounded-xl px-4 py-2.5 text-xs font-black transition-colors cursor-pointer ${managerTab === 'applications' ? 'bg-white text-emerald-700 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}>
+          {language === 'zh' ? 'Curator 申請' : 'Curator Applications'}
+        </button>
+      </div>
+
+      {managerTab === 'applications' ? (
+        <CuratorApplicationsManager
+          onRequestConfirm={onRequestConfirm}
+          onApplicationReviewed={(updatedProfile) => {
+            setProfiles((current) => current.map((profile) => (
+              profile.id === updatedProfile.id ? { ...profile, ...updatedProfile } : profile
+            )));
+          }}
+        />
+      ) : (
+      <>
       {/* Search Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div className="relative group w-full max-w-md">
@@ -596,6 +646,8 @@ export default function UsersManager({ onRequestConfirm }: UsersManagerProps) {
             ))}
           </div>
         </>
+      )}
+      </>
       )}
     </div>
   );

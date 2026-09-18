@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { User, Heart, Calendar, Clock, Mail, X, Settings, ArrowLeft, ShieldCheck, FileEdit } from 'lucide-react';
+import { User, Heart, Calendar, Clock, Mail, X, Settings, ArrowLeft, ShieldCheck, FileEdit, Send, Clock3 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '@/context/AuthContext';
 import { useLanguage } from '@/context/LanguageContext';
@@ -9,6 +9,7 @@ import { useSpeciesPanel } from '@/context/SpeciesPanelContext';
 import UsernameForm from './UsernameForm';
 import BookmarksSection from './BookmarksSection';
 import CuratorDraftsSection from './CuratorDraftsSection';
+import CuratorApplicationModal from './CuratorApplicationModal';
 
 type TabType = 'profile' | 'bookmarks' | 'drafts';
 
@@ -17,6 +18,7 @@ export default function AccountModule() {
   const { t, language } = useLanguage();
   const { isAccountOpen, setIsAccountOpen, openSpeciesIds } = useSpeciesPanel();
   const [activeTab, setActiveTab] = useState<TabType>('profile');
+  const [isCuratorApplicationOpen, setIsCuratorApplicationOpen] = useState(false);
 
   // 禁止背景捲動
   useEffect(() => {
@@ -66,7 +68,8 @@ export default function AccountModule() {
   }
 
   return (
-    <AnimatePresence>
+    <>
+      <AnimatePresence>
       {isAccountOpen && (
         <>
           {/* 背景遮罩 */}
@@ -182,7 +185,7 @@ export default function AccountModule() {
                             {t('account.profile_info')}
                           </h4>
                           <div className="space-y-4">
-                             <div className="flex items-center gap-4 p-4 bg-slate-50/50 rounded-2xl border border-slate-100">
+                            <div className="flex items-center gap-4 p-4 bg-slate-50/50 rounded-2xl border border-slate-100">
                               <ShieldCheck className={`w-4 h-4 ${
                                 profile?.role === 'admin' ? 'text-red-500' : 
                                 profile?.role === 'curator' ? 'text-amber-500' : 'text-slate-400'
@@ -196,6 +199,26 @@ export default function AccountModule() {
                                   {t(`account.role_${profile?.role || 'guest'}`)}
                                 </p>
                               </div>
+                              {profile?.role === 'guest' && (
+                                <button
+                                  type="button"
+                                  onClick={() => setIsCuratorApplicationOpen(true)}
+                                  className={`shrink-0 inline-flex items-center gap-1.5 rounded-xl border px-3 py-2 text-[10px] font-black transition-colors cursor-pointer focus:outline-none focus:ring-4 focus:ring-emerald-500/10 ${
+                                    profile.curator_application_status === 'pending'
+                                      ? 'border-amber-100 bg-amber-50 text-amber-700 hover:bg-amber-100'
+                                      : profile.curator_application_status === 'rejected'
+                                        ? 'border-rose-100 bg-rose-50 text-rose-600 hover:bg-rose-100'
+                                        : 'border-emerald-100 bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
+                                  }`}
+                                >
+                                  {profile.curator_application_status === 'pending' ? <Clock3 className="w-3.5 h-3.5" /> : <Send className="w-3.5 h-3.5" />}
+                                  {profile.curator_application_status === 'pending'
+                                    ? (language === 'zh' ? '批核中' : 'Pending')
+                                    : profile.curator_application_status === 'rejected'
+                                      ? (language === 'zh' ? '已拒絕' : 'Rejected')
+                                      : (language === 'zh' ? '申請 Curator' : 'Apply Curator')}
+                                </button>
+                              )}
                             </div>
                             <div className="flex items-center gap-4 p-4 bg-slate-50/50 rounded-2xl border border-slate-100">
                               <Calendar className="w-4 h-4 text-emerald-600" />
@@ -232,6 +255,12 @@ export default function AccountModule() {
           </motion.div>
         </>
       )}
-    </AnimatePresence>
+      </AnimatePresence>
+      <CuratorApplicationModal
+        isOpen={isCuratorApplicationOpen}
+        onClose={() => setIsCuratorApplicationOpen(false)}
+        profile={profile}
+      />
+    </>
   );
 }

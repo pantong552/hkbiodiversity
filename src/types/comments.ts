@@ -1,5 +1,6 @@
 export type UserRole = 'admin' | 'curator' | 'guest';
 export type UserStatus = 'active' | 'blocked';
+export type CuratorApplicationStatus = 'pending' | 'approved' | 'rejected';
 
 export interface Profile {
   id: string;
@@ -13,6 +14,12 @@ export interface Profile {
   last_online_at?: string | null;
   inaturalist_username?: string | null;
   allow_all_rights_reserved_usage?: boolean;
+  curator_application_status?: CuratorApplicationStatus | null;
+  curator_application_reason?: string | null;
+  curator_application_submitted_at?: string | null;
+  curator_application_reviewed_at?: string | null;
+  curator_application_reviewed_by?: string | null;
+  curator_application_rejection_reason?: string | null;
 }
 
 export interface Comment {
