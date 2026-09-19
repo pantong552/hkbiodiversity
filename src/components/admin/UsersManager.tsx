@@ -336,7 +336,7 @@ export default function UsersManager({ onRequestConfirm }: UsersManagerProps) {
           {language === 'zh' ? '所有使用者' : 'All Users'}
         </button>
         <button type="button" role="tab" aria-selected={managerTab === 'applications'} onClick={() => setManagerTab('applications')} className={`flex-1 rounded-xl px-4 py-2.5 text-xs font-black transition-colors cursor-pointer ${managerTab === 'applications' ? 'bg-white text-emerald-700 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}>
-          {language === 'zh' ? 'Curator 申請' : 'Curator Applications'}
+          {language === 'zh' ? '策展人申請' : 'Curator Applications'}
         </button>
       </div>
 

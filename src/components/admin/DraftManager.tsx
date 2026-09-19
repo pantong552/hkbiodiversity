@@ -159,7 +159,7 @@ export default function DraftManager() {
                 {language === 'zh' ? '草稿修訂管理員 (Draft Manager)' : 'Draft Manager Console'}
               </h2>
               <p className="text-xs text-slate-400 font-medium">
-                {language === 'zh' ? '管理並審核 Curator 提交的動物 (Fauna) 與植物 (Flora) 修訂草稿' : 'Review and manage Fauna & Flora draft revisions submitted by curators.'}
+                {language === 'zh' ? '管理並審核策展人提交的動物 (Fauna) 與植物 (Flora) 修訂草稿' : 'Review and manage Fauna & Flora draft revisions submitted by curators.'}
               </p>
             </div>
           </div>
@@ -239,7 +239,7 @@ export default function DraftManager() {
             <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
             <input
               type="text"
-              placeholder={language === 'zh' ? '搜尋物種名或 Curator...' : 'Search species or curator...'}
+              placeholder={language === 'zh' ? '搜尋物種名或策展人...' : 'Search species or curator...'}
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="w-full bg-white border border-slate-200 text-slate-800 placeholder-slate-400 font-medium text-xs pl-9 pr-4 py-2.5 rounded-2xl shadow-xs focus:outline-none focus:border-emerald-500"
@@ -272,7 +272,7 @@ export default function DraftManager() {
                 <tr className="bg-slate-50/80 border-b border-slate-100 text-[11px] font-black text-slate-400 uppercase tracking-wider">
                   <th className="py-4 px-6">{language === 'zh' ? '物種資料 (Species)' : 'Species'}</th>
                   <th className="py-4 px-6">{language === 'zh' ? '分類 (Taxa)' : 'Taxa'}</th>
-                  <th className="py-4 px-6">{language === 'zh' ? '提交者 (Curator)' : 'Curator'}</th>
+                  <th className="py-4 px-6">{language === 'zh' ? '提交者 (策展人)' : 'Curator'}</th>
                   <th className="py-4 px-6">{language === 'zh' ? '草稿狀態 (Status)' : 'Status'}</th>
                   <th className="py-4 px-6">{language === 'zh' ? '提交時間 (Submission Date)' : 'Submitted At'}</th>
                   <th className="py-4 px-6 text-right">{language === 'zh' ? '操作 (Action)' : 'Action'}</th>
@@ -318,12 +318,12 @@ export default function DraftManager() {
                       <td className="py-4 px-6">
                         <div className="flex items-center gap-2.5">
                           {draft.curator_avatar ? (
-                            <img src={draft.curator_avatar} alt={draft.curator_name || 'Curator'} className="w-6 h-6 rounded-full object-cover border border-slate-200" />
+                            <img src={draft.curator_avatar} alt={draft.curator_name || (language === 'zh' ? '策展人' : 'Curator')} className="w-6 h-6 rounded-full object-cover border border-slate-200" />
                           ) : (
                             <UserCircle className="w-6 h-6 text-slate-300" />
                           )}
                           <span className="font-bold text-slate-700">
-                            {draft.curator_name || 'Curator'}
+                            {draft.curator_name || (language === 'zh' ? '策展人' : 'Curator')}
                           </span>
                         </div>
                       </td>

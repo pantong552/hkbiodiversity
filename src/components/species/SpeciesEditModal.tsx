@@ -197,7 +197,7 @@ export default function SpeciesEditModal({
     }
 
     if (isLockedByOtherCurator) {
-      showToast('error', language === 'zh' ? '此物種已被其他 Curator 鎖定，暫無法編輯' : 'This species is locked by another curator');
+      showToast('error', language === 'zh' ? '此物種已被其他策展人鎖定，暫無法編輯' : 'This species is locked by another curator');
       return;
     }
 
@@ -538,7 +538,7 @@ export default function SpeciesEditModal({
                 <span className="italic">"{ currentDraft.rejection_reason || (language === 'zh' ? '未提供特定理由' : 'No specific reason provided') }"</span>
               </p>
               <p className="text-[11px] text-rose-500 mt-1">
-                {language === 'zh' ? 'Curator 可根據退回原因重新修正內容後按右上角「重新提交草稿 (Resubmit Draft)」，或點擊右上角「刪除」撤回此草稿。' : 'Curator may update the fields to resubmit or click "Delete" at top right to remove this draft.'}
+                {language === 'zh' ? '策展人可根據退回原因重新修正內容後按右上角「重新提交草稿 (Resubmit Draft)」，或點擊右上角「刪除」撤回此草稿。' : 'Curator may update the fields to resubmit or click "Delete" at top right to remove this draft.'}
               </p>
             </div>
           </div>
@@ -627,7 +627,7 @@ export default function SpeciesEditModal({
 
               <p className="text-xs text-slate-500">
                 {language === 'zh'
-                  ? '請輸入退回理由，Curator 將會看到此意見並可修正後重新提交：'
+                  ? '請輸入退回理由，策展人將會看到此意見並可修正後重新提交：'
                   : 'Please enter the reason for rejection to guide the curator for re-submission:'}
               </p>
 

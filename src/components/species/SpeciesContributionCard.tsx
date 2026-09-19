@@ -131,7 +131,7 @@ export default function SpeciesContributionCard({ speciesId, refreshTrigger = 0 
                       v{idx + 1}.0
                     </span>
                     <h4 className="font-black text-slate-800 text-sm truncate">
-                      {draft.curator_name || (language === 'zh' ? '熱心館員' : 'Curator')}
+                      {draft.curator_name || (language === 'zh' ? '熱心策展人' : 'Curator')}
                     </h4>
                   </div>
 

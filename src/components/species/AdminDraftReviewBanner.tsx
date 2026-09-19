@@ -199,7 +199,7 @@ export default function AdminDraftReviewBanner({
                 {isRejected ? (
                   isAdmin
                     ? (language === 'zh'
-                        ? `Curator (${pendingDraft.curator_name || '館員'}) 的修訂草稿已被退回 (Rejected)，等待 Curator 查看退回原因並重新提交 (Resubmit)。`
+                        ? `策展人 (${pendingDraft.curator_name || '館員'}) 的修訂草稿已被退回 (Rejected)，等待策展人查看退回原因並重新提交 (Resubmit)。`
                         : `Draft by Curator (${pendingDraft.curator_name}) was rejected. Waiting for curator to review and resubmit.`)
                     : (language === 'zh'
                         ? `您的修訂草稿已被退回。退回原因："${pendingDraft.rejection_reason || '未填寫原因'}"。請進行修正後重新提交 (Resubmit)。`
@@ -207,14 +207,14 @@ export default function AdminDraftReviewBanner({
                 ) : (
                   isAdmin
                     ? (language === 'zh'
-                        ? `Curator ${pendingDraft.curator_name || '館員'} 提交了此物種的修訂草稿`
+                        ? `策展人 ${pendingDraft.curator_name || '館員'} 提交了此物種的修訂草稿`
                         : `Curator ${pendingDraft.curator_name || 'Curator'} submitted a revision for this species.`)
                     : (isDraftOwner
                         ? (language === 'zh'
                             ? `您於 ${new Date(pendingDraft.submitted_at).toLocaleString()} 提交了此物種修訂草稿，正在等待管理員審核中。`
                             : `You submitted a draft on ${new Date(pendingDraft.submitted_at).toLocaleString()}. Waiting for admin approval.`)
                         : (language === 'zh'
-                            ? `Curator (${pendingDraft.curator_name || '館員'}) 已提交修訂草稿，本物種目前處於獨佔鎖定狀態。`
+                            ? `策展人 (${pendingDraft.curator_name || '館員'}) 已提交修訂草稿，本物種目前處於獨佔鎖定狀態。`
                             : `Curator (${pendingDraft.curator_name}) has submitted a pending revision for this species.`)
                       )
                 )}
@@ -269,7 +269,7 @@ export default function AdminDraftReviewBanner({
                       {language === 'zh' ? '審核物種修訂草稿' : 'Review Species Draft Revision'}
                     </h3>
                     <p className="text-xs text-slate-400">
-                      Curator: {pendingDraft.curator_name} • {new Date(pendingDraft.submitted_at).toLocaleString()}
+                      {language === 'zh' ? '策展人' : 'Curator'}: {pendingDraft.curator_name} • {new Date(pendingDraft.submitted_at).toLocaleString()}
                     </p>
                   </div>
                 </div>
@@ -346,7 +346,7 @@ export default function AdminDraftReviewBanner({
 
               <p className="text-xs text-slate-500">
                 {language === 'zh'
-                  ? '請輸入退回理由，Curator 將會看到此意見並可修正後重新提交：'
+                  ? '請輸入退回理由，策展人將會看到此意見並可修正後重新提交：'
                   : 'Please enter the reason for rejection to guide the curator for re-submission:'}
               </p>
 

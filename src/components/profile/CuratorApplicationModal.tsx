@@ -126,7 +126,7 @@ export default function CuratorApplicationModal({ isOpen, onClose, profile }: Cu
                 </div>
                 <div>
                   <h2 id="curator-application-title" className="text-lg font-black text-slate-900">
-                    {language === 'zh' ? '申請 Curator' : 'Apply to become a Curator'}
+                    {language === 'zh' ? '申請策展人' : 'Apply to become a Curator'}
                   </h2>
                   <p className="text-xs text-slate-500 mt-1">
                     {language === 'zh' ? '請提供你希望協助維護生物多樣性資料的原因。' : 'Tell us why you would like to help curate biodiversity data.'}
@@ -139,6 +139,56 @@ export default function CuratorApplicationModal({ isOpen, onClose, profile }: Cu
             </div>
 
             <div className="p-6 space-y-5">
+              <div className="rounded-2xl border border-emerald-100 bg-emerald-50/70 p-4">
+                <h3 className="text-xs font-black text-emerald-800">
+                  {language === 'zh' ? '成為策展人後可以獲得的功能及責任' : 'Curator features and responsibilities'}
+                </h3>
+                <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                  <div>
+                    <p className="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-wider text-emerald-700">
+                      <CheckCircle2 className="h-3.5 w-3.5" />
+                      {language === 'zh' ? '可使用功能' : 'Features'}
+                    </p>
+                    <ul className="mt-2 space-y-1.5 text-xs leading-relaxed text-emerald-900">
+                      {language === 'zh' ? (
+                        <>
+                          <li>• 提交及管理物種資料修訂草稿</li>
+                          <li>• 協助整理及更新生物多樣性資料</li>
+                          <li>• 新增及維護參考文獻資料</li>
+                        </>
+                      ) : (
+                        <>
+                          <li>• Submit and manage species revision drafts</li>
+                          <li>• Help maintain biodiversity information</li>
+                          <li>• Add and maintain reference records</li>
+                        </>
+                      )}
+                    </ul>
+                  </div>
+                  <div>
+                    <p className="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-wider text-emerald-700">
+                      <ShieldCheck className="h-3.5 w-3.5" />
+                      {language === 'zh' ? '主要責任' : 'Responsibilities'}
+                    </p>
+                    <ul className="mt-2 space-y-1.5 text-xs leading-relaxed text-emerald-900">
+                      {language === 'zh' ? (
+                        <>
+                          <li>• 確保提交內容準確並附上可靠來源</li>
+                          <li>• 遵守資料編輯及社群協作規範</li>
+                          <li>• 以客觀、尊重及負責任的態度維護資料</li>
+                        </>
+                      ) : (
+                        <>
+                          <li>• Keep submissions accurate and well-sourced</li>
+                          <li>• Follow data-editing and collaboration guidelines</li>
+                          <li>• Maintain data objectively, respectfully, and responsibly</li>
+                        </>
+                      )}
+                    </ul>
+                  </div>
+                </div>
+              </div>
+
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <InfoItem icon={<User className="w-4 h-4" />} label={language === 'zh' ? 'User Name' : 'User Name'} value={displayName} />
                 <InfoItem icon={<Clock3 className="w-4 h-4" />} label={language === 'zh' ? '提交時間' : 'Submitted'} value={formatDate(profile?.curator_application_submitted_at)} />
@@ -148,7 +198,7 @@ export default function CuratorApplicationModal({ isOpen, onClose, profile }: Cu
 
               <div>
                 <label htmlFor="curator-reason" className="block text-xs font-black uppercase tracking-wider text-slate-500 mb-2">
-                  {language === 'zh' ? '想成為 Curator 的原因' : 'Why would you like to become a Curator?'}
+                  {language === 'zh' ? '想成為策展人的原因' : 'Why would you like to become a Curator?'}
                 </label>
                 <textarea
                   id="curator-reason"

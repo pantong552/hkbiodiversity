@@ -216,7 +216,7 @@ export default function AccountModule() {
                                     ? (language === 'zh' ? '批核中' : 'Pending')
                                     : profile.curator_application_status === 'rejected'
                                       ? (language === 'zh' ? '已拒絕' : 'Rejected')
-                                      : (language === 'zh' ? '申請 Curator' : 'Apply Curator')}
+                                      : (language === 'zh' ? '申請策展人' : 'Apply Curator')}
                                 </button>
                               )}
                             </div>
