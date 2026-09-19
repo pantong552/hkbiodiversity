@@ -1188,7 +1188,6 @@ const faunaFieldGroups = (t: any): FieldGroup[] => [
       {key: 'china_vertebrates_red_list', labelChi: '中國脊椎動物紅皮書', labelEng: 'China Vertebrates Red List', type: 'select', options: ['Least Concern', 'Near Threatened', 'Vulnerable', 'Endangered', 'Critically Endangered', 'Data Deficient']},
       {key: 'endemic', labelChi: '特有種', labelEng: 'Endemicity', type: 'text'},
       {key: 'native_status', labelChi: '原生概況', labelEng: 'Native Status', type: 'select', options: ['Native', 'Exotic', 'Vagrant', 'Reintroduced', 'Uncertain']},
-      {key: 'restrictedness', labelChi: '受限度/稀有度', labelEng: 'Restrictedness', type: 'text'},
     ]
   },
   {
@@ -1340,7 +1339,6 @@ const fungiFieldGroups = (t: any): FieldGroup[] => [
       { key: 'iucn', labelChi: 'IUCN 評級', labelEng: 'IUCN Status', type: 'select', options: ['LC', 'NT', 'VU', 'EN', 'CR', 'EW', 'EX', 'DD', 'NE'] },
       { key: 'endemic', labelChi: '特有種', labelEng: 'Endemicity', type: 'text' },
       { key: 'native_status', labelChi: '原生概況', labelEng: 'Native Status', type: 'select', options: ['Native', 'Exotic', 'Reintroduced', 'Uncertain'] },
-      { key: 'restrictedness', labelChi: '受限度/稀有度', labelEng: 'Restrictedness', type: 'text' },
     ]
   },
   {

@@ -40,7 +40,6 @@ export interface Species {
   cap586?: string;
   iucn: string;
   native_status?: string;
-  restrictedness?: string;
   china_vertebrates_red_list?: string;
   
   // Descriptions & Info (Eng / Chi)
