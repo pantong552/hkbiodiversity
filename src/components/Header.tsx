@@ -157,12 +157,12 @@ export default function Header({ isHomePage: propIsHomePage }: HeaderProps = {})
   };
 
   const navLinks = [
-    { name: t('nav.home'), href: '/' },
-    { name: t('nav.database'), href: '/database' },
+    { name: t('nav.home'), href: '/', hasSubmenu: false, disabled: false },
+    { name: t('nav.database'), href: '/database', hasSubmenu: false, disabled: false },
     // 以下頁面尚未建立，暫時停用以避免 404 prefetch 錯誤
-    { name: t('nav.about'), href: '#', disabled: true },
-    { name: t('nav.blog'), href: '/journal' },
-    ...(profile?.role === 'admin' ? [{ name: t('nav.manage'), href: '/maintain' }] : []),
+    { name: t('nav.about'), href: '/about', hasSubmenu: true, disabled: false },
+    { name: t('nav.blog'), href: '/journal', hasSubmenu: false, disabled: false },
+    ...(profile?.role === 'admin' ? [{ name: t('nav.manage'), href: '/maintain', hasSubmenu: false, disabled: false }] : []),
   ];
 
   return (
@@ -237,6 +237,17 @@ export default function Header({ isHomePage: propIsHomePage }: HeaderProps = {})
         <div className={`hidden min-[1101px]:flex items-center ${language === 'en' ? 'gap-4 xl:gap-6' : 'gap-6 xl:gap-10'}`}>
           <div className="flex items-center gap-4 xl:gap-8">
             {navLinks.map((link) => (
+              link.hasSubmenu ? (
+                <div key={link.name} className="group relative">
+                  <Link href={link.href} className={`${language === 'en' ? 'text-xs xl:text-sm' : 'text-sm'} font-bold transition-colors duration-500 ${isHeaderTransparent ? 'text-white drop-shadow-sm hover:text-emerald-300' : 'text-slate-500 hover:text-emerald-600'}`}>{link.name}</Link>
+                  <div className="pointer-events-none absolute left-1/2 top-full z-50 w-48 -translate-x-1/2 pt-4 opacity-0 transition-all duration-200 group-hover:pointer-events-auto group-hover:opacity-100">
+                    <div className="rounded-2xl border border-slate-100 bg-white p-2 shadow-2xl shadow-slate-300/30">
+                      <Link href="/about" className="block rounded-xl px-4 py-3 text-sm font-bold text-slate-600 transition-colors hover:bg-emerald-50 hover:text-emerald-700">{language === 'zh' ? '本站簡介' : 'About this website'}</Link>
+                      <Link href="/about/curators" className="block rounded-xl px-4 py-3 text-sm font-bold text-slate-600 transition-colors hover:bg-emerald-50 hover:text-emerald-700">{language === 'zh' ? '策展人' : 'Curators'}</Link>
+                    </div>
+                  </div>
+                </div>
+              ) : (
               link.disabled ? (
                 <span
                   key={link.name}
@@ -258,6 +269,7 @@ export default function Header({ isHomePage: propIsHomePage }: HeaderProps = {})
                 >
                   {link.name}
                 </Link>
+              )
               )
             ))}
           </div>
@@ -380,6 +392,15 @@ export default function Header({ isHomePage: propIsHomePage }: HeaderProps = {})
 
             <div className="flex flex-col gap-2">
               {navLinks.map((link) => (
+                link.hasSubmenu ? (
+                  <div key={link.name} className="rounded-xl bg-emerald-50/60 px-4 py-2">
+                    <Link href="/about" onClick={() => setIsMobileMenuOpen(false)} className="block py-1 text-lg font-bold text-slate-700 hover:text-emerald-600">{link.name}</Link>
+                    <div className="mt-1 flex flex-col gap-1 border-l-2 border-emerald-200 pl-3">
+                      <Link href="/about" onClick={() => setIsMobileMenuOpen(false)} className="py-1 text-sm font-semibold text-slate-600 hover:text-emerald-600">{language === 'zh' ? '本站簡介' : 'About this website'}</Link>
+                      <Link href="/about/curators" onClick={() => setIsMobileMenuOpen(false)} className="py-1 text-sm font-semibold text-slate-600 hover:text-emerald-600">{language === 'zh' ? '策展人' : 'Curators'}</Link>
+                    </div>
+                  </div>
+                ) : (
                 link.disabled ? (
                   <span
                     key={link.name}
@@ -401,6 +422,7 @@ export default function Header({ isHomePage: propIsHomePage }: HeaderProps = {})
                   >
                     {link.name}
                   </Link>
+                )
                 )
               ))}
               <hr className="border-slate-100 my-2" />
