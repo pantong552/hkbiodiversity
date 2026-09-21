@@ -34,7 +34,8 @@ export interface FetchObservationsResult {
  */
 export async function fetchAllInatObservations(
   taxonId: number,
-  onProgress?: (current: number, total: number) => void
+  onProgress?: (current: number, total: number) => void,
+  options?: { includeObscured?: boolean }
 ): Promise<InatObservation[]> {
   const allObservations: InatObservation[] = [];
   let page = 1;
@@ -48,14 +49,18 @@ export async function fetchAllInatObservations(
       taxon_id: taxonId.toString(),
       place_id: '7613',
       quality_grade: 'research',
-      geoprivacy: 'open',
       threatened: 'false',
-      obscuration: 'none',
       acc_below_or_equal: '1000',
       per_page: perPage.toString(),
       fields: '(id:!t,uri:!t,observed_on_details:(date:!t,hour:!t,minute:!t),time_observed_at:!t,place_guess:!t,location:!t,photos:(url:!t),user:(login:!t,name:!t),quality_grade:!t)',
       total_results: 'true'
     });
+    // Map data should remain limited to public, accurate locations. Temporal
+    // trends may include observations whose location is obscured.
+    if (!options?.includeObscured) {
+      baseParams.set('geoprivacy', 'open');
+      baseParams.set('obscuration', 'none');
+    }
 
 
     while (true) {
@@ -71,6 +76,23 @@ export async function fetchAllInatObservations(
       totalResults = data.total_results || totalResults;
 
       allObservations.push(...results);
+
+      console.debug('[iNat fetch] page response', {
+        taxonId,
+        page,
+        pageResults: results.length,
+        apiTotalResults: data.total_results,
+        accumulatedResults: allObservations.length,
+        pageMissingLocation: results.filter((observation: InatObservation) => !observation.location).length,
+        pageMissingDate: results.filter((observation: InatObservation) => !observation.observed_on_details?.date).length,
+        filters: {
+          place_id: baseParams.get('place_id'),
+          quality_grade: baseParams.get('quality_grade'),
+          geoprivacy: baseParams.get('geoprivacy'),
+          obscuration: baseParams.get('obscuration'),
+          acc_below_or_equal: baseParams.get('acc_below_or_equal')
+        }
+      });
 
       if (onProgress) {
         onProgress(allObservations.length, totalResults);
@@ -89,6 +111,14 @@ export async function fetchAllInatObservations(
       // Small delay to be nice to the API
       await new Promise(resolve => setTimeout(resolve, 300));
     }
+
+    console.debug('[iNat fetch] complete', {
+      taxonId,
+      fetchedResults: allObservations.length,
+      missingLocation: allObservations.filter(observation => !observation.location).length,
+      missingDate: allObservations.filter(observation => !observation.observed_on_details?.date).length,
+      dates: allObservations.map(observation => observation.observed_on_details?.date || null)
+    });
 
     return allObservations;
   } catch (error) {

@@ -188,21 +188,20 @@ export function ObservationChart({
     }
     if (!taxonId || taxonId <= 0) return;
 
-    for (const key of Object.keys(speciesMapCache)) {
-      if (speciesMapCache[key]?.observations?.length) {
-        setInatObservations(speciesMapCache[key].observations);
-        return;
-      }
-    }
-
     let cancelled = false;
-    fetchAllInatObservations(taxonId).then(obs => {
+    // Trends must include obscured observations. Do not reuse the map cache,
+    // because map data intentionally excludes obscured locations.
+    fetchAllInatObservations(taxonId, undefined, { includeObscured: true }).then(obs => {
       if (!cancelled) setInatObservations(obs);
     }).catch(() => {});
     return () => { cancelled = true; };
   }, [taxonId, propObservations]);
 
-  const observations = propObservations || inatObservations;
+  // Trends intentionally uses the complete iNaturalist result set. Do not
+  // filter by location here: records without coordinates must still be
+  // included in the temporal counts. Spatial filtering is only performed by
+  // the map's grid aggregation below.
+  const observations = propObservations ?? inatObservations;
 
   const statsKey = `${scientificName || ''}|${chineseName || ''}|${ebirdSpeciesCode || ''}|${isBirdGroup}`;
   const initialCache = observationStatsCache[statsKey];
@@ -334,7 +333,10 @@ export function ObservationChart({
     ...points.flatMap(point => visibleSources.map(s => point[s]))
   );
 
-  const totalInat = points.reduce((sum, p) => sum + p.inat, 0);
+  // The source total must represent every fetched observation, including
+  // records that cannot be assigned to a month because their observation date
+  // is missing. Monthly points still only include records with a valid date.
+  const totalInat = observations.length;
   const totalBgis = points.reduce((sum, p) => sum + p.bgis, 0);
   const totalEbird = points.reduce((sum, p) => sum + p.ebird, 0);
   const totalActive = points.reduce((sum, p) => {
@@ -1523,6 +1525,14 @@ export default function SpeciesMap({ taxonId, scientificName, chineseName, taxaG
           geoJsonPromise
         ]);
 
+        console.debug('[SpeciesMap] iNat data received', {
+          taxonId,
+          records: obs.length,
+          missingLocation: obs.filter(observation => !observation.location).length,
+          missingDate: obs.filter(observation => !observation.observed_on_details?.date).length,
+          dates: obs.map(observation => observation.observed_on_details?.date || null)
+        });
+
         if (taxonId && taxonId > 0) {
           setInatStatus('done');
           setObservations(obs);
@@ -1600,6 +1610,8 @@ export default function SpeciesMap({ taxonId, scientificName, chineseName, taxaG
           const ptsInPoly = obsPoints.filter((pt: any) =>
             turf.booleanPointInPolygon(pt, feature)
           );
+          // Map counts are spatial counts only. This must not be reused by
+          // ObservationChart, which counts the complete `obs` array above.
           feature.properties.count = ptsInPoly.length;
           feature.properties.observations = ptsInPoly.map((p: any) => p.properties);
           totalInatCounted += ptsInPoly.length;
