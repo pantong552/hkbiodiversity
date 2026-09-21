@@ -21,6 +21,7 @@ export interface InatObservation {
     name?: string;
   };
   quality_grade: string;
+  geoprivacy?: string | null;
 }
 
 export interface FetchObservationsResult {
@@ -28,11 +29,14 @@ export interface FetchObservationsResult {
   totalResults: number;
 }
 
+const completeInatFetchCache: Record<number, Promise<InatObservation[]>> = {};
+
 /**
  * Fetch ALL observations for a specific taxon in Hong Kong with filters
- * Filters: Research Grade, Open Location, Accuracy <= 1km
+ * Filters: Research Grade, Hong Kong, Accuracy <= 1km. Privacy handling is
+ * applied by each consumer after the complete result set is fetched.
  */
-export async function fetchAllInatObservations(
+async function fetchAllInatObservationsUncached(
   taxonId: number,
   onProgress?: (current: number, total: number) => void,
   options?: { includeObscured?: boolean }
@@ -52,7 +56,7 @@ export async function fetchAllInatObservations(
       threatened: 'false',
       acc_below_or_equal: '1000',
       per_page: perPage.toString(),
-      fields: '(id:!t,uri:!t,observed_on_details:(date:!t,hour:!t,minute:!t),time_observed_at:!t,place_guess:!t,location:!t,photos:(url:!t),user:(login:!t,name:!t),quality_grade:!t)',
+      fields: '(id:!t,uri:!t,observed_on_details:(date:!t,hour:!t,minute:!t),time_observed_at:!t,place_guess:!t,location:!t,geoprivacy:!t,photos:(url:!t),user:(login:!t,name:!t),quality_grade:!t)',
       total_results: 'true'
     });
     // Map data should remain limited to public, accurate locations. Temporal
@@ -125,4 +129,25 @@ export async function fetchAllInatObservations(
     console.error('Error fetching iNaturalist observations:', error);
     return allObservations; // Return what we have so far
   }
+}
+
+/**
+ * Fetch the complete observation set once per taxon. Consumers decide how to
+ * use the data: trends keep all observations, while the map ignores records
+ * without usable public coordinates during spatial aggregation.
+ */
+export function fetchAllInatObservations(
+  taxonId: number,
+  onProgress?: (current: number, total: number) => void,
+  _options?: { includeObscured?: boolean }
+): Promise<InatObservation[]> {
+  const cacheKey = taxonId;
+  if (!completeInatFetchCache[cacheKey]) {
+    completeInatFetchCache[cacheKey] = fetchAllInatObservationsUncached(
+      taxonId,
+      onProgress,
+      { includeObscured: true }
+    );
+  }
+  return completeInatFetchCache[cacheKey];
 }

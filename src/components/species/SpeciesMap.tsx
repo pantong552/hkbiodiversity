@@ -1582,7 +1582,7 @@ export default function SpeciesMap({ taxonId, scientificName, chineseName, taxaG
         let totalEbirdCounted = 0;
 
         // 建構 iNat 點位
-        const obsPoints = obs.map((o) => {
+        const obsPoints = obs.filter((o) => o.geoprivacy !== 'obscured').map((o) => {
           if (!o.location) return null;
           const parts = o.location.split(',').map(Number);
           if (parts.length < 2) return null;
