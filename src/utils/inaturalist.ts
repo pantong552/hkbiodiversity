@@ -22,6 +22,7 @@ export interface InatObservation {
   };
   quality_grade: string;
   geoprivacy?: string | null;
+  threatened?: boolean | null;
 }
 
 export interface FetchObservationsResult {
@@ -56,7 +57,7 @@ async function fetchAllInatObservationsUncached(
       threatened: 'false',
       acc_below_or_equal: '1000',
       per_page: perPage.toString(),
-      fields: '(id:!t,uri:!t,observed_on_details:(date:!t,hour:!t,minute:!t),time_observed_at:!t,place_guess:!t,location:!t,geoprivacy:!t,photos:(url:!t),user:(login:!t,name:!t),quality_grade:!t)',
+      fields: '(id:!t,uri:!t,observed_on_details:(date:!t,hour:!t,minute:!t),time_observed_at:!t,place_guess:!t,location:!t,geoprivacy:!t,threatened:!t,photos:(url:!t),user:(login:!t,name:!t),quality_grade:!t)',
       total_results: 'true'
     });
     // Map data should remain limited to public, accurate locations. Temporal

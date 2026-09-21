@@ -75,7 +75,9 @@ const speciesMapCache: Record<string, SpeciesMapCacheEntry> = {};
 const observationStatsCache: Record<string, { bgis: ObservationStats; ebird: ObservationStats }> = {};
 
 function getSpeciesDataKey({ taxonId, scientificName, chineseName, taxaGroup, ebirdSpeciesCode }: SpeciesMapProps): string {
-  return [taxonId || 0, scientificName || '', chineseName || '', taxaGroup || '', ebirdSpeciesCode || ''].join('|');
+  // Bump this when spatial filtering rules change so stale processed grids
+  // cannot keep displaying records filtered by the previous rules.
+  return [taxonId || 0, scientificName || '', chineseName || '', taxaGroup || '', ebirdSpeciesCode || '', 'map-filter-v2'].join('|');
 }
 
 function getMonotoneSplinePath(coords: { x: number; y: number }[], baseY: number, topY: number): string {
@@ -1385,6 +1387,7 @@ export default function SpeciesMap({ taxonId, scientificName, chineseName, taxaG
   const [isBasemapPanelOpen, setIsBasemapPanelOpen] = useState(false);
   const [isBgisCreditOpen, setIsBgisCreditOpen] = useState(false);
   const [showAttribution, setShowAttribution] = useState(false);
+  const [showObscuredInfo, setShowObscuredInfo] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
   const attributionRef = useRef<HTMLDivElement>(null);
 
@@ -1441,6 +1444,7 @@ export default function SpeciesMap({ taxonId, scientificName, chineseName, taxaG
   }, [showAttribution, isMobile]);
 
   const currentStyle = BASEMAPS.find(m => m.id === currentStyleId)?.style || BASEMAPS[0].style;
+  const obscuredInatCount = observations.filter(observation => observation.geoprivacy === 'obscured').length;
 
   // 動態根據選取的 Dataset Filter (iNaturalist / BGIS / eBird) 實時更新地圖 GeoJSON 網格資料
   useEffect(() => {
@@ -1582,7 +1586,9 @@ export default function SpeciesMap({ taxonId, scientificName, chineseName, taxaG
         let totalEbirdCounted = 0;
 
         // 建構 iNat 點位
-        const obsPoints = obs.filter((o) => o.geoprivacy !== 'obscured').map((o) => {
+        const obsPoints = obs
+          .filter((o) => o.geoprivacy !== 'obscured' && String(o.threatened).toLowerCase() !== 'true')
+          .map((o) => {
           if (!o.location) return null;
           const parts = o.location.split(',').map(Number);
           if (parts.length < 2) return null;
@@ -2720,6 +2726,20 @@ export default function SpeciesMap({ taxonId, scientificName, chineseName, taxaG
             ? `已載入 ${(showInat ? observations.length : 0) + (showBgis ? totalBgisCount : 0) + ((isBirdGroup && showEbird) ? ebirdRecords.length : 0)} 筆記錄`
             : `Loaded ${(showInat ? observations.length : 0) + (showBgis ? totalBgisCount : 0) + ((isBirdGroup && showEbird) ? ebirdRecords.length : 0)} Records`}
         </span>
+        <div
+          className="relative flex-shrink-0"
+          onMouseEnter={() => !isMobile && setShowObscuredInfo(true)}
+          onMouseLeave={() => !isMobile && setShowObscuredInfo(false)}
+        >
+          <Info className="w-3.5 h-3.5 text-slate-400 hover:text-emerald-600 transition-colors" />
+          {showObscuredInfo && (
+            <div className="absolute right-0 bottom-full mb-2 w-56 rounded-xl bg-slate-900/95 px-3 py-2 text-[10px] font-semibold leading-relaxed text-white shadow-xl">
+              {language === 'zh'
+                ? `有 ${obscuredInatCount} 筆 Geoprivacy 為 Obscured 的 iNaturalist 記錄未顯示於地圖。`
+                : `${obscuredInatCount} iNaturalist record${obscuredInatCount === 1 ? '' : 's'} with Geoprivacy: Obscured are hidden from the map.`}
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Attribution info icon (Bottom Left) */}
