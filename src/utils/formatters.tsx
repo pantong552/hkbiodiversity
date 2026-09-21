@@ -23,7 +23,11 @@ export function formatScientificName(
   const parts = scientificName.split(/(\s+|\(|\)|,)/g);
   
   let entityCount = 0;
-  const maxEntities = 3; // 屬名、種小名、亞種小名 最多三個學名單詞
+  // Accept a third lowercase epithet for subspecies. Authorship starts at the
+  // first capitalized token after the scientific name (for example, Zilch or E.).
+  const maxEntities = 3;
+  let authorStarted = false;
+  let scientificParenthesis = false;
 
   return (
     <>
@@ -39,6 +43,24 @@ export function formatScientificName(
         const isYear = /^\d{4}$/.test(trimmed);
         const isCapitalized = /^[A-Z]/.test(trimmed);
 
+        if (trimmed === '(') {
+          scientificParenthesis = entityCount < 2;
+          return <span key={index} className={scientificParenthesis ? `${forceItalic ? 'italic' : 'not-italic'} ${boldName ? 'font-bold' : 'font-medium'}` : 'not-italic font-sans font-normal'}>{part}</span>;
+        }
+        if (trimmed === ')') {
+          const className = scientificParenthesis ? `${forceItalic ? 'italic' : 'not-italic'} ${boldName ? 'font-bold' : 'font-medium'}` : 'not-italic font-sans font-normal';
+          scientificParenthesis = false;
+          return <span key={index} className={className}>{part}</span>;
+        }
+
+        if (scientificParenthesis) {
+          return <span key={index} className={`${forceItalic ? 'italic' : 'not-italic'} ${boldName ? 'font-bold' : 'font-medium'}`}>{part}</span>;
+        }
+
+        if (entityCount >= 2 && isCapitalized) {
+          authorStarted = true;
+        }
+
         if (isSymbol || isAbbr || isYear) {
           return <span key={index} className="not-italic font-sans font-normal">{part}</span>;
         }
@@ -47,10 +69,10 @@ export function formatScientificName(
         // 1. 第一個單詞
         // 2. 之後的小寫單詞（最多到第 3 個）
         let isEntity = false;
-        if (entityCount === 0) {
+        if (!authorStarted && entityCount === 0) {
           isEntity = true;
           entityCount++;
-        } else if (entityCount < maxEntities && !isCapitalized) {
+        } else if (!authorStarted && entityCount < maxEntities && !isCapitalized) {
           isEntity = true;
           entityCount++;
         }
@@ -64,7 +86,7 @@ export function formatScientificName(
         }
 
         // 否則為作者資訊
-        return <span key={index} className="not-italic font-sans font-normal ml-1">{part}</span>;
+        return <span key={index} className="not-italic font-sans font-normal">{part}</span>;
       })}
     </>
   );
@@ -146,6 +168,8 @@ export function HighlightText({
   const tokens = text.split(/(\s+|\(|\)|,)/g);
   let entityCount = 0;
   const maxEntities = 3;
+  let authorStarted = false;
+  let scientificParenthesis = false;
 
   return (
     <span className={className}>
@@ -161,15 +185,26 @@ export function HighlightText({
         const isYear = /^\d{4}$/.test(trimmed);
         const isCapitalized = /^[A-Z]/.test(trimmed);
 
+        if (trimmed === '(') scientificParenthesis = entityCount < 2;
+        if (trimmed === ')') {
+          const result = renderPartWithHighlight(token, scientificParenthesis);
+          scientificParenthesis = false;
+          return <React.Fragment key={index}>{result}</React.Fragment>;
+        }
+        if (scientificParenthesis) {
+          return <React.Fragment key={index}>{renderPartWithHighlight(token, true)}</React.Fragment>;
+        }
+        if (entityCount >= 2 && isCapitalized) authorStarted = true;
+
         if (isSymbol || isAbbr || isYear) {
           return <React.Fragment key={index}>{renderPartWithHighlight(token, false)}</React.Fragment>;
         }
 
         let isEntity = false;
-        if (entityCount === 0) {
+        if (!authorStarted && entityCount === 0) {
           isEntity = true;
           entityCount++;
-        } else if (entityCount < maxEntities && !isCapitalized) {
+        } else if (!authorStarted && entityCount < maxEntities && !isCapitalized) {
           isEntity = true;
           entityCount++;
         }
