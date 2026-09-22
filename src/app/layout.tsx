@@ -57,6 +57,11 @@ import { TaxonomyProvider } from '@/context/TaxonomyContext';
 import SpeciesFloatingPanel from '@/components/species/SpeciesFloatingPanel';
 import SpeciesAutoIdModal from '@/components/species/SpeciesAutoIdModal';
 import AccountModule from '@/components/profile/AccountModule';
+import PwaRegistration from '@/components/PwaRegistration';
+
+export const viewport = {
+  themeColor: '#083344',
+};
 
 export default function RootLayout({
   children,
@@ -85,6 +90,7 @@ export default function RootLayout({
         />
       </head>
       <body className={`${workSans.variable} ${outfit.variable} font-sans antialiased text-cyan-900`}>
+        <PwaRegistration />
         <LanguageProvider>
           <AuthProvider>
             <TaxonomyProvider>
