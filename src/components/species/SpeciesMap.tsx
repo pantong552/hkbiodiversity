@@ -1463,9 +1463,9 @@ export default function SpeciesMap({ taxonId, scientificName, chineseName, taxaG
   }, [showAttribution, isMobile]);
 
   const currentStyle = BASEMAPS.find(m => m.id === currentStyleId)?.style || BASEMAPS[0].style;
-  const obscuredInatCount = observations.filter(isInatObscured).length;
   const threatenedInatCount = observations.filter(isInatThreatened).length;
-  const inaccurateInatCount = observations.filter(observation => Number(observation.positional_accuracy) > 1000).length;
+  const obscuredInatCount = observations.filter(observation => !isInatThreatened(observation) && isInatObscured(observation)).length;
+  const inaccurateInatCount = observations.filter(observation => !isInatThreatened(observation) && Number(observation.positional_accuracy) > 1000).length;
 
   // 動態根據選取的 Dataset Filter (iNaturalist / BGIS / eBird) 實時更新地圖 GeoJSON 網格資料
   useEffect(() => {
