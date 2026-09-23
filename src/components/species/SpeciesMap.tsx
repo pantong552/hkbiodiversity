@@ -44,6 +44,7 @@ interface SpeciesMapProps {
   chineseName?: string;
   taxaGroup?: string;
   ebirdSpeciesCode?: string;
+  iucn?: string;
 }
 
 interface GridFeatureProperties {
@@ -73,11 +74,13 @@ type SpeciesMapCacheEntry = {
 
 const speciesMapCache: Record<string, SpeciesMapCacheEntry> = {};
 const observationStatsCache: Record<string, { bgis: ObservationStats; ebird: ObservationStats }> = {};
+// Temporarily disabled while the eBird points endpoint is failing upstream.
+const EBIRD_API_ENABLED = false;
 
 function getSpeciesDataKey({ taxonId, scientificName, chineseName, taxaGroup, ebirdSpeciesCode }: SpeciesMapProps): string {
   // Bump this when spatial filtering rules change so stale processed grids
   // cannot keep displaying records filtered by the previous rules.
-  return [taxonId || 0, scientificName || '', chineseName || '', taxaGroup || '', ebirdSpeciesCode || '', 'map-filter-v2'].join('|');
+  return [taxonId || 0, scientificName || '', chineseName || '', taxaGroup || '', ebirdSpeciesCode || '', 'map-filter-v4'].join('|');
 }
 
 function getMonotoneSplinePath(coords: { x: number; y: number }[], baseY: number, topY: number): string {
@@ -209,9 +212,9 @@ export function ObservationChart({
   const initialCache = observationStatsCache[statsKey];
   const [mode, setMode] = useState<'seasonality' | 'history'>('seasonality');
   const [bgisStats, setBgisStats] = useState<ObservationStats>(initialCache?.bgis || { seasonality: [], history: [] });
-  const [ebirdStats, setEbirdStats] = useState<ObservationStats>(initialCache?.ebird || { seasonality: [], history: [] });
+  const [ebirdStats, setEbirdStats] = useState<ObservationStats>(EBIRD_API_ENABLED ? (initialCache?.ebird || { seasonality: [], history: [] }) : { seasonality: [], history: [] });
   const [isBgisLoading, setIsBgisLoading] = useState(!initialCache?.bgis && !!(scientificName || chineseName));
-  const [isEbirdLoading, setIsEbirdLoading] = useState(!initialCache?.ebird && isBirdGroup && !!ebirdSpeciesCode);
+  const [isEbirdLoading, setIsEbirdLoading] = useState(EBIRD_API_ENABLED && !initialCache?.ebird && isBirdGroup && !!ebirdSpeciesCode);
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
   const [activeSources, setActiveSources] = useState<Set<'inat' | 'bgis' | 'ebird'>>(new Set(['inat', 'bgis', 'ebird']));
   const [isFilterDropdownOpen, setIsFilterDropdownOpen] = useState(false);
@@ -241,7 +244,7 @@ export function ObservationChart({
     const cachedStats = observationStatsCache[statsKey];
     if (cachedStats) {
       setBgisStats(cachedStats.bgis);
-      setEbirdStats(cachedStats.ebird);
+      setEbirdStats(EBIRD_API_ENABLED ? cachedStats.ebird : { seasonality: [], history: [] });
       setIsBgisLoading(false);
       setIsEbirdLoading(false);
       return;
@@ -261,7 +264,7 @@ export function ObservationChart({
         });
     }
 
-    if (isBirdGroup && ebirdSpeciesCode) {
+    if (EBIRD_API_ENABLED && isBirdGroup && ebirdSpeciesCode) {
       setIsEbirdLoading(true);
       fetchEbirdObservationStats(ebirdSpeciesCode)
         .then(nextEbird => {
@@ -272,6 +275,9 @@ export function ObservationChart({
         .catch(() => {
           if (!cancelled) setIsEbirdLoading(false);
         });
+    } else {
+      setEbirdStats({ seasonality: [], history: [] });
+      setIsEbirdLoading(false);
     }
 
     return () => { cancelled = true; };
@@ -299,7 +305,7 @@ export function ObservationChart({
   const selectedSourcesSummary = [
     activeSources.has('inat') ? 'iNat' : null,
     activeSources.has('bgis') ? 'BGIS' : null,
-    (isBirdGroup && activeSources.has('ebird')) ? 'eBird' : null
+    (EBIRD_API_ENABLED && isBirdGroup && activeSources.has('ebird')) ? 'eBird' : null
   ].filter(Boolean).join(' + ') || (language === 'zh' ? '無選擇' : 'None');
 
   const inatSeasonality = Array.from({ length: 12 }, (_, index) => ({
@@ -321,15 +327,15 @@ export function ObservationChart({
       label: String(point.month),
       inat: point.count,
       bgis: bgisStats.seasonality[index]?.count || 0,
-      ebird: ebirdStats.seasonality[index]?.count || 0
+      ebird: EBIRD_API_ENABLED ? (ebirdStats.seasonality[index]?.count || 0) : 0
     }))
     : historyYears.map(year => ({
       label: String(year),
       inat: inatHistoryMap[year] || 0,
       bgis: bgisStats.history.find(point => point.year === year)?.count || 0,
-      ebird: ebirdStats.history.find(point => point.year === year)?.count || 0
+      ebird: EBIRD_API_ENABLED ? (ebirdStats.history.find(point => point.year === year)?.count || 0) : 0
     }));
-  const visibleSources = (['inat', 'bgis', ...(isBirdGroup ? ['ebird' as const] : [])] as const).filter(s => activeSources.has(s));
+  const visibleSources = (['inat', 'bgis', ...((EBIRD_API_ENABLED && isBirdGroup) ? ['ebird' as const] : [])] as const).filter(s => activeSources.has(s));
   const maxValue = Math.max(
     1,
     ...points.flatMap(point => visibleSources.map(s => point[s]))
@@ -345,7 +351,7 @@ export function ObservationChart({
     let s = 0;
     if (activeSources.has('inat')) s += p.inat;
     if (activeSources.has('bgis')) s += p.bgis;
-    if (isBirdGroup && activeSources.has('ebird')) s += p.ebird;
+    if (EBIRD_API_ENABLED && isBirdGroup && activeSources.has('ebird')) s += p.ebird;
     return sum + s;
   }, 0);
 
@@ -355,7 +361,7 @@ export function ObservationChart({
     let s = 0;
     if (activeSources.has('inat')) s += p.inat;
     if (activeSources.has('bgis')) s += p.bgis;
-    if (isBirdGroup && activeSources.has('ebird')) s += p.ebird;
+    if (EBIRD_API_ENABLED && isBirdGroup && activeSources.has('ebird')) s += p.ebird;
     if (s > peakValue && s > 0) {
       peakValue = s;
       peakIndex = idx;
@@ -447,7 +453,7 @@ export function ObservationChart({
   const hoveredTotal = hoveredPoint
     ? (activeSources.has('inat') ? hoveredPoint.inat : 0) +
       (activeSources.has('bgis') ? hoveredPoint.bgis : 0) +
-      (isBirdGroup && activeSources.has('ebird') ? hoveredPoint.ebird : 0)
+      (EBIRD_API_ENABLED && isBirdGroup && activeSources.has('ebird') ? hoveredPoint.ebird : 0)
     : 0;
 
   return (
@@ -612,7 +618,7 @@ export function ObservationChart({
                   transition={{ duration: 0.15 }}
                   className="absolute top-10 left-0 w-52 bg-white/95 backdrop-blur-xl border border-slate-200 shadow-xl rounded-2xl p-1.5 flex flex-col gap-1 z-50"
                 >
-                  {(['inat', 'bgis', ...(isBirdGroup ? ['ebird' as const] : [])] as const).map(src => {
+                  {(['inat', 'bgis', ...((EBIRD_API_ENABLED && isBirdGroup) ? ['ebird' as const] : [])] as const).map(src => {
                     const cfg = sourceConfig[src];
                     const isSelected = activeSources.has(src);
                     return (
@@ -654,7 +660,7 @@ export function ObservationChart({
 
           {/* Desktop Filter Pills */}
           <div className="hidden sm:flex flex-wrap items-center gap-2">
-            {(['inat', 'bgis', ...(isBirdGroup ? ['ebird' as const] : [])] as const).map(src => {
+            {(['inat', 'bgis', ...((EBIRD_API_ENABLED && isBirdGroup) ? ['ebird' as const] : [])] as const).map(src => {
               const cfg = sourceConfig[src];
               const isSelected = activeSources.has(src);
               return (
@@ -1345,13 +1351,16 @@ function EbirdYearGroupList({
   );
 }
 
-export default function SpeciesMap({ taxonId, scientificName, chineseName, taxaGroup, ebirdSpeciesCode }: SpeciesMapProps) {
+export default function SpeciesMap({ taxonId, scientificName, chineseName, taxaGroup, ebirdSpeciesCode, iucn }: SpeciesMapProps) {
   const { language } = useLanguage();
   const { profile } = useAuth();
   const isAdmin = profile?.role === 'admin';
   const t = translations[language === 'zh' ? 'zh' : 'en'];
 
   const isBirdGroup = String(taxaGroup || '').trim().toUpperCase() === 'BIRD';
+  const normalizedIucn = String(iucn || '').trim().toUpperCase();
+  const isSensitiveSpecies = normalizedIucn === 'EN' || normalizedIucn === 'CR'
+    || normalizedIucn === 'ENDANGERED' || normalizedIucn === 'CRITICALLY ENDANGERED';
 
   const getRecordUnit = (count: number) => {
     if (language === 'zh') return '筆';
@@ -1445,6 +1454,8 @@ export default function SpeciesMap({ taxonId, scientificName, chineseName, taxaG
 
   const currentStyle = BASEMAPS.find(m => m.id === currentStyleId)?.style || BASEMAPS[0].style;
   const obscuredInatCount = observations.filter(observation => observation.geoprivacy === 'obscured').length;
+  const threatenedInatCount = observations.filter(observation => String(observation.threatened).toLowerCase() === 'true').length;
+  const inaccurateInatCount = observations.filter(observation => Number(observation.positional_accuracy) > 1000).length;
 
   // 動態根據選取的 Dataset Filter (iNaturalist / BGIS / eBird) 實時更新地圖 GeoJSON 網格資料
   useEffect(() => {
@@ -1475,6 +1486,21 @@ export default function SpeciesMap({ taxonId, scientificName, chineseName, taxaG
 
   // Load independent sources concurrently, then perform the spatial join.
   useEffect(() => {
+    if (isSensitiveSpecies) {
+      setIsLoading(false);
+      setInatStatus('skipped');
+      setBgisStatus('skipped');
+      setEbirdStatus('skipped');
+      setGridStatus('skipped');
+      setObservations([]);
+      setEbirdRecords([]);
+      setTotalBgisCount(0);
+      setAllProcessedFeatures([]);
+      setGridData({ type: 'FeatureCollection', features: [] });
+      setStageCounts({ inat: 0, bgis: 0, ebird: 0 });
+      return;
+    }
+
     async function loadData() {
       setIsLoading(true);
       setInatStatus('idle');
@@ -1487,7 +1513,7 @@ export default function SpeciesMap({ taxonId, scientificName, chineseName, taxaG
       console.log('SpeciesMap: 啟動分步載入程序...', { taxonId, scientificName, chineseName, ebirdSpeciesCode, isBirdGroup });
 
       try {
-        const speciesDataKey = getSpeciesDataKey({ taxonId, scientificName, chineseName, taxaGroup, ebirdSpeciesCode });
+        const speciesDataKey = `${getSpeciesDataKey({ taxonId, scientificName, chineseName, taxaGroup, ebirdSpeciesCode })}|ebird-paused-v1`;
         const cachedData = speciesMapCache[speciesDataKey];
         if (cachedData) {
           setObservations(cachedData.observations);
@@ -1500,7 +1526,7 @@ export default function SpeciesMap({ taxonId, scientificName, chineseName, taxaG
           });
           setInatStatus(taxonId && taxonId > 0 ? 'done' : 'skipped');
           setBgisStatus(scientificName || chineseName ? 'done' : 'skipped');
-          setEbirdStatus(isBirdGroup && ebirdSpeciesCode ? 'done' : 'skipped');
+          setEbirdStatus(EBIRD_API_ENABLED && isBirdGroup && ebirdSpeciesCode ? 'done' : 'skipped');
           setGridStatus('done');
           setAllProcessedFeatures(cachedData.processedFeatures);
           setIsLoading(false);
@@ -1517,7 +1543,7 @@ export default function SpeciesMap({ taxonId, scientificName, chineseName, taxaG
           ? (setBgisStatus('loading'), fetchBgisSpeciesList(scientificName || '', chineseName))
           : Promise.resolve([] as BgisGridRecord[]);
 
-        const ebirdPromise = isBirdGroup && ebirdSpeciesCode
+        const ebirdPromise = EBIRD_API_ENABLED && isBirdGroup && ebirdSpeciesCode
           ? (setEbirdStatus('loading'), fetchEbirdMapPoints(ebirdSpeciesCode))
           : Promise.resolve([] as EbirdRecord[]);
 
@@ -1565,7 +1591,7 @@ export default function SpeciesMap({ taxonId, scientificName, chineseName, taxaG
           setBgisStatus('skipped');
         }
 
-        if (isBirdGroup && ebirdSpeciesCode) {
+        if (EBIRD_API_ENABLED && isBirdGroup && ebirdSpeciesCode) {
           setEbirdStatus('done');
           setEbirdRecords(ebirdPts);
           setStageCounts(prev => ({ ...prev, ebird: ebirdPts.length }));
@@ -1587,7 +1613,9 @@ export default function SpeciesMap({ taxonId, scientificName, chineseName, taxaG
 
         // 建構 iNat 點位
         const obsPoints = obs
-          .filter((o) => o.geoprivacy !== 'obscured' && String(o.threatened).toLowerCase() !== 'true')
+          .filter((o) => o.geoprivacy !== 'obscured'
+            && String(o.threatened).toLowerCase() !== 'true'
+            && !(Number(o.positional_accuracy) > 1000))
           .map((o) => {
           if (!o.location) return null;
           const parts = o.location.split(',').map(Number);
@@ -1670,7 +1698,7 @@ export default function SpeciesMap({ taxonId, scientificName, chineseName, taxaG
     if (taxonId || scientificName || chineseName || ebirdSpeciesCode) {
       loadData();
     }
-  }, [taxonId, scientificName, chineseName, isBirdGroup, ebirdSpeciesCode]);
+  }, [taxonId, scientificName, chineseName, isBirdGroup, ebirdSpeciesCode, isSensitiveSpecies]);
 
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -1757,7 +1785,7 @@ export default function SpeciesMap({ taxonId, scientificName, chineseName, taxaG
   };
 
   return (
-    <div ref={containerRef} id="map-container" className="relative w-full h-[550px] rounded-[2.5rem] overflow-hidden bg-slate-100 border border-slate-200 shadow-inner group">
+    <div ref={containerRef} id="map-container" className="relative w-full h-[420px] sm:h-[550px] rounded-[2.5rem] overflow-hidden bg-slate-100 border border-slate-200 shadow-inner group">
       <style jsx global>{`
         .maplibregl-ctrl-top-right { margin-top: 12px; margin-right: 12px; }
         .maplibregl-ctrl-bottom-right { margin-bottom: 12px; margin-right: 12px; }
@@ -2132,6 +2160,38 @@ export default function SpeciesMap({ taxonId, scientificName, chineseName, taxaG
           </Source>
         )}
       </Map>
+
+      {isSensitiveSpecies && (
+        <div className="absolute inset-0 z-20 flex items-center justify-center bg-slate-950/10 px-5 pointer-events-none">
+          <div className="w-full max-w-md overflow-hidden rounded-3xl border border-white/70 bg-white/90 shadow-[0_24px_80px_-24px_rgba(15,23,42,0.45)] backdrop-blur-xl">
+            <div className="h-1.5 bg-gradient-to-r from-amber-400 via-orange-500 to-rose-500" />
+            <div className="flex gap-4 p-5 sm:p-7">
+              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-amber-200 bg-amber-50 text-amber-700 shadow-sm">
+                <Shield className="h-6 w-6" />
+              </div>
+              <div>
+                <div className="mb-1 flex items-center gap-2">
+                  <h3 className="text-base font-black tracking-tight text-slate-900 sm:text-lg">
+                    {language === 'zh' ? '敏感物種' : 'Sensitive Species'}
+                  </h3>
+                  <span className="rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[10px] font-extrabold tracking-wide text-amber-800">
+                    IUCN {normalizedIucn}
+                  </span>
+                </div>
+                <p className="text-sm font-semibold leading-relaxed text-slate-600">
+                  {language === 'zh'
+                    ? '基於物種保育及位置敏感性考量，本地分布網格不予顯示。'
+                    : 'Local distribution grids are hidden to protect this species and its sensitive locations.'}
+                </p>
+                <div className="mt-3 flex items-center gap-2 text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                  <Shield className="h-3.5 w-3.5" />
+                  {language === 'zh' ? '保育位置保護' : 'Conservation location protection'}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Basemap Switcher Panel */}
       <div className={`absolute ${isMobile ? 'top-[54px]' : 'top-[130px]'} right-[22px] z-40`}>
@@ -2728,15 +2788,35 @@ export default function SpeciesMap({ taxonId, scientificName, chineseName, taxaG
         </span>
         <div
           className="relative flex-shrink-0"
+          onClick={() => isMobile && setShowObscuredInfo(current => !current)}
           onMouseEnter={() => !isMobile && setShowObscuredInfo(true)}
           onMouseLeave={() => !isMobile && setShowObscuredInfo(false)}
         >
-          <Info className="w-3.5 h-3.5 text-slate-400 hover:text-emerald-600 transition-colors" />
+          <button
+            type="button"
+            aria-label={language === 'zh' ? '顯示隱藏的 Obscured 記錄數量' : 'Show hidden obscured record count'}
+            aria-expanded={showObscuredInfo}
+            className="flex items-center justify-center rounded-full focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500"
+          >
+            <Info className="w-3.5 h-3.5 text-slate-400 hover:text-emerald-600 transition-colors" />
+          </button>
           {showObscuredInfo && (
-            <div className="absolute right-0 bottom-full mb-2 w-56 rounded-xl bg-slate-900/95 px-3 py-2 text-[10px] font-semibold leading-relaxed text-white shadow-xl">
-              {language === 'zh'
-                ? `有 ${obscuredInatCount} 筆 Geoprivacy 為 Obscured 的 iNaturalist 記錄未顯示於地圖。`
-                : `${obscuredInatCount} iNaturalist record${obscuredInatCount === 1 ? '' : 's'} with Geoprivacy: Obscured are hidden from the map.`}
+            <div className="absolute right-0 bottom-full mb-2 w-64 rounded-xl bg-slate-900/95 px-3 py-2.5 text-[10px] font-semibold leading-relaxed text-white shadow-xl">
+              <div>
+                {language === 'zh'
+                  ? `有 ${obscuredInatCount} 筆 Geoprivacy: Obscured 記錄未顯示於地圖。`
+                  : `${obscuredInatCount} iNaturalist record${obscuredInatCount === 1 ? '' : 's'} with Geoprivacy: Obscured are hidden from the map.`}
+              </div>
+              <div className="mt-1.5 border-t border-white/15 pt-1.5">
+                {language === 'zh'
+                  ? `有 ${threatenedInatCount} 筆 Threatened: true 記錄未顯示於地圖。`
+                  : `${threatenedInatCount} iNaturalist record${threatenedInatCount === 1 ? '' : 's'} with Threatened: true are hidden from the map.`}
+              </div>
+              <div className="mt-1.5 border-t border-white/15 pt-1.5">
+                {language === 'zh'
+                  ? `有 ${inaccurateInatCount} 筆定位精確度大於 1 公里的記錄未顯示於地圖。`
+                  : `${inaccurateInatCount} iNaturalist record${inaccurateInatCount === 1 ? '' : 's'} with accuracy over 1 km are hidden from the map.`}
+              </div>
             </div>
           )}
         </div>

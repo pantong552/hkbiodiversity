@@ -23,6 +23,7 @@ export interface InatObservation {
   quality_grade: string;
   geoprivacy?: string | null;
   threatened?: boolean | null;
+  positional_accuracy?: number | null;
 }
 
 export interface FetchObservationsResult {
@@ -34,8 +35,8 @@ const completeInatFetchCache: Record<number, Promise<InatObservation[]>> = {};
 
 /**
  * Fetch ALL observations for a specific taxon in Hong Kong with filters
- * Filters: Research Grade, Hong Kong, Accuracy <= 1km. Privacy handling is
- * applied by each consumer after the complete result set is fetched.
+ * Filters: Research Grade and Hong Kong. Accuracy and privacy rules are
+ * applied by consumers after the complete result set is fetched.
  */
 async function fetchAllInatObservationsUncached(
   taxonId: number,
@@ -54,10 +55,8 @@ async function fetchAllInatObservationsUncached(
       taxon_id: taxonId.toString(),
       place_id: '7613',
       quality_grade: 'research',
-      threatened: 'false',
-      acc_below_or_equal: '1000',
       per_page: perPage.toString(),
-      fields: '(id:!t,uri:!t,observed_on_details:(date:!t,hour:!t,minute:!t),time_observed_at:!t,place_guess:!t,location:!t,geoprivacy:!t,threatened:!t,photos:(url:!t),user:(login:!t,name:!t),quality_grade:!t)',
+      fields: '(id:!t,uri:!t,observed_on_details:(date:!t,hour:!t,minute:!t),time_observed_at:!t,place_guess:!t,location:!t,positional_accuracy:!t,geoprivacy:!t,threatened:!t,photos:(url:!t),user:(login:!t,name:!t),quality_grade:!t)',
       total_results: 'true'
     });
     // Map data should remain limited to public, accurate locations. Temporal
@@ -89,7 +88,8 @@ async function fetchAllInatObservationsUncached(
         apiTotalResults: data.total_results,
         accumulatedResults: allObservations.length,
         pageMissingLocation: results.filter((observation: InatObservation) => !observation.location).length,
-        pageMissingDate: results.filter((observation: InatObservation) => !observation.observed_on_details?.date).length,
+          pageMissingDate: results.filter((observation: InatObservation) => !observation.observed_on_details?.date).length,
+          pageAccuracyOver1km: results.filter((observation: InatObservation) => Number(observation.positional_accuracy) > 1000).length,
         filters: {
           place_id: baseParams.get('place_id'),
           quality_grade: baseParams.get('quality_grade'),

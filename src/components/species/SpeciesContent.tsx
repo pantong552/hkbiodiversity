@@ -490,6 +490,7 @@ export default function SpeciesContent({ species, showBreadcrumb = true, refresh
                   chineseName={species.common_name_chi}
                   taxaGroup={species.taxa_group}
                   ebirdSpeciesCode={species.ebird_species_code}
+                  iucn={species.iucn}
                 />
               ) : (
                 <div className="w-full h-[300px] bg-slate-200 rounded-[2.5rem] flex items-center justify-center text-slate-500">
