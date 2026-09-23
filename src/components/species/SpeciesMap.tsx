@@ -72,6 +72,16 @@ type SpeciesMapCacheEntry = {
   totalBgisCount: number;
 };
 
+function isInatThreatened(observation: InatObservation): boolean {
+  return String(observation.taxon?.threatened ?? observation.threatened).toLowerCase() === 'true';
+}
+
+function isInatObscured(observation: InatObservation): boolean {
+  return observation.obscured === true
+    || observation.geoprivacy?.toLowerCase() === 'obscured'
+    || observation.taxon_geoprivacy?.toLowerCase() === 'obscured';
+}
+
 const speciesMapCache: Record<string, SpeciesMapCacheEntry> = {};
 const observationStatsCache: Record<string, { bgis: ObservationStats; ebird: ObservationStats }> = {};
 // Temporarily disabled while the eBird points endpoint is failing upstream.
@@ -80,7 +90,7 @@ const EBIRD_API_ENABLED = false;
 function getSpeciesDataKey({ taxonId, scientificName, chineseName, taxaGroup, ebirdSpeciesCode }: SpeciesMapProps): string {
   // Bump this when spatial filtering rules change so stale processed grids
   // cannot keep displaying records filtered by the previous rules.
-  return [taxonId || 0, scientificName || '', chineseName || '', taxaGroup || '', ebirdSpeciesCode || '', 'map-filter-v4'].join('|');
+  return [taxonId || 0, scientificName || '', chineseName || '', taxaGroup || '', ebirdSpeciesCode || '', 'map-filter-v5'].join('|');
 }
 
 function getMonotoneSplinePath(coords: { x: number; y: number }[], baseY: number, topY: number): string {
@@ -1453,8 +1463,8 @@ export default function SpeciesMap({ taxonId, scientificName, chineseName, taxaG
   }, [showAttribution, isMobile]);
 
   const currentStyle = BASEMAPS.find(m => m.id === currentStyleId)?.style || BASEMAPS[0].style;
-  const obscuredInatCount = observations.filter(observation => observation.geoprivacy === 'obscured').length;
-  const threatenedInatCount = observations.filter(observation => String(observation.threatened).toLowerCase() === 'true').length;
+  const obscuredInatCount = observations.filter(isInatObscured).length;
+  const threatenedInatCount = observations.filter(isInatThreatened).length;
   const inaccurateInatCount = observations.filter(observation => Number(observation.positional_accuracy) > 1000).length;
 
   // 動態根據選取的 Dataset Filter (iNaturalist / BGIS / eBird) 實時更新地圖 GeoJSON 網格資料
@@ -1613,8 +1623,8 @@ export default function SpeciesMap({ taxonId, scientificName, chineseName, taxaG
 
         // 建構 iNat 點位
         const obsPoints = obs
-          .filter((o) => o.geoprivacy !== 'obscured'
-            && String(o.threatened).toLowerCase() !== 'true'
+          .filter((o) => !isInatObscured(o)
+            && !isInatThreatened(o)
             && !(Number(o.positional_accuracy) > 1000))
           .map((o) => {
           if (!o.location) return null;
@@ -2794,28 +2804,24 @@ export default function SpeciesMap({ taxonId, scientificName, chineseName, taxaG
         >
           <button
             type="button"
-            aria-label={language === 'zh' ? '顯示隱藏的 Obscured 記錄數量' : 'Show hidden obscured record count'}
+            aria-label={language === 'zh' ? '顯示未於地圖呈現的觀察記錄數量' : 'Show hidden observation record counts'}
             aria-expanded={showObscuredInfo}
             className="flex items-center justify-center rounded-full focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500"
           >
             <Info className="w-3.5 h-3.5 text-slate-400 hover:text-emerald-600 transition-colors" />
           </button>
           {showObscuredInfo && (
-            <div className="absolute right-0 bottom-full mb-2 w-64 rounded-xl bg-slate-900/95 px-3 py-2.5 text-[10px] font-semibold leading-relaxed text-white shadow-xl">
-              <div>
-                {language === 'zh'
-                  ? `有 ${obscuredInatCount} 筆 Geoprivacy: Obscured 記錄未顯示於地圖。`
-                  : `${obscuredInatCount} iNaturalist record${obscuredInatCount === 1 ? '' : 's'} with Geoprivacy: Obscured are hidden from the map.`}
+            <div className="absolute right-0 bottom-full mb-2 w-44 rounded-xl bg-slate-900/95 px-3 py-2.5 text-[10px] font-semibold leading-relaxed text-white shadow-xl">
+              <div className="mb-1.5 border-b border-white/15 pb-1.5 font-extrabold text-white">
+                {language === 'zh' ? '地圖未顯示的記錄' : 'Records hidden from map'}
               </div>
-              <div className="mt-1.5 border-t border-white/15 pt-1.5">
-                {language === 'zh'
-                  ? `有 ${threatenedInatCount} 筆 Threatened: true 記錄未顯示於地圖。`
-                  : `${threatenedInatCount} iNaturalist record${threatenedInatCount === 1 ? '' : 's'} with Threatened: true are hidden from the map.`}
-              </div>
-              <div className="mt-1.5 border-t border-white/15 pt-1.5">
-                {language === 'zh'
-                  ? `有 ${inaccurateInatCount} 筆定位精確度大於 1 公里的記錄未顯示於地圖。`
-                  : `${inaccurateInatCount} iNaturalist record${inaccurateInatCount === 1 ? '' : 's'} with accuracy over 1 km are hidden from the map.`}
+              <div className="grid grid-cols-[1fr_auto] gap-x-4 gap-y-1">
+                <span>{language === 'zh' ? '位置模糊' : 'Obscured location'}</span>
+                <span className="tabular-nums">{obscuredInatCount} {language === 'zh' ? '筆' : 'records'}</span>
+                <span>{language === 'zh' ? '受威脅物種' : 'Threatened species'}</span>
+                <span className="tabular-nums">{threatenedInatCount} {language === 'zh' ? '筆' : 'records'}</span>
+                <span>{language === 'zh' ? '定位誤差逾 1 公里' : 'Accuracy over 1 km'}</span>
+                <span className="tabular-nums">{inaccurateInatCount} {language === 'zh' ? '筆' : 'records'}</span>
               </div>
             </div>
           )}

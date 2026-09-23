@@ -22,6 +22,14 @@ export interface InatObservation {
   };
   quality_grade: string;
   geoprivacy?: string | null;
+  obscured?: boolean | null;
+  taxon_geoprivacy?: string | null;
+  taxon?: {
+    id?: number;
+    name?: string;
+    threatened?: boolean | null;
+  } | null;
+  /** Kept as a fallback for any cached/legacy observation payloads. */
   threatened?: boolean | null;
   positional_accuracy?: number | null;
 }
@@ -31,7 +39,7 @@ export interface FetchObservationsResult {
   totalResults: number;
 }
 
-const completeInatFetchCache: Record<number, Promise<InatObservation[]>> = {};
+const completeInatFetchCache: Record<string, Promise<InatObservation[]>> = {};
 
 /**
  * Fetch ALL observations for a specific taxon in Hong Kong with filters
@@ -56,7 +64,7 @@ async function fetchAllInatObservationsUncached(
       place_id: '7613',
       quality_grade: 'research',
       per_page: perPage.toString(),
-      fields: '(id:!t,uri:!t,observed_on_details:(date:!t,hour:!t,minute:!t),time_observed_at:!t,place_guess:!t,location:!t,positional_accuracy:!t,geoprivacy:!t,threatened:!t,photos:(url:!t),user:(login:!t,name:!t),quality_grade:!t)',
+      fields: '(id:!t,uri:!t,observed_on_details:(date:!t,hour:!t,minute:!t),time_observed_at:!t,place_guess:!t,location:!t,positional_accuracy:!t,geoprivacy:!t,obscured:!t,taxon_geoprivacy:!t,taxon:(id:!t,name:!t,threatened:!t),photos:(url:!t),user:(login:!t,name:!t),quality_grade:!t)',
       total_results: 'true'
     });
     // Map data should remain limited to public, accurate locations. Temporal
@@ -90,6 +98,7 @@ async function fetchAllInatObservationsUncached(
         pageMissingLocation: results.filter((observation: InatObservation) => !observation.location).length,
           pageMissingDate: results.filter((observation: InatObservation) => !observation.observed_on_details?.date).length,
           pageAccuracyOver1km: results.filter((observation: InatObservation) => Number(observation.positional_accuracy) > 1000).length,
+          pageThreatened: results.filter((observation: InatObservation) => String(observation.taxon?.threatened ?? observation.threatened).toLowerCase() === 'true').length,
         filters: {
           place_id: baseParams.get('place_id'),
           quality_grade: baseParams.get('quality_grade'),
@@ -142,7 +151,7 @@ export function fetchAllInatObservations(
   onProgress?: (current: number, total: number) => void,
   _options?: { includeObscured?: boolean }
 ): Promise<InatObservation[]> {
-  const cacheKey = taxonId;
+  const cacheKey = `${taxonId}|observation-fields-v2`;
   if (!completeInatFetchCache[cacheKey]) {
     completeInatFetchCache[cacheKey] = fetchAllInatObservationsUncached(
       taxonId,
