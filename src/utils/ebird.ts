@@ -1,3 +1,5 @@
+import { createClient } from '@/utils/supabase/client';
+
 export interface EbirdRecord {
   hs: number;    // hotspot: 1 or 0
   e: string;     // e.g. "N", "P"
@@ -5,6 +7,64 @@ export interface EbirdRecord {
   n: string;     // location ID, e.g. "L1012793"
   y: number;     // latitude
   x: number;     // longitude
+}
+
+export interface EbirdGridSummary {
+  species_code: string;
+  points_count: number;
+  total_records: number;
+  monthly_counts: Record<string, number> | string | null;
+  grid_json: Record<string, number> | string | null;
+  updated_at?: string | null;
+}
+
+function parseJsonObject<T>(value: T | string | null | undefined): T | null {
+  if (!value) return null;
+  if (typeof value !== 'string') return value;
+  try {
+    return JSON.parse(value) as T;
+  } catch {
+    return null;
+  }
+}
+
+export async function fetchEbirdGridSummary(speciesCode: string): Promise<EbirdGridSummary | null> {
+  if (!speciesCode.trim()) return null;
+  const { data, error } = await createClient()
+    .from('ebird_species_summary')
+    .select('species_code, points_count, total_records, monthly_counts, grid_json, updated_at')
+    .eq('species_code', speciesCode.trim())
+    .maybeSingle();
+
+  if (error) {
+    console.error('[eBird summary] Failed to load species summary:', error.message);
+    return null;
+  }
+  if (!data) return null;
+  return {
+    ...data,
+    monthly_counts: parseJsonObject<Record<string, number>>(data.monthly_counts),
+    grid_json: parseJsonObject<Record<string, number>>(data.grid_json)
+  };
+}
+
+export function getEbirdObservationStats(monthlyCounts: Record<string, number> | null | undefined) {
+  const months = Array.from({ length: 12 }, (_, index) => ({ month: index + 1, count: 0 }));
+  const years: Record<number, number> = {};
+  for (const [key, rawCount] of Object.entries(monthlyCounts || {})) {
+    const match = /^(\d{4})-(\d{2})$/.exec(key);
+    const count = Number(rawCount);
+    if (!match || !Number.isFinite(count)) continue;
+    const year = Number(match[1]);
+    const month = Number(match[2]);
+    if (month < 1 || month > 12) continue;
+    months[month - 1].count += count;
+    years[year] = (years[year] || 0) + count;
+  }
+  return {
+    seasonality: months,
+    history: Object.entries(years).map(([year, count]) => ({ year: Number(year), count })).sort((a, b) => a.year - b.year)
+  };
 }
 
 export interface EbirdLocInfo {
