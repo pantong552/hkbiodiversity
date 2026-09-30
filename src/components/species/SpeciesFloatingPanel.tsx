@@ -19,6 +19,8 @@ import SpeciesEditModal from './SpeciesEditModal';
 import SpeciesAnatomyCard from './SpeciesAnatomyCard';
 import AdminDraftReviewBanner from './AdminDraftReviewBanner';
 import { SpeciesDraft } from '@/types/speciesDraft';
+import { AnatomyIllustration, EMPTY_ANATOMY_ILLUSTRATION } from '@/types/anatomy';
+import { anatomyIllustrationToDatabase, anatomyIllustrationToLegacyColumns, mapAnatomyIllustrations } from '@/utils/anatomy';
 
 // --- Subcomponent: Species Tab Preview (Tooltip) ---
 function SpeciesTabPreview({ 
@@ -216,7 +218,11 @@ export default function SpeciesFloatingPanel() {
     if (!activeSpecies || !profile) return;
     const targetTable = activeSpecies.taxa_group === 'FLORA' || (activeSpecies as any).category_chi ? 'plant_species' : activeSpecies.taxa_group === 'FUNGI' || String(activeSpecies.taxa_id || '').startsWith('fungi_') ? 'fungi_species' : 'species';
     const finalData = { ...(updatedData || draft.draft_data) };
-    const anatomyIllustration = finalData.anatomy_illustration;
+    const savedAnatomy = finalData.anatomy_illustrations ?? finalData.anatomy_illustration;
+    const anatomyIllustrations: AnatomyIllustration[] | undefined = savedAnatomy === undefined
+      ? undefined
+      : mapAnatomyIllustrations({ illustrations: Array.isArray(savedAnatomy) ? savedAnatomy : [savedAnatomy] });
+    delete finalData.anatomy_illustrations;
     delete finalData.anatomy_illustration;
 
     // 1. 更新正式物種表
@@ -227,14 +233,15 @@ export default function SpeciesFloatingPanel() {
 
     if (updateError) throw updateError;
 
-    if (anatomyIllustration) {
+    if (anatomyIllustrations) {
+      const firstIllustration = anatomyIllustrations[0] || EMPTY_ANATOMY_ILLUSTRATION;
       const { error: anatomyError } = await supabase
         .from('species_anatomy_illustrations')
         .upsert({
           table_name: targetTable,
           species_taxa_id: String(activeSpecies.taxa_id || activeSpecies.id),
-          photo_url: anatomyIllustration.photoUrl,
-          markers: anatomyIllustration.markers,
+          illustrations: anatomyIllustrations?.map(anatomyIllustrationToDatabase) || [],
+          ...anatomyIllustrationToLegacyColumns(firstIllustration),
           updated_at: new Date().toISOString()
         }, { onConflict: 'table_name,species_taxa_id' });
 
@@ -246,7 +253,7 @@ export default function SpeciesFloatingPanel() {
       .from('species_drafts')
       .update({
         status: 'approved',
-        draft_data: { ...finalData, ...(anatomyIllustration ? { anatomy_illustration: anatomyIllustration } : {}) }, // 將草稿的內容也更新為管理員最終修改並發布的內容
+        draft_data: { ...finalData, ...(anatomyIllustrations ? { anatomy_illustrations: anatomyIllustrations } : {}) }, // 將草稿的內容也更新為管理員最終修改並發布的內容
         approved_by: profile.id,
         approved_by_name: profile.username || profile.email?.split('@')[0],
         approved_at: new Date().toISOString()
@@ -645,14 +652,18 @@ export default function SpeciesFloatingPanel() {
                       setIsEditModalOpen(true);
                     }}
                   />
-                  <SpeciesContent species={speciesData[activeSpeciesId]} showBreadcrumb={true} refreshTrigger={bannerRefreshKey} />
-                  <div className="mx-auto w-full max-w-7xl px-6 pb-12">
-                    <SpeciesAnatomyCard
+                  <SpeciesContent
+                    species={speciesData[activeSpeciesId]}
+                    showBreadcrumb={true}
+                    refreshTrigger={bannerRefreshKey}
+                    anatomyCard={
+                      <SpeciesAnatomyCard
                       tableName={speciesData[activeSpeciesId].taxa_group === 'FLORA' || (speciesData[activeSpeciesId] as any).category_chi ? 'plant_species' : speciesData[activeSpeciesId].taxa_group === 'FUNGI' || String(speciesData[activeSpeciesId].taxa_id || '').startsWith('fungi_') ? 'fungi_species' : 'species'}
                       speciesTaxaId={String(speciesData[activeSpeciesId].taxa_id || speciesData[activeSpeciesId].id)}
                       refreshKey={bannerRefreshKey}
-                    />
-                  </div>
+                      />
+                    }
+                  />
                 </>
               ) : (
                 <div className="h-full flex flex-col items-center justify-center py-20">

@@ -8,8 +8,14 @@ export interface AnatomyMarker {
 }
 
 export interface AnatomyIllustration {
+  id: string;
   photoUrl: string;
+  photoAttribution: string;
+  photoLink: string;
   markers: AnatomyMarker[];
+  zoom: number;
+  offsetX: number;
+  offsetY: number;
 }
 
 export interface AnatomyImageRect {
@@ -20,6 +26,12 @@ export interface AnatomyImageRect {
 }
 
 export const EMPTY_ANATOMY_ILLUSTRATION: AnatomyIllustration = {
+  id: 'illustration-1',
   photoUrl: '',
-  markers: []
+  photoAttribution: '',
+  photoLink: '',
+  markers: [],
+  zoom: 1,
+  offsetX: 0,
+  offsetY: 0
 };

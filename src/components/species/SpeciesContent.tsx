@@ -30,6 +30,7 @@ interface SpeciesContentProps {
   species: Species;
   showBreadcrumb?: boolean;
   refreshTrigger?: number;
+  anatomyCard?: React.ReactNode;
 }
 
 const SpeciesHeroBackground = ({ photos, defaultImage, isLoading }: { photos: InatGalleryPhoto[], defaultImage: string, isLoading: boolean }) => {
@@ -199,7 +200,7 @@ const SpeciesHeroBackground = ({ photos, defaultImage, isLoading }: { photos: In
   );
 };
 
-export default function SpeciesContent({ species, showBreadcrumb = true, refreshTrigger = 0 }: SpeciesContentProps) {
+export default function SpeciesContent({ species, showBreadcrumb = true, refreshTrigger = 0, anatomyCard }: SpeciesContentProps) {
   const { language } = useLanguage();
   const { getTaxonomyChi } = useTaxonomy();
   const { isLightboxOpen, setPendingTaxonomyFilter, toggleExpand } = useSpeciesPanel();
@@ -385,6 +386,8 @@ export default function SpeciesContent({ species, showBreadcrumb = true, refresh
                 onProfilePictureUpdate={setCurrentProfilePic}
               />
             </section>
+
+            {anatomyCard}
 
 
             {/* Description, Introduction, Habitat, Microhabitat, Host Plants */}

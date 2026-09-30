@@ -1129,6 +1129,14 @@ interface SpeciesDetailEditorProps {
   disableDirectDatabaseUpdate?: boolean;
   externalDirty?: boolean;
   allowUnchangedSave?: boolean;
+  additionalTab?: {
+    id: string;
+    nameChi: string;
+    nameEng: string;
+    icon: React.ReactNode;
+    content: React.ReactNode;
+    dirty?: boolean;
+  };
 }
 
 // 1. 動物 (species) 欄位組配置
@@ -1367,7 +1375,7 @@ const fungiFieldGroups = (t: any): FieldGroup[] => [
   }
 ];
 
-export default function SpeciesDetailEditor({ table, data, originalData, publishedOriginal: propPublishedOriginal, onSave, onCancel, onDirtyChange, saveButtonLabel, hideHeader, onRegisterSave, disableDirectDatabaseUpdate, externalDirty = false, allowUnchangedSave = false }: SpeciesDetailEditorProps) {
+export default function SpeciesDetailEditor({ table, data, originalData, publishedOriginal: propPublishedOriginal, onSave, onCancel, onDirtyChange, saveButtonLabel, hideHeader, onRegisterSave, disableDirectDatabaseUpdate, externalDirty = false, allowUnchangedSave = false, additionalTab }: SpeciesDetailEditorProps) {
   const { language, t } = useLanguage();
   const { profile } = useAuth();
   const { getTaxonomyChi } = useTaxonomy();
@@ -1443,6 +1451,16 @@ export default function SpeciesDetailEditor({ table, data, originalData, publish
       });
 
     let groups = [...baseGroups];
+    if (additionalTab) {
+      const descriptionsIndex = groups.findIndex((group) => group.id === 'descriptions');
+      groups.splice(descriptionsIndex + 1, 0, {
+        id: additionalTab.id,
+        nameChi: additionalTab.nameChi,
+        nameEng: additionalTab.nameEng,
+        icon: additionalTab.icon,
+        fields: []
+      });
+    }
     if (otherFields.length > 0) {
       groups.push({
         id: 'others',
@@ -1465,7 +1483,7 @@ export default function SpeciesDetailEditor({ table, data, originalData, publish
     });
 
     return groups;
-  }, [baseGroups, data]);
+  }, [additionalTab, baseGroups, data]);
 
   // 4. 偵測是否有欄位被修改
   const isDirty = useMemo(() => {
@@ -1691,7 +1709,7 @@ export default function SpeciesDetailEditor({ table, data, originalData, publish
         {/* Left Tabs Column */}
         <div className="w-1/4 min-w-[150px] border-r border-slate-50 py-4 flex flex-col gap-1.5 bg-slate-50/20">
           {finalGroups.map(group => {
-            const hasGroupDirty = group.fields.some(f => checkIsDirty(f.key));
+            const hasGroupDirty = group.fields.some(f => checkIsDirty(f.key)) || (group.id === additionalTab?.id && !!additionalTab.dirty);
             return (
               <button
                 key={group.id}
@@ -1731,6 +1749,7 @@ export default function SpeciesDetailEditor({ table, data, originalData, publish
 
         {/* Right Fields Scroll Column */}
         <div className="flex-1 overflow-y-auto p-6 custom-scrollbar bg-white">
+          {additionalTab?.id === currentGroup.id ? additionalTab.content : (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
             
             {currentGroup.fields.map(field => {
@@ -1915,6 +1934,7 @@ export default function SpeciesDetailEditor({ table, data, originalData, publish
             })}
 
           </div>
+          )}
         </div>
 
       </div>
