@@ -8,6 +8,9 @@ import { fetchSpeciesOrPlantRow } from '@/utils/speciesQuery';
 import { Species } from '@/types/species';
 import { SpeciesDraft } from '@/types/speciesDraft';
 import SpeciesDetailEditor from '@/components/admin/SpeciesDetailEditor';
+import { SpeciesAnatomyEditor } from './SpeciesAnatomyCard';
+import { AnatomyIllustration, EMPTY_ANATOMY_ILLUSTRATION } from '@/types/anatomy';
+import { isValidAnatomyIllustration, mapAnatomyIllustration } from '@/utils/anatomy';
 import { 
   X, 
   Save, 
@@ -50,9 +53,13 @@ export default function SpeciesEditModal({
 
   const [loadingDraft, setLoadingDraft] = useState(false);
   const [submitting, setSubmitting] = useState(false);
-  const [isApproving, setIsApproving] = useState(false);
+  const isApprovingRef = React.useRef(false);
   const [activeDraft, setActiveDraft] = useState<SpeciesDraft | null>(null);
   const [editorData, setEditorData] = useState<any>(species);
+  const [anatomyIllustration, setAnatomyIllustration] = useState<AnatomyIllustration>(EMPTY_ANATOMY_ILLUSTRATION);
+  const [originalAnatomyIllustration, setOriginalAnatomyIllustration] = useState<AnatomyIllustration>(EMPTY_ANATOMY_ILLUSTRATION);
+  const [loadingAnatomy, setLoadingAnatomy] = useState(false);
+  const [anatomyLoadError, setAnatomyLoadError] = useState(false);
   const [toastMessage, setToastMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [isEditorDirty, setIsEditorDirty] = useState(false);
   const [showRejectModal, setShowRejectModal] = useState(false);
@@ -107,17 +114,47 @@ export default function SpeciesEditModal({
 
         if (targetDraft) {
           setActiveDraft(targetDraft);
-          setEditorData({
-            ...basePub,
-            ...targetDraft.draft_data
-          });
+          const draftFields = { ...targetDraft.draft_data };
+          const draftAnatomy = draftFields.anatomy_illustration as AnatomyIllustration | undefined;
+          delete draftFields.anatomy_illustration;
+          setEditorData({ ...basePub, ...draftFields });
+
+          setLoadingAnatomy(true);
+          const { data: anatomyRow, error: anatomyError } = await supabase
+            .from('species_anatomy_illustrations')
+            .select('photo_url, markers')
+            .eq('table_name', targetTable)
+            .eq('species_taxa_id', String(species?.taxa_id || speciesId))
+            .maybeSingle();
+          if (anatomyError) throw anatomyError;
+          const loadedAnatomy = draftAnatomy && isValidAnatomyIllustration(draftAnatomy)
+            ? draftAnatomy
+            : mapAnatomyIllustration(anatomyRow);
+          setAnatomyIllustration(loadedAnatomy);
+          setOriginalAnatomyIllustration(loadedAnatomy);
+          setAnatomyLoadError(false);
         } else {
           setActiveDraft(null);
           setEditorData(basePub);
+
+          setLoadingAnatomy(true);
+          const { data: anatomyRow, error: anatomyError } = await supabase
+            .from('species_anatomy_illustrations')
+            .select('photo_url, markers')
+            .eq('table_name', targetTable)
+            .eq('species_taxa_id', String(species?.taxa_id || speciesId))
+            .maybeSingle();
+          if (anatomyError) throw anatomyError;
+          const loadedAnatomy = mapAnatomyIllustration(anatomyRow);
+          setAnatomyIllustration(loadedAnatomy);
+          setOriginalAnatomyIllustration(loadedAnatomy);
+          setAnatomyLoadError(false);
         }
       } catch (err) {
         console.error('Error loading species draft and published row:', err);
+        setAnatomyLoadError(true);
       } finally {
+        setLoadingAnatomy(false);
         setLoadingDraft(false);
       }
     }
@@ -201,11 +238,20 @@ export default function SpeciesEditModal({
       return;
     }
 
+    const finalUpdatedData = {
+      ...updatedData,
+      anatomy_illustration: { ...anatomyIllustration, photoUrl: anatomyIllustration.photoUrl.trim() }
+    };
+    if (!isValidAnatomyIllustration(finalUpdatedData.anatomy_illustration)) {
+      showToast('error', language === 'zh' ? '請確認圖片 URL、標記 key 唯一，以及 X/Y 座標介乎 0 至 100。' : 'Check the image URL, unique marker keys, and X/Y values between 0 and 100.');
+      return;
+    }
+
     setSubmitting(true);
     try {
-      if (isApproving && onApproveDraft && currentDraft) {
+      if (isApprovingRef.current && onApproveDraft && currentDraft) {
         // Admin「批准並發布」模式：調用批准並帶入管理員最新編輯的 updatedData
-        await onApproveDraft(currentDraft, updatedData);
+        await onApproveDraft(currentDraft, finalUpdatedData);
         showToast('success', language === 'zh' ? '已成功批准修訂並發布！' : 'Draft approved and published!');
         if (onSuccess) onSuccess();
         setTimeout(() => onClose(), 1200);
@@ -215,10 +261,12 @@ export default function SpeciesEditModal({
       const isFungi = tableName === 'fungi_species' || species?.taxa_group === 'FUNGI' || String(species?.taxa_id || '').startsWith('fungi_') || String(speciesId || '').startsWith('fungi_');
       const isPlant = tableName === 'plant_species' || species?.taxa_group === 'FLORA' || (species as any)?.category_chi || String(species?.taxa_id || '').startsWith('flora_') || String(speciesId || '').startsWith('flora_');
       const targetTable = isFungi ? 'fungi_species' : (isPlant ? 'plant_species' : 'species');
+      const speciesFields = { ...finalUpdatedData };
+      delete speciesFields.anatomy_illustration;
 
       if (isAdmin) {
         // Admin: 直接更新正本 species / plant_species / fungi_species 表
-        let query = supabase.from(targetTable).update(updatedData);
+        let query = supabase.from(targetTable).update(speciesFields);
         if (species.id) {
           query = query.eq('id', species.id);
         } else if (species.taxa_id) {
@@ -230,13 +278,24 @@ export default function SpeciesEditModal({
         const { error: updateError } = await query;
         if (updateError) throw updateError;
 
+        const { error: anatomyError } = await supabase
+          .from('species_anatomy_illustrations')
+          .upsert({
+            table_name: targetTable,
+            species_taxa_id: String(species?.taxa_id || speciesId),
+            photo_url: finalUpdatedData.anatomy_illustration.photoUrl,
+            markers: finalUpdatedData.anatomy_illustration.markers,
+            updated_at: new Date().toISOString()
+          }, { onConflict: 'table_name,species_taxa_id' });
+        if (anatomyError) throw anatomyError;
+
         // 同時將 any pending 草稿設為 approved (若原本有館員草稿，則標記批准)
         if (activeDraft) {
           await supabase
             .from('species_drafts')
             .update({
               status: 'approved',
-              draft_data: updatedData,
+              draft_data: finalUpdatedData,
               approved_by: user.id,
               approved_by_name: profile.username || user.email?.split('@')[0],
               approved_at: new Date().toISOString()
@@ -266,7 +325,7 @@ export default function SpeciesEditModal({
 
           if (error) throw error;
 
-          setActiveDraft(prev => prev ? { ...prev, draft_data: updatedData, status: 'pending', submitted_at: nowIso, rejection_reason: null } : null);
+          setActiveDraft(prev => prev ? { ...prev, draft_data: finalUpdatedData, status: 'pending', submitted_at: nowIso, rejection_reason: null } : null);
           showToast('success', language === 'zh' ? '草稿已成功更新！提交時間已重新計算。' : 'Draft updated! Submission time refreshed.');
         } else {
           const { data: newDraft, error } = await supabase
@@ -277,7 +336,7 @@ export default function SpeciesEditModal({
               curator_id: user.id,
               curator_name: profile.username || user.email?.split('@')[0],
               curator_avatar: profile.avatar_url,
-              draft_data: updatedData,
+              draft_data: finalUpdatedData,
               status: 'pending',
               submitted_at: nowIso
             })
@@ -298,7 +357,7 @@ export default function SpeciesEditModal({
       showToast('error', err.message || (language === 'zh' ? '儲存失敗，請重試' : 'Save failed, please try again'));
     } finally {
       setSubmitting(false);
-      setIsApproving(false);
+      isApprovingRef.current = false;
     }
   };
 
@@ -400,7 +459,7 @@ export default function SpeciesEditModal({
                   disabled={submitting || deletingDraft}
                   onClick={async () => {
                     if (onApproveDraft && currentDraft) {
-                      setIsApproving(true);
+                      isApprovingRef.current = true;
                       if (triggerSaveRef.current) {
                         // 觸發編輯器儲存，會收集最新資料並呼叫 handleSave
                         triggerSaveRef.current();
@@ -416,7 +475,7 @@ export default function SpeciesEditModal({
                           showToast('error', language === 'zh' ? '審核失敗' : 'Approval failed');
                         } finally {
                           setSubmitting(false);
-                          setIsApproving(false);
+                          isApprovingRef.current = false;
                         }
                       }
                     }
@@ -584,6 +643,24 @@ export default function SpeciesEditModal({
               <p className="text-xs font-bold">{language === 'zh' ? '載入編輯器與修訂草稿...' : 'Loading editor and draft...'}</p>
             </div>
           ) : (
+            <>
+            <div className="mb-6 rounded-2xl border border-emerald-100 bg-white p-4 sm:p-6">
+              <div className="mb-4 flex items-center justify-between gap-3">
+                <div>
+                  <h4 className="text-base font-black text-slate-900">{language === 'zh' ? '互動特徵圖鑑' : 'Interactive Anatomy'}</h4>
+                  <p className="mt-1 text-xs text-slate-500">{language === 'zh' ? '圖片及標記會與物種修訂一併保存。' : 'The image and markers are saved with this species revision.'}</p>
+                </div>
+                {loadingAnatomy && <Loader2 className="size-4 animate-spin text-emerald-600" />}
+              </div>
+              {anatomyLoadError && <p role="alert" className="mb-3 text-xs font-semibold text-rose-600">{language === 'zh' ? '載入既有圖鑑資料失敗；請關閉後重試，避免覆寫。' : 'Could not load the saved illustration. Close and retry to avoid overwriting it.'}</p>}
+              <SpeciesAnatomyEditor
+                value={anatomyIllustration}
+                inatId={species?.inat_id}
+                taxaId={String(species?.taxa_id || '')}
+                disabled={isLockedByOtherCurator || loadingAnatomy || anatomyLoadError}
+                onChange={setAnatomyIllustration}
+              />
+            </div>
             <SpeciesDetailEditor
               table={
                 tableName === 'fungi_species' || species?.taxa_group === 'FUNGI' || String(species?.taxa_id || '').startsWith('fungi_') || String(speciesId || '').startsWith('fungi_')
@@ -596,6 +673,8 @@ export default function SpeciesEditModal({
               originalData={publishedSpecies || species}
               publishedOriginal={publishedSpecies || species}
               onSave={handleSave}
+              externalDirty={JSON.stringify(anatomyIllustration) !== JSON.stringify(originalAnatomyIllustration)}
+              allowUnchangedSave={!!(isAdmin && onApproveDraft && isPending)}
               onCancel={onClose}
               hideHeader={true}
               disableDirectDatabaseUpdate={true}
@@ -604,6 +683,7 @@ export default function SpeciesEditModal({
               }}
               onDirtyChange={(dirty) => setIsEditorDirty(dirty)}
             />
+            </>
           )}
         </div>
       </motion.div>

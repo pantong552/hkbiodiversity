@@ -16,6 +16,7 @@ import { useTaxonomy } from '@/context/TaxonomyContext';
 import { useAuth } from '@/context/AuthContext';
 import { Sliders } from 'lucide-react';
 import SpeciesEditModal from './SpeciesEditModal';
+import SpeciesAnatomyCard from './SpeciesAnatomyCard';
 import AdminDraftReviewBanner from './AdminDraftReviewBanner';
 import { SpeciesDraft } from '@/types/speciesDraft';
 
@@ -214,7 +215,9 @@ export default function SpeciesFloatingPanel() {
   const handleApproveDraft = async (draft: SpeciesDraft, updatedData?: any) => {
     if (!activeSpecies || !profile) return;
     const targetTable = activeSpecies.taxa_group === 'FLORA' || (activeSpecies as any).category_chi ? 'plant_species' : activeSpecies.taxa_group === 'FUNGI' || String(activeSpecies.taxa_id || '').startsWith('fungi_') ? 'fungi_species' : 'species';
-    const finalData = updatedData || draft.draft_data;
+    const finalData = { ...(updatedData || draft.draft_data) };
+    const anatomyIllustration = finalData.anatomy_illustration;
+    delete finalData.anatomy_illustration;
 
     // 1. 更新正式物種表
     const { error: updateError } = await supabase
@@ -224,12 +227,26 @@ export default function SpeciesFloatingPanel() {
 
     if (updateError) throw updateError;
 
+    if (anatomyIllustration) {
+      const { error: anatomyError } = await supabase
+        .from('species_anatomy_illustrations')
+        .upsert({
+          table_name: targetTable,
+          species_taxa_id: String(activeSpecies.taxa_id || activeSpecies.id),
+          photo_url: anatomyIllustration.photoUrl,
+          markers: anatomyIllustration.markers,
+          updated_at: new Date().toISOString()
+        }, { onConflict: 'table_name,species_taxa_id' });
+
+      if (anatomyError) throw anatomyError;
+    }
+
     // 2. 更新 species_drafts 狀態為 approved
     const { error: draftError } = await supabase
       .from('species_drafts')
       .update({
         status: 'approved',
-        draft_data: finalData, // 將草稿的內容也更新為管理員最終修改並發布的內容
+        draft_data: { ...finalData, ...(anatomyIllustration ? { anatomy_illustration: anatomyIllustration } : {}) }, // 將草稿的內容也更新為管理員最終修改並發布的內容
         approved_by: profile.id,
         approved_by_name: profile.username || profile.email?.split('@')[0],
         approved_at: new Date().toISOString()
@@ -629,6 +646,13 @@ export default function SpeciesFloatingPanel() {
                     }}
                   />
                   <SpeciesContent species={speciesData[activeSpeciesId]} showBreadcrumb={true} refreshTrigger={bannerRefreshKey} />
+                  <div className="mx-auto w-full max-w-7xl px-6 pb-12">
+                    <SpeciesAnatomyCard
+                      tableName={speciesData[activeSpeciesId].taxa_group === 'FLORA' || (speciesData[activeSpeciesId] as any).category_chi ? 'plant_species' : speciesData[activeSpeciesId].taxa_group === 'FUNGI' || String(speciesData[activeSpeciesId].taxa_id || '').startsWith('fungi_') ? 'fungi_species' : 'species'}
+                      speciesTaxaId={String(speciesData[activeSpeciesId].taxa_id || speciesData[activeSpeciesId].id)}
+                      refreshKey={bannerRefreshKey}
+                    />
+                  </div>
                 </>
               ) : (
                 <div className="h-full flex flex-col items-center justify-center py-20">

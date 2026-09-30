@@ -1127,6 +1127,8 @@ interface SpeciesDetailEditorProps {
   hideHeader?: boolean;
   onRegisterSave?: (saveFn: () => void) => void;
   disableDirectDatabaseUpdate?: boolean;
+  externalDirty?: boolean;
+  allowUnchangedSave?: boolean;
 }
 
 // 1. 動物 (species) 欄位組配置
@@ -1365,7 +1367,7 @@ const fungiFieldGroups = (t: any): FieldGroup[] => [
   }
 ];
 
-export default function SpeciesDetailEditor({ table, data, originalData, publishedOriginal: propPublishedOriginal, onSave, onCancel, onDirtyChange, saveButtonLabel, hideHeader, onRegisterSave, disableDirectDatabaseUpdate }: SpeciesDetailEditorProps) {
+export default function SpeciesDetailEditor({ table, data, originalData, publishedOriginal: propPublishedOriginal, onSave, onCancel, onDirtyChange, saveButtonLabel, hideHeader, onRegisterSave, disableDirectDatabaseUpdate, externalDirty = false, allowUnchangedSave = false }: SpeciesDetailEditorProps) {
   const { language, t } = useLanguage();
   const { profile } = useAuth();
   const { getTaxonomyChi } = useTaxonomy();
@@ -1467,8 +1469,8 @@ export default function SpeciesDetailEditor({ table, data, originalData, publish
 
   // 4. 偵測是否有欄位被修改
   const isDirty = useMemo(() => {
-    return JSON.stringify(formValues) !== JSON.stringify(originalValues);
-  }, [formValues, originalValues]);
+    return externalDirty || JSON.stringify(formValues) !== JSON.stringify(originalValues);
+  }, [externalDirty, formValues, originalValues]);
 
   useEffect(() => {
     onDirtyChange?.(isDirty);
@@ -1490,7 +1492,7 @@ export default function SpeciesDetailEditor({ table, data, originalData, publish
 
   // 7. 儲存變更
   const handleSave = async () => {
-    if (!isDirty || saving) return;
+    if ((!isDirty && !allowUnchangedSave) || saving) return;
     setSaving(true);
 
     try {
