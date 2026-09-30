@@ -506,7 +506,7 @@ export function SpeciesAnatomyCollectionEditor({ value, inatId, taxaId, disabled
   );
 }
 
-function AnatomyIllustrationDisplay({ illustration, isZh }: { illustration: AnatomyIllustration; isZh: boolean }) {
+function AnatomyIllustrationDisplay({ illustration, isZh, title }: { illustration: AnatomyIllustration; isZh: boolean; title: string }) {
   const { frameRef, frameSize, imageSize, onImageLoad } = useFittedAnatomyImage(illustration.photoUrl);
   const [imageError, setImageError] = useState(false);
   const [hoveredKey, setHoveredKey] = useState<string | null>(null);
@@ -520,7 +520,7 @@ function AnatomyIllustrationDisplay({ illustration, isZh }: { illustration: Anat
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-3">
       <div ref={frameRef} className="relative mx-auto aspect-[4/3] w-full max-w-[820px] overflow-hidden rounded-[2rem] bg-slate-900 sm:rounded-[2.5rem]" onClick={() => { setActiveKey(null); setHoveredKey(null); }}>
         <div
           className="absolute left-1/2 top-1/2 origin-center"
@@ -573,8 +573,9 @@ function AnatomyIllustrationDisplay({ illustration, isZh }: { illustration: Anat
           </div>
         )}
       </div>
+      <h3 className="px-2 pt-1 text-center text-base font-bold text-slate-800 sm:text-lg">{title}</h3>
       {illustration.markers.length > 0 && (
-        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-3">
+        <div className="grid grid-cols-1 gap-x-3 gap-y-4 pt-1 sm:grid-cols-2 xl:grid-cols-3">
           {illustration.markers.map((marker) => {
             const isHighlighted = marker.key === hoveredKey || marker.key === activeKey;
             return (
@@ -582,12 +583,9 @@ function AnatomyIllustrationDisplay({ illustration, isZh }: { illustration: Anat
                 key={marker.key}
                 onMouseEnter={() => setHoveredKey(marker.key)}
                 onMouseLeave={() => setHoveredKey(null)}
-                className={`rounded-lg border px-3 py-2.5 transition-colors ${isHighlighted ? 'border-emerald-400 bg-emerald-50 ring-2 ring-emerald-200' : 'border-slate-200 bg-white'}`}
+                className={`relative rounded-lg border px-3 pb-3 pt-4 transition-colors ${isHighlighted ? 'border-emerald-400 bg-emerald-50 ring-2 ring-emerald-200' : 'border-slate-200 bg-white'}`}
               >
-                <div className="mb-1 flex items-center gap-2">
-                  <span className={`grid size-6 place-items-center rounded-full text-[11px] font-black ${isHighlighted ? 'bg-emerald-600 text-white' : 'bg-slate-100 text-slate-700'}`}>{marker.key}</span>
-                  <span className={`text-xs font-bold ${isHighlighted ? 'text-emerald-900' : 'text-slate-600'}`}>{isZh ? `特徵 ${marker.key}` : `Feature ${marker.key}`}</span>
-                </div>
+                <span className={`absolute -top-2 left-3 px-1.5 text-[10px] font-bold leading-4 ${isHighlighted ? 'bg-emerald-50 text-emerald-800' : 'bg-white text-slate-500'}`}>No. {marker.key}</span>
                 <p className={`whitespace-pre-wrap text-sm leading-relaxed ${isHighlighted ? 'text-slate-900' : 'text-slate-700'}`}>{isZh ? marker.zh : marker.en}</p>
               </article>
             );
@@ -672,8 +670,11 @@ export default function SpeciesAnatomyCard({ tableName, speciesTaxaId, refreshKe
                 transition={{ duration: 0.22, ease: 'easeOut' }}
                 className="space-y-3"
               >
-                {currentTitle && <h3 className="text-base font-bold text-slate-800 sm:text-lg">{currentTitle}</h3>}
-                <AnatomyIllustrationDisplay illustration={currentIllustration} isZh={isZh} />
+                <AnatomyIllustrationDisplay
+                  illustration={currentIllustration}
+                  isZh={isZh}
+                  title={currentTitle || (isZh ? `圖鑑圖片 ${currentImageIndex + 1}` : `Illustration ${currentImageIndex + 1}`)}
+                />
               </motion.div>
             </AnimatePresence>
           </div>
