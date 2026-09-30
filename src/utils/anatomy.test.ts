@@ -7,6 +7,8 @@ import { anatomyIllustrationToDatabase, anatomyIllustrationToLegacyColumns, clam
 test('validates marker coordinates and unique keys', () => {
   const valid: AnatomyIllustration = {
     id: 'illustration-1',
+    titleZh: '翅膀特徵',
+    titleEn: 'Wing features',
     photoUrl: 'https://res.cloudinary.com/example/species.png',
     photoAttribution: '',
     photoLink: '',
@@ -20,22 +22,29 @@ test('validates marker coordinates and unique keys', () => {
   assert.equal(isValidAnatomyIllustration({ ...valid, markers: [valid.markers[0], valid.markers[0]] }), false);
   assert.equal(isValidAnatomyIllustration({ ...valid, zoom: 4.1 }), false);
   assert.equal(isValidAnatomyIllustration({ ...valid, photoLink: 'javascript:alert(1)' }), false);
+  assert.equal(isValidAnatomyIllustration({ ...valid, titleZh: undefined as unknown as string }), false);
   assert.equal(isValidAnatomyIllustrations([valid, { ...valid, id: 'illustration-2' }]), true);
   assert.equal(isValidAnatomyIllustrations([valid, valid]), false);
 });
 
 test('maps bilingual descriptions and defaults missing translations', () => {
   const illustration = mapAnatomyIllustration({
+    title_zh: '翅膀特徵',
+    title_en: 'Wing features',
     photo_url: '/images/species.png',
     photo_attribution: '© Photographer (CC-BY)',
     photo_link: 'https://www.inaturalist.org/observations/123',
     markers: [{ key: 'wing', x: 25, y: 60, zh: '翼', placement: 'top' }]
   });
+  assert.equal(illustration.titleZh, '翅膀特徵');
+  assert.equal(illustration.titleEn, 'Wing features');
   assert.equal(illustration.photoAttribution, '© Photographer (CC-BY)');
   assert.equal(illustration.photoLink, 'https://www.inaturalist.org/observations/123');
   assert.equal(mapAnatomyIllustrations({ photo_url: '/images/legacy.png', markers: [] })[0].id, 'illustration-1');
   const databaseIllustration = anatomyIllustrationToDatabase(illustration);
   assert.equal(mapAnatomyIllustrations({ illustrations: [databaseIllustration] }).length, 1);
+  assert.equal(databaseIllustration.title_zh, '翅膀特徵');
+  assert.equal(databaseIllustration.title_en, 'Wing features');
   assert.equal('id' in anatomyIllustrationToLegacyColumns(illustration), false);
   assert.deepEqual(illustration.markers[0], {
     key: '1', x: 25, y: 60, placement: 'top', zh: '翼', en: ''
@@ -83,6 +92,11 @@ test('migration restricts published writes to admins and validates one atomic il
   assert.match(multipleMigration, /ADD COLUMN IF NOT EXISTS illustrations JSONB/i);
   assert.match(multipleMigration, /jsonb_build_array\(jsonb_build_object/);
   assert.match(multipleMigration, /is_valid_anatomy_illustrations\(illustrations\)/);
+  const titleMigration = readFileSync('supabase/migrations/202609300005_add_anatomy_illustration_titles.sql', 'utf8');
+  assert.match(titleMigration, /title_zh text/i);
+  assert.match(titleMigration, /title_en text/i);
+  assert.match(titleMigration, /title_zh/);
+  assert.match(titleMigration, /title_en/);
 });
 
 test('fits images inside a 4:3 frame and clamps pan to the visible frame bounds', () => {

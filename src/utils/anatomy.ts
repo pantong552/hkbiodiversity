@@ -28,6 +28,7 @@ export function isAllowedAnatomyImageUrl(value: string): boolean {
 
 export function isValidAnatomyIllustration(value: AnatomyIllustration): boolean {
   if (!value || typeof value.id !== 'string' || !value.id.trim()) return false;
+  if (typeof value.titleZh !== 'string' || typeof value.titleEn !== 'string') return false;
   if (typeof value.photoUrl !== 'string' || !isAllowedAnatomyImageUrl(value.photoUrl) || !Array.isArray(value.markers)) return false;
   if (typeof value.photoAttribution !== 'string' || typeof value.photoLink !== 'string') return false;
   if (value.photoLink && !/^https:\/\/(www\.)?inaturalist\.org\//i.test(value.photoLink)) return false;
@@ -124,6 +125,8 @@ export function mapAnatomyIllustration(row: unknown, fallbackId = 'illustration-
   };
   return {
     id: getString('id', 'id', fallbackId),
+    titleZh: getString('titleZh', 'title_zh'),
+    titleEn: getString('titleEn', 'title_en'),
     photoUrl: getString('photoUrl', 'photo_url'),
     photoAttribution: getString('photoAttribution', 'photo_attribution'),
     photoLink: getString('photoLink', 'photo_link'),
@@ -161,6 +164,8 @@ export function mapAnatomyIllustrations(row: unknown): AnatomyIllustration[] {
 export function anatomyIllustrationToDatabase(illustration: AnatomyIllustration) {
   return {
     id: illustration.id,
+    title_zh: illustration.titleZh,
+    title_en: illustration.titleEn,
     photo_url: illustration.photoUrl,
     photo_attribution: illustration.photoAttribution,
     photo_link: illustration.photoLink,
@@ -174,6 +179,8 @@ export function anatomyIllustrationToDatabase(illustration: AnatomyIllustration)
 export function anatomyIllustrationToLegacyColumns(illustration: AnatomyIllustration) {
   const databaseIllustration = anatomyIllustrationToDatabase(illustration);
   return {
+    title_zh: databaseIllustration.title_zh,
+    title_en: databaseIllustration.title_en,
     photo_url: databaseIllustration.photo_url,
     photo_attribution: databaseIllustration.photo_attribution,
     photo_link: databaseIllustration.photo_link,

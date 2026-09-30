@@ -2,7 +2,8 @@
 
 import React, { useEffect, useRef, useState } from 'react';
 import Image from 'next/image';
-import { AlertCircle, BookOpen, ExternalLink, Loader2, Mouse, Plus, RotateCcw, Trash2 } from 'lucide-react';
+import { AnimatePresence, motion } from 'framer-motion';
+import { AlertCircle, BookOpen, ChevronLeft, ChevronRight, ExternalLink, Loader2, Mouse, Plus, RotateCcw, Trash2 } from 'lucide-react';
 import { useLanguage } from '@/context/LanguageContext';
 import { createClient } from '@/utils/supabase/client';
 import { useInaturalistSpeciesPhotos } from '@/hooks/useInaturalistSpeciesPhotos';
@@ -143,28 +144,36 @@ export function SpeciesAnatomyEditor({ value, inatId, taxaId, disabled = false, 
     handlePointerUp();
   };
 
-  const handleWheelZoom = (event: React.WheelEvent<HTMLDivElement>) => {
-    if (disabled || !frameRef.current || !imageSize.width || !imageSize.height) return;
-    event.preventDefault();
-    const nextZoom = Math.max(1, Math.min(4, value.zoom * Math.exp(-event.deltaY * 0.001)));
-    if (nextZoom === value.zoom) return;
-    const frame = frameRef.current.getBoundingClientRect();
-    const cursorOffsetX = event.clientX - (frame.left + frame.width / 2);
-    const cursorOffsetY = event.clientY - (frame.top + frame.height / 2);
-    const limits = getAnatomyPanLimits(frame.width, frame.height, imageSize.width, imageSize.height, nextZoom);
-    const offsets = getAnatomyZoomPan(
-      value.zoom,
-      nextZoom,
-      cursorOffsetX,
-      cursorOffsetY,
-      imageSize.width,
-      imageSize.height,
-      value.offsetX,
-      value.offsetY,
-      limits
-    );
-    onChange({ ...value, zoom: nextZoom, ...offsets });
-  };
+  useEffect(() => {
+    const frame = frameRef.current;
+    if (!frame) return;
+
+    const handleWheel = (event: WheelEvent) => {
+      if (disabled || !imageSize.width || !imageSize.height) return;
+      event.preventDefault();
+      const nextZoom = Math.max(1, Math.min(4, value.zoom * Math.exp(-event.deltaY * 0.001)));
+      if (nextZoom === value.zoom) return;
+      const frameRect = frame.getBoundingClientRect();
+      const cursorOffsetX = event.clientX - (frameRect.left + frameRect.width / 2);
+      const cursorOffsetY = event.clientY - (frameRect.top + frameRect.height / 2);
+      const limits = getAnatomyPanLimits(frameRect.width, frameRect.height, imageSize.width, imageSize.height, nextZoom);
+      const offsets = getAnatomyZoomPan(
+        value.zoom,
+        nextZoom,
+        cursorOffsetX,
+        cursorOffsetY,
+        imageSize.width,
+        imageSize.height,
+        value.offsetX,
+        value.offsetY,
+        limits
+      );
+      onChange({ ...value, zoom: nextZoom, ...offsets });
+    };
+
+    frame.addEventListener('wheel', handleWheel, { passive: false });
+    return () => frame.removeEventListener('wheel', handleWheel);
+  }, [disabled, frameRef, imageError, imageSize.height, imageSize.width, imageUrlAllowed, onChange, value]);
 
   const changePhoto = (photoUrl: string, photoAttribution = '', photoLink = '') => {
     onChange({ ...value, photoUrl, photoAttribution, photoLink, zoom: 1, offsetX: 0, offsetY: 0 });
@@ -182,6 +191,29 @@ export function SpeciesAnatomyEditor({ value, inatId, taxaId, disabled = false, 
 
   return (
     <div className="space-y-5">
+      <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+        <label>
+          <span className={labelClass}>Title（繁體中文）</span>
+          <input
+            value={value.titleZh}
+            disabled={disabled}
+            onChange={(event) => onChange({ ...value, titleZh: event.target.value })}
+            placeholder="輸入圖鑑標題"
+            className={inputClass}
+          />
+        </label>
+        <label>
+          <span className={labelClass}>Title (English)</span>
+          <input
+            value={value.titleEn}
+            disabled={disabled}
+            onChange={(event) => onChange({ ...value, titleEn: event.target.value })}
+            placeholder="Enter illustration title"
+            className={inputClass}
+          />
+        </label>
+      </div>
+
       <label className="block">
         <span className={labelClass}>{isZh ? '特徵插圖圖片 URL' : 'Illustration image URL'}</span>
         <input
@@ -256,7 +288,6 @@ export function SpeciesAnatomyEditor({ value, inatId, taxaId, disabled = false, 
               onPointerMove={handlePointerMove}
               onPointerUp={handlePointerUp}
               onPointerCancel={handlePointerCancel}
-              onWheel={handleWheelZoom}
               style={{ overscrollBehavior: 'contain' }}
             >
               <div
@@ -421,7 +452,9 @@ export function SpeciesAnatomyCollectionEditor({ value, inatId, taxaId, disabled
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center gap-2">
-        {value.map((illustration, index) => (
+        {value.map((illustration, index) => {
+          const title = (isZh ? illustration.titleZh || illustration.titleEn : illustration.titleEn || illustration.titleZh).trim();
+          return (
           <div key={illustration.id} className={`flex items-center rounded-lg border ${activeIllustration?.id === illustration.id ? 'border-emerald-300 bg-emerald-50' : 'border-slate-200 bg-white'}`}>
             <button
               type="button"
@@ -431,7 +464,7 @@ export function SpeciesAnatomyCollectionEditor({ value, inatId, taxaId, disabled
               className="flex items-center gap-2 px-3 py-2 text-xs font-bold text-slate-700"
             >
               <span className="grid size-5 place-items-center rounded-full bg-emerald-100 text-[10px] text-emerald-800">{index + 1}</span>
-              {isZh ? '圖片' : 'Image'} {index + 1}
+              {title || `${isZh ? '圖片' : 'Image'} ${index + 1}`}
             </button>
             <button
               type="button"
@@ -444,7 +477,8 @@ export function SpeciesAnatomyCollectionEditor({ value, inatId, taxaId, disabled
               <Trash2 className="size-3.5" />
             </button>
           </div>
-        ))}
+          );
+        })}
         <button
           type="button"
           disabled={disabled}
@@ -540,7 +574,7 @@ function AnatomyIllustrationDisplay({ illustration, isZh }: { illustration: Anat
         )}
       </div>
       {illustration.markers.length > 0 && (
-        <div className="space-y-2">
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-3">
           {illustration.markers.map((marker) => {
             const isHighlighted = marker.key === hoveredKey || marker.key === activeKey;
             return (
@@ -548,9 +582,9 @@ function AnatomyIllustrationDisplay({ illustration, isZh }: { illustration: Anat
                 key={marker.key}
                 onMouseEnter={() => setHoveredKey(marker.key)}
                 onMouseLeave={() => setHoveredKey(null)}
-                className={`rounded-xl border px-4 py-3 transition-colors ${isHighlighted ? 'border-emerald-400 bg-emerald-50 ring-2 ring-emerald-200' : 'border-slate-200 bg-white'}`}
+                className={`rounded-lg border px-3 py-2.5 transition-colors ${isHighlighted ? 'border-emerald-400 bg-emerald-50 ring-2 ring-emerald-200' : 'border-slate-200 bg-white'}`}
               >
-                <div className="mb-1.5 flex items-center gap-2">
+                <div className="mb-1 flex items-center gap-2">
                   <span className={`grid size-6 place-items-center rounded-full text-[11px] font-black ${isHighlighted ? 'bg-emerald-600 text-white' : 'bg-slate-100 text-slate-700'}`}>{marker.key}</span>
                   <span className={`text-xs font-bold ${isHighlighted ? 'text-emerald-900' : 'text-slate-600'}`}>{isZh ? `特徵 ${marker.key}` : `Feature ${marker.key}`}</span>
                 </div>
@@ -568,6 +602,8 @@ export default function SpeciesAnatomyCard({ tableName, speciesTaxaId, refreshKe
   const { language } = useLanguage();
   const supabase = createClient();
   const [illustrations, setIllustrations] = useState<AnatomyIllustration[]>([]);
+  const [activeImageIndex, setActiveImageIndex] = useState(0);
+  const [slideDirection, setSlideDirection] = useState(1);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
   const isZh = language === 'zh';
@@ -588,12 +624,25 @@ export default function SpeciesAnatomyCard({ tableName, speciesTaxaId, refreshKe
         setLoadError(true);
       } else {
         setIllustrations(mapAnatomyIllustrations(data));
+        setActiveImageIndex(0);
       }
       setLoading(false);
     }
     loadIllustration();
     return () => { cancelled = true; };
   }, [speciesTaxaId, tableName, refreshKey, supabase]);
+
+  const currentImageIndex = Math.min(activeImageIndex, Math.max(illustrations.length - 1, 0));
+  const currentIllustration = illustrations[currentImageIndex];
+  const currentTitle = currentIllustration
+    ? (isZh ? currentIllustration.titleZh || currentIllustration.titleEn : currentIllustration.titleEn || currentIllustration.titleZh).trim()
+    : '';
+
+  const showImage = (nextIndex: number) => {
+    if (nextIndex < 0 || nextIndex >= illustrations.length || nextIndex === currentImageIndex) return;
+    setSlideDirection(nextIndex > currentImageIndex ? 1 : -1);
+    setActiveImageIndex(nextIndex);
+  };
 
   return (
     <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-7">
@@ -611,13 +660,46 @@ export default function SpeciesAnatomyCard({ tableName, speciesTaxaId, refreshKe
       ) : illustrations.length === 0 ? (
         <div className="flex min-h-28 items-center justify-center text-sm text-slate-400">{isZh ? '此物種尚未提供特徵插圖。' : 'No anatomy illustration is available for this species yet.'}</div>
       ) : (
-        <div className="space-y-8">
-          {illustrations.map((illustration, index) => (
-            <div key={illustration.id} className="space-y-3">
-              {illustrations.length > 1 && <h3 className="text-sm font-bold text-slate-600">{isZh ? `圖片 ${index + 1}` : `Image ${index + 1}`}</h3>}
-              <AnatomyIllustrationDisplay illustration={illustration} isZh={isZh} />
+        <div className="space-y-4">
+          <div className="overflow-hidden">
+            <AnimatePresence mode="wait" initial={false} custom={slideDirection}>
+              <motion.div
+                key={currentIllustration.id}
+                custom={slideDirection}
+                initial={{ opacity: 0, x: slideDirection * 48 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: slideDirection * -48 }}
+                transition={{ duration: 0.22, ease: 'easeOut' }}
+                className="space-y-3"
+              >
+                {currentTitle && <h3 className="text-base font-bold text-slate-800 sm:text-lg">{currentTitle}</h3>}
+                <AnatomyIllustrationDisplay illustration={currentIllustration} isZh={isZh} />
+              </motion.div>
+            </AnimatePresence>
+          </div>
+          {illustrations.length > 1 && (
+            <div className="flex items-center justify-center gap-4">
+              <button
+                type="button"
+                aria-label={isZh ? '上一張圖鑑圖片' : 'Previous illustration'}
+                disabled={currentImageIndex === 0}
+                onClick={() => showImage(currentImageIndex - 1)}
+                className="grid size-9 place-items-center rounded-full border border-slate-200 text-slate-600 transition-colors hover:border-emerald-300 hover:bg-emerald-50 disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                <ChevronLeft className="size-4" />
+              </button>
+              <span className="min-w-12 text-center text-xs font-semibold tabular-nums text-slate-500">{currentImageIndex + 1} / {illustrations.length}</span>
+              <button
+                type="button"
+                aria-label={isZh ? '下一張圖鑑圖片' : 'Next illustration'}
+                disabled={currentImageIndex === illustrations.length - 1}
+                onClick={() => showImage(currentImageIndex + 1)}
+                className="grid size-9 place-items-center rounded-full border border-slate-200 text-slate-600 transition-colors hover:border-emerald-300 hover:bg-emerald-50 disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                <ChevronRight className="size-4" />
+              </button>
             </div>
-          ))}
+          )}
         </div>
       )}
     </section>

@@ -9,6 +9,8 @@ export interface AnatomyMarker {
 
 export interface AnatomyIllustration {
   id: string;
+  titleZh: string;
+  titleEn: string;
   photoUrl: string;
   photoAttribution: string;
   photoLink: string;
@@ -27,6 +29,8 @@ export interface AnatomyImageRect {
 
 export const EMPTY_ANATOMY_ILLUSTRATION: AnatomyIllustration = {
   id: 'illustration-1',
+  titleZh: '',
+  titleEn: '',
   photoUrl: '',
   photoAttribution: '',
   photoLink: '',
