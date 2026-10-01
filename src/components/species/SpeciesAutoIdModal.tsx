@@ -24,6 +24,7 @@ import {
   Loader2
 } from 'lucide-react';
 import { useLanguage } from '@/context/LanguageContext';
+import { useAuth } from '@/context/AuthContext';
 import { useSpeciesPanel } from '@/context/SpeciesPanelContext';
 import { supabase } from '@/lib/supabase';
 
@@ -174,6 +175,7 @@ export type AutoIdEngine = 'inaturalist' | 'plantnet';
 
 export default function SpeciesAutoIdModal() {
   const { language } = useLanguage();
+  const { isLoading: isAuthLoading, isAuthorized, openAuthReminder } = useAuth();
   const { isAutoIdOpen, setAutoIdOpen, addSpecies } = useSpeciesPanel();
 
   // 狀態管理
@@ -755,6 +757,38 @@ export default function SpeciesAutoIdModal() {
 
           {/* 內容區域 - 可滾動 */}
           <div className="p-6 overflow-y-auto space-y-5 custom-scrollbar flex-1 bg-slate-50/50">
+            {isAuthLoading ? (
+              <div className="min-h-[260px] flex flex-col items-center justify-center text-center gap-4" role="status" aria-live="polite">
+                <Loader2 className="w-10 h-10 text-emerald-600 animate-spin" />
+                <div>
+                  <h4 className="text-base font-bold text-slate-800">
+                    {isZh ? '登入中...' : 'Logging in...'}
+                  </h4>
+                  <p className="text-sm text-slate-500 mt-1">
+                    {isZh ? '正在確認登入狀態，完成後會自動解鎖物種辨識。' : 'Checking your login status. Species ID will unlock automatically.'}
+                  </p>
+                </div>
+              </div>
+            ) : !isAuthorized ? (
+              <div className="min-h-[260px] flex flex-col items-center justify-center text-center gap-4">
+                <AlertCircle className="w-10 h-10 text-amber-500" />
+                <div>
+                  <h4 className="text-base font-bold text-slate-800">
+                    {isZh ? '尚未登入' : 'Not signed in'}
+                  </h4>
+                  <p className="text-sm text-slate-500 mt-1">
+                    {isZh ? '登入後即可使用物種辨識功能。' : 'Sign in to use species identification.'}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => openAuthReminder('AI 相片物種辨識')}
+                  className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold transition-colors"
+                >
+                  {isZh ? '前往登入' : 'Sign in'}
+                </button>
+              </div>
+            ) : <>
 
             {/* AI 辨識引擎選擇切換列 */}
             <div className="bg-slate-200/70 p-1 rounded-2xl flex items-center gap-1 border border-slate-300/60 shadow-inner">
@@ -1234,6 +1268,7 @@ export default function SpeciesAutoIdModal() {
                 </div>
               </div>
             )}
+            </>}
           </div>
 
           {/* Footer 區塊 */}

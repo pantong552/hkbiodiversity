@@ -72,8 +72,16 @@ function SuggestionItemAvatar({ item, isSelected }: { item: SuggestionItem; isSe
 export default function HomeHero() {
   const { language, t } = useLanguage();
   const { setAutoIdOpen, addSpecies, skipNextAutoCollapse, setIsFilterOpen } = useSpeciesPanel();
-  const { isAuthorized, requireAuth } = useAuth();
+  const { isAuthorized, isLoading: isAuthLoading, requireAuth } = useAuth();
   const router = useRouter();
+
+  const openAutoId = (featureName: string) => {
+    if (isAuthLoading) {
+      setAutoIdOpen(true);
+      return;
+    }
+    requireAuth(() => setAutoIdOpen(true), featureName);
+  };
   
   // Search state
   const [searchQuery, setSearchQuery] = useState('');
@@ -449,7 +457,7 @@ export default function HomeHero() {
               {/* AI 相片辨識按鈕 (圓形相機圖示按鈕) */}
               <button
                 type="button"
-                onClick={() => requireAuth(() => setAutoIdOpen(true), 'AI 相片物種辨識')}
+                onClick={() => openAutoId('AI 相片 物種辨識')}
                 className="w-10 h-10 md:w-14 md:h-14 shrink-0 flex items-center justify-center bg-emerald-50 hover:bg-emerald-100 text-emerald-700 hover:text-emerald-800 rounded-full border border-emerald-200/80 shadow-md shadow-emerald-900/5 hover:scale-105 active:scale-95 transition-all duration-300 mr-1.5 md:mr-2 cursor-pointer"
                 title={language === 'zh' ? '相片 AI 物種辨識' : 'Species Photo Recognition'}
               >

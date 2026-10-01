@@ -16,7 +16,7 @@ interface HeaderProps {
 
 export default function Header({ isHomePage: propIsHomePage }: HeaderProps = {}) {
   const { language, setLanguage, t } = useLanguage();
-  const { user, profile, signOut, requireAuth } = useAuth();
+  const { user, profile, signOut, requireAuth, isLoading: isAuthLoading } = useAuth();
   const pathname = usePathname();
   const [isScrolled, setIsScrolled] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -28,6 +28,14 @@ export default function Header({ isHomePage: propIsHomePage }: HeaderProps = {})
   }, []);
 
   const { openSpeciesIds, isExpanded, isGalleryOpen, isUploadModalOpen, isFilterOpen, isEditModalOpen, isLightboxOpen, toggleExpand, setIsAccountOpen, isAccountOpen, setAutoIdOpen } = useSpeciesPanel();
+
+  const openAutoId = (featureName: string) => {
+    if (isAuthLoading) {
+      setAutoIdOpen(true);
+      return;
+    }
+    requireAuth(() => setAutoIdOpen(true), featureName);
+  };
   
   // 正規化路徑（移除結尾斜線或查詢參數，確保 Vercel 生產環境首頁正確辨識）
   const normalizedPath = (pathname || '/').replace(/\/$/, '') || '/';
@@ -276,7 +284,7 @@ export default function Header({ isHomePage: propIsHomePage }: HeaderProps = {})
 
           {/* AI 相片物種辨識按鈕 */}
           <button
-            onClick={() => requireAuth(() => setAutoIdOpen(true), 'AI 相片物種辨識')}
+            onClick={() => openAutoId('AI 相片物種 辨識')}
             className={`px-3 py-1.5 rounded-full text-xs font-bold flex items-center gap-1.5 transition-all duration-300 cursor-pointer border ${
               isHeaderTransparent 
                 ? 'bg-white/10 hover:bg-white/20 text-white border-white/20 backdrop-blur-md shadow-sm' 
@@ -378,7 +386,7 @@ export default function Header({ isHomePage: propIsHomePage }: HeaderProps = {})
             <button
               onClick={() => {
                 setIsMobileMenuOpen(false);
-                requireAuth(() => setAutoIdOpen(true), 'AI 相片物種辨識');
+                openAutoId('AI 相片物種辨識');
               }}
               className="w-full py-3 px-4 rounded-2xl bg-emerald-50 hover:bg-emerald-100 text-emerald-800 font-bold text-sm flex items-center justify-between border border-emerald-200/80 active:scale-[0.98] transition-all cursor-pointer"
             >
