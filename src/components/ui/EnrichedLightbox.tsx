@@ -1,7 +1,8 @@
 'use client';
 
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
-import { motion, AnimatePresence, useAnimation } from 'framer-motion';
+import { createPortal } from 'react-dom';
+import { animate, motion, AnimatePresence, useAnimation, useMotionValue } from 'framer-motion';
 import { 
   X, 
   ChevronLeft, 
@@ -67,25 +68,38 @@ export default function EnrichedLightbox({
   const [isDeleting, setIsDeleting] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [scale, setScale] = useState(1);
-  const [position, setPosition] = useState({ x: 0, y: 0 });
   const [isAutoplay, setIsAutoplay] = useState(false);
   const [autoplayProgress, setAutoplayProgress] = useState(0);
   const [showUI, setShowUI] = useState(true);
   const [isImageLoading, setIsImageLoading] = useState(true);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [isMounted, setIsMounted] = useState(false);
   
   const uiTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const autoplayTimerRef = useRef<NodeJS.Timeout | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const imageRef = useRef<HTMLDivElement>(null);
+  const scaleRef = useRef(1);
+  const imageX = useMotionValue(0);
+  const imageY = useMotionValue(0);
+  const imageScale = useMotionValue(1);
+
+  useEffect(() => {
+    setIsMounted(true);
+    return () => setIsMounted(false);
+  }, []);
 
   const currentPhoto = photos[currentIndex];
 
   // 重置縮放與位置
   const resetZoom = useCallback(() => {
+    scaleRef.current = 1;
     setScale(1);
-    setPosition({ x: 0, y: 0 });
-  }, []);
+    const transition = { duration: 0.16, ease: 'easeOut' as const };
+    animate(imageScale, 1, transition);
+    animate(imageX, 0, transition);
+    animate(imageY, 0, transition);
+  }, [imageScale, imageX, imageY]);
 
   // 切換圖片時重置
   useEffect(() => {
@@ -133,9 +147,26 @@ export default function EnrichedLightbox({
     return currentProfilePicture === currentPhoto.large_url;
   }, [currentProfilePicture, currentPhoto?.large_url, getInatIdFromUrl]);
 
+  // Keep the image point under the zoom origin stationary while scaling.
+  const applyZoom = useCallback((nextScale: number, originX = 0, originY = 0) => {
+    const clampedScale = Math.min(Math.max(nextScale, 1), 5);
+    const currentScale = imageScale.get();
+    const ratio = clampedScale / currentScale;
+
+    const nextX = clampedScale === 1 ? 0 : originX - (originX - imageX.get()) * ratio;
+    const nextY = clampedScale === 1 ? 0 : originY - (originY - imageY.get()) * ratio;
+    const transition = { duration: 0.16, ease: 'easeOut' as const };
+
+    scaleRef.current = clampedScale;
+    setScale(clampedScale);
+    animate(imageScale, clampedScale, transition);
+    animate(imageX, nextX, transition);
+    animate(imageY, nextY, transition);
+  }, [imageScale, imageX, imageY]);
+
   // 工具功能：縮放
-  const handleZoomIn = () => setScale(prev => Math.min(prev + 0.5, 5));
-  const handleZoomOut = () => setScale(prev => Math.max(prev - 0.5, 1));
+  const handleZoomIn = useCallback(() => applyZoom(scaleRef.current + 0.5), [applyZoom]);
+  const handleZoomOut = useCallback(() => applyZoom(scaleRef.current - 0.5), [applyZoom]);
 
   // 鍵盤支援
   useEffect(() => {
@@ -158,7 +189,7 @@ export default function EnrichedLightbox({
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isOpen, onClose, handlePrev, handleNext, resetZoom]);
+  }, [isOpen, onClose, handlePrev, handleNext, handleZoomIn, handleZoomOut, resetZoom]);
 
   // 自動播放邏輯
   useEffect(() => {
@@ -317,11 +348,11 @@ export default function EnrichedLightbox({
 
   // 滾輪縮放邏輯
   const handleWheel = (e: React.WheelEvent) => {
-    if (e.deltaY < 0) {
-      handleZoomIn();
-    } else {
-      handleZoomOut();
-    }
+    e.preventDefault();
+    const bounds = e.currentTarget.getBoundingClientRect();
+    const originX = e.clientX - bounds.left - bounds.width / 2;
+    const originY = e.clientY - bounds.top - bounds.height / 2;
+    applyZoom(scaleRef.current + (e.deltaY < 0 ? 0.5 : -0.5), originX, originY);
   };
 
   // Pinch to Zoom (行動裝置)
@@ -335,7 +366,7 @@ export default function EnrichedLightbox({
         e.touches[0].pageY - e.touches[1].pageY
       );
       touchStartDistRef.current = dist;
-      initialScaleRef.current = scale;
+      initialScaleRef.current = scaleRef.current;
     }
   };
 
@@ -347,7 +378,10 @@ export default function EnrichedLightbox({
       );
       const ratio = dist / touchStartDistRef.current;
       const newScale = Math.min(Math.max(initialScaleRef.current * ratio, 1), 5);
-      setScale(newScale);
+      const bounds = e.currentTarget.getBoundingClientRect();
+      const originX = (e.touches[0].clientX + e.touches[1].clientX) / 2 - bounds.left - bounds.width / 2;
+      const originY = (e.touches[0].clientY + e.touches[1].clientY) / 2 - bounds.top - bounds.height / 2;
+      applyZoom(newScale, originX, originY);
     }
   };
 
@@ -355,9 +389,9 @@ export default function EnrichedLightbox({
     touchStartDistRef.current = null;
   };
 
-  if (!isOpen) return null;
+  if (!isMounted || !isOpen) return null;
 
-  return (
+  return createPortal(
     <AnimatePresence>
       <motion.div
         ref={containerRef}
@@ -365,7 +399,7 @@ export default function EnrichedLightbox({
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
         onMouseMove={handleMouseMove}
-        className="fixed inset-0 z-[1000] flex items-center justify-center bg-slate-950/98 backdrop-blur-2xl select-none overflow-hidden touch-none"
+        className="fixed inset-0 z-[100006] flex items-center justify-center bg-slate-950/98 backdrop-blur-2xl select-none overflow-hidden touch-none"
       >
         {/* 背景裝飾：模糊的當前圖片 */}
         <div className="absolute inset-0 opacity-20 blur-3xl scale-110 pointer-events-none">
@@ -502,12 +536,7 @@ export default function EnrichedLightbox({
             key={currentIndex}
             drag={scale > 1}
             dragConstraints={scale > 1 ? undefined : { left: 0, right: 0, top: 0, bottom: 0 }}
-            animate={{ 
-              scale: scale,
-              x: position.x,
-              y: position.y
-            }}
-            transition={{ type: 'spring', damping: 25, stiffness: 200 }}
+            style={{ x: imageX, y: imageY, scale: imageScale }}
             onDragEnd={(_, info) => {
                // 這裡可以加入邊界檢查，防止圖片飛出去
                // 暫時保持靈活
@@ -636,6 +665,7 @@ export default function EnrichedLightbox({
           isLoading={isDeleting}
         />
       </motion.div>
-    </AnimatePresence>
+    </AnimatePresence>,
+    document.body
   );
 }

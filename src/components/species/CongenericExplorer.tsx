@@ -93,6 +93,7 @@ const HorizontalSpeciesCard = ({ species, index, onOpenLightbox }: { species: Sp
           const effectiveSpecies = globalProfilePic !== undefined ? { ...species, profile_picture: globalProfilePic } : species;
           const displayImage = getSpeciesImageUrl(effectiveSpecies as any, 'medium') || getSpeciesImageUrl(effectiveSpecies as any, 'square');
           const finalImage = displayImage || imageUrl || (isInatLoading ? '' : placeholderImage);
+          const largeImage = getSpeciesImageUrl({ ...effectiveSpecies, profile_picture: displayImage || imageUrl }, 'large') || finalImage;
           
           if (!finalImage) return null;
           
@@ -103,7 +104,7 @@ const HorizontalSpeciesCard = ({ species, index, onOpenLightbox }: { species: Sp
                 e.stopPropagation();
                 if (finalImage && finalImage !== placeholderImage) {
                   onOpenLightbox?.({
-                    url: finalImage,
+                    url: largeImage,
                     commonName: commonName || species.scientific_name,
                     scientificName: species.scientific_name,
                   });
@@ -229,6 +230,7 @@ const MiniSpeciesCard = ({ species, index, onOpenLightbox }: { species: Species;
           const effectiveSpecies = globalProfilePic !== undefined ? { ...species, profile_picture: globalProfilePic } : species;
           const displayImage = getSpeciesImageUrl(effectiveSpecies as any, 'medium') || getSpeciesImageUrl(effectiveSpecies as any, 'square');
           const finalImage = displayImage || imageUrl || (isInatLoading ? '' : placeholderImage);
+          const largeImage = getSpeciesImageUrl({ ...effectiveSpecies, profile_picture: displayImage || imageUrl }, 'large') || finalImage;
           
           if (!finalImage) return null;
           
@@ -239,7 +241,7 @@ const MiniSpeciesCard = ({ species, index, onOpenLightbox }: { species: Species;
                 e.stopPropagation();
                 if (finalImage && finalImage !== placeholderImage) {
                   onOpenLightbox?.({
-                    url: finalImage,
+                    url: largeImage,
                     commonName: commonName || species.scientific_name,
                     scientificName: species.scientific_name,
                   });
