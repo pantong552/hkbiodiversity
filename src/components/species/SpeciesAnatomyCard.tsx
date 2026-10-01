@@ -60,9 +60,17 @@ export function SpeciesAnatomyEditor({ value, inatId, taxaId, disabled = false, 
   const suppressImageClickRef = useRef(false);
   const [activeKey, setActiveKey] = useState<string | null>(value.markers[0]?.key || null);
   const [imageErrorUrl, setImageErrorUrl] = useState<string | null>(null);
+  const [photoPagination, setPhotoPagination] = useState({ taxonKey: '', page: 0 });
   const isZh = language === 'zh';
   const imageUrlAllowed = isAllowedAnatomyImageUrl(value.photoUrl);
   const imageError = imageErrorUrl === value.photoUrl;
+  const taxonKey = `${inatId || ''}:${taxaId || ''}`;
+  const photoPage = photoPagination.taxonKey === taxonKey ? photoPagination.page : 0;
+  const visiblePhotos = photos.slice(photoPage * 20, (photoPage + 1) * 20);
+
+  useEffect(() => {
+    if (!photosLoading && hasMore && photos.length < (photoPage + 1) * 20) loadMore();
+  }, [hasMore, loadMore, photoPage, photos.length, photosLoading]);
 
   const updateMarker = (key: string, changes: Partial<AnatomyMarker>) => {
     onChange({ ...value, markers: value.markers.map((marker) => marker.key === key ? { ...marker, ...changes } : marker) });
@@ -214,30 +222,18 @@ export function SpeciesAnatomyEditor({ value, inatId, taxaId, disabled = false, 
         </label>
       </div>
 
-      <label className="block">
-        <span className={labelClass}>{isZh ? '特徵插圖圖片 URL' : 'Illustration image URL'}</span>
-        <input
-          type="text"
-          value={value.photoUrl}
-          disabled={disabled}
-          onChange={(event) => changePhoto(event.target.value)}
-          placeholder="https://… or /images/…"
-          className={inputClass}
-        />
-      </label>
-
       <div className="space-y-2">
         <div className="flex items-center justify-between gap-3">
-          <span className={labelClass}>{isZh ? '從物種照片選擇' : 'Choose from species photos'}</span>
+          <span className={labelClass}>{isZh ? '從 iNaturalist 物種照片中選擇' : 'Choose from iNaturalist species photos'}</span>
           {photos.length > 0 && <span className="text-[10px] text-slate-400">{photos.length}</span>}
         </div>
         {photosLoading && photos.length === 0 ? (
           <div className="flex items-center gap-2 py-3 text-xs text-slate-500"><Loader2 className="size-3.5 animate-spin" />{isZh ? '載入 iNaturalist 照片…' : 'Loading iNaturalist photos…'}</div>
         ) : photos.length === 0 ? (
-          <p className="py-2 text-xs text-slate-400">{isZh ? '目前沒有可選照片；你仍可輸入自訂 URL。' : 'No selectable photos found. You can still enter a custom URL.'}</p>
+          <p className="py-2 text-xs text-slate-400">{isZh ? '目前沒有可選的 iNaturalist 物種照片。' : 'No selectable iNaturalist species photos found.'}</p>
         ) : (
-          <div className="flex gap-2 overflow-x-auto pb-2">
-            {photos.map((photo) => {
+          <div className="grid grid-cols-10 gap-2 py-2">
+            {visiblePhotos.map((photo) => {
               const photoUrl = photo.large_url || photo.medium_url || photo.url;
               const isSelected = value.photoUrl === photoUrl;
               return (
@@ -249,30 +245,43 @@ export function SpeciesAnatomyEditor({ value, inatId, taxaId, disabled = false, 
                   aria-pressed={isSelected}
                   title={photo.attribution}
                   onClick={() => changePhoto(photoUrl, photo.attribution, photo.observationUrl || photo.nativePageUrl || '')}
-                  className={`relative size-16 shrink-0 overflow-hidden rounded-lg border-2 bg-white transition ${isSelected ? 'border-emerald-600 ring-2 ring-emerald-200' : 'border-slate-200 hover:border-emerald-400'} disabled:cursor-not-allowed disabled:opacity-60`}
+                  className={`relative z-0 aspect-square min-w-0 overflow-hidden rounded-lg border-2 bg-white transition duration-200 hover:z-20 hover:scale-150 ${isSelected ? 'border-emerald-600 ring-2 ring-emerald-200' : 'border-slate-200 hover:border-emerald-400'} disabled:cursor-not-allowed disabled:opacity-60`}
                 >
                   <Image
                     src={photo.small_url || photoUrl}
                     alt={photo.attribution}
                     fill
-                    sizes="64px"
+                    sizes="(min-width: 768px) 64px, 10vw"
                     unoptimized={(photo.small_url || photoUrl).includes('/api/image/transform')}
                     className="object-cover"
                   />
                 </button>
               );
             })}
-            {hasMore && (
-              <button
-                type="button"
-                disabled={photosLoading || disabled}
-                onClick={loadMore}
-                className="flex size-16 shrink-0 flex-col items-center justify-center gap-1 rounded-lg border border-dashed border-slate-300 text-[9px] font-bold text-slate-500 hover:border-emerald-400 hover:text-emerald-700 disabled:opacity-50"
-              >
-                {photosLoading ? <Loader2 className="size-4 animate-spin" /> : <Plus className="size-4" />}
-                {isZh ? '更多' : 'More'}
-              </button>
-            )}
+          </div>
+        )}
+        {(photoPage > 0 || hasMore || photos.length > (photoPage + 1) * 20) && (
+          <div className="flex items-center justify-between text-xs text-slate-500">
+            <button
+              type="button"
+              disabled={photoPage === 0 || photosLoading || disabled}
+              onClick={() => setPhotoPagination({ taxonKey, page: Math.max(0, photoPage - 1) })}
+              className="inline-flex items-center gap-1 rounded-md px-2 py-1 hover:bg-slate-100 disabled:opacity-40"
+            >
+              <ChevronLeft className="size-4" />{isZh ? '上一頁' : 'Previous'}
+            </button>
+            <span>{photos.length > 0 ? `${photoPage * 20 + 1}-${photoPage * 20 + visiblePhotos.length} / ${photos.length}${hasMore ? '+' : ''}` : ''}</span>
+            <button
+              type="button"
+              disabled={(!hasMore && photos.length <= (photoPage + 1) * 20) || photosLoading || disabled}
+              onClick={() => {
+                setPhotoPagination({ taxonKey, page: photoPage + 1 });
+              }}
+              className="inline-flex items-center gap-1 rounded-md px-2 py-1 hover:bg-slate-100 disabled:opacity-40"
+            >
+              {photosLoading ? <Loader2 className="size-4 animate-spin" /> : null}
+              {isZh ? '下一頁' : 'Next'}<ChevronRight className="size-4" />
+            </button>
           </div>
         )}
       </div>
@@ -337,7 +346,7 @@ export function SpeciesAnatomyEditor({ value, inatId, taxaId, disabled = false, 
             </div>
             <div className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2">
               <Mouse className="size-4 shrink-0 text-slate-500" />
-              <span className="min-w-0 flex-1 text-xs text-slate-600">{isZh ? '游標移到相框內，滾動滑鼠滾輪縮放' : 'Hover over the frame and scroll to zoom'}</span>
+              <span className="min-w-0 flex-1 text-xs text-slate-600">{isZh ? '游標移到相框內滾動滑鼠滾輪縮放；拖曳插圖調整位置，點擊圖片新增標記，拖曳編號移動標記。' : 'Hover over the frame and scroll to zoom; drag the image to pan, click to add a marker, or drag a number to move it.'}</span>
               <span className="shrink-0 text-xs tabular-nums text-slate-500">{Math.round(value.zoom * 100)}%</span>
               <button
                 type="button"
@@ -356,11 +365,6 @@ export function SpeciesAnatomyEditor({ value, inatId, taxaId, disabled = false, 
             {imageError ? <AlertCircle className="size-5 text-rose-500" /> : null}
             <span>{!imageUrlAllowed && value.photoUrl ? (isZh ? '圖片 URL 不在允許的來源清單內。' : 'This image URL is not from an allowed image source.') : imageError ? (isZh ? '圖片無法載入，請檢查 URL。' : 'Image failed to load. Check the URL.') : (isZh ? '輸入圖片 URL 後即可在圖片上點擊新增標記。' : 'Add an image URL to place markers on the illustration.')}</span>
           </div>
-        )}
-        {value.photoUrl && !imageError && imageUrlAllowed && (
-          <p className="text-center text-[11px] text-slate-500">
-            {isZh ? '拖曳插圖調整位置；點擊圖片新增標記，拖曳編號移動標記。' : 'Drag the image to pan, click to add a marker, or drag a number to move it.'}
-          </p>
         )}
       </div>
 

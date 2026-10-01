@@ -91,21 +91,21 @@ export default function HomeHero() {
   const typeOptions = [
     { 
       id: 'fauna' as const, 
-      label: language === 'zh' ? '動物 (Fauna)' : 'Fauna',
+      label: language === 'zh' ? '動物' : 'Fauna',
       icon: Dog,
       iconColor: 'text-amber-600',
       activeBg: 'bg-amber-50 text-amber-900 border-amber-200/80',
     },
     { 
       id: 'flora' as const, 
-      label: language === 'zh' ? '植物 (Flora)' : 'Flora',
+      label: language === 'zh' ? '植物' : 'Flora',
       icon: Leaf,
       iconColor: 'text-emerald-600',
       activeBg: 'bg-emerald-50 text-emerald-950 border-emerald-200/80',
     },
     { 
       id: 'fungi' as const, 
-      label: language === 'zh' ? '真菌 (Fungi)' : 'Fungi',
+      label: language === 'zh' ? '真菌' : 'Fungi',
       icon: MushroomIcon,
       iconColor: 'text-purple-600',
       activeBg: 'bg-purple-50 text-purple-950 border-purple-200/80',
