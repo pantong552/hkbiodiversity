@@ -319,13 +319,17 @@ export default function SpeciesPhotoGallery({
       console.log('[Gallery UI] Calling deletePhoto API for photoId:', currentPhoto.id);
       await deletePhoto(currentPhoto.id);
       console.log('[Gallery UI] deletePhoto API call succeeded');
+      window.dispatchEvent(new CustomEvent('species-anatomy-photo-deleted', {
+        detail: { taxaId, photoId: currentPhoto.id }
+      }));
       setIsDeleteModalOpen(false);
       if (currentIndex > 0 && currentIndex >= photos.length - 1) {
         setCurrentIndex(prev => prev - 1);
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('[Gallery UI] Failed to delete photo:', err);
-      alert((language === 'zh' ? '刪除照片失敗：' : 'Failed to delete photo: ') + (err.message || ''));
+      const message = err instanceof Error ? err.message : '';
+      alert((language === 'zh' ? '刪除照片失敗：' : 'Failed to delete photo: ') + message);
     } finally {
       setIsDeletingPhoto(false);
     }

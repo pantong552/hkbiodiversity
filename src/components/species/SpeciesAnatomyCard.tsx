@@ -3,10 +3,10 @@
 import React, { useEffect, useRef, useState } from 'react';
 import Image from 'next/image';
 import { AnimatePresence, motion } from 'framer-motion';
-import { AlertCircle, BookOpen, ChevronLeft, ChevronRight, ExternalLink, Loader2, Mouse, Plus, RotateCcw, Trash2 } from 'lucide-react';
+import { AlertCircle, BookOpen, Check, ChevronDown, ChevronLeft, ChevronRight, ExternalLink, Loader2, Mouse, Plus, RotateCcw, Trash2, Upload } from 'lucide-react';
 import { useLanguage } from '@/context/LanguageContext';
 import { createClient } from '@/utils/supabase/client';
-import { useInaturalistSpeciesPhotos } from '@/hooks/useInaturalistSpeciesPhotos';
+import { InatGalleryPhoto, useInaturalistSpeciesPhotos } from '@/hooks/useInaturalistSpeciesPhotos';
 import { AnatomyIllustration, AnatomyMarker, EMPTY_ANATOMY_ILLUSTRATION } from '@/types/anatomy';
 import { clampAnatomyPan, fitAnatomyImage, getAnatomyCoordinates, getAnatomyPanLimits, getAnatomyPanOffset, getAnatomyZoomPan, isAllowedAnatomyImageUrl, mapAnatomyIllustrations, normalizeAnatomyMarkers } from '@/utils/anatomy';
 
@@ -23,6 +23,8 @@ interface SpeciesAnatomyEditorProps {
   disabled?: boolean;
   onChange: (value: AnatomyIllustration) => void;
 }
+
+const PHOTO_UPLOAD_LICENSES = ['CC BY', 'CC BY-SA', 'CC BY-ND', 'CC BY-NC', 'CC BY-NC-SA', 'CC BY-NC-ND'];
 
 function useFittedAnatomyImage(photoUrl: string) {
   const frameRef = useRef<HTMLDivElement>(null);
@@ -51,7 +53,8 @@ function useFittedAnatomyImage(photoUrl: string) {
 
 export function SpeciesAnatomyEditor({ value, inatId, taxaId, disabled = false, onChange }: SpeciesAnatomyEditorProps) {
   const { language } = useLanguage();
-  const { photos, isLoading: photosLoading, hasMore, loadMore } = useInaturalistSpeciesPhotos(inatId, taxaId);
+  const supabase = createClient();
+  const { photos, isLoading: photosLoading, hasMore, loadMore, deletePhoto: deleteCommunityPhoto } = useInaturalistSpeciesPhotos(inatId, taxaId);
   const { frameRef, frameSize, imageSize, onImageLoad } = useFittedAnatomyImage(value.photoUrl);
   const imagePlaneRef = useRef<HTMLDivElement>(null);
   const draggingKeyRef = useRef<string | null>(null);
@@ -61,16 +64,137 @@ export function SpeciesAnatomyEditor({ value, inatId, taxaId, disabled = false, 
   const [activeKey, setActiveKey] = useState<string | null>(value.markers[0]?.key || null);
   const [imageErrorUrl, setImageErrorUrl] = useState<string | null>(null);
   const [photoPagination, setPhotoPagination] = useState({ taxonKey: '', page: 0 });
+  const [uploadedPhotos, setUploadedPhotos] = useState<InatGalleryPhoto[]>([]);
+  const [uploadAuthor, setUploadAuthor] = useState('');
+  const [uploadLicense, setUploadLicense] = useState('CC BY');
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
+  const [deletingPhotoId, setDeletingPhotoId] = useState<string | number | null>(null);
+  const [licenseDropdownOpen, setLicenseDropdownOpen] = useState(false);
+  const [uploadMessage, setUploadMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const uploadInputRef = useRef<HTMLInputElement>(null);
+  const licenseDropdownRef = useRef<HTMLDivElement>(null);
+  const licenseTriggerRef = useRef<HTMLButtonElement>(null);
+  const licenseOptionRefs = useRef<(HTMLButtonElement | null)[]>([]);
   const isZh = language === 'zh';
   const imageUrlAllowed = isAllowedAnatomyImageUrl(value.photoUrl);
   const imageError = imageErrorUrl === value.photoUrl;
   const taxonKey = `${inatId || ''}:${taxaId || ''}`;
   const photoPage = photoPagination.taxonKey === taxonKey ? photoPagination.page : 0;
-  const visiblePhotos = photos.slice(photoPage * 20, (photoPage + 1) * 20);
+  const inaturalistPhotos = photos.filter((photo) => !photo.isCommunityPhoto);
+  const communityPhotos = [...uploadedPhotos, ...photos.filter((photo) => photo.isCommunityPhoto && !uploadedPhotos.some((uploadedPhoto) => uploadedPhoto.id === photo.id))];
+  const visiblePhotos = inaturalistPhotos.slice(photoPage * 20, (photoPage + 1) * 20);
 
   useEffect(() => {
-    if (!photosLoading && hasMore && photos.length < (photoPage + 1) * 20) loadMore();
-  }, [hasMore, loadMore, photoPage, photos.length, photosLoading]);
+    if (!photosLoading && hasMore && inaturalistPhotos.length < (photoPage + 1) * 20) loadMore();
+  }, [hasMore, inaturalistPhotos.length, loadMore, photoPage, photosLoading]);
+
+  useEffect(() => {
+    if (!licenseDropdownOpen) return;
+    const closeOnOutsideClick = (event: PointerEvent) => {
+      if (!licenseDropdownRef.current?.contains(event.target as Node)) setLicenseDropdownOpen(false);
+    };
+    const handleDropdownKeys = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setLicenseDropdownOpen(false);
+        licenseTriggerRef.current?.focus();
+      }
+    };
+    document.addEventListener('pointerdown', closeOnOutsideClick);
+    document.addEventListener('keydown', handleDropdownKeys);
+    return () => {
+      document.removeEventListener('pointerdown', closeOnOutsideClick);
+      document.removeEventListener('keydown', handleDropdownKeys);
+    };
+  }, [licenseDropdownOpen]);
+
+  const handlePhotoUpload = async (file: File) => {
+    const allowedTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/avif'];
+    if (!allowedTypes.includes(file.type)) {
+      setUploadMessage({ type: 'error', text: isZh ? '僅支援 JPG、PNG、WEBP、AVIF 格式。' : 'Only JPG, PNG, WEBP, and AVIF images are supported.' });
+      return;
+    }
+    if (file.size > 10 * 1024 * 1024) {
+      setUploadMessage({ type: 'error', text: isZh ? '檔案大小不能超過 10MB。' : 'Image size must not exceed 10MB.' });
+      return;
+    }
+    if (!uploadAuthor.trim()) {
+      setUploadMessage({ type: 'error', text: isZh ? '請先填寫圖片作者。' : 'Enter the image author before uploading.' });
+      return;
+    }
+
+    const targetTaxaId = taxaId || inatId;
+    const cloudName = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME;
+    const uploadPreset = process.env.NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET;
+    if (!targetTaxaId || !cloudName || !uploadPreset) {
+      setUploadMessage({ type: 'error', text: isZh ? '缺少物種或 Cloudinary 上傳設定。' : 'Species or Cloudinary upload configuration is missing.' });
+      return;
+    }
+
+    setUploadingPhoto(true);
+    setUploadMessage(null);
+    try {
+      const { data: { user }, error: authError } = await supabase.auth.getUser();
+      if (authError) throw authError;
+      if (!user) throw new Error(isZh ? '請先登入再上傳圖片。' : 'Sign in before uploading an image.');
+
+      const safeAuthor = uploadAuthor.trim().replace(/[^a-zA-Z0-9_-]+/g, '_');
+      const publicId = `${String(targetTaxaId).replace(/[^a-zA-Z0-9_-]+/g, '_')}_${safeAuthor}_${Date.now()}`;
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('upload_preset', uploadPreset);
+      formData.append('public_id', publicId);
+
+      const cloudResponse = await fetch(`https://api.cloudinary.com/v1_1/${cloudName}/image/upload`, {
+        method: 'POST',
+        body: formData
+      });
+      const cloudData = await cloudResponse.json();
+      if (!cloudResponse.ok || !cloudData.secure_url || !cloudData.public_id) {
+        throw new Error(cloudData.error?.message || (isZh ? 'Cloudinary 上傳失敗。' : 'Cloudinary upload failed.'));
+      }
+
+      const { data: photoRecord, error: insertError } = await supabase
+        .from('species_community_photos')
+        .insert({
+          taxa_id: String(targetTaxaId),
+          image_url: cloudData.secure_url,
+          author_name: uploadAuthor.trim(),
+          license: uploadLicense,
+          user_id: user.id,
+          cloudinary_public_id: cloudData.public_id
+        })
+        .select('id')
+        .single();
+      if (insertError) throw insertError;
+
+      const optimizedUrl = cloudData.secure_url.replace('/upload/', '/upload/f_auto,q_auto/');
+      const uploadedPhoto: InatGalleryPhoto = {
+        id: photoRecord.id,
+        url: optimizedUrl,
+        small_url: optimizedUrl.replace('/upload/f_auto,q_auto/', '/upload/f_auto,q_auto,w_400,c_limit/'),
+        medium_url: optimizedUrl.replace('/upload/f_auto,q_auto/', '/upload/f_auto,q_auto,w_800,c_limit/'),
+        large_url: optimizedUrl,
+        original_url: cloudData.secure_url,
+        attribution: `© ${uploadAuthor.trim()} (${uploadLicense})`,
+        licenseCode: uploadLicense,
+        nativePageUrl: null,
+        observationUrl: null,
+        observedOn: new Date().toISOString(),
+        isCommunityPhoto: true,
+        uploaderUserId: user.id
+      };
+      setUploadedPhotos((current) => [uploadedPhoto, ...current]);
+      setPhotoPagination({ taxonKey, page: 0 });
+      changePhoto(cloudData.secure_url, uploadedPhoto.attribution);
+      setUploadMessage({ type: 'success', text: isZh ? '圖片已上傳並加入物種照片庫。按儲存後會套用至圖鑑。' : 'Image uploaded to the species photo library. Save to apply it to the illustration.' });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : (isZh ? '圖片上傳失敗。' : 'Image upload failed.');
+      setUploadMessage({ type: 'error', text: message });
+    } finally {
+      setUploadingPhoto(false);
+      if (uploadInputRef.current) uploadInputRef.current.value = '';
+    }
+  };
 
   const updateMarker = (key: string, changes: Partial<AnatomyMarker>) => {
     onChange({ ...value, markers: value.markers.map((marker) => marker.key === key ? { ...marker, ...changes } : marker) });
@@ -187,6 +311,30 @@ export function SpeciesAnatomyEditor({ value, inatId, taxaId, disabled = false, 
     onChange({ ...value, photoUrl, photoAttribution, photoLink, zoom: 1, offsetX: 0, offsetY: 0 });
   };
 
+  const handleDeleteCommunityPhoto = async (photo: InatGalleryPhoto) => {
+    setUploadMessage(null);
+    setDeletingPhotoId(photo.id);
+    const wasSelected = [photo.url, photo.large_url, photo.original_url].includes(value.photoUrl);
+    try {
+      await deleteCommunityPhoto(photo.id);
+      setUploadedPhotos((current) => current.filter((uploadedPhoto) => uploadedPhoto.id !== photo.id));
+      if (wasSelected) {
+        onChange({ ...value, photoUrl: '', photoAttribution: '', photoLink: '', zoom: 1, offsetX: 0, offsetY: 0 });
+      }
+      setUploadMessage({
+        type: 'success',
+        text: wasSelected
+          ? (isZh ? '已刪除目前選取的圖片，圖鑑圖片已移除，請重新選擇圖片。' : 'The selected image was deleted and removed from the illustration. Please select another image.')
+          : (isZh ? '已刪除圖片。' : 'Image deleted.')
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : (isZh ? '刪除圖片失敗。' : 'Failed to delete image.');
+      setUploadMessage({ type: 'error', text: message });
+    } finally {
+      setDeletingPhotoId(null);
+    }
+  };
+
   const removeMarker = (key: string) => {
     const markerIndex = value.markers.findIndex((marker) => marker.key === key);
     const markers = normalizeAnatomyMarkers(value.markers.filter((marker) => marker.key !== key));
@@ -222,68 +370,202 @@ export function SpeciesAnatomyEditor({ value, inatId, taxaId, disabled = false, 
         </label>
       </div>
 
-      <div className="space-y-2">
-        <div className="flex items-center justify-between gap-3">
-          <span className={labelClass}>{isZh ? '從 iNaturalist 物種照片中選擇' : 'Choose from iNaturalist species photos'}</span>
-          {photos.length > 0 && <span className="text-[10px] text-slate-400">{photos.length}</span>}
-        </div>
-        {photosLoading && photos.length === 0 ? (
-          <div className="flex items-center gap-2 py-3 text-xs text-slate-500"><Loader2 className="size-3.5 animate-spin" />{isZh ? '載入 iNaturalist 照片…' : 'Loading iNaturalist photos…'}</div>
-        ) : photos.length === 0 ? (
-          <p className="py-2 text-xs text-slate-400">{isZh ? '目前沒有可選的 iNaturalist 物種照片。' : 'No selectable iNaturalist species photos found.'}</p>
-        ) : (
-          <div className="grid grid-cols-10 gap-2 py-2">
-            {visiblePhotos.map((photo) => {
-              const photoUrl = photo.large_url || photo.medium_url || photo.url;
-              const isSelected = value.photoUrl === photoUrl;
-              return (
+      <div className="space-y-5">
+        <section className="space-y-2">
+          <div className="flex items-center justify-between gap-3">
+            <span className={labelClass}>{isZh ? '從 iNaturalist 物種照片中選擇' : 'Choose from iNaturalist species photos'}</span>
+            {inaturalistPhotos.length > 0 && <span className="text-[10px] text-slate-400">{inaturalistPhotos.length}</span>}
+          </div>
+          {photosLoading && inaturalistPhotos.length === 0 ? (
+            <div className="flex items-center gap-2 py-3 text-xs text-slate-500"><Loader2 className="size-3.5 animate-spin" />{isZh ? '載入 iNaturalist 照片…' : 'Loading iNaturalist photos…'}</div>
+          ) : inaturalistPhotos.length === 0 ? (
+            <p className="py-2 text-xs text-slate-400">{isZh ? '目前沒有可選的 iNaturalist 物種照片。' : 'No selectable iNaturalist species photos found.'}</p>
+          ) : (
+            <div className="grid grid-cols-10 gap-2 py-2">
+              {visiblePhotos.map((photo) => {
+                const photoUrl = photo.large_url || photo.medium_url || photo.url;
+                const isSelected = value.photoUrl === photoUrl;
+                return (
+                  <button
+                    key={photo.id}
+                    type="button"
+                    disabled={disabled}
+                    aria-label={`${isZh ? '選擇照片' : 'Select photo'}: ${photo.attribution}`}
+                    aria-pressed={isSelected}
+                    title={photo.attribution}
+                    onClick={() => changePhoto(photoUrl, photo.attribution, photo.observationUrl || photo.nativePageUrl || '')}
+                    className={`relative z-0 aspect-square min-w-0 overflow-hidden rounded-lg border-2 bg-white transition duration-200 hover:z-20 hover:scale-150 ${isSelected ? 'border-emerald-600 ring-2 ring-emerald-200' : 'border-slate-200 hover:border-emerald-400'} disabled:cursor-not-allowed disabled:opacity-60`}
+                  >
+                    <Image
+                      src={photo.small_url || photoUrl}
+                      alt={photo.attribution}
+                      fill
+                      sizes="(min-width: 768px) 64px, 10vw"
+                      unoptimized={(photo.small_url || photoUrl).includes('/api/image/transform')}
+                      className="object-cover"
+                    />
+                  </button>
+                );
+              })}
+            </div>
+          )}
+          {(photoPage > 0 || hasMore || inaturalistPhotos.length > (photoPage + 1) * 20) && (
+            <div className="flex items-center justify-between text-xs text-slate-500">
+              <button
+                type="button"
+                disabled={photoPage === 0 || photosLoading || disabled}
+                onClick={() => setPhotoPagination({ taxonKey, page: Math.max(0, photoPage - 1) })}
+                className="inline-flex items-center gap-1 rounded-md px-2 py-1 hover:bg-slate-100 disabled:opacity-40"
+              >
+                <ChevronLeft className="size-4" />{isZh ? '上一頁' : 'Previous'}
+              </button>
+              <span>{inaturalistPhotos.length > 0 ? `${photoPage * 20 + 1}-${photoPage * 20 + visiblePhotos.length} / ${inaturalistPhotos.length}${hasMore ? '+' : ''}` : ''}</span>
+              <button
+                type="button"
+                disabled={(!hasMore && inaturalistPhotos.length <= (photoPage + 1) * 20) || photosLoading || disabled}
+                onClick={() => setPhotoPagination({ taxonKey, page: photoPage + 1 })}
+                className="inline-flex items-center gap-1 rounded-md px-2 py-1 hover:bg-slate-100 disabled:opacity-40"
+              >
+                {photosLoading ? <Loader2 className="size-4 animate-spin" /> : null}
+                {isZh ? '下一頁' : 'Next'}<ChevronRight className="size-4" />
+              </button>
+            </div>
+          )}
+        </section>
+
+        <section className="space-y-2 border-t border-slate-200 pt-4">
+          <div className="flex items-center justify-between gap-3">
+            <h4 className="text-xs font-bold text-slate-700">{isZh ? '使用者上傳' : 'User uploads'}</h4>
+            {communityPhotos.length > 0 && <span className="text-[10px] text-slate-400">{communityPhotos.length}</span>}
+          </div>
+          <div className="flex flex-wrap items-end gap-2">
+            <label className="min-w-32 flex-1">
+              <span className="mb-1 block text-[10px] font-bold text-slate-500">{isZh ? '圖片作者' : 'Image author'}</span>
+              <input
+                value={uploadAuthor}
+                disabled={disabled || uploadingPhoto}
+                onChange={(event) => setUploadAuthor(event.target.value)}
+                placeholder={isZh ? '輸入作者名稱' : 'Author name'}
+                className="w-full rounded-lg border border-slate-200 bg-white px-2.5 py-2 text-xs text-slate-800 outline-none focus:border-emerald-500 disabled:bg-slate-100"
+              />
+            </label>
+            <label>
+              <span className="mb-1 block text-[10px] font-bold text-slate-500">{isZh ? '圖片授權' : 'Image license'}</span>
+              <div ref={licenseDropdownRef} className="relative">
                 <button
-                  key={photo.id}
+                  ref={licenseTriggerRef}
                   type="button"
-                  disabled={disabled}
-                  aria-label={`${isZh ? '選擇照片' : 'Select photo'}: ${photo.attribution}`}
-                  aria-pressed={isSelected}
-                  title={photo.attribution}
-                  onClick={() => changePhoto(photoUrl, photo.attribution, photo.observationUrl || photo.nativePageUrl || '')}
-                  className={`relative z-0 aspect-square min-w-0 overflow-hidden rounded-lg border-2 bg-white transition duration-200 hover:z-20 hover:scale-150 ${isSelected ? 'border-emerald-600 ring-2 ring-emerald-200' : 'border-slate-200 hover:border-emerald-400'} disabled:cursor-not-allowed disabled:opacity-60`}
+                  role="combobox"
+                  aria-label={isZh ? '圖片授權' : 'Image license'}
+                  aria-haspopup="listbox"
+                  aria-expanded={licenseDropdownOpen}
+                  aria-controls="anatomy-license-options"
+                  disabled={disabled || uploadingPhoto}
+                  onClick={() => setLicenseDropdownOpen((open) => !open)}
+                  onKeyDown={(event) => {
+                    if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+                      event.preventDefault();
+                      setLicenseDropdownOpen(true);
+                      const selectedIndex = PHOTO_UPLOAD_LICENSES.indexOf(uploadLicense);
+                      requestAnimationFrame(() => licenseOptionRefs.current[selectedIndex]?.focus());
+                    }
+                  }}
+                  className="flex min-w-28 items-center justify-between gap-3 rounded-lg border border-slate-200 bg-white px-2.5 py-2 text-xs text-slate-800 outline-none hover:border-emerald-400 focus:border-emerald-500 disabled:bg-slate-100"
                 >
-                  <Image
-                    src={photo.small_url || photoUrl}
-                    alt={photo.attribution}
-                    fill
-                    sizes="(min-width: 768px) 64px, 10vw"
-                    unoptimized={(photo.small_url || photoUrl).includes('/api/image/transform')}
-                    className="object-cover"
-                  />
+                  {uploadLicense}<ChevronDown className={`size-3.5 text-slate-500 transition-transform ${licenseDropdownOpen ? 'rotate-180' : ''}`} />
                 </button>
-              );
-            })}
-          </div>
-        )}
-        {(photoPage > 0 || hasMore || photos.length > (photoPage + 1) * 20) && (
-          <div className="flex items-center justify-between text-xs text-slate-500">
-            <button
-              type="button"
-              disabled={photoPage === 0 || photosLoading || disabled}
-              onClick={() => setPhotoPagination({ taxonKey, page: Math.max(0, photoPage - 1) })}
-              className="inline-flex items-center gap-1 rounded-md px-2 py-1 hover:bg-slate-100 disabled:opacity-40"
-            >
-              <ChevronLeft className="size-4" />{isZh ? '上一頁' : 'Previous'}
-            </button>
-            <span>{photos.length > 0 ? `${photoPage * 20 + 1}-${photoPage * 20 + visiblePhotos.length} / ${photos.length}${hasMore ? '+' : ''}` : ''}</span>
-            <button
-              type="button"
-              disabled={(!hasMore && photos.length <= (photoPage + 1) * 20) || photosLoading || disabled}
-              onClick={() => {
-                setPhotoPagination({ taxonKey, page: photoPage + 1 });
+                {licenseDropdownOpen && (
+                  <div id="anatomy-license-options" role="listbox" aria-label={isZh ? '圖片授權選項' : 'Image license options'} className="absolute right-0 top-full z-50 mt-1 max-h-56 min-w-full overflow-y-auto rounded-lg border border-slate-200 bg-white p-1 shadow-xl">
+                    {PHOTO_UPLOAD_LICENSES.map((license, index) => (
+                      <button
+                        key={license}
+                        ref={(element) => { licenseOptionRefs.current[index] = element; }}
+                        type="button"
+                        role="option"
+                        aria-selected={uploadLicense === license}
+                        onClick={() => {
+                          setUploadLicense(license);
+                          setLicenseDropdownOpen(false);
+                          licenseTriggerRef.current?.focus();
+                        }}
+                        onKeyDown={(event) => {
+                          if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp') return;
+                          event.preventDefault();
+                          const nextIndex = event.key === 'ArrowDown'
+                            ? (index + 1) % PHOTO_UPLOAD_LICENSES.length
+                            : (index - 1 + PHOTO_UPLOAD_LICENSES.length) % PHOTO_UPLOAD_LICENSES.length;
+                          licenseOptionRefs.current[nextIndex]?.focus();
+                        }}
+                        className="flex w-full items-center justify-between gap-3 rounded-md px-2 py-1.5 text-left text-xs text-slate-700 hover:bg-emerald-50 focus:bg-emerald-50 focus:outline-none"
+                      >
+                        {license}{uploadLicense === license && <Check className="size-3.5 text-emerald-700" />}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </label>
+            <input
+              ref={uploadInputRef}
+              type="file"
+              accept="image/jpeg,image/png,image/webp,image/avif"
+              className="hidden"
+              disabled={disabled || uploadingPhoto}
+              onChange={(event) => {
+                const file = event.currentTarget.files?.[0];
+                if (file) void handlePhotoUpload(file);
               }}
-              className="inline-flex items-center gap-1 rounded-md px-2 py-1 hover:bg-slate-100 disabled:opacity-40"
+            />
+            <button
+              type="button"
+              disabled={disabled || uploadingPhoto || !uploadAuthor.trim()}
+              onClick={() => uploadInputRef.current?.click()}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-bold text-emerald-800 hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-50"
             >
-              {photosLoading ? <Loader2 className="size-4 animate-spin" /> : null}
-              {isZh ? '下一頁' : 'Next'}<ChevronRight className="size-4" />
+              {uploadingPhoto ? <Loader2 className="size-3.5 animate-spin" /> : <Upload className="size-3.5" />}
+              {isZh ? '上傳圖片' : 'Upload image'}
             </button>
           </div>
-        )}
+          {uploadMessage && <p role={uploadMessage.type === 'error' ? 'alert' : 'status'} className={`text-xs ${uploadMessage.type === 'error' ? 'text-rose-600' : 'text-emerald-700'}`}>{uploadMessage.text}</p>}
+          {photosLoading && communityPhotos.length === 0 ? (
+            <div className="flex items-center gap-2 py-3 text-xs text-slate-500"><Loader2 className="size-3.5 animate-spin" />{isZh ? '載入使用者上傳圖片…' : 'Loading user uploads…'}</div>
+          ) : communityPhotos.length === 0 ? (
+            <p className="py-2 text-xs text-slate-400">{isZh ? '尚未上傳圖片。' : 'No user uploads yet.'}</p>
+          ) : (
+            <div className="grid grid-cols-10 gap-2 py-2">
+              {communityPhotos.map((photo) => {
+                const photoUrl = photo.large_url || photo.medium_url || photo.url;
+                const isSelected = [photo.url, photo.large_url, photo.original_url].includes(value.photoUrl);
+                const isDeleting = deletingPhotoId === photo.id;
+                return (
+                  <div key={photo.id} className="group relative z-0 aspect-square min-w-0 hover:z-20">
+                    <button
+                      type="button"
+                      disabled={disabled || isDeleting}
+                      aria-label={`${isZh ? '選擇上傳圖片' : 'Select uploaded image'}: ${photo.attribution}`}
+                      aria-pressed={isSelected}
+                      title={photo.attribution}
+                      onClick={() => changePhoto(photoUrl, photo.attribution)}
+                      className={`relative size-full overflow-hidden rounded-lg border-2 bg-white transition duration-200 group-hover:scale-150 ${isSelected ? 'border-emerald-600 ring-2 ring-emerald-200' : 'border-slate-200 hover:border-emerald-400'} disabled:cursor-not-allowed disabled:opacity-60`}
+                    >
+                      <Image src={photo.small_url || photoUrl} alt={photo.attribution} fill sizes="(min-width: 768px) 64px, 10vw" className="object-cover" />
+                    </button>
+                    <button
+                      type="button"
+                      disabled={disabled || isDeleting}
+                      aria-label={`${isZh ? '刪除上傳圖片' : 'Delete uploaded image'}: ${photo.attribution}`}
+                      title={isZh ? '刪除此圖片' : 'Delete this image'}
+                      onClick={() => void handleDeleteCommunityPhoto(photo)}
+                      className="absolute right-0.5 top-0.5 z-30 grid size-6 place-items-center rounded-md bg-rose-600 text-white opacity-0 shadow transition-opacity hover:bg-rose-700 focus-visible:opacity-100 group-hover:opacity-100 disabled:cursor-wait"
+                    >
+                      {isDeleting ? <Loader2 className="size-3.5 animate-spin" /> : <Trash2 className="size-3.5" />}
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </section>
       </div>
 
       <div className="space-y-3">
@@ -363,7 +645,7 @@ export function SpeciesAnatomyEditor({ value, inatId, taxaId, disabled = false, 
         ) : (
           <div className="flex min-h-36 flex-col items-center justify-center gap-2 text-center text-sm text-slate-500">
             {imageError ? <AlertCircle className="size-5 text-rose-500" /> : null}
-            <span>{!imageUrlAllowed && value.photoUrl ? (isZh ? '圖片 URL 不在允許的來源清單內。' : 'This image URL is not from an allowed image source.') : imageError ? (isZh ? '圖片無法載入，請檢查 URL。' : 'Image failed to load. Check the URL.') : (isZh ? '輸入圖片 URL 後即可在圖片上點擊新增標記。' : 'Add an image URL to place markers on the illustration.')}</span>
+            <span>{!imageUrlAllowed && value.photoUrl ? (isZh ? '圖片 URL 不在允許的來源清單內。' : 'This image URL is not from an allowed image source.') : imageError ? (isZh ? '圖片無法載入，請檢查 URL。' : 'Image failed to load. Check the URL.') : (isZh ? '尚未選擇圖片，請先從上方選取一張圖片。' : 'No image selected. Choose an image above to begin.')}</span>
           </div>
         )}
       </div>
@@ -516,6 +798,18 @@ function AnatomyIllustrationDisplay({ illustration, isZh, title }: { illustratio
   const [hoveredKey, setHoveredKey] = useState<string | null>(null);
   const [activeKey, setActiveKey] = useState<string | null>(null);
 
+  if (!illustration.photoUrl) {
+    return (
+      <div className="space-y-3">
+        <div role="status" className="flex min-h-36 items-center justify-center gap-2 rounded-xl border border-dashed border-slate-200 bg-slate-50 px-4 text-center text-sm text-slate-500">
+          <AlertCircle className="size-4 shrink-0" />
+          {isZh ? '尚未選擇圖片，請先選取一張圖鑑圖片。' : 'No image selected. Choose an illustration image to continue.'}
+        </div>
+        <h3 className="px-2 pt-1 text-center text-base font-bold text-slate-800 sm:text-lg">{title}</h3>
+      </div>
+    );
+  }
+
   if (!isAllowedAnatomyImageUrl(illustration.photoUrl)) {
     return <div role="alert" className="flex min-h-32 items-center justify-center gap-2 text-sm text-rose-700"><AlertCircle className="size-4" />{isZh ? '插圖來源不受支援。' : 'The illustration source is not allowed.'}</div>;
   }
@@ -608,7 +902,17 @@ export default function SpeciesAnatomyCard({ tableName, speciesTaxaId, refreshKe
   const [slideDirection, setSlideDirection] = useState(1);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
+  const [photoDeleteRefreshKey, setPhotoDeleteRefreshKey] = useState(0);
   const isZh = language === 'zh';
+
+  useEffect(() => {
+    const handleDeletedPhoto = (event: Event) => {
+      const detail = (event as CustomEvent<{ taxaId?: string }>).detail;
+      if (detail?.taxaId === speciesTaxaId) setPhotoDeleteRefreshKey((key) => key + 1);
+    };
+    window.addEventListener('species-anatomy-photo-deleted', handleDeletedPhoto);
+    return () => window.removeEventListener('species-anatomy-photo-deleted', handleDeletedPhoto);
+  }, [speciesTaxaId]);
 
   useEffect(() => {
     let cancelled = false;
@@ -632,7 +936,7 @@ export default function SpeciesAnatomyCard({ tableName, speciesTaxaId, refreshKe
     }
     loadIllustration();
     return () => { cancelled = true; };
-  }, [speciesTaxaId, tableName, refreshKey, supabase]);
+  }, [speciesTaxaId, tableName, refreshKey, photoDeleteRefreshKey, supabase]);
 
   const currentImageIndex = Math.min(activeImageIndex, Math.max(illustrations.length - 1, 0));
   const currentIllustration = illustrations[currentImageIndex];

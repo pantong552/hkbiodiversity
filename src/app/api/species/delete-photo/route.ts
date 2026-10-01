@@ -89,6 +89,14 @@ export async function POST(req: NextRequest) {
 
     console.log('[DeletePhoto API] Cloudinary params:', { publicId, cloudName, hasApiKey: !!apiKey, hasApiSecret: !!apiSecret });
 
+    if (photoData.image_url?.includes('res.cloudinary.com') && !publicId) {
+      return NextResponse.json({ error: 'Could not determine the Cloudinary photo ID' }, { status: 502 });
+    }
+
+    if (publicId && (!cloudName || !apiKey || !apiSecret)) {
+      return NextResponse.json({ error: 'Cloudinary deletion is not configured on the server' }, { status: 503 });
+    }
+
     if (publicId && cloudName && apiKey && apiSecret) {
       try {
         const timestamp = Math.floor(Date.now() / 1000);
@@ -107,14 +115,26 @@ export async function POST(req: NextRequest) {
         });
         const cloudResult = await cloudRes.json();
         console.log('[DeletePhoto API] Cloudinary destroy response:', cloudResult);
+        if (!cloudRes.ok || !['ok', 'not found'].includes(cloudResult.result)) {
+          return NextResponse.json({ error: cloudResult.error?.message || 'Cloudinary failed to delete the photo' }, { status: 502 });
+        }
       } catch (cloudErr) {
         console.error('[DeletePhoto API] Error deleting from Cloudinary:', cloudErr);
+        return NextResponse.json({ error: 'Cloudinary failed to delete the photo' }, { status: 502 });
       }
     } else {
       console.warn('[DeletePhoto API] Cloudinary deletion skipped (credentials missing or publicId unknown)');
     }
 
-    // 5. 從 Supabase 資料庫中刪除該紀錄
+    const { error: anatomyError } = await supabase.rpc('clear_anatomy_reference_for_deleted_community_photo', {
+      p_photo_id: String(photoId)
+    });
+    if (anatomyError) {
+      console.error('[DeletePhoto API] Failed to clear anatomy reference:', anatomyError);
+      return NextResponse.json({ error: anatomyError.message || 'Failed to remove photo from the anatomy illustration' }, { status: 500 });
+    }
+
+    // Remove the photo record after its anatomy references have been cleared.
     const { data: deleteData, error: deleteError } = await supabase
       .from('species_community_photos')
       .delete()
@@ -146,9 +166,10 @@ export async function POST(req: NextRequest) {
     console.log('[DeletePhoto API] Successfully deleted photo:', photoId);
     return NextResponse.json({ success: true, deletedId: photoId });
 
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error('[DeletePhoto API] Internal error:', err);
-    return NextResponse.json({ error: err.message || 'Internal Server Error' }, { status: 500 });
+    const message = err instanceof Error ? err.message : 'Internal Server Error';
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }
 
