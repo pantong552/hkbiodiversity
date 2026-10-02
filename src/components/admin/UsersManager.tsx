@@ -41,9 +41,10 @@ interface RoleSelectDropdownProps {
   currentRole: UserRole;
   onRoleChange: (newRole: UserRole) => void;
   disabled?: boolean;
+  openUpward?: boolean;
 }
 
-function RoleSelectDropdown({ currentRole, onRoleChange, disabled }: RoleSelectDropdownProps) {
+function RoleSelectDropdown({ currentRole, onRoleChange, disabled, openUpward = false }: RoleSelectDropdownProps) {
   const [isOpen, setIsOpen] = useState(false);
   const { t } = useLanguage();
   const ref = useClickOutside(() => setIsOpen(false));
@@ -91,11 +92,11 @@ function RoleSelectDropdown({ currentRole, onRoleChange, disabled }: RoleSelectD
       <AnimatePresence>
         {isOpen && (
           <motion.div
-            initial={{ opacity: 0, scale: 0.95, y: 4 }}
-            animate={{ opacity: 1, scale: 1, y: 4 }}
-            exit={{ opacity: 0, scale: 0.95, y: 4 }}
+            initial={{ opacity: 0, scale: 0.95, y: openUpward ? -4 : 4 }}
+            animate={{ opacity: 1, scale: 1, y: openUpward ? -4 : 4 }}
+            exit={{ opacity: 0, scale: 0.95, y: openUpward ? -4 : 4 }}
             transition={{ duration: 0.15 }}
-            className="absolute left-0 top-full z-30 mt-1 w-32 rounded-xl bg-white/95 backdrop-blur-md p-1 shadow-xl border border-slate-100 ring-1 ring-slate-900/5"
+            className={`absolute left-0 z-30 w-32 rounded-xl bg-white/95 backdrop-blur-md p-1 shadow-xl border border-slate-100 ring-1 ring-slate-900/5 ${openUpward ? 'bottom-full mb-1' : 'top-full mt-1'}`}
           >
             {roleOptions.map((opt) => {
               const OptIcon = opt.icon;
@@ -602,13 +603,13 @@ export default function UsersManager({ onRequestConfirm }: UsersManagerProps) {
                         <div className="flex items-center justify-between text-slate-500">
                           <div className="flex items-center gap-1.5">
                             <Clock className="w-3 h-3 text-slate-300" />
-                            <span className="text-[9px] font-black uppercase text-slate-400 tracking-wider">Joined</span>
+                            <span className="text-[9px] font-black uppercase text-slate-400 tracking-wider">{t('admin.joined_at')}</span>
                             <span className="text-xs font-bold text-slate-600 ml-1">{formatDate(profile.created_at)}</span>
                           </div>
                           <div className="flex items-center gap-1.5">
                             <History className="w-3 h-3 text-slate-300" />
-                            <span className="text-[9px] font-black uppercase text-slate-400 tracking-wider">Active</span>
-                            <span className="text-[10px] font-medium text-slate-400 italic ml-1">{formatDate(profile.last_online_at)}</span>
+                            <span className="text-[9px] font-black uppercase text-slate-400 tracking-wider">{t('admin.last_online')}</span>
+                            <span className="text-xs font-bold text-slate-600 ml-1">{formatDate(profile.last_online_at)}</span>
                           </div>
                         </div>
                         <div className="flex items-center justify-between pt-2 border-t border-slate-100/50">
@@ -617,6 +618,7 @@ export default function UsersManager({ onRequestConfirm }: UsersManagerProps) {
                               currentRole={profile.role}
                               onRoleChange={(newRole) => handleRoleChange(profile.id, newRole)}
                               disabled={actionLoading === profile.id}
+                              openUpward
                             />
                             {getStatusBadge(profile.status)}
                           </div>
