@@ -298,7 +298,7 @@ export default function UsersManager({ onRequestConfirm }: UsersManagerProps) {
   const formatDate = (dateStr: string | null | undefined) => {
     if (!dateStr) return '-';
     try {
-      return format(new Date(dateStr), 'yy/MM/dd HH:mm', { 
+      return format(new Date(dateStr), 'yyyy/MM/dd HH:mm', { 
         locale: language === 'zh' ? zhTW : enUS 
       });
     } catch {

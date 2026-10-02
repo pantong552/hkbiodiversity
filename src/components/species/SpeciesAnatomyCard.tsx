@@ -59,7 +59,11 @@ export function SpeciesAnatomyEditor({ value, inatId, taxaId, disabled = false, 
   const imagePlaneRef = useRef<HTMLDivElement>(null);
   const draggingKeyRef = useRef<string | null>(null);
   const draggingAnchorKeyRef = useRef<string | null>(null);
-  const [anchorPlacementKey, setAnchorPlacementKey] = useState<string | null>(null);
+  const trashDropzoneRef = useRef<HTMLDivElement>(null);
+  const dragStartRef = useRef<{ x: number; y: number } | null>(null);
+  const dragMovedRef = useRef(false);
+  const [draggingMarkerKey, setDraggingMarkerKey] = useState<string | null>(null);
+  const [trashDropActive, setTrashDropActive] = useState(false);
   const panStartRef = useRef<{ x: number; y: number; offsetX: number; offsetY: number; moved: boolean } | null>(null);
   const pointerStartedOnImageRef = useRef(false);
   const suppressImageClickRef = useRef(false);
@@ -233,20 +237,6 @@ export function SpeciesAnatomyEditor({ value, inatId, taxaId, disabled = false, 
       return;
     }
     if (disabled || !startedOnImage || !imagePlaneRef.current) return;
-    if (anchorPlacementKey) {
-      const imageRect = imagePlaneRef.current.getBoundingClientRect();
-      const point = getAnatomyCoordinates(event.clientX, event.clientY, imageRect);
-      const markerPosition = getAnatomyCoordinates(event.clientX + 20, event.clientY - 20, imageRect);
-      updateMarker(anchorPlacementKey, {
-        anchorX: point.x,
-        anchorY: point.y,
-        x: markerPosition.x,
-        y: markerPosition.y
-      });
-      setActiveKey(anchorPlacementKey);
-      setAnchorPlacementKey(null);
-      return;
-    }
     addMarker(event.clientX, event.clientY);
   };
 
@@ -254,7 +244,6 @@ export function SpeciesAnatomyEditor({ value, inatId, taxaId, disabled = false, 
     const target = event.target as HTMLElement;
     if (disabled || !target.closest('[data-image-plane]') || target.closest('[data-anatomy-marker], [data-anatomy-anchor]')) return;
     pointerStartedOnImageRef.current = true;
-    if (anchorPlacementKey) return;
     panStartRef.current = {
       x: event.clientX,
       y: event.clientY,
@@ -266,6 +255,16 @@ export function SpeciesAnatomyEditor({ value, inatId, taxaId, disabled = false, 
   };
 
   const handlePointerMove = (event: React.PointerEvent<HTMLDivElement>) => {
+    const draggedKey = draggingKeyRef.current || draggingAnchorKeyRef.current;
+    if (draggedKey && imagePlaneRef.current) {
+      const dragStart = dragStartRef.current;
+      if (dragStart && (Math.abs(event.clientX - dragStart.x) > 3 || Math.abs(event.clientY - dragStart.y) > 3)) {
+        dragMovedRef.current = true;
+      }
+      const trashRect = trashDropzoneRef.current?.getBoundingClientRect();
+      setTrashDropActive(Boolean(trashRect && event.clientX >= trashRect.left && event.clientX <= trashRect.right && event.clientY >= trashRect.top && event.clientY <= trashRect.bottom));
+    }
+
     const anchorKey = draggingAnchorKeyRef.current;
     if (anchorKey && imagePlaneRef.current) {
       const point = getAnatomyCoordinates(event.clientX, event.clientY, imagePlaneRef.current.getBoundingClientRect());
@@ -295,16 +294,34 @@ export function SpeciesAnatomyEditor({ value, inatId, taxaId, disabled = false, 
     onChange({ ...value, ...offsets });
   };
 
-  const handlePointerUp = () => {
+  const handlePointerUp = (event: React.PointerEvent<HTMLDivElement>) => {
+    const draggedKey = draggingKeyRef.current || draggingAnchorKeyRef.current;
+    const trashRect = trashDropzoneRef.current?.getBoundingClientRect();
+    const droppedInTrash = Boolean(
+      dragMovedRef.current && draggedKey && trashRect &&
+      event.clientX >= trashRect.left && event.clientX <= trashRect.right &&
+      event.clientY >= trashRect.top && event.clientY <= trashRect.bottom
+    );
     draggingKeyRef.current = null;
     draggingAnchorKeyRef.current = null;
     panStartRef.current = null;
+    dragStartRef.current = null;
+    dragMovedRef.current = false;
+    setDraggingMarkerKey(null);
+    setTrashDropActive(false);
+    if (droppedInTrash && draggedKey) removeMarker(draggedKey);
   };
 
   const handlePointerCancel = () => {
     pointerStartedOnImageRef.current = false;
     suppressImageClickRef.current = false;
-    handlePointerUp();
+    draggingKeyRef.current = null;
+    draggingAnchorKeyRef.current = null;
+    panStartRef.current = null;
+    dragStartRef.current = null;
+    dragMovedRef.current = false;
+    setDraggingMarkerKey(null);
+    setTrashDropActive(false);
   };
 
   useEffect(() => {
@@ -367,11 +384,9 @@ export function SpeciesAnatomyEditor({ value, inatId, taxaId, disabled = false, 
   };
 
   const removeMarker = (key: string) => {
-    const markerIndex = value.markers.findIndex((marker) => marker.key === key);
     const markers = normalizeAnatomyMarkers(value.markers.filter((marker) => marker.key !== key));
     onChange({ ...value, markers });
-    setActiveKey(markers[Math.min(markerIndex, markers.length - 1)]?.key || null);
-    if (anchorPlacementKey === key) setAnchorPlacementKey(null);
+    setActiveKey(markers[0]?.key || null);
   };
 
   const labelClass = 'mb-1 block text-[11px] font-bold text-slate-500';
@@ -675,6 +690,10 @@ export function SpeciesAnatomyEditor({ value, inatId, taxaId, disabled = false, 
                       event.stopPropagation();
                       event.currentTarget.setPointerCapture(event.pointerId);
                       draggingAnchorKeyRef.current = marker.key;
+                      dragStartRef.current = { x: event.clientX, y: event.clientY };
+                      dragMovedRef.current = false;
+                      setDraggingMarkerKey(marker.key);
+                      setTrashDropActive(false);
                       setActiveKey(marker.key);
                     }}
                     onClick={(event) => event.stopPropagation()}
@@ -702,6 +721,10 @@ export function SpeciesAnatomyEditor({ value, inatId, taxaId, disabled = false, 
                         event.stopPropagation();
                         event.currentTarget.setPointerCapture(event.pointerId);
                         draggingKeyRef.current = marker.key;
+                        dragStartRef.current = { x: event.clientX, y: event.clientY };
+                        dragMovedRef.current = false;
+                        setDraggingMarkerKey(marker.key);
+                        setTrashDropActive(false);
                         setActiveKey(marker.key);
                       }}
                       onClick={(event) => {
@@ -709,16 +732,26 @@ export function SpeciesAnatomyEditor({ value, inatId, taxaId, disabled = false, 
                         setActiveKey(marker.key);
                       }}
                       style={{ left: `${marker.x}%`, top: `${marker.y}%`, scale: 1 / value.zoom, touchAction: 'none' }}
-                      className={`absolute z-10 grid size-5 sm:size-7 -translate-x-1/2 -translate-y-1/2 place-items-center rounded-full border sm:border-2 text-[9px] sm:text-xs font-black shadow-md ${activeKey === marker.key ? 'border-emerald-700 bg-emerald-600 text-white' : 'border-white bg-white text-slate-800'} disabled:cursor-default`}
+                      className={`absolute z-10 grid size-5 sm:size-7 -translate-x-1/2 -translate-y-1/2 cursor-grab place-items-center rounded-full border sm:border-2 text-[9px] sm:text-xs font-black shadow-md active:cursor-grabbing ${activeKey === marker.key ? 'border-emerald-700 bg-emerald-600 text-white' : 'border-white bg-white text-slate-800'} disabled:cursor-default`}
                     >
                       {marker.key}
                     </button>
                 ))}
               </div>
+              {draggingMarkerKey && (
+                <div
+                  ref={trashDropzoneRef}
+                  role="status"
+                  className={`pointer-events-none absolute bottom-4 right-4 z-30 flex items-center gap-2 rounded-2xl border px-4 py-3 shadow-xl backdrop-blur-md transition-all ${trashDropActive ? 'scale-105 border-rose-500 bg-rose-600 text-white' : 'border-rose-200 bg-white/95 text-rose-700'}`}
+                >
+                  <Trash2 className="size-4 shrink-0" />
+                  <span className="text-xs font-bold">{isZh ? '拖曳至此刪除' : 'Drop to delete'}</span>
+                </div>
+              )}
             </div>
             <div className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2">
               <Mouse className="size-4 shrink-0 text-slate-500" />
-              <span className="min-w-0 flex-1 text-xs text-slate-600">{anchorPlacementKey ? (isZh ? `點擊插圖設定標記 ${anchorPlacementKey} 的錨點；完成後可拖曳錨點或編號，分別調整錨點與標記位置。` : `Click the illustration to set marker ${anchorPlacementKey}'s anchor, then drag the anchor or number to reposition them.`) : (isZh ? '滾動滑鼠滾輪縮放；拖曳插圖調整位置；點擊插圖新增標記；拖曳錨點或編號可分別移動錨點與標記。' : 'Scroll to zoom; drag the illustration to pan; click it to add a marker; drag an anchor or number to move the anchor or marker independently.')}</span>
+              <span className="min-w-0 flex-1 text-xs text-slate-600">{isZh ? '滾動滑鼠滾輪縮放；拖曳插圖調整位置；點擊插圖新增標記；拖曳錨點或編號可分別移動錨點與標記。' : 'Scroll to zoom; drag the illustration to pan; click it to add a marker; drag an anchor or number to move the anchor or marker independently.'}</span>
               <span className="shrink-0 text-xs tabular-nums text-slate-500">{Math.round(value.zoom * 100)}%</span>
               <button
                 type="button"
@@ -776,21 +809,6 @@ export function SpeciesAnatomyEditor({ value, inatId, taxaId, disabled = false, 
                   className="inline-flex size-8 items-center justify-center rounded-lg border border-rose-200 text-rose-600 hover:bg-rose-50 disabled:opacity-50"
                 >
                   <Trash2 className="size-3.5" />
-                </button>
-              </div>
-              <div className="mb-3 flex flex-wrap items-center gap-2">
-                <span className="text-[11px] text-slate-500">{isZh ? '錨點' : 'Anchor'}: {marker.anchorX ?? marker.x}%, {marker.anchorY ?? marker.y}%</span>
-                <button
-                  type="button"
-                  disabled={disabled || !value.photoUrl || !imageUrlAllowed || imageError}
-                  aria-pressed={anchorPlacementKey === marker.key}
-                  onClick={() => {
-                    setActiveKey(marker.key);
-                    setAnchorPlacementKey(anchorPlacementKey === marker.key ? null : marker.key);
-                  }}
-                  className={`rounded-md border px-2 py-1 text-[11px] font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${anchorPlacementKey === marker.key ? 'border-emerald-500 bg-emerald-100 text-emerald-900' : 'border-slate-200 text-slate-600 hover:border-emerald-300 hover:bg-emerald-50'}`}
-                >
-                  {anchorPlacementKey === marker.key ? (isZh ? '取消設定' : 'Cancel anchor') : (isZh ? '設定錨點' : 'Set anchor')}
                 </button>
               </div>
               <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
