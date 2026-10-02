@@ -2,6 +2,8 @@ export interface AnatomyMarker {
   key: string;
   x: number;
   y: number;
+  anchorX?: number;
+  anchorY?: number;
   placement: string;
   zh: string;
   en: string;

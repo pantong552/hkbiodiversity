@@ -19,6 +19,8 @@ test('validates marker coordinates and unique keys', () => {
   };
   assert.equal(isValidAnatomyIllustration(valid), true);
   assert.equal(isValidAnatomyIllustration({ ...valid, markers: [{ ...valid.markers[0], x: 100.1 }] }), false);
+  assert.equal(isValidAnatomyIllustration({ ...valid, markers: [{ ...valid.markers[0], anchorX: -0.1, anchorY: 50 }] }), false);
+  assert.equal(isValidAnatomyIllustration({ ...valid, markers: [{ ...valid.markers[0], anchorX: 50 }] }), false);
   assert.equal(isValidAnatomyIllustration({ ...valid, markers: [valid.markers[0], valid.markers[0]] }), false);
   assert.equal(isValidAnatomyIllustration({ ...valid, zoom: 4.1 }), false);
   assert.equal(isValidAnatomyIllustration({ ...valid, photoLink: 'javascript:alert(1)' }), false);
@@ -47,8 +49,19 @@ test('maps bilingual descriptions and defaults missing translations', () => {
   assert.equal(databaseIllustration.title_en, 'Wing features');
   assert.equal('id' in anatomyIllustrationToLegacyColumns(illustration), false);
   assert.deepEqual(illustration.markers[0], {
-    key: '1', x: 25, y: 60, placement: 'top', zh: '翼', en: ''
+    key: '1', x: 25, y: 60, anchorX: 25, anchorY: 60, placement: 'top', zh: '翼', en: ''
   });
+  const anchoredIllustration = mapAnatomyIllustration({
+    markers: [{ key: 'wing', x: 75, y: 30, anchorX: 25, anchorY: 60 }]
+  });
+  assert.deepEqual(
+    [anchoredIllustration.markers[0].x, anchoredIllustration.markers[0].y, anchoredIllustration.markers[0].anchorX, anchoredIllustration.markers[0].anchorY],
+    [75, 30, 25, 60]
+  );
+  assert.deepEqual(
+    anatomyIllustrationToDatabase(anchoredIllustration).markers[0],
+    { key: '1', x: 75, y: 30, anchorX: 25, anchorY: 60, placement: 'top', zh: '', en: '' }
+  );
   assert.equal(illustration.zoom, 1);
 });
 

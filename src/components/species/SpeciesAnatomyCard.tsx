@@ -58,6 +58,8 @@ export function SpeciesAnatomyEditor({ value, inatId, taxaId, disabled = false, 
   const { frameRef, frameSize, imageSize, onImageLoad } = useFittedAnatomyImage(value.photoUrl);
   const imagePlaneRef = useRef<HTMLDivElement>(null);
   const draggingKeyRef = useRef<string | null>(null);
+  const draggingAnchorKeyRef = useRef<string | null>(null);
+  const [anchorPlacementKey, setAnchorPlacementKey] = useState<string | null>(null);
   const panStartRef = useRef<{ x: number; y: number; offsetX: number; offsetY: number; moved: boolean } | null>(null);
   const pointerStartedOnImageRef = useRef(false);
   const suppressImageClickRef = useRef(false);
@@ -201,13 +203,19 @@ export function SpeciesAnatomyEditor({ value, inatId, taxaId, disabled = false, 
   };
 
   const addMarker = (clientX?: number, clientY?: number) => {
-    const point = clientX !== undefined && clientY !== undefined && imagePlaneRef.current
-      ? getAnatomyCoordinates(clientX, clientY, imagePlaneRef.current.getBoundingClientRect())
+    const imageRect = imagePlaneRef.current?.getBoundingClientRect();
+    const point = clientX !== undefined && clientY !== undefined && imageRect
+      ? getAnatomyCoordinates(clientX, clientY, imageRect)
       : { x: 50, y: 50 };
+    const markerPosition = clientX !== undefined && clientY !== undefined && imageRect
+      ? getAnatomyCoordinates(clientX + 20, clientY - 20, imageRect)
+      : { x: Math.min(100, point.x + 3), y: Math.max(0, point.y - 3) };
     const marker: AnatomyMarker = {
       key: '',
-      x: point.x,
-      y: point.y,
+      x: markerPosition.x,
+      y: markerPosition.y,
+      anchorX: point.x,
+      anchorY: point.y,
       placement: 'top',
       zh: '',
       en: ''
@@ -225,13 +233,28 @@ export function SpeciesAnatomyEditor({ value, inatId, taxaId, disabled = false, 
       return;
     }
     if (disabled || !startedOnImage || !imagePlaneRef.current) return;
+    if (anchorPlacementKey) {
+      const imageRect = imagePlaneRef.current.getBoundingClientRect();
+      const point = getAnatomyCoordinates(event.clientX, event.clientY, imageRect);
+      const markerPosition = getAnatomyCoordinates(event.clientX + 20, event.clientY - 20, imageRect);
+      updateMarker(anchorPlacementKey, {
+        anchorX: point.x,
+        anchorY: point.y,
+        x: markerPosition.x,
+        y: markerPosition.y
+      });
+      setActiveKey(anchorPlacementKey);
+      setAnchorPlacementKey(null);
+      return;
+    }
     addMarker(event.clientX, event.clientY);
   };
 
   const handlePointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
     const target = event.target as HTMLElement;
-    if (disabled || !target.closest('[data-image-plane]') || target.closest('[data-anatomy-marker]')) return;
+    if (disabled || !target.closest('[data-image-plane]') || target.closest('[data-anatomy-marker], [data-anatomy-anchor]')) return;
     pointerStartedOnImageRef.current = true;
+    if (anchorPlacementKey) return;
     panStartRef.current = {
       x: event.clientX,
       y: event.clientY,
@@ -243,6 +266,13 @@ export function SpeciesAnatomyEditor({ value, inatId, taxaId, disabled = false, 
   };
 
   const handlePointerMove = (event: React.PointerEvent<HTMLDivElement>) => {
+    const anchorKey = draggingAnchorKeyRef.current;
+    if (anchorKey && imagePlaneRef.current) {
+      const point = getAnatomyCoordinates(event.clientX, event.clientY, imagePlaneRef.current.getBoundingClientRect());
+      updateMarker(anchorKey, { anchorX: point.x, anchorY: point.y });
+      return;
+    }
+
     const key = draggingKeyRef.current;
     if (key && imagePlaneRef.current) {
       updateMarker(key, getAnatomyCoordinates(event.clientX, event.clientY, imagePlaneRef.current.getBoundingClientRect()));
@@ -267,6 +297,7 @@ export function SpeciesAnatomyEditor({ value, inatId, taxaId, disabled = false, 
 
   const handlePointerUp = () => {
     draggingKeyRef.current = null;
+    draggingAnchorKeyRef.current = null;
     panStartRef.current = null;
   };
 
@@ -340,6 +371,7 @@ export function SpeciesAnatomyEditor({ value, inatId, taxaId, disabled = false, 
     const markers = normalizeAnatomyMarkers(value.markers.filter((marker) => marker.key !== key));
     onChange({ ...value, markers });
     setActiveKey(markers[Math.min(markerIndex, markers.length - 1)]?.key || null);
+    if (anchorPlacementKey === key) setAnchorPlacementKey(null);
   };
 
   const labelClass = 'mb-1 block text-[11px] font-bold text-slate-500';
@@ -599,6 +631,64 @@ export function SpeciesAnatomyEditor({ value, inatId, taxaId, disabled = false, 
                   onLoad={onImageLoad}
                   onError={() => setImageErrorUrl(value.photoUrl)}
                 />
+                {imageSize.width > 0 && (
+                  <svg
+                    aria-hidden="true"
+                    className="pointer-events-none absolute inset-0 size-full overflow-visible"
+                    viewBox="0 0 100 100"
+                    preserveAspectRatio="none"
+                  >
+                    {value.markers.map((marker) => (
+                      <g key={marker.key}>
+                        <line
+                          x1={marker.anchorX ?? marker.x}
+                          y1={marker.anchorY ?? marker.y}
+                          x2={marker.x}
+                          y2={marker.y}
+                          stroke="white"
+                          strokeWidth="0.55"
+                          strokeLinecap="round"
+                        />
+                        <line
+                          x1={marker.anchorX ?? marker.x}
+                          y1={marker.anchorY ?? marker.y}
+                          x2={marker.x}
+                          y2={marker.y}
+                          stroke="#047857"
+                          strokeWidth="0.25"
+                          strokeLinecap="round"
+                        />
+                      </g>
+                    ))}
+                  </svg>
+                )}
+                {imageSize.width > 0 && value.markers.map((marker) => (
+                  <button
+                    key={`anchor-${marker.key}`}
+                    type="button"
+                    data-anatomy-anchor
+                    disabled={disabled}
+                    aria-label={`${isZh ? '移動錨點' : 'Move anchor'} ${marker.key}`}
+                    onPointerDown={(event) => {
+                      if (disabled) return;
+                      event.preventDefault();
+                      event.stopPropagation();
+                      event.currentTarget.setPointerCapture(event.pointerId);
+                      draggingAnchorKeyRef.current = marker.key;
+                      setActiveKey(marker.key);
+                    }}
+                    onClick={(event) => event.stopPropagation()}
+                    style={{
+                      left: `${marker.anchorX ?? marker.x}%`,
+                      top: `${marker.anchorY ?? marker.y}%`,
+                      scale: 1 / value.zoom,
+                      touchAction: 'none'
+                    }}
+                    className="absolute z-20 grid size-5 -translate-x-1/2 -translate-y-1/2 cursor-grab place-items-center rounded-full active:cursor-grabbing disabled:cursor-default"
+                  >
+                    <span className="size-2 rounded-full border border-emerald-800 bg-white shadow-sm" />
+                  </button>
+                ))}
                 {imageSize.width > 0 && value.markers.map((marker) => (
                     <button
                       key={marker.key}
@@ -628,7 +718,7 @@ export function SpeciesAnatomyEditor({ value, inatId, taxaId, disabled = false, 
             </div>
             <div className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2">
               <Mouse className="size-4 shrink-0 text-slate-500" />
-              <span className="min-w-0 flex-1 text-xs text-slate-600">{isZh ? '游標移到相框內滾動滑鼠滾輪縮放；拖曳插圖調整位置，點擊圖片新增標記，拖曳編號移動標記。' : 'Hover over the frame and scroll to zoom; drag the image to pan, click to add a marker, or drag a number to move it.'}</span>
+              <span className="min-w-0 flex-1 text-xs text-slate-600">{anchorPlacementKey ? (isZh ? `點擊插圖設定標記 ${anchorPlacementKey} 的錨點；完成後可拖曳錨點或編號，分別調整錨點與標記位置。` : `Click the illustration to set marker ${anchorPlacementKey}'s anchor, then drag the anchor or number to reposition them.`) : (isZh ? '滾動滑鼠滾輪縮放；拖曳插圖調整位置；點擊插圖新增標記；拖曳錨點或編號可分別移動錨點與標記。' : 'Scroll to zoom; drag the illustration to pan; click it to add a marker; drag an anchor or number to move the anchor or marker independently.')}</span>
               <span className="shrink-0 text-xs tabular-nums text-slate-500">{Math.round(value.zoom * 100)}%</span>
               <button
                 type="button"
@@ -686,6 +776,21 @@ export function SpeciesAnatomyEditor({ value, inatId, taxaId, disabled = false, 
                   className="inline-flex size-8 items-center justify-center rounded-lg border border-rose-200 text-rose-600 hover:bg-rose-50 disabled:opacity-50"
                 >
                   <Trash2 className="size-3.5" />
+                </button>
+              </div>
+              <div className="mb-3 flex flex-wrap items-center gap-2">
+                <span className="text-[11px] text-slate-500">{isZh ? '錨點' : 'Anchor'}: {marker.anchorX ?? marker.x}%, {marker.anchorY ?? marker.y}%</span>
+                <button
+                  type="button"
+                  disabled={disabled || !value.photoUrl || !imageUrlAllowed || imageError}
+                  aria-pressed={anchorPlacementKey === marker.key}
+                  onClick={() => {
+                    setActiveKey(marker.key);
+                    setAnchorPlacementKey(anchorPlacementKey === marker.key ? null : marker.key);
+                  }}
+                  className={`rounded-md border px-2 py-1 text-[11px] font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${anchorPlacementKey === marker.key ? 'border-emerald-500 bg-emerald-100 text-emerald-900' : 'border-slate-200 text-slate-600 hover:border-emerald-300 hover:bg-emerald-50'}`}
+                >
+                  {anchorPlacementKey === marker.key ? (isZh ? '取消設定' : 'Cancel anchor') : (isZh ? '設定錨點' : 'Set anchor')}
                 </button>
               </div>
               <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
@@ -829,6 +934,51 @@ function AnatomyIllustrationDisplay({ illustration, isZh, title }: { illustratio
           }}
         >
           <img src={illustration.photoUrl} alt={isZh ? '物種特徵插圖' : 'Species anatomy illustration'} className={`block size-full select-none ${imageSize.width ? 'object-fill' : 'object-contain opacity-0'}`} onLoad={onImageLoad} onError={() => setImageError(true)} />
+          {imageSize.width > 0 && (
+            <svg
+              aria-hidden="true"
+              className="pointer-events-none absolute inset-0 size-full overflow-visible"
+              viewBox="0 0 100 100"
+              preserveAspectRatio="none"
+            >
+              {illustration.markers.map((marker) => (
+                <g key={marker.key}>
+                  <line
+                    x1={marker.anchorX ?? marker.x}
+                    y1={marker.anchorY ?? marker.y}
+                    x2={marker.x}
+                    y2={marker.y}
+                    stroke="white"
+                    strokeWidth="0.55"
+                    strokeLinecap="round"
+                  />
+                  <line
+                    x1={marker.anchorX ?? marker.x}
+                    y1={marker.anchorY ?? marker.y}
+                    x2={marker.x}
+                    y2={marker.y}
+                    stroke="#047857"
+                    strokeWidth="0.25"
+                    strokeLinecap="round"
+                  />
+                </g>
+              ))}
+            </svg>
+          )}
+          {imageSize.width > 0 && illustration.markers.map((marker) => (
+            <span
+              key={`anchor-${marker.key}`}
+              aria-hidden="true"
+              style={{
+                left: `${marker.anchorX ?? marker.x}%`,
+                top: `${marker.anchorY ?? marker.y}%`,
+                scale: 1 / illustration.zoom
+              }}
+              className="pointer-events-none absolute z-10 grid size-5 -translate-x-1/2 -translate-y-1/2 place-items-center rounded-full"
+            >
+              <span className="size-2 rounded-full border border-emerald-800 bg-white shadow-sm" />
+            </span>
+          ))}
           {imageSize.width > 0 && illustration.markers.map((marker) => {
             const selected = marker.key === hoveredKey || marker.key === activeKey;
             return (

@@ -41,6 +41,13 @@ export function isValidAnatomyIllustration(value: AnatomyIllustration): boolean 
     if (!marker || typeof marker.key !== 'string' || !marker.key.trim() || marker.key.length > 50 || keys.has(marker.key.trim())) return false;
     if (!Number.isFinite(marker.x) || !Number.isFinite(marker.y)) return false;
     if (marker.x < 0 || marker.x > 100 || marker.y < 0 || marker.y > 100) return false;
+    const hasAnchor = marker.anchorX !== undefined || marker.anchorY !== undefined;
+    if (hasAnchor && (
+      typeof marker.anchorX !== 'number' || !Number.isFinite(marker.anchorX) ||
+      typeof marker.anchorY !== 'number' || !Number.isFinite(marker.anchorY) ||
+      marker.anchorX < 0 || marker.anchorX > 100 ||
+      marker.anchorY < 0 || marker.anchorY > 100
+    )) return false;
     if (typeof marker.zh !== 'string' || typeof marker.en !== 'string') return false;
     keys.add(marker.key.trim());
     return true;
@@ -138,6 +145,8 @@ export function mapAnatomyIllustration(row: unknown, fallbackId = 'illustration-
         key: marker.key,
         x: Number(marker.x),
         y: Number(marker.y),
+        anchorX: marker.anchorX !== undefined && marker.anchorX !== null && Number.isFinite(Number(marker.anchorX)) ? Number(marker.anchorX) : Number(marker.x),
+        anchorY: marker.anchorY !== undefined && marker.anchorY !== null && Number.isFinite(Number(marker.anchorY)) ? Number(marker.anchorY) : Number(marker.y),
         placement: typeof marker.placement === 'string' ? marker.placement : 'top',
         zh: typeof marker.zh === 'string' ? marker.zh : '',
         en: typeof marker.en === 'string' ? marker.en : ''
