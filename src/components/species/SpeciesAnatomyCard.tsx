@@ -1124,7 +1124,7 @@ export default function SpeciesAnatomyCard({ tableName, speciesTaxaId, refreshKe
         <div className="flex size-8 shrink-0 items-center justify-center rounded-xl bg-emerald-50 sm:size-10 sm:rounded-2xl">
           <BookOpen className="size-4 text-emerald-500 sm:size-5" />
         </div>
-        <h2 className="truncate text-xl font-black text-slate-800 sm:text-2xl">{isZh ? '互動特徵圖鑑' : 'Interactive Anatomy'}</h2>
+        <h2 className="truncate text-xl font-black text-slate-800 sm:text-2xl">{isZh ? '圖鑑' : 'Field Guide'}</h2>
       </div>
 
       {loading ? (

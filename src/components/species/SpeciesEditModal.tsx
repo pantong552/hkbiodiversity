@@ -682,15 +682,15 @@ export default function SpeciesEditModal({
               onDirtyChange={(dirty) => setIsEditorDirty(dirty)}
               additionalTab={{
                 id: 'anatomy',
-                nameChi: '互動特徵圖鑑',
-                nameEng: 'Interactive anatomy',
+                nameChi: '圖鑑',
+                nameEng: 'Field Guide',
                 icon: <Sparkles className="w-4 h-4" />,
                 dirty: JSON.stringify(anatomyIllustrations) !== JSON.stringify(originalAnatomyIllustrations),
                 content: (
                   <div className="space-y-4">
                     <div className="flex items-center justify-between gap-3">
                       <div>
-                        <h4 className="text-base font-black text-slate-900">{language === 'zh' ? '互動特徵圖鑑' : 'Interactive Anatomy'}</h4>
+                        <h4 className="text-base font-black text-slate-900">{language === 'zh' ? '圖鑑' : 'Field Guide'}</h4>
                         <p className="mt-1 text-xs text-slate-500">{language === 'zh' ? '圖片及標記會與物種修訂一併保存。' : 'The image and markers are saved with this species revision.'}</p>
                       </div>
                       {loadingAnatomy && <Loader2 className="size-4 animate-spin text-emerald-600" />}
