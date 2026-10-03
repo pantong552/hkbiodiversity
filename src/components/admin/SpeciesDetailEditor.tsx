@@ -5,6 +5,7 @@ import { createClient } from '@/utils/supabase/client';
 import { useLanguage } from '@/context/LanguageContext';
 import { useTaxonomy } from '@/context/TaxonomyContext';
 import { useAuth } from '@/context/AuthContext';
+import Image from 'next/image';
 import { 
   Save, 
   RotateCcw, 
@@ -22,10 +23,319 @@ import {
   ChevronDown,
   Check,
   Sparkles,
-  Info
+  Info,
+  ImageIcon,
+  GripVertical
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { formatScientificName, parseAliases, renderFormattedText } from '@/utils/formatters';
+import { formatScientificName, getSpeciesImageVariantUrl, parseAliases, renderFormattedText } from '@/utils/formatters';
+import { useInaturalistSpeciesPhotos, type InatGalleryPhoto } from '@/hooks/useInaturalistSpeciesPhotos';
+import type { SpeciesGalleryPhotoMetadata } from '@/types/species';
+
+interface SpeciesGalleryPickerProps {
+  value: string[];
+  credits: Record<string, string>;
+  metadata: Record<string, SpeciesGalleryPhotoMetadata>;
+  photos: InatGalleryPhoto[];
+  taxaId: string;
+  supabase: any;
+  isLoading: boolean;
+  hasMore: boolean;
+  dataScope: 'hongkong' | 'global';
+  hasHkPhotos: boolean;
+  hasInatId: boolean;
+  onLoadMore: () => void;
+  onScopeChange: (scope: 'hongkong' | 'global') => void;
+  onChange: (images: string[], credits: Record<string, string>, metadata: Record<string, SpeciesGalleryPhotoMetadata>) => void;
+  language: string;
+}
+
+function getGalleryPhotoKey(url: string) {
+  try {
+    const parsedUrl = new URL(url, 'https://gallery.invalid');
+    const sourceUrl = parsedUrl.searchParams.get('url') || url;
+    const photoId = sourceUrl.match(/\/photos\/(\d+)\//)?.[1];
+    return photoId ? `inat:${photoId}` : sourceUrl;
+  } catch {
+    return url;
+  }
+}
+
+function SpeciesGalleryPicker({ value, credits, metadata, photos, taxaId, supabase, isLoading, hasMore, dataScope, hasHkPhotos, hasInatId, onLoadMore, onScopeChange, onChange, language }: SpeciesGalleryPickerProps) {
+  const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
+  const [communityCredits, setCommunityCredits] = useState<Record<string, string>>({});
+  const [communityMetadata, setCommunityMetadata] = useState<Record<string, InatGalleryPhoto>>({});
+
+  const getPhotoUrls = (photo: InatGalleryPhoto) => [photo.large_url, photo.medium_url, photo.original_url, photo.url];
+  const isPhotoSelected = (photo: InatGalleryPhoto) => {
+    const photoKeys = new Set(getPhotoUrls(photo).map(getGalleryPhotoKey));
+    return value.some(url => photoKeys.has(getGalleryPhotoKey(url)));
+  };
+  const getPhoto = (url: string) => photos.find(photo =>
+    getPhotoUrls(photo).some(photoUrl => getGalleryPhotoKey(photoUrl) === getGalleryPhotoKey(url))
+  );
+
+  useEffect(() => {
+    let isActive = true;
+
+    async function loadCommunityCredits() {
+      if (!taxaId) return;
+
+      const { data, error } = await supabase
+        .from('species_community_photos')
+        .select('id, image_url, author_name, license, created_at, user_id')
+        .eq('taxa_id', taxaId);
+
+      if (!isActive || error || !data) return;
+
+      const nextCredits: Record<string, string> = {};
+      const nextMetadata: Record<string, InatGalleryPhoto> = {};
+      data.forEach((photo: { id: string; image_url: string; author_name: string; license: string; created_at: string; user_id: string }) => {
+        const attribution = `© ${photo.author_name} (${photo.license})`;
+        const imageUrl = photo.image_url.includes('res.cloudinary.com')
+          ? photo.image_url.replace('/upload/', '/upload/f_auto,q_auto/')
+          : photo.image_url;
+        nextCredits[getGalleryPhotoKey(photo.image_url)] = attribution;
+        nextCredits[getGalleryPhotoKey(imageUrl)] = attribution;
+        const communityPhoto: InatGalleryPhoto = {
+          id: photo.id,
+          url: imageUrl,
+          small_url: imageUrl.includes('res.cloudinary.com') ? imageUrl.replace('/upload/f_auto,q_auto/', '/upload/f_auto,q_auto,w_400,c_limit/') : imageUrl,
+          medium_url: imageUrl.includes('res.cloudinary.com') ? imageUrl.replace('/upload/f_auto,q_auto/', '/upload/f_auto,q_auto,w_800,c_limit/') : imageUrl,
+          large_url: imageUrl,
+          original_url: imageUrl,
+          attribution,
+          licenseCode: photo.license,
+          nativePageUrl: null,
+          observationUrl: null,
+          observedOn: photo.created_at,
+          isCommunityPhoto: true,
+          uploaderUserId: photo.user_id
+        };
+        nextMetadata[getGalleryPhotoKey(photo.image_url)] = communityPhoto;
+        nextMetadata[getGalleryPhotoKey(imageUrl)] = communityPhoto;
+      });
+      setCommunityCredits(nextCredits);
+      setCommunityMetadata(nextMetadata);
+    }
+
+    loadCommunityCredits();
+    return () => {
+      isActive = false;
+    };
+  }, [taxaId, supabase]);
+
+  const togglePhoto = (photo: InatGalleryPhoto) => {
+    const photoKeys = new Set(getPhotoUrls(photo).map(getGalleryPhotoKey));
+    const isSelected = value.some(url => photoKeys.has(getGalleryPhotoKey(url)));
+    if (isSelected) {
+      const nextValue = value.filter(url => !photoKeys.has(getGalleryPhotoKey(url)));
+      const nextCredits = Object.fromEntries(Object.entries(credits).filter(([url]) => nextValue.includes(url)));
+      const nextMetadata = Object.fromEntries(Object.entries(metadata).filter(([url]) => nextValue.includes(url)));
+      onChange(nextValue, nextCredits, nextMetadata);
+      return;
+    }
+    if (value.length >= 10) return;
+    const url = photo.large_url || photo.original_url || photo.url;
+    if (url && !value.includes(url)) {
+      onChange([...value, url], { ...credits, [url]: photo.attribution }, { ...metadata, [url]: photo });
+    }
+  };
+
+  const handleDrop = (targetIndex: number) => {
+    if (draggedIndex === null || draggedIndex === targetIndex) return;
+    const nextValue = [...value];
+    const [draggedImage] = nextValue.splice(draggedIndex, 1);
+    nextValue.splice(targetIndex, 0, draggedImage);
+    onChange(nextValue, credits, metadata);
+  };
+
+  const movePhoto = (index: number, offset: number) => {
+    const nextIndex = index + offset;
+    if (nextIndex < 0 || nextIndex >= value.length) return;
+    const nextValue = [...value];
+    [nextValue[index], nextValue[nextIndex]] = [nextValue[nextIndex], nextValue[index]];
+    onChange(nextValue, credits, metadata);
+  };
+
+  const selectedPhotos: InatGalleryPhoto[] = value.map((url, index) => {
+    const key = getGalleryPhotoKey(url);
+    const photo = getPhoto(url);
+    const savedPhoto = metadata[url] || communityMetadata[key];
+    const attribution = photo?.attribution || savedPhoto?.attribution || credits[url] || communityCredits[key] || '';
+    const fallbackPhoto = savedPhoto || {
+      id: `selected-${index}-${getGalleryPhotoKey(url)}`,
+      url,
+      small_url: getSpeciesImageVariantUrl(url, 'small'),
+      medium_url: getSpeciesImageVariantUrl(url, 'medium'),
+      large_url: url,
+      original_url: url,
+      attribution,
+      licenseCode: null,
+      nativePageUrl: null,
+      observationUrl: null,
+      observedOn: null
+    };
+    return photo ? {
+      ...fallbackPhoto,
+      ...photo,
+      attribution,
+      observedOn: photo.observedOn || fallbackPhoto.observedOn,
+      observationUrl: photo.observationUrl || fallbackPhoto.observationUrl,
+      nativePageUrl: photo.nativePageUrl || fallbackPhoto.nativePageUrl
+    } : { ...fallbackPhoto, attribution };
+  });
+  const availablePhotos = [
+    ...selectedPhotos,
+    ...photos.filter(photo => !selectedPhotos.some(selectedPhoto =>
+      getPhotoUrls(selectedPhoto).some(url => getPhotoUrls(photo).some(photoUrl => getGalleryPhotoKey(url) === getGalleryPhotoKey(photoUrl)))
+    ))
+  ];
+
+  return (
+    <div className="flex flex-col gap-5 rounded-2xl border border-slate-100 bg-slate-50/40 p-4">
+      <div>
+        <div className="mb-2 flex items-center justify-between gap-2">
+          <span className="text-[10px] font-black uppercase tracking-wider text-slate-400">
+            {language === 'zh' ? '已選圖片' : 'Selected images'} ({value.length}/10)
+          </span>
+          <span className="text-[10px] font-semibold text-emerald-700">
+            {language === 'zh' ? '第一張會作為封面' : 'First image is the profile picture'}
+          </span>
+        </div>
+        {value.length === 0 ? (
+          <div className="rounded-xl border border-dashed border-slate-200 bg-white/60 py-6 text-center text-xs font-semibold text-slate-400">
+            {language === 'zh' ? '尚未選擇圖片' : 'No images selected'}
+          </div>
+        ) : (
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
+            {value.map((url, index) => {
+              const photo = getPhoto(url) || metadata[url] || communityMetadata[getGalleryPhotoKey(url)];
+              const credit = photo?.attribution || credits[url] || communityCredits[getGalleryPhotoKey(url)];
+              return (
+                <div
+                  key={`${url}-${index}`}
+                  draggable
+                  onDragStart={(event) => {
+                    setDraggedIndex(index);
+                    event.dataTransfer.effectAllowed = 'move';
+                  }}
+                  onDragOver={(event) => {
+                    event.preventDefault();
+                    event.dataTransfer.dropEffect = 'move';
+                  }}
+                  onDrop={(event) => {
+                    event.preventDefault();
+                    handleDrop(index);
+                    setDraggedIndex(null);
+                  }}
+                  onDragEnd={() => setDraggedIndex(null)}
+                  className={`overflow-hidden rounded-xl border border-emerald-100 bg-white shadow-sm ${draggedIndex === index ? 'opacity-40' : ''} cursor-grab active:cursor-grabbing`}
+                >
+                  <div className="relative aspect-square bg-slate-100">
+                    <Image src={photo?.small_url || url} alt="" fill unoptimized className="object-cover" sizes="160px" />
+                    {index === 0 && (
+                      <span className="absolute left-1.5 top-1.5 rounded-md bg-emerald-700 px-1.5 py-1 text-[9px] font-black text-white">
+                        {language === 'zh' ? '封面' : 'COVER'}
+                      </span>
+                    )}
+                  </div>
+                  <div className="space-y-1 border-t border-slate-100 px-2 py-1.5 text-[9px] leading-snug">
+                    <div className="flex gap-1">
+                      <span className="shrink-0 font-bold text-slate-400">Credit</span>
+                      <span className="min-w-0 truncate text-slate-600" title={photo?.attribution || ''}>
+                        {credit || (language === 'zh' ? '未提供' : 'Not provided')}
+                      </span>
+                    </div>
+                  </div>
+                  <div className="flex items-center justify-between gap-1 p-1.5">
+                    <span className="flex min-w-0 items-center gap-1 truncate text-[10px] font-bold text-slate-500">
+                      <GripVertical className="h-3.5 w-3.5 shrink-0 text-slate-400" />
+                      {index + 1}
+                    </span>
+                    <div className="flex shrink-0 items-center gap-0.5">
+                      <button type="button" onClick={() => movePhoto(index, -1)} disabled={index === 0} title={language === 'zh' ? '向前' : 'Move earlier'} className="rounded p-1 text-slate-500 hover:bg-slate-100 disabled:opacity-30">
+                        <ChevronDown className="h-3.5 w-3.5 rotate-180" />
+                      </button>
+                      <button type="button" onClick={() => movePhoto(index, 1)} disabled={index === value.length - 1} title={language === 'zh' ? '向後' : 'Move later'} className="rounded p-1 text-slate-500 hover:bg-slate-100 disabled:opacity-30">
+                        <ChevronDown className="h-3.5 w-3.5" />
+                      </button>
+                      <button type="button" onClick={() => {
+                        const nextValue = value.filter((_, selectedIndex) => selectedIndex !== index);
+                        const nextCredits = Object.fromEntries(Object.entries(credits).filter(([creditUrl]) => nextValue.includes(creditUrl)));
+                        const nextMetadata = Object.fromEntries(Object.entries(metadata).filter(([metadataUrl]) => nextValue.includes(metadataUrl)));
+                        onChange(nextValue, nextCredits, nextMetadata);
+                      }} title={language === 'zh' ? '移除' : 'Remove'} className="rounded p-1 text-slate-400 hover:bg-red-50 hover:text-red-500">
+                        <X className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      <div>
+        <div className="mb-2 flex items-center justify-between">
+          <span className="text-[10px] font-black uppercase tracking-wider text-slate-400">
+            {language === 'zh' ? '可加入的物種照片' : 'Available species photos'}
+          </span>
+          <div className="flex items-center gap-2">
+            {value.length >= 10 && <span className="text-[10px] font-bold text-amber-600">{language === 'zh' ? '已達上限' : 'Limit reached'}</span>}
+            {hasInatId && (
+              <div className="inline-flex rounded-lg border border-slate-200 bg-white p-0.5" role="group" aria-label={language === 'zh' ? '照片範圍' : 'Photo scope'}>
+                <button
+                  type="button"
+                  onClick={() => onScopeChange('hongkong')}
+                  disabled={isLoading || (!hasHkPhotos && dataScope === 'global')}
+                  aria-pressed={dataScope === 'hongkong'}
+                  className={`rounded-md px-2.5 py-1 text-[10px] font-bold transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${dataScope === 'hongkong' ? 'bg-emerald-600 text-white' : 'text-slate-500 hover:bg-slate-50'}`}
+                >
+                  {language === 'zh' ? '本地' : 'Local'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onScopeChange('global')}
+                  disabled={isLoading || dataScope === 'global'}
+                  aria-pressed={dataScope === 'global'}
+                  className={`rounded-md px-2.5 py-1 text-[10px] font-bold transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${dataScope === 'global' ? 'bg-blue-600 text-white' : 'text-slate-500 hover:bg-slate-50'}`}
+                >
+                  Global
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+        {photos.length === 0 && !isLoading ? (
+          <div className="rounded-xl border border-dashed border-slate-200 bg-white/60 py-6 text-center text-xs font-semibold text-slate-400">
+            {language === 'zh' ? '目前沒有可選照片' : 'No photos available'}
+          </div>
+        ) : (
+          <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 lg:grid-cols-6">
+            {availablePhotos.map(photo => {
+              const selected = isPhotoSelected(photo);
+              return (
+                <button key={photo.id} type="button" onClick={() => togglePhoto(photo)} disabled={!selected && value.length >= 10} title={selected ? (language === 'zh' ? '點擊移除' : 'Click to remove') : (language === 'zh' ? '加入圖庫' : 'Add to gallery')} className={`relative aspect-square overflow-hidden rounded-xl bg-slate-100 ring-offset-2 transition hover:ring-2 hover:ring-emerald-500 disabled:cursor-not-allowed ${!selected && value.length >= 10 ? 'opacity-45' : ''}`}>
+                  <Image src={photo.small_url || photo.url} alt="" fill unoptimized className="object-cover" sizes="120px" />
+                  {selected && <span className="absolute inset-0 flex items-center justify-center bg-slate-900/30"><Check className="h-6 w-6 text-white" /></span>}
+                  {!selected && <span className="absolute bottom-1 right-1 rounded-md bg-white/90 p-1 text-emerald-700"><Plus className="h-3.5 w-3.5" /></span>}
+                </button>
+              );
+            })}
+          </div>
+        )}
+        {(hasMore || isLoading) && (
+          <button type="button" onClick={onLoadMore} disabled={isLoading} className="mt-3 flex w-full items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white py-2 text-xs font-bold text-slate-600 hover:bg-slate-50 disabled:opacity-50">
+            {isLoading && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+            {isLoading ? (language === 'zh' ? '載入中...' : 'Loading...') : (language === 'zh' ? '載入更多照片' : 'Load more photos')}
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
 
 interface SimilarSpeciesPickerProps {
   value: string;
@@ -1380,6 +1690,7 @@ export default function SpeciesDetailEditor({ table, data, originalData, publish
   const { profile } = useAuth();
   const { getTaxonomyChi } = useTaxonomy();
   const supabase = useMemo(() => createClient(), []);
+  const { photos: galleryPhotos, isLoading: isLoadingGalleryPhotos, hasMore: hasMoreGalleryPhotos, loadMore: loadMoreGalleryPhotos, dataScope: galleryPhotoScope, setScope: setGalleryPhotoScope, hasHkPhotos: hasHkGalleryPhotos } = useInaturalistSpeciesPhotos(data?.inat_id, data?.taxa_id);
   
   const [formValues, setFormValues] = useState<any>({});
   const [originalValues, setOriginalValues] = useState<any>({});
@@ -1432,9 +1743,12 @@ export default function SpeciesDetailEditor({ table, data, originalData, publish
     }
 
     const otherLabelMap: Record<string, { labelChi: string; labelEng: string }> = {
-      profile_picture: { labelChi: '頭像圖片路徑', labelEng: 'Profile Picture' },
       similar_species: { labelChi: '相似物種 (taxa_id清單)', labelEng: 'Similar Species (taxa_ids)' }
     };
+
+    ignoredKeys.push('profile_picture');
+    ignoredKeys.push('gallery_image_credits');
+    ignoredKeys.push('gallery_image_metadata');
 
     const otherFields = Object.keys(data)
       .filter(key => !definedKeys.has(key) && !ignoredKeys.includes(key))
@@ -1450,10 +1764,19 @@ export default function SpeciesDetailEditor({ table, data, originalData, publish
         } as FieldConfig;
       });
 
-    let groups = [...baseGroups];
+    const groups = [...baseGroups];
+    const descriptionsIndex = groups.findIndex((group) => group.id === 'descriptions');
+    groups.splice(descriptionsIndex + 1, 0, {
+      id: 'gallery',
+      nameChi: '圖庫',
+      nameEng: 'Gallery',
+      icon: <ImageIcon className="w-4 h-4" />,
+      fields: [
+        { key: 'gallery_images', labelChi: '優先顯示圖片', labelEng: 'Priority images', type: 'text' }
+      ]
+    });
     if (additionalTab) {
-      const descriptionsIndex = groups.findIndex((group) => group.id === 'descriptions');
-      groups.splice(descriptionsIndex + 1, 0, {
+      groups.splice(descriptionsIndex + 2, 0, {
         id: additionalTab.id,
         nameChi: additionalTab.nameChi,
         nameEng: additionalTab.nameEng,
@@ -1501,6 +1824,16 @@ export default function SpeciesDetailEditor({ table, data, originalData, publish
       finalVal = val === '' ? null : Number(val);
     }
     setFormValues((prev: any) => ({ ...prev, [key]: finalVal }));
+  };
+
+  const handleGalleryImagesChange = (images: string[], credits: Record<string, string>, metadata: Record<string, SpeciesGalleryPhotoMetadata>) => {
+    setFormValues((prev: any) => ({
+      ...prev,
+      gallery_images: images,
+      gallery_image_credits: credits,
+      gallery_image_metadata: metadata,
+      profile_picture: images[0] || null
+    }));
   };
 
   // 6. 恢復原狀
@@ -1625,6 +1958,9 @@ export default function SpeciesDetailEditor({ table, data, originalData, publish
 
   const currentGroup = finalGroups.find(g => g.id === activeTab) || finalGroups[0];
   const commonName = language === 'zh' ? data.common_name_chi : data.common_name_eng;
+  const selectedGalleryImages = Array.isArray(formValues.gallery_images)
+    ? formValues.gallery_images.filter((image: unknown): image is string => typeof image === 'string' && image.trim() !== '').slice(0, 10)
+    : (formValues.profile_picture ? [String(formValues.profile_picture)] : []);
 
   // 通用欄位異動檢查：
   // 優先與正本發布數據 (publishedOriginal) 比對，確保草稿修改欄位 100% 亮起 Highlight。
@@ -1774,7 +2110,7 @@ export default function SpeciesDetailEditor({ table, data, originalData, publish
               const label = language === 'zh' ? field.labelChi : field.labelEng;
               const isFieldDirty = checkIsDirty(field.key);
               const isBilingualField = field.key.endsWith('_chi') || field.key.endsWith('_eng');
-              const useFullWidth = (isTextarea && !isBilingualField) || field.key === 'similar_species' || field.key === 'reference_codes';
+              const useFullWidth = (isTextarea && !isBilingualField) || field.key === 'similar_species' || field.key === 'reference_codes' || field.key === 'gallery_images';
 
               return (
                 <div 
@@ -1850,6 +2186,24 @@ export default function SpeciesDetailEditor({ table, data, originalData, publish
                         </svg>
                       </div>
                     </div>
+                  ) : field.key === 'gallery_images' ? (
+                    <SpeciesGalleryPicker
+                      value={selectedGalleryImages}
+                      credits={formValues.gallery_image_credits || {}}
+                      metadata={formValues.gallery_image_metadata || {}}
+                      photos={galleryPhotos}
+                      taxaId={data.taxa_id}
+                      supabase={supabase}
+                      isLoading={isLoadingGalleryPhotos}
+                      hasMore={hasMoreGalleryPhotos}
+                      dataScope={galleryPhotoScope}
+                      hasHkPhotos={hasHkGalleryPhotos}
+                      hasInatId={!!data?.inat_id}
+                      onLoadMore={loadMoreGalleryPhotos}
+                      onScopeChange={setGalleryPhotoScope}
+                      onChange={handleGalleryImagesChange}
+                      language={language}
+                    />
                   ) : field.key === 'similar_species' ? (
                     <SimilarSpeciesPicker
                       value={String(val)}

@@ -19,14 +19,9 @@ import {
   Calendar,
   ExternalLink,
   Loader2,
-  Star,
-  CheckCircle2,
-  AlertCircle,
   Trash2
 } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
-import { useSpeciesPanel } from '@/context/SpeciesPanelContext';
-import { supabase } from '@/lib/supabase';
 import { useLanguage } from '@/context/LanguageContext';
 import Image from 'next/image';
 import { InatGalleryPhoto } from '@/hooks/useInaturalistSpeciesPhotos';
@@ -42,8 +37,6 @@ interface EnrichedLightboxProps {
   commonName?: string;
   scientificName?: string;
   taxaId?: string;
-  currentProfilePicture?: string;
-  onProfilePictureUpdate?: (newUrl: string) => void;
   onDeletePhoto?: (photoId: string | number) => Promise<void>;
 }
 
@@ -56,15 +49,10 @@ export default function EnrichedLightbox({
   commonName,
   scientificName,
   taxaId,
-  currentProfilePicture,
-  onProfilePictureUpdate,
   onDeletePhoto
 }: EnrichedLightboxProps) {
   const { profile } = useAuth();
   const { t, language } = useLanguage();
-  const { updateProfilePicture } = useSpeciesPanel();
-  const [isUpdatingProfile, setIsUpdatingProfile] = useState(false);
-  const [updateStatus, setUpdateStatus] = useState<'idle' | 'success' | 'error'>('idle');
   const [isDeleting, setIsDeleting] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [scale, setScale] = useState(1);
@@ -123,29 +111,6 @@ export default function EnrichedLightbox({
       onNavigate(0); // 循環
     }
   }, [currentIndex, onNavigate, photos.length]);
-
-  // 判斷當前照片是否為封面
-  const getInatIdFromUrl = useCallback((url: string | undefined | null) => {
-    if (!url) return null;
-    try {
-      const decoded = decodeURIComponent(url);
-      const match = decoded.match(/\/photos\/(\d+)\//);
-      return match ? match[1] : decoded;
-    } catch (e) {
-      const match = url.match(/\/photos\/(\d+)\//);
-      return match ? match[1] : url;
-    }
-  }, []);
-
-  const isCurrentPhotoProfile = useMemo(() => {
-    if (!currentProfilePicture || !currentPhoto?.large_url) return false;
-    if (currentPhoto.large_url.includes('inaturalist') || currentProfilePicture.includes('inaturalist')) {
-      const currentId = getInatIdFromUrl(currentPhoto.large_url);
-      const profileId = getInatIdFromUrl(currentProfilePicture);
-      return currentId !== null && currentId === profileId;
-    }
-    return currentProfilePicture === currentPhoto.large_url;
-  }, [currentProfilePicture, currentPhoto?.large_url, getInatIdFromUrl]);
 
   // Keep the image point under the zoom origin stationary while scaling.
   const applyZoom = useCallback((nextScale: number, originX = 0, originY = 0) => {
@@ -250,65 +215,6 @@ export default function EnrichedLightbox({
     } else {
       document.exitFullscreen();
       setIsFullscreen(false);
-    }
-  };
-
-  // 處理指定封面圖
-  const handleSetProfilePicture = async () => {
-    if (!profile || !taxaId || !currentPhoto?.large_url) return;
-    if (profile.role !== 'admin' && profile.role !== 'curator') return;
-
-    setIsUpdatingProfile(true);
-    setUpdateStatus('idle');
-
-    try {
-      const isFauna = taxaId.startsWith('fauna_');
-      const table = isFauna ? 'species' : 'plant_species';
-      
-      // 邏輯：移除代理路徑並轉換為 square 版本
-      let imageUrl = currentPhoto.large_url;
-      if (imageUrl.includes('/api/image/transform')) {
-        const urlParams = new URLSearchParams(imageUrl.split('?')[1]);
-        imageUrl = urlParams.get('url') || imageUrl;
-      }
-      
-      // 如果是 iNaturalist 圖片，轉換為 medium
-      if (imageUrl.includes('inaturalist')) {
-        imageUrl = imageUrl.replace(/\/(square|large|medium|small|original)\./, '/medium.');
-      }
-
-      // 如果點擊的照片已經是封面圖，則取消設定（設為 null）
-      let isAlreadyProfile = false;
-      if (imageUrl.includes('inaturalist') || (currentProfilePicture && currentProfilePicture.includes('inaturalist'))) {
-          const currentId = getInatIdFromUrl(imageUrl);
-          const profileId = getInatIdFromUrl(currentProfilePicture);
-          isAlreadyProfile = (currentId !== null && currentId === profileId);
-      } else {
-          isAlreadyProfile = currentProfilePicture === imageUrl;
-      }
-      
-      const finalUpdateValue = isAlreadyProfile ? null : imageUrl;
-
-      const { error } = await supabase
-        .from(table)
-        .update({ profile_picture: finalUpdateValue })
-        .eq('taxa_id', taxaId);
-
-      if (error) throw error;
-
-      setUpdateStatus('success');
-      const finalUrl = finalUpdateValue || '';
-      onProfilePictureUpdate?.(finalUrl);
-      updateProfilePicture(taxaId, finalUpdateValue);
-      
-      // 3秒後恢復圖示
-      setTimeout(() => setUpdateStatus('idle'), 3000);
-    } catch (err) {
-      console.error('Error updating profile picture:', err);
-      setUpdateStatus('error');
-      setTimeout(() => setUpdateStatus('idle'), 3000);
-    } finally {
-      setIsUpdatingProfile(false);
     }
   };
 
@@ -479,30 +385,6 @@ export default function EnrichedLightbox({
               </button>
             )}
 
-            {/* 指定封面按鈕 (Admin/Curator only) */}
-            {(profile?.role === 'admin' || profile?.role === 'curator') && taxaId && (
-              <button 
-                onClick={handleSetProfilePicture}
-                disabled={isUpdatingProfile}
-                className={`p-2.5 rounded-full transition-all relative group/star ${
-                  updateStatus === 'success' ? 'bg-emerald-500 text-white' : 
-                  updateStatus === 'error' ? 'bg-red-500 text-white' :
-                  isCurrentPhotoProfile ? 'bg-amber-400 text-slate-900 border border-amber-500' : 'text-white/70 hover:bg-white/10 hover:text-white'
-                }`}
-                title={isCurrentPhotoProfile ? t('gallery.current_profile') : t('gallery.set_profile_picture')}
-              >
-                {isUpdatingProfile ? (
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                ) : updateStatus === 'success' ? (
-                  <CheckCircle2 className="w-4 h-4" />
-                ) : updateStatus === 'error' ? (
-                  <AlertCircle className="w-4 h-4" />
-                ) : (
-                  <Star className={`w-4 h-4 ${isCurrentPhotoProfile ? 'fill-current' : ''}`} />
-                )}
-              </button>
-            )}
-
             <div className="hidden md:block">
               <button onClick={toggleFullscreen} className="p-2.5 text-white/70 hover:bg-white/10 hover:text-white rounded-full transition-all" title="Toggle Fullscreen">{isFullscreen ? <Minimize className="w-4 h-4" /> : <Maximize className="w-4 h-4" />}</button>
             </div>
@@ -628,24 +510,6 @@ export default function EnrichedLightbox({
              </div>
            </div>
 
-           {/* 浮動提示 Toast (成功/失敗) */}
-           <AnimatePresence>
-             {updateStatus !== 'idle' && (
-               <motion.div
-                 initial={{ opacity: 0, y: 20 }}
-                 animate={{ opacity: 1, y: 0 }}
-                 exit={{ opacity: 0, y: 20 }}
-                 className={`fixed bottom-24 md:bottom-32 px-6 py-3 rounded-2xl shadow-2xl backdrop-blur-xl border flex items-center gap-3 z-[150] ${
-                   updateStatus === 'success' ? 'bg-emerald-500/20 border-emerald-500/30 text-emerald-400' : 'bg-red-500/20 border-red-500/30 text-red-400'
-                 }`}
-               >
-                 {updateStatus === 'success' ? <CheckCircle2 className="w-5 h-5" /> : <AlertCircle className="w-5 h-5" />}
-                 <span className="text-sm font-bold tracking-wide">
-                   {updateStatus === 'success' ? t('gallery.set_profile_success') : t('gallery.set_profile_error')}
-                 </span>
-               </motion.div>
-             )}
-           </AnimatePresence>
         </motion.div>
 
         {/* 底部縮圖進度條 (可選，這裡用簡單的小點表示) */}

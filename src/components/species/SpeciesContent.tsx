@@ -221,14 +221,8 @@ export default function SpeciesContent({ species, showBreadcrumb = true, refresh
   };
 
 
-  const [currentProfilePic, setCurrentProfilePic] = React.useState(species.profile_picture);
   const [refsList, setRefsList] = React.useState<any[]>([]);
   const [refsLoading, setRefsLoading] = React.useState(false);
-
-  // 當傳入的 species 改變時重置狀態
-  React.useEffect(() => {
-    setCurrentProfilePic(species.profile_picture);
-  }, [species.taxa_id, species.profile_picture]);
 
   // 載入關聯的參考文獻
   React.useEffect(() => {
@@ -382,8 +376,9 @@ export default function SpeciesContent({ species, showBreadcrumb = true, refresh
                 inatId={species.inat_id || ''} 
                 commonName={commonName} 
                 scientificName={species.scientific_name}
-                profilePicture={currentProfilePic}
-                onProfilePictureUpdate={setCurrentProfilePic}
+                galleryImages={species.gallery_images || []}
+                galleryImageCredits={species.gallery_image_credits || {}}
+                galleryImageMetadata={species.gallery_image_metadata || {}}
               />
             </section>
 

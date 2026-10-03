@@ -14,19 +14,18 @@ import {
   ExternalLink,
   Calendar,
   Star,
-  CheckCircle2,
-  AlertCircle,
   Trash2
 } from 'lucide-react';
 import { useInaturalistSpeciesPhotos, InatGalleryPhoto } from '@/hooks/useInaturalistSpeciesPhotos';
 import { useLanguage } from '@/context/LanguageContext';
 import { useSpeciesPanel } from '@/context/SpeciesPanelContext';
 import { useAuth } from '@/context/AuthContext';
-import { supabase } from '@/lib/supabase';
+import type { SpeciesGalleryPhotoMetadata } from '@/types/species';
 import EnrichedLightbox from '../ui/EnrichedLightbox';
 import PhotoUploadModal from './PhotoUploadModal';
 import DeleteConfirmModal from '../ui/DeleteConfirmModal';
 import { Upload } from 'lucide-react';
+import { getSpeciesImageVariantUrl } from '@/utils/formatters';
 
 
 interface SpeciesPhotoGalleryProps {
@@ -34,8 +33,21 @@ interface SpeciesPhotoGalleryProps {
   inatId: number | string; // iNaturalist ID
   commonName?: string;
   scientificName?: string;
-  profilePicture?: string;
-  onProfilePictureUpdate?: (newUrl: string) => void;
+  galleryImages?: string[];
+  galleryImageCredits?: Record<string, string>;
+  galleryImageMetadata?: Record<string, SpeciesGalleryPhotoMetadata>;
+}
+
+function getGalleryPhotoKey(url: string) {
+  try {
+    const parsedUrl = new URL(url, 'https://gallery.invalid');
+    const sourceUrl = parsedUrl.searchParams.get('url') || url;
+    const decodedUrl = decodeURIComponent(sourceUrl);
+    const photoId = decodedUrl.match(/\/photos\/(\d+)\//)?.[1];
+    return photoId ? `inat:${photoId}` : decodedUrl;
+  } catch {
+    return url;
+  }
 }
 
 export default function SpeciesPhotoGallery({ 
@@ -43,16 +55,15 @@ export default function SpeciesPhotoGallery({
   inatId, 
   commonName,
   scientificName,
-  profilePicture,
-  onProfilePictureUpdate
+  galleryImages = [],
+  galleryImageCredits = {},
+  galleryImageMetadata = {}
 }: SpeciesPhotoGalleryProps) {
   const { language, t } = useLanguage();
   const { profile } = useAuth();
-  const { setGalleryOpen, isUploadModalOpen, setUploadModalOpen, updateProfilePicture } = useSpeciesPanel();
+  const { setGalleryOpen, isUploadModalOpen, setUploadModalOpen } = useSpeciesPanel();
   const { photos: fetchedPhotos, isLoading, hasMore, loadMore, dataScope, setScope, hasHkPhotos, deletePhoto } = useInaturalistSpeciesPhotos(inatId, taxaId);
   
-  const [isUpdatingProfile, setIsUpdatingProfile] = useState(false);
-  const [updateStatus, setUpdateStatus] = useState<'idle' | 'success' | 'error'>('idle');
   const [isDeletingPhoto, setIsDeletingPhoto] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
 
@@ -67,6 +78,60 @@ export default function SpeciesPhotoGallery({
   const [showTooltip, setShowTooltip] = useState(false);
   const thumbRef = useRef<HTMLDivElement>(null);
   const loadMoreSentinelRef = useRef<HTMLButtonElement>(null);
+
+  const priorityPhotos = useMemo(() => galleryImages
+    .filter((url): url is string => typeof url === 'string' && url.trim() !== '')
+    .slice(0, 10)
+    .map((url, index) => {
+      const fetchedPhoto = fetchedPhotos.find(photo =>
+        [photo.large_url, photo.medium_url, photo.original_url, photo.url].some(photoUrl => getGalleryPhotoKey(photoUrl) === getGalleryPhotoKey(url))
+      );
+      const savedPhoto = galleryImageMetadata[url] || Object.entries(galleryImageMetadata)
+        .find(([savedUrl]) => getGalleryPhotoKey(savedUrl) === getGalleryPhotoKey(url))?.[1];
+      const savedCredit = galleryImageCredits[url] || Object.entries(galleryImageCredits)
+        .find(([savedUrl]) => getGalleryPhotoKey(savedUrl) === getGalleryPhotoKey(url))?.[1];
+      const fallbackPhoto = savedPhoto || {
+        id: `curated-${index}-${url}`,
+        url,
+        small_url: getSpeciesImageVariantUrl(url, 'small'),
+        medium_url: getSpeciesImageVariantUrl(url, 'medium'),
+        large_url: url,
+        original_url: url,
+        attribution: savedCredit || '',
+        licenseCode: null,
+        nativePageUrl: null,
+        observationUrl: null,
+        observedOn: null
+      };
+
+      return fetchedPhoto ? {
+        ...fallbackPhoto,
+        ...fetchedPhoto,
+        attribution: fetchedPhoto.attribution || fallbackPhoto.attribution,
+        observedOn: fetchedPhoto.observedOn || fallbackPhoto.observedOn,
+        observationUrl: fetchedPhoto.observationUrl || fallbackPhoto.observationUrl,
+        nativePageUrl: fetchedPhoto.nativePageUrl || fallbackPhoto.nativePageUrl
+      } : fallbackPhoto;
+    }), [galleryImages, galleryImageCredits, galleryImageMetadata, fetchedPhotos]);
+
+  const curatedPhotoKeys = useMemo(() => new Set(priorityPhotos.flatMap(photo => [
+    photo.url,
+    photo.small_url,
+    photo.medium_url,
+    photo.large_url,
+    photo.original_url
+  ].map(getGalleryPhotoKey))), [priorityPhotos]);
+
+  const orderedPhotos = useMemo(() => [
+    ...priorityPhotos,
+    ...fetchedPhotos.filter(photo => ![
+      photo.url,
+      photo.small_url,
+      photo.medium_url,
+      photo.large_url,
+      photo.original_url
+    ].some(url => curatedPhotoKeys.has(getGalleryPhotoKey(url))))
+  ], [priorityPhotos, fetchedPhotos, curatedPhotoKeys]);
 
   // 3. 橫向滾動無限加載 (Intersection Observer + Scroll Boundary Listener)
   useEffect(() => {
@@ -104,15 +169,13 @@ export default function SpeciesPhotoGallery({
 
   useEffect(() => {
     if (isLoading && fetchedPhotos.length === 0) {
-      setPhotos([]);
+      setPhotos(priorityPhotos);
       setCurrentIndex(0);
       return;
     }
 
-    if (fetchedPhotos.length > 0) {
-      setPhotos(fetchedPhotos);
-    }
-  }, [fetchedPhotos, isLoading]);
+    setPhotos(orderedPhotos);
+  }, [fetchedPhotos, isLoading, orderedPhotos, priorityPhotos]);
 
   const [isMobile, setIsMobile] = useState(false);
   useEffect(() => {
@@ -199,33 +262,6 @@ export default function SpeciesPhotoGallery({
 
   const currentPhoto = photos[currentIndex];
 
-  // 判斷當前照片是否為封面
-  const getInatIdFromUrl = useCallback((url: string | undefined | null) => {
-    if (!url) return null;
-    try {
-      const decoded = decodeURIComponent(url);
-      const match = decoded.match(/\/photos\/(\d+)\//);
-      return match ? match[1] : decoded;
-    } catch (e) {
-      const match = url.match(/\/photos\/(\d+)\//);
-      return match ? match[1] : url;
-    }
-  }, []);
-
-  const isCurrentPhotoProfile = useMemo(() => {
-    if (!profilePicture || !currentPhoto?.large_url) return false;
-    
-    // 如果是 iNaturalist 圖片，比對 ID
-    if (currentPhoto.large_url.includes('inaturalist') || profilePicture.includes('inaturalist')) {
-      const currentId = getInatIdFromUrl(currentPhoto.large_url);
-      const profileId = getInatIdFromUrl(profilePicture);
-      return currentId !== null && currentId === profileId;
-    }
-    
-    // 非 iNaturalist 圖片則比對完整網址
-    return profilePicture === currentPhoto.large_url;
-  }, [profilePicture, currentPhoto?.large_url, getInatIdFromUrl]);
-
   const handleNext = () => {
     if (currentIndex < photos.length - 1) {
       setCurrentIndex(prev => prev + 1);
@@ -235,66 +271,6 @@ export default function SpeciesPhotoGallery({
   const handlePrev = () => {
     if (currentIndex > 0) {
       setCurrentIndex(prev => prev - 1);
-    }
-  };
-
-  const handleSetProfilePicture = async (e: React.MouseEvent) => {
-    e.stopPropagation();
-    if (!profile || !taxaId || !currentPhoto?.large_url) return;
-    if (profile.role !== 'admin' && profile.role !== 'curator') return;
-
-    setIsUpdatingProfile(true);
-    setUpdateStatus('idle');
-
-    try {
-      const isFauna = taxaId.startsWith('fauna_');
-      const table = isFauna ? 'species' : 'plant_species';
-      
-      // 邏輯：移除代理路徑並轉換為 medium 版本
-      let imageUrl = currentPhoto.large_url;
-      if (imageUrl.includes('/api/image/transform')) {
-        const urlParams = new URLSearchParams(imageUrl.split('?')[1]);
-        imageUrl = urlParams.get('url') || imageUrl;
-      }
-
-      // 如果是 iNaturalist 圖片，轉換為 medium
-      if (imageUrl.includes('inaturalist')) {
-        imageUrl = imageUrl.replace(/\/(square|large|medium|small|original)\./, '/medium.');
-      }
-
-      // 如果點擊的照片已經是封面圖，則取消設定（設為 null）
-      // 使用與 isCurrentPhotoProfile 相同的邏輯
-      let isAlreadyProfile = false;
-      if (imageUrl.includes('inaturalist') || (profilePicture && profilePicture.includes('inaturalist'))) {
-          const currentId = getInatIdFromUrl(imageUrl);
-          const profileId = getInatIdFromUrl(profilePicture);
-          isAlreadyProfile = (currentId !== null && currentId === profileId);
-      } else {
-          isAlreadyProfile = profilePicture === imageUrl;
-      }
-
-      const finalUpdateValue = isAlreadyProfile ? null : imageUrl;
-
-      const { error } = await supabase
-        .from(table)
-        .update({ profile_picture: finalUpdateValue })
-        .eq('taxa_id', taxaId);
-
-      if (error) throw error;
-
-      setUpdateStatus('success');
-      // 觸發更新
-      const finalUrl = finalUpdateValue || '';
-      onProfilePictureUpdate?.(finalUrl);
-      updateProfilePicture(taxaId, finalUpdateValue);
-      
-      setTimeout(() => setUpdateStatus('idle'), 3000);
-    } catch (err) {
-      console.error('Error updating profile picture:', err);
-      setUpdateStatus('error');
-      setTimeout(() => setUpdateStatus('idle'), 3000);
-    } finally {
-      setIsUpdatingProfile(false);
     }
   };
 
@@ -558,33 +534,6 @@ export default function SpeciesPhotoGallery({
                 </button>
               )}
 
-              {/* 指定封面按鈕 (Admin/Curator only) */}
-              {(profile?.role === 'admin' || profile?.role === 'curator') && (
-                <button 
-                  onClick={handleSetProfilePicture}
-                  disabled={isUpdatingProfile}
-                  className={`flex items-center gap-2.5 px-4 h-[34px] leading-none backdrop-blur-md border rounded-xl transition-all group/star shadow-lg ${
-                    updateStatus === 'success' ? 'bg-emerald-500 border-emerald-400 text-white' : 
-                    updateStatus === 'error' ? 'bg-red-500 border-red-400 text-white' :
-                    isCurrentPhotoProfile ? 'bg-amber-400 border-amber-500 text-slate-900 font-bold shadow-amber-500/20' : 'bg-black/40 border-white/10 text-white/70 hover:bg-black/60 hover:text-white'
-                  }`}
-                >
-                  {isUpdatingProfile ? (
-                    <Loader2 className="w-3.5 h-3.5 animate-spin shrink-0" />
-                  ) : updateStatus === 'success' ? (
-                    <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
-                  ) : updateStatus === 'error' ? (
-                    <AlertCircle className="w-3.5 h-3.5 shrink-0" />
-                  ) : (
-                    <Star className={`w-3.5 h-3.5 shrink-0 ${isCurrentPhotoProfile ? 'fill-current' : ''}`} />
-                  )}
-                  <span className="text-[11px] font-black uppercase tracking-wider hidden sm:inline leading-none">
-                    {updateStatus === 'success' ? t('gallery.set_profile_success') : 
-                     isCurrentPhotoProfile ? t('gallery.current_profile') : t('gallery.set_profile_picture')}
-                  </span>
-                </button>
-              )}
-
               <span className="px-3 py-1.5 bg-black/40 backdrop-blur-md border border-white/10 rounded-xl text-white text-[9px] sm:text-[10px] font-black tracking-widest">
                 {currentIndex + 1} / {photos.length}
               </span>
@@ -630,22 +579,34 @@ export default function SpeciesPhotoGallery({
               onMouseLeave={handleMouseUp}
               className={`flex gap-4 overflow-x-auto pb-4 pt-4 no-scrollbar scroll-smooth px-3 items-center cursor-grab active:cursor-grabbing ${isDragging ? 'select-none' : ''}`}
             >
-              {photos.map((photo, index) => (
-                <button
-                  key={photo.id || `photo-idx-${index}`}
-                  onClick={() => !isDragging && setCurrentIndex(index)}
-                  className={`relative flex-shrink-0 w-24 aspect-square rounded-2xl overflow-hidden transition-all duration-300 ${index === currentIndex ? 'ring-4 ring-emerald-500 ring-offset-4 ring-offset-slate-50 scale-105 shadow-xl' : 'opacity-60 hover:opacity-100'}`}
-                >
-                  <Image
-                    src={photo.small_url || photo.url}
-                    alt="Thumb"
-                    fill
-                    unoptimized={(photo.small_url || photo.url)?.includes('/api/image/transform')}
-                    className="object-cover pointer-events-none"
-                    sizes="96px"
-                  />
-                </button>
-              ))}
+              {photos.map((photo, index) => {
+                const isSelected = galleryImages.some(url =>
+                  [photo.large_url, photo.medium_url, photo.original_url, photo.url]
+                    .some(photoUrl => getGalleryPhotoKey(photoUrl) === getGalleryPhotoKey(url))
+                );
+                return (
+                  <button
+                    key={photo.id || `photo-idx-${index}`}
+                    onClick={() => !isDragging && setCurrentIndex(index)}
+                    title={isSelected ? (language === 'zh' ? '已選圖片' : 'Selected photo') : undefined}
+                    className={`relative flex-shrink-0 w-24 aspect-square rounded-2xl overflow-hidden transition-all duration-300 ${index === currentIndex ? 'ring-4 ring-emerald-500 ring-offset-4 ring-offset-slate-50 scale-105 shadow-xl' : 'opacity-60 hover:opacity-100'}`}
+                  >
+                    <Image
+                      src={photo.small_url || photo.url}
+                      alt="Thumb"
+                      fill
+                      unoptimized={(photo.small_url || photo.url)?.includes('/api/image/transform')}
+                      className="object-cover pointer-events-none"
+                      sizes="96px"
+                    />
+                    {isSelected && (
+                      <span className="absolute right-1.5 top-1.5 text-amber-300/80 drop-shadow-sm">
+                        <Star className="h-3 w-3 fill-current" strokeWidth={1.75} />
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
   
               {hasMore && (
                 <button
@@ -686,10 +647,6 @@ export default function SpeciesPhotoGallery({
         commonName={commonName}
         scientificName={scientificName}
         taxaId={taxaId}
-        currentProfilePicture={profilePicture}
-        onProfilePictureUpdate={(newUrl) => {
-          onProfilePictureUpdate?.(newUrl);
-        }}
         onDeletePhoto={async (photoId) => {
           await deletePhoto(photoId);
         }}

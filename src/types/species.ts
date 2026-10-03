@@ -1,3 +1,19 @@
+export interface SpeciesGalleryPhotoMetadata {
+  id: string | number;
+  url: string;
+  small_url: string;
+  medium_url: string;
+  large_url: string;
+  original_url: string;
+  attribution: string;
+  licenseCode: string | null;
+  nativePageUrl: string | null;
+  observationUrl: string | null;
+  observedOn: string | null;
+  isCommunityPhoto?: boolean;
+  uploaderUserId?: string;
+}
+
 export interface Species {
   id: number;
   taxa_id?: string;
@@ -60,6 +76,9 @@ export interface Species {
   references_eng?: string;
   references_chi?: string;
   profile_picture?: string;
+  gallery_images?: string[];
+  gallery_image_credits?: Record<string, string>;
+  gallery_image_metadata?: Record<string, SpeciesGalleryPhotoMetadata>;
   introduction_chi?: string;
   introduction_eng?: string;
   microhabitat_chi?: string;

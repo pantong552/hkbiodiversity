@@ -1,5 +1,36 @@
 import React from 'react';
 
+export function getSpeciesImageVariantUrl(url: string | undefined | null, size: 'small' | 'medium' | 'large') {
+  if (!url) return '';
+
+  try {
+    const parsedUrl = new URL(url, 'https://gallery.invalid');
+    const sourceUrl = parsedUrl.searchParams.get('url');
+
+    if (sourceUrl) {
+      const source = new URL(sourceUrl);
+      source.pathname = source.pathname.replace(/\/(square|small|medium|large|original)\.(?=[^/]+$)/, `/${size}.`);
+      parsedUrl.searchParams.set('url', source.toString());
+      parsedUrl.searchParams.set('size', size);
+      return url.startsWith('/') ? `${parsedUrl.pathname}${parsedUrl.search}` : parsedUrl.toString();
+    }
+
+    if (parsedUrl.hostname.includes('inaturalist')) {
+      parsedUrl.pathname = parsedUrl.pathname.replace(/\/(square|small|medium|large|original)\.(?=[^/]+$)/, `/${size}.`);
+      return parsedUrl.toString();
+    }
+
+    if (parsedUrl.hostname.includes('res.cloudinary.com') && size === 'small') {
+      parsedUrl.pathname = parsedUrl.pathname.replace('/upload/', '/upload/w_400,c_limit/');
+      return parsedUrl.toString();
+    }
+  } catch {
+    return url;
+  }
+
+  return url;
+}
+
 /**
  * 格式化生物學名，確保學名部分根據需要斜體/粗體，而作者、年份、縮寫保持正體/常規。
  * @param scientificName 原始學名字符串

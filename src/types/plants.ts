@@ -39,6 +39,9 @@ export interface PlantSpecies {
   created_at: string;
   updated_at: string;
   profile_picture?: string;
+  gallery_images?: string[];
+  gallery_image_credits?: Record<string, string>;
+  gallery_image_metadata?: Record<string, import('./species').SpeciesGalleryPhotoMetadata>;
 }
 
 export interface PlantFilterState {
