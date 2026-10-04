@@ -346,7 +346,7 @@ export default function SimilarSpeciesExplorer({ species }: SimilarSpeciesExplor
   if (!isLoading && similarSpecies.length === 0) return null;
 
   return (
-    <div className="bg-white p-8 rounded-[2.5rem] shadow-sm border border-slate-100 w-full mb-12">
+    <div className="rounded-[2rem] sm:rounded-[2.5rem] shadow-sm bg-white p-8 border border-slate-100 w-full mb-12">
       {/* Tablet & Desktop Title (md以上) */}
       <div className="hidden md:flex items-center justify-between mb-8">
         <h2 className="text-2xl font-black text-slate-800 flex items-center gap-3">

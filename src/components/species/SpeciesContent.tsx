@@ -365,12 +365,12 @@ export default function SpeciesContent({ species, showBreadcrumb = true, refresh
             
 
             {/* Taxonomy Section - Always Card Style now */}
-            <section className="bg-white p-5 sm:p-8 rounded-[2rem] sm:rounded-[2.5rem] shadow-sm border border-slate-100">
+            <section className="rounded-[2rem] sm:rounded-[2.5rem] shadow-sm bg-white p-5 sm:p-8 border border-slate-100">
               <TaxonomyDisplay species={species} />
             </section>
 
             {/* iNaturalist Photo Gallery */}
-            <section className="bg-white p-8 rounded-[2.5rem] shadow-sm border border-slate-100">
+            <section className="rounded-[2rem] sm:rounded-[2.5rem] shadow-sm bg-white p-8 border border-slate-100">
               <SpeciesPhotoGallery 
                 taxaId={species.taxa_id || ''}
                 inatId={species.inat_id || ''} 
@@ -387,7 +387,7 @@ export default function SpeciesContent({ species, showBreadcrumb = true, refresh
 
             {/* Description, Introduction, Habitat, Microhabitat, Host Plants */}
             {(introduction || description || habitat || microhabitat || hostPlants) && (
-              <section className="bg-white p-6 sm:p-8 rounded-[2.5rem] shadow-sm border border-slate-100 divide-y divide-slate-50">
+              <section className="rounded-[2rem] sm:rounded-[2.5rem] shadow-sm bg-white p-6 sm:p-8 border border-slate-100 divide-y divide-slate-50">
                 {introduction && (
                   <div className="py-8 first:pt-0 last:pb-0">
                     <h2 className="text-xl sm:text-2xl font-black text-slate-800 mb-6 flex items-center gap-2 sm:gap-3">
@@ -462,7 +462,7 @@ export default function SpeciesContent({ species, showBreadcrumb = true, refresh
 
             {/* Remarks */}
             {remarks && (
-              <section className="bg-emerald-50/50 p-8 rounded-[2.5rem] border border-emerald-100/50">
+              <section className="rounded-[2rem] sm:rounded-[2.5rem] shadow-sm bg-emerald-50/50 p-8 border border-emerald-100/50">
                 <h2 className="text-xl font-bold text-emerald-900 mb-4">
                   {language === 'zh' ? '備註' : 'Remarks'}
                 </h2>
@@ -491,7 +491,7 @@ export default function SpeciesContent({ species, showBreadcrumb = true, refresh
                   iucn={species.iucn}
                 />
               ) : (
-                <div className="w-full h-[300px] bg-slate-200 rounded-[2.5rem] flex items-center justify-center text-slate-500">
+                <div className="rounded-[2rem] sm:rounded-[2.5rem] shadow-sm w-full h-[300px] bg-slate-200 flex items-center justify-center text-slate-500">
                   <p>{language === 'zh' ? '無 iNaturalist ID' : 'No iNaturalist ID available'}</p>
                 </div>
               )}
@@ -502,11 +502,11 @@ export default function SpeciesContent({ species, showBreadcrumb = true, refresh
               )}
 
               <div className="grid md:grid-cols-2 gap-6">
-                <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-100">
+                <div className="rounded-[2rem] sm:rounded-[2.5rem] shadow-sm bg-white p-6 border border-slate-100">
                   <h3 className="font-black text-slate-800 mb-2">{language === 'zh' ? '香港分布' : 'HK Distribution'}</h3>
                   <p className="text-slate-600 text-sm">{hkDist || '-'}</p>
                 </div>
-                <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-100">
+                <div className="rounded-[2rem] sm:rounded-[2.5rem] shadow-sm bg-white p-6 border border-slate-100">
                   <h3 className="font-black text-slate-800 mb-2">{language === 'zh' ? '全球分布' : 'Global Distribution'}</h3>
                   <p className="text-slate-600 text-sm">{globalDist || '-'}</p>
                 </div>
@@ -541,7 +541,7 @@ export default function SpeciesContent({ species, showBreadcrumb = true, refresh
 
             {/* References */}
             {species.reference_codes && (
-              <section className="bg-slate-900 text-slate-300 p-8 rounded-[2.5rem]">
+              <section className="rounded-[2rem] sm:rounded-[2.5rem] shadow-sm bg-slate-900 text-slate-300 p-8">
                 <h2 className="text-xl font-bold text-white mb-6 flex items-center gap-3">
                   <ExternalLink className="w-5 h-5 text-emerald-400" />
                   {language === 'zh' ? '參考文獻' : 'References'}

@@ -466,7 +466,7 @@ export function ObservationChart({
     : 0;
 
   return (
-    <section className="relative overflow-hidden rounded-[2.5rem] border border-slate-200/90 bg-white shadow-sm transition-all hover:shadow-md">
+    <section className="rounded-[2rem] sm:rounded-[2.5rem] shadow-sm relative overflow-hidden border border-slate-200/90 bg-white">
       {/* Top Banner & Header */}
       <div className="border-b border-slate-100 bg-gradient-to-r from-slate-50/80 via-white to-emerald-50/30 p-5 sm:p-6">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -1637,7 +1637,7 @@ export default function SpeciesMap({ taxonId, scientificName, chineseName, taxaG
   };
 
   return (
-    <div ref={containerRef} id="map-container" className="relative w-full h-[420px] sm:h-[550px] rounded-[2.5rem] overflow-hidden bg-slate-100 border border-slate-200 shadow-inner group">
+    <div ref={containerRef} id="map-container" className="rounded-[2rem] sm:rounded-[2.5rem] shadow-sm relative w-full h-[420px] sm:h-[550px] overflow-hidden bg-slate-100 border border-slate-200 group">
       <style jsx global>{`
         .maplibregl-ctrl-top-right { margin-top: 12px; margin-right: 12px; }
         .maplibregl-ctrl-bottom-right { margin-bottom: 12px; margin-right: 12px; }

@@ -461,7 +461,7 @@ export default function CongenericExplorer({ species, isMobile = false }: Congen
   }] : [];
 
   return (
-    <div className={`p-6 rounded-[2.5rem] bg-white border border-slate-100 shadow-sm ${isMobile ? 'mt-6 mb-8' : ''}`}>
+    <div className={`rounded-[2rem] sm:rounded-[2.5rem] shadow-sm p-6 bg-white border border-slate-100 ${isMobile ? 'mt-6 mb-8' : ''}`}>
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center gap-3">
           <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl sm:rounded-2xl bg-emerald-50 border border-emerald-100/50 flex items-center justify-center text-emerald-600 shrink-0 shadow-xs">

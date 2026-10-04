@@ -106,7 +106,7 @@ export default function ConservationStatus({ species }: ConservationStatusProps)
   }
 
   return (
-    <div className="bg-white p-5 sm:p-8 rounded-[2rem] sm:rounded-[2.5rem] shadow-sm border border-slate-100 w-full mb-6 sm:mb-12">
+    <div className="rounded-[2rem] sm:rounded-[2.5rem] shadow-sm bg-white p-5 sm:p-8 border border-slate-100 w-full mb-6 sm:mb-12">
       <h2 className="text-xl sm:text-2xl font-black text-slate-800 mb-4 sm:mb-8 flex items-center gap-2 sm:gap-3">
         <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl sm:rounded-2xl bg-emerald-50 border border-emerald-100/50 flex items-center justify-center text-emerald-600 shrink-0 shadow-xs">
           <Shield className="w-4 h-4 sm:w-5 sm:h-5 text-emerald-600" />

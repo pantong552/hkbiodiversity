@@ -190,7 +190,7 @@ export default function GbifGlobalMap({ scientificName }: GbifGlobalMapProps) {
   }, [scientificName]);
 
   return (
-    <div id="gbif-map-container" className="relative w-full h-[550px] rounded-[2.5rem] overflow-hidden bg-slate-100 border border-slate-200 shadow-inner group">
+    <div id="gbif-map-container" className="rounded-[2rem] sm:rounded-[2.5rem] shadow-sm relative w-full h-[550px] overflow-hidden bg-slate-100 border border-slate-200 group">
       <style jsx global>{`
         .maplibregl-ctrl-top-right { margin-top: 12px; margin-right: 12px; }
         .maplibregl-ctrl-bottom-right { margin-bottom: 12px; margin-right: 12px; }

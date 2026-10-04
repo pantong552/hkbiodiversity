@@ -1392,9 +1392,9 @@ function AnatomyIllustrationDisplay({ illustration, isZh, title }: { illustratio
                 key={marker.key}
                 onMouseEnter={() => setHoveredKey(marker.key)}
                 onMouseLeave={() => setHoveredKey(null)}
-                className={`relative rounded-lg border px-3 pb-3 pt-4 transition-colors ${isHighlighted ? 'border-emerald-400 bg-emerald-50 ring-2 ring-emerald-200' : 'border-slate-200 bg-white'}`}
+                className={`rounded-lg border px-3 pb-3 pt-3 transition-colors ${isHighlighted ? 'border-emerald-400 bg-emerald-50' : 'border-slate-200 bg-white'}`}
               >
-                <span className={`absolute -top-2 left-3 px-1.5 text-[10px] font-bold leading-4 ${isHighlighted ? 'bg-emerald-50 text-emerald-800' : 'bg-white text-slate-500'}`}>No. {marker.key}</span>
+                <span className={`mb-1.5 block w-fit text-[10px] font-bold leading-4 ${isHighlighted ? 'text-emerald-800' : 'text-slate-500'}`}>No. {marker.key}</span>
                 <p className={`whitespace-pre-wrap text-sm leading-relaxed ${isHighlighted ? 'text-slate-900' : 'text-slate-700'}`}>{isZh ? marker.zh : marker.en}</p>
               </article>
             );
@@ -1462,7 +1462,7 @@ export default function SpeciesAnatomyCard({ tableName, speciesTaxaId, refreshKe
   };
 
   return (
-    <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-7">
+    <section className="rounded-[2rem] sm:rounded-[2.5rem] shadow-sm border border-slate-200 bg-white p-5 sm:p-7">
       <div className="mb-5 flex items-center gap-2 sm:gap-3">
         <div className="flex size-8 shrink-0 items-center justify-center rounded-xl bg-emerald-50 sm:size-10 sm:rounded-2xl">
           <BookOpen className="size-4 text-emerald-500 sm:size-5" />

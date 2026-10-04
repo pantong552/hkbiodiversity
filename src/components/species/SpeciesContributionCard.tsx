@@ -81,7 +81,7 @@ export default function SpeciesContributionCard({ speciesId, refreshTrigger = 0 
   };
 
   return (
-    <section className="bg-gradient-to-br from-white via-slate-50/50 to-emerald-50/30 rounded-[2.5rem] p-6 md:p-8 border border-emerald-100/80 shadow-sm relative overflow-hidden my-8">
+    <section className="rounded-[2rem] sm:rounded-[2.5rem] shadow-sm bg-gradient-to-br from-white via-slate-50/50 to-emerald-50/30 p-6 md:p-8 border border-emerald-100/80 relative overflow-hidden my-8">
       {/* Background Decorative Sparkles */}
       <div className="absolute top-0 right-0 p-8 text-emerald-500/5 pointer-events-none">
         <Award className="w-36 h-36" />

@@ -229,7 +229,7 @@ export default function BirdSoundCard({ scientificName, commonName }: BirdSoundC
   };
 
   return (
-    <section className="bg-white p-6 sm:p-8 rounded-[2.5rem] shadow-sm border border-slate-100 space-y-6">
+    <section className="rounded-[2rem] sm:rounded-[2.5rem] shadow-sm bg-white p-6 sm:p-8 border border-slate-100 space-y-6">
       {/* Header (無下劃分隔線與數字 Badge) */}
       <div>
         <div className="flex items-center gap-3">
