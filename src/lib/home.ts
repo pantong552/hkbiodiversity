@@ -74,6 +74,7 @@ async function fetchLeaderboard(): Promise<LeaderboardUser[]> {
   const { data: photoStats } = await supabase
     .from('species_community_photos')
     .select('user_id, profiles:user_id(username, avatar_url)')
+    .eq('media_type', 'photo')
     .order('created_at', { ascending: false })
     .limit(200);
 
@@ -214,4 +215,3 @@ export async function getNewsById(id: string) {
 
   return data;
 }
-

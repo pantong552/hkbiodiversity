@@ -121,7 +121,8 @@ function SpeciesGalleryPicker({ value, credits, metadata, photos, taxaId, supaba
       const { data, error } = await supabase
         .from('species_community_photos')
         .select('id, image_url, author_name, license, created_at, user_id')
-        .eq('taxa_id', taxaId);
+        .eq('taxa_id', taxaId)
+        .eq('media_type', 'photo');
 
       if (!isActive) return;
       if (error || !data) {
@@ -288,6 +289,7 @@ function SpeciesGalleryPicker({ value, credits, metadata, photos, taxaId, supaba
           image_url: cloudData.secure_url,
           author_name: uploadAuthor.trim(),
           license: uploadLicense,
+          media_type: 'photo',
           user_id: user.id,
           cloudinary_public_id: cloudData.public_id
         });

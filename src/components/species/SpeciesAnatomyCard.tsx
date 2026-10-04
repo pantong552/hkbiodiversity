@@ -71,23 +71,43 @@ export function SpeciesAnatomyEditor({ value, inatId, taxaId, disabled = false, 
   const [imageErrorUrl, setImageErrorUrl] = useState<string | null>(null);
   const [photoPagination, setPhotoPagination] = useState({ taxonKey: '', page: 0 });
   const [uploadedPhotos, setUploadedPhotos] = useState<InatGalleryPhoto[]>([]);
+  const [illustrationData, setIllustrationData] = useState<{
+    taxaId: string;
+    photos: InatGalleryPhoto[];
+    error: string | null;
+  }>({ taxaId: '', photos: [], error: null });
   const [uploadAuthor, setUploadAuthor] = useState('');
   const [uploadLicense, setUploadLicense] = useState('CC BY');
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
+  const [illustrationAuthor, setIllustrationAuthor] = useState('');
+  const [illustrationLicense, setIllustrationLicense] = useState('CC BY');
+  const [uploadingIllustration, setUploadingIllustration] = useState(false);
   const [deletingPhotoId, setDeletingPhotoId] = useState<string | number | null>(null);
   const [licenseDropdownOpen, setLicenseDropdownOpen] = useState(false);
+  const [illustrationLicenseDropdownOpen, setIllustrationLicenseDropdownOpen] = useState(false);
   const [uploadMessage, setUploadMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [illustrationUploadMessage, setIllustrationUploadMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const uploadInputRef = useRef<HTMLInputElement>(null);
+  const illustrationInputRef = useRef<HTMLInputElement>(null);
   const licenseDropdownRef = useRef<HTMLDivElement>(null);
   const licenseTriggerRef = useRef<HTMLButtonElement>(null);
   const licenseOptionRefs = useRef<(HTMLButtonElement | null)[]>([]);
+  const illustrationLicenseDropdownRef = useRef<HTMLDivElement>(null);
+  const illustrationLicenseTriggerRef = useRef<HTMLButtonElement>(null);
+  const illustrationLicenseOptionRefs = useRef<(HTMLButtonElement | null)[]>([]);
+  const photoLicenseOptionsId = React.useId();
+  const illustrationLicenseOptionsId = React.useId();
   const isZh = language === 'zh';
   const imageUrlAllowed = isAllowedAnatomyImageUrl(value.photoUrl);
   const imageError = imageErrorUrl === value.photoUrl;
   const taxonKey = `${inatId || ''}:${taxaId || ''}`;
+  const illustrationTaxaId = String(taxaId || inatId || '');
   const photoPage = photoPagination.taxonKey === taxonKey ? photoPagination.page : 0;
   const inaturalistPhotos = photos.filter((photo) => !photo.isCommunityPhoto);
   const communityPhotos = [...uploadedPhotos, ...photos.filter((photo) => photo.isCommunityPhoto && !uploadedPhotos.some((uploadedPhoto) => uploadedPhoto.id === photo.id))];
+  const illustrationPhotos = illustrationData.taxaId === illustrationTaxaId ? illustrationData.photos : [];
+  const illustrationsLoading = !!illustrationTaxaId && illustrationData.taxaId !== illustrationTaxaId;
+  const illustrationLoadError = illustrationData.taxaId === illustrationTaxaId ? illustrationData.error : null;
   const visiblePhotos = inaturalistPhotos.slice(photoPage * 20, (photoPage + 1) * 20);
 
   useEffect(() => {
@@ -112,6 +132,81 @@ export function SpeciesAnatomyEditor({ value, inatId, taxaId, disabled = false, 
       document.removeEventListener('keydown', handleDropdownKeys);
     };
   }, [licenseDropdownOpen]);
+
+  useEffect(() => {
+    if (!illustrationTaxaId) return;
+    let isActive = true;
+
+    async function loadIllustrations() {
+      const { data, error } = await supabase
+        .from('species_community_photos')
+        .select('id, image_url, author_name, license, created_at, user_id')
+        .eq('taxa_id', illustrationTaxaId)
+        .eq('media_type', 'illustration')
+        .order('created_at', { ascending: false });
+
+      if (!isActive) return;
+      if (error) {
+        console.error('Failed to load user-uploaded Field Guide illustrations:', error);
+        setIllustrationData({ taxaId: illustrationTaxaId, photos: [], error: error.message });
+        return;
+      }
+
+      const illustrationRows = (data || []) as Array<{
+        id: string;
+        image_url: string;
+        author_name: string;
+        license: string;
+        created_at: string;
+        user_id: string;
+      }>;
+      const loadedPhotos: InatGalleryPhoto[] = illustrationRows.map((photo) => {
+        const imageUrl = photo.image_url.includes('res.cloudinary.com')
+          ? photo.image_url.replace('/upload/', '/upload/f_auto,q_auto/')
+          : photo.image_url;
+        return {
+          id: photo.id,
+          url: imageUrl,
+          small_url: imageUrl.includes('res.cloudinary.com') ? imageUrl.replace('/upload/f_auto,q_auto/', '/upload/f_auto,q_auto,w_400,c_limit/') : imageUrl,
+          medium_url: imageUrl.includes('res.cloudinary.com') ? imageUrl.replace('/upload/f_auto,q_auto/', '/upload/f_auto,q_auto,w_800,c_limit/') : imageUrl,
+          large_url: imageUrl,
+          original_url: photo.image_url,
+          attribution: `© ${photo.author_name} (${photo.license})`,
+          licenseCode: photo.license,
+          nativePageUrl: null,
+          observationUrl: null,
+          observedOn: photo.created_at,
+          isCommunityPhoto: true,
+          uploaderUserId: photo.user_id
+        };
+      });
+      setIllustrationData({ taxaId: illustrationTaxaId, photos: loadedPhotos, error: null });
+    }
+
+    void loadIllustrations();
+    return () => {
+      isActive = false;
+    };
+  }, [illustrationTaxaId, supabase]);
+
+  useEffect(() => {
+    if (!illustrationLicenseDropdownOpen) return;
+    const closeOnOutsideClick = (event: PointerEvent) => {
+      if (!illustrationLicenseDropdownRef.current?.contains(event.target as Node)) setIllustrationLicenseDropdownOpen(false);
+    };
+    const handleDropdownKeys = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setIllustrationLicenseDropdownOpen(false);
+        illustrationLicenseTriggerRef.current?.focus();
+      }
+    };
+    document.addEventListener('pointerdown', closeOnOutsideClick);
+    document.addEventListener('keydown', handleDropdownKeys);
+    return () => {
+      document.removeEventListener('pointerdown', closeOnOutsideClick);
+      document.removeEventListener('keydown', handleDropdownKeys);
+    };
+  }, [illustrationLicenseDropdownOpen]);
 
   const handlePhotoUpload = async (file: File) => {
     const allowedTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/avif'];
@@ -166,6 +261,7 @@ export function SpeciesAnatomyEditor({ value, inatId, taxaId, disabled = false, 
           image_url: cloudData.secure_url,
           author_name: uploadAuthor.trim(),
           license: uploadLicense,
+          media_type: 'photo',
           user_id: user.id,
           cloudinary_public_id: cloudData.public_id
         })
@@ -199,6 +295,100 @@ export function SpeciesAnatomyEditor({ value, inatId, taxaId, disabled = false, 
     } finally {
       setUploadingPhoto(false);
       if (uploadInputRef.current) uploadInputRef.current.value = '';
+    }
+  };
+
+  const handleIllustrationUpload = async (file: File) => {
+    const allowedTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/avif'];
+    if (!allowedTypes.includes(file.type)) {
+      setIllustrationUploadMessage({ type: 'error', text: isZh ? '僅支援 JPG、PNG、WEBP、AVIF 格式。' : 'Only JPG, PNG, WEBP, and AVIF images are supported.' });
+      return;
+    }
+    if (file.size > 10 * 1024 * 1024) {
+      setIllustrationUploadMessage({ type: 'error', text: isZh ? '檔案大小不能超過 10MB。' : 'Image size must not exceed 10MB.' });
+      return;
+    }
+    if (!illustrationAuthor.trim()) {
+      setIllustrationUploadMessage({ type: 'error', text: isZh ? '請先填寫插圖作者。' : 'Enter the illustration author before uploading.' });
+      return;
+    }
+
+    const targetTaxaId = taxaId || inatId;
+    const cloudName = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME;
+    const uploadPreset = process.env.NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET;
+    if (!targetTaxaId || !cloudName || !uploadPreset) {
+      setIllustrationUploadMessage({ type: 'error', text: isZh ? '缺少物種或 Cloudinary 上傳設定。' : 'Species or Cloudinary upload configuration is missing.' });
+      return;
+    }
+
+    setUploadingIllustration(true);
+    setIllustrationUploadMessage(null);
+    try {
+      const { data: { user }, error: authError } = await supabase.auth.getUser();
+      if (authError) throw authError;
+      if (!user) throw new Error(isZh ? '請先登入再上傳插圖。' : 'Sign in before uploading an illustration.');
+
+      const safeTaxaId = String(targetTaxaId).replace(/[^a-zA-Z0-9_-]+/g, '_');
+      const safeAuthor = illustrationAuthor.trim().replace(/[^a-zA-Z0-9_-]+/g, '_');
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('upload_preset', uploadPreset);
+      formData.append('folder', 'Illustration');
+      formData.append('public_id', `${safeTaxaId}_${safeAuthor}_${Date.now()}`);
+
+      const cloudResponse = await fetch(`https://api.cloudinary.com/v1_1/${cloudName}/image/upload`, {
+        method: 'POST',
+        body: formData
+      });
+      const cloudData = await cloudResponse.json();
+      if (!cloudResponse.ok || !cloudData.secure_url || !cloudData.public_id) {
+        throw new Error(cloudData.error?.message || (isZh ? 'Cloudinary 上傳失敗。' : 'Cloudinary upload failed.'));
+      }
+
+      const { data: illustrationRecord, error: insertError } = await supabase
+        .from('species_community_photos')
+        .insert({
+          taxa_id: String(targetTaxaId),
+          image_url: cloudData.secure_url,
+          author_name: illustrationAuthor.trim(),
+          license: illustrationLicense,
+          media_type: 'illustration',
+          user_id: user.id,
+          cloudinary_public_id: cloudData.public_id
+        })
+        .select('id')
+        .single();
+      if (insertError) throw insertError;
+
+      const optimizedUrl = cloudData.secure_url.replace('/upload/', '/upload/f_auto,q_auto/');
+      const uploadedIllustration: InatGalleryPhoto = {
+        id: illustrationRecord.id,
+        url: optimizedUrl,
+        small_url: optimizedUrl.replace('/upload/f_auto,q_auto/', '/upload/f_auto,q_auto,w_400,c_limit/'),
+        medium_url: optimizedUrl.replace('/upload/f_auto,q_auto/', '/upload/f_auto,q_auto,w_800,c_limit/'),
+        large_url: optimizedUrl,
+        original_url: cloudData.secure_url,
+        attribution: `© ${illustrationAuthor.trim()} (${illustrationLicense})`,
+        licenseCode: illustrationLicense,
+        nativePageUrl: null,
+        observationUrl: null,
+        observedOn: new Date().toISOString(),
+        isCommunityPhoto: true,
+        uploaderUserId: user.id
+      };
+      setIllustrationData((current) => ({
+        taxaId: illustrationTaxaId,
+        photos: [uploadedIllustration, ...(current.taxaId === illustrationTaxaId ? current.photos : [])],
+        error: null
+      }));
+      changePhoto(cloudData.secure_url, uploadedIllustration.attribution);
+      setIllustrationUploadMessage({ type: 'success', text: isZh ? '插圖已上傳至 Illustration 資料夾。按儲存後會套用至圖鑑。' : 'Illustration uploaded to the Illustration folder. Save to apply it to the Field Guide.' });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : (isZh ? '插圖上傳失敗。' : 'Illustration upload failed.');
+      setIllustrationUploadMessage({ type: 'error', text: message });
+    } finally {
+      setUploadingIllustration(false);
+      if (illustrationInputRef.current) illustrationInputRef.current.value = '';
     }
   };
 
@@ -359,17 +549,24 @@ export function SpeciesAnatomyEditor({ value, inatId, taxaId, disabled = false, 
     onChange({ ...value, photoUrl, photoAttribution, photoLink, zoom: 1, offsetX: 0, offsetY: 0 });
   };
 
-  const handleDeleteCommunityPhoto = async (photo: InatGalleryPhoto) => {
-    setUploadMessage(null);
+  const handleDeleteCommunityPhoto = async (
+    photo: InatGalleryPhoto,
+    setMessage: React.Dispatch<React.SetStateAction<{ type: 'success' | 'error'; text: string } | null>> = setUploadMessage
+  ) => {
+    setMessage(null);
     setDeletingPhotoId(photo.id);
     const wasSelected = [photo.url, photo.large_url, photo.original_url].includes(value.photoUrl);
     try {
       await deleteCommunityPhoto(photo.id);
       setUploadedPhotos((current) => current.filter((uploadedPhoto) => uploadedPhoto.id !== photo.id));
+      setIllustrationData((current) => ({
+        ...current,
+        photos: current.photos.filter((uploadedPhoto) => uploadedPhoto.id !== photo.id)
+      }));
       if (wasSelected) {
         onChange({ ...value, photoUrl: '', photoAttribution: '', photoLink: '', zoom: 1, offsetX: 0, offsetY: 0 });
       }
-      setUploadMessage({
+      setMessage({
         type: 'success',
         text: wasSelected
           ? (isZh ? '已刪除目前選取的圖片，圖鑑圖片已移除，請重新選擇圖片。' : 'The selected image was deleted and removed from the illustration. Please select another image.')
@@ -377,7 +574,7 @@ export function SpeciesAnatomyEditor({ value, inatId, taxaId, disabled = false, 
       });
     } catch (error) {
       const message = error instanceof Error ? error.message : (isZh ? '刪除圖片失敗。' : 'Failed to delete image.');
-      setUploadMessage({ type: 'error', text: message });
+      setMessage({ type: 'error', text: message });
     } finally {
       setDeletingPhotoId(null);
     }
@@ -482,7 +679,10 @@ export function SpeciesAnatomyEditor({ value, inatId, taxaId, disabled = false, 
 
         <section className="space-y-2 border-t border-slate-200 pt-4">
           <div className="flex items-center justify-between gap-3">
-            <h4 className="text-xs font-bold text-slate-700">{isZh ? '使用者上傳' : 'User uploads'}</h4>
+            <div className="flex items-center gap-2">
+              <h4 className="text-xs font-bold text-slate-700">{isZh ? '使用者上傳' : 'User uploads'}</h4>
+              <span className="rounded-md bg-emerald-50 px-2 py-0.5 text-[10px] font-bold text-emerald-700">{isZh ? '照片上傳' : 'Photo upload'}</span>
+            </div>
             {communityPhotos.length > 0 && <span className="text-[10px] text-slate-400">{communityPhotos.length}</span>}
           </div>
           <div className="flex flex-wrap items-end gap-2">
@@ -506,7 +706,7 @@ export function SpeciesAnatomyEditor({ value, inatId, taxaId, disabled = false, 
                   aria-label={isZh ? '圖片授權' : 'Image license'}
                   aria-haspopup="listbox"
                   aria-expanded={licenseDropdownOpen}
-                  aria-controls="anatomy-license-options"
+                  aria-controls={photoLicenseOptionsId}
                   disabled={disabled || uploadingPhoto}
                   onClick={() => setLicenseDropdownOpen((open) => !open)}
                   onKeyDown={(event) => {
@@ -522,7 +722,7 @@ export function SpeciesAnatomyEditor({ value, inatId, taxaId, disabled = false, 
                   {uploadLicense}<ChevronDown className={`size-3.5 text-slate-500 transition-transform ${licenseDropdownOpen ? 'rotate-180' : ''}`} />
                 </button>
                 {licenseDropdownOpen && (
-                  <div id="anatomy-license-options" role="listbox" aria-label={isZh ? '圖片授權選項' : 'Image license options'} className="absolute right-0 top-full z-50 mt-1 max-h-56 min-w-full overflow-y-auto rounded-lg border border-slate-200 bg-white p-1 shadow-xl">
+                  <div id={photoLicenseOptionsId} role="listbox" aria-label={isZh ? '圖片授權選項' : 'Image license options'} className="absolute right-0 top-full z-50 mt-1 max-h-56 min-w-full overflow-y-auto rounded-lg border border-slate-200 bg-white p-1 shadow-xl">
                     {PHOTO_UPLOAD_LICENSES.map((license, index) => (
                       <button
                         key={license}
@@ -603,6 +803,147 @@ export function SpeciesAnatomyEditor({ value, inatId, taxaId, disabled = false, 
                       aria-label={`${isZh ? '刪除上傳圖片' : 'Delete uploaded image'}: ${photo.attribution}`}
                       title={isZh ? '刪除此圖片' : 'Delete this image'}
                       onClick={() => void handleDeleteCommunityPhoto(photo)}
+                      className="absolute right-0.5 top-0.5 z-30 grid size-6 place-items-center rounded-md bg-rose-600 text-white opacity-0 shadow transition-opacity hover:bg-rose-700 focus-visible:opacity-100 group-hover:opacity-100 disabled:cursor-wait"
+                    >
+                      {isDeleting ? <Loader2 className="size-3.5 animate-spin" /> : <Trash2 className="size-3.5" />}
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </section>
+
+        <section className="space-y-2 border-t border-slate-200 pt-4">
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2">
+              <h4 className="text-xs font-bold text-slate-700">{isZh ? '使用者上傳' : 'User uploads'}</h4>
+              <span className="rounded-md bg-violet-50 px-2 py-0.5 text-[10px] font-bold text-violet-700">Illustration 插圖</span>
+            </div>
+            {illustrationPhotos.length > 0 && <span className="text-[10px] text-slate-400">{illustrationPhotos.length}</span>}
+          </div>
+          <p className="text-[10px] text-slate-500">
+            {isZh ? '插圖會獨立儲存至 Cloudinary 的 Illustration 資料夾。' : 'Illustrations are stored separately in the Cloudinary Illustration folder.'}
+          </p>
+          <div className="flex flex-wrap items-end gap-2">
+            <label className="min-w-32 flex-1">
+              <span className="mb-1 block text-[10px] font-bold text-slate-500">{isZh ? '插圖作者' : 'Illustration author'}</span>
+              <input
+                value={illustrationAuthor}
+                disabled={disabled || uploadingIllustration}
+                onChange={(event) => setIllustrationAuthor(event.target.value)}
+                placeholder={isZh ? '輸入作者名稱' : 'Enter author name'}
+                className="w-full rounded-lg border border-slate-200 bg-white px-2.5 py-2 text-xs text-slate-800 outline-none focus:border-emerald-500 disabled:bg-slate-100"
+              />
+            </label>
+            <label>
+              <span className="mb-1 block text-[10px] font-bold text-slate-500">{isZh ? '圖片授權' : 'Image license'}</span>
+              <div ref={illustrationLicenseDropdownRef} className="relative">
+                <button
+                  ref={illustrationLicenseTriggerRef}
+                  type="button"
+                  role="combobox"
+                  aria-label={isZh ? '插圖授權' : 'Illustration license'}
+                  aria-haspopup="listbox"
+                  aria-expanded={illustrationLicenseDropdownOpen}
+                  aria-controls={illustrationLicenseOptionsId}
+                  disabled={disabled || uploadingIllustration}
+                  onClick={() => setIllustrationLicenseDropdownOpen((open) => !open)}
+                  onKeyDown={(event) => {
+                    if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp') return;
+                    event.preventDefault();
+                    setIllustrationLicenseDropdownOpen(true);
+                    const selectedIndex = PHOTO_UPLOAD_LICENSES.indexOf(illustrationLicense);
+                    requestAnimationFrame(() => illustrationLicenseOptionRefs.current[selectedIndex]?.focus());
+                  }}
+                  className="flex min-w-28 items-center justify-between gap-3 rounded-lg border border-slate-200 bg-white px-2.5 py-2 text-xs text-slate-800 outline-none hover:border-emerald-400 focus:border-emerald-500 disabled:bg-slate-100"
+                >
+                  {illustrationLicense}<ChevronDown className={`size-3.5 text-slate-500 transition-transform ${illustrationLicenseDropdownOpen ? 'rotate-180' : ''}`} />
+                </button>
+                {illustrationLicenseDropdownOpen && (
+                  <div id={illustrationLicenseOptionsId} role="listbox" aria-label={isZh ? '插圖授權選項' : 'Illustration license options'} className="absolute right-0 top-full z-50 mt-1 max-h-56 min-w-full overflow-y-auto rounded-lg border border-slate-200 bg-white p-1 shadow-xl">
+                    {PHOTO_UPLOAD_LICENSES.map((license, index) => (
+                      <button
+                        key={license}
+                        ref={(element) => { illustrationLicenseOptionRefs.current[index] = element; }}
+                        type="button"
+                        role="option"
+                        aria-selected={illustrationLicense === license}
+                        onClick={() => {
+                          setIllustrationLicense(license);
+                          setIllustrationLicenseDropdownOpen(false);
+                          illustrationLicenseTriggerRef.current?.focus();
+                        }}
+                        onKeyDown={(event) => {
+                          if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp') return;
+                          event.preventDefault();
+                          const nextIndex = event.key === 'ArrowDown'
+                            ? (index + 1) % PHOTO_UPLOAD_LICENSES.length
+                            : (index - 1 + PHOTO_UPLOAD_LICENSES.length) % PHOTO_UPLOAD_LICENSES.length;
+                          illustrationLicenseOptionRefs.current[nextIndex]?.focus();
+                        }}
+                        className="flex w-full items-center justify-between gap-3 rounded-md px-2 py-1.5 text-left text-xs text-slate-700 hover:bg-emerald-50 focus:bg-emerald-50 focus:outline-none"
+                      >
+                        {license}{illustrationLicense === license && <Check className="size-3.5 text-emerald-700" />}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </label>
+            <input
+              ref={illustrationInputRef}
+              type="file"
+              accept="image/jpeg,image/png,image/webp,image/avif"
+              className="hidden"
+              disabled={disabled || uploadingIllustration}
+              onChange={(event) => {
+                const file = event.currentTarget.files?.[0];
+                if (file) void handleIllustrationUpload(file);
+              }}
+            />
+            <button
+              type="button"
+              disabled={disabled || uploadingIllustration || !illustrationAuthor.trim()}
+              onClick={() => illustrationInputRef.current?.click()}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-xs font-bold text-violet-800 hover:bg-violet-100 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {uploadingIllustration ? <Loader2 className="size-3.5 animate-spin" /> : <Upload className="size-3.5" />}
+              {isZh ? '上傳插圖' : 'Upload illustration'}
+            </button>
+          </div>
+          {illustrationUploadMessage && <p role={illustrationUploadMessage.type === 'error' ? 'alert' : 'status'} className={`text-xs ${illustrationUploadMessage.type === 'error' ? 'text-rose-600' : 'text-emerald-700'}`}>{illustrationUploadMessage.text}</p>}
+          {illustrationsLoading ? (
+            <div className="flex items-center gap-2 py-3 text-xs text-slate-500"><Loader2 className="size-3.5 animate-spin" />{isZh ? '載入使用者上傳插圖…' : 'Loading user-uploaded illustrations…'}</div>
+          ) : illustrationLoadError ? (
+            <p role="alert" className="py-2 text-xs text-rose-600">{isZh ? `載入插圖失敗：${illustrationLoadError}` : `Failed to load illustrations: ${illustrationLoadError}`}</p>
+          ) : illustrationPhotos.length === 0 ? (
+            <p className="py-2 text-xs text-slate-400">{isZh ? '尚未上傳插圖。' : 'No user-uploaded illustrations yet.'}</p>
+          ) : (
+            <div className="grid grid-cols-10 gap-2 py-2">
+              {illustrationPhotos.map((illustration) => {
+                const imageUrl = illustration.large_url || illustration.medium_url || illustration.url;
+                const isSelected = [illustration.url, illustration.large_url, illustration.original_url].includes(value.photoUrl);
+                const isDeleting = deletingPhotoId === illustration.id;
+                return (
+                  <div key={illustration.id} className="group relative z-0 aspect-square min-w-0 hover:z-20">
+                    <button
+                      type="button"
+                      disabled={disabled || isDeleting}
+                      aria-label={`${isZh ? '選擇上傳插圖' : 'Select uploaded illustration'}: ${illustration.attribution}`}
+                      aria-pressed={isSelected}
+                      title={illustration.attribution}
+                      onClick={() => changePhoto(imageUrl, illustration.attribution)}
+                      className={`relative size-full overflow-hidden rounded-lg border-2 bg-white transition duration-200 group-hover:scale-150 ${isSelected ? 'border-violet-600 ring-2 ring-violet-200' : 'border-slate-200 hover:border-violet-400'} disabled:cursor-not-allowed disabled:opacity-60`}
+                    >
+                      <Image src={illustration.small_url || imageUrl} alt={illustration.attribution} fill sizes="(min-width: 768px) 64px, 10vw" className="object-cover" />
+                    </button>
+                    <button
+                      type="button"
+                      disabled={disabled || isDeleting}
+                      aria-label={`${isZh ? '刪除上傳插圖' : 'Delete uploaded illustration'}: ${illustration.attribution}`}
+                      title={isZh ? '刪除此插圖' : 'Delete this illustration'}
+                      onClick={() => void handleDeleteCommunityPhoto(illustration, setIllustrationUploadMessage)}
                       className="absolute right-0.5 top-0.5 z-30 grid size-6 place-items-center rounded-md bg-rose-600 text-white opacity-0 shadow transition-opacity hover:bg-rose-700 focus-visible:opacity-100 group-hover:opacity-100 disabled:cursor-wait"
                     >
                       {isDeleting ? <Loader2 className="size-3.5 animate-spin" /> : <Trash2 className="size-3.5" />}

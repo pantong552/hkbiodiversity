@@ -95,6 +95,7 @@ export function useInaturalistSpeciesPhotos(inatId: number | string | undefined,
         .from('species_community_photos')
         .select('*')
         .eq('taxa_id', idToUse.toString())
+        .eq('media_type', 'photo')
         .order('created_at', { ascending: false });
 
       if (error) throw error;
