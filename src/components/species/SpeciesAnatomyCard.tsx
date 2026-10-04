@@ -961,7 +961,7 @@ export function SpeciesAnatomyEditor({ value, inatId, taxaId, disabled = false, 
           <>
             <div
               ref={frameRef}
-              className="relative mx-auto aspect-[4/3] w-full max-w-[820px] touch-none overflow-hidden rounded-[2rem] bg-slate-900 sm:rounded-[2.5rem]"
+              className="relative mx-auto aspect-[4/3] w-full max-w-[820px] touch-none overflow-hidden rounded-[2rem] bg-white sm:rounded-[2.5rem]"
               onClick={handleImageClick}
               onPointerDown={handlePointerDown}
               onPointerMove={handlePointerMove}
@@ -969,6 +969,7 @@ export function SpeciesAnatomyEditor({ value, inatId, taxaId, disabled = false, 
               onPointerCancel={handlePointerCancel}
               style={{ overscrollBehavior: 'contain' }}
             >
+              <div aria-hidden="true" className="pointer-events-none absolute inset-0 z-30 rounded-[2rem] border border-slate-200 sm:rounded-[2.5rem]" />
               <div
                 ref={imagePlaneRef}
                 data-image-plane
@@ -1283,7 +1284,8 @@ function AnatomyIllustrationDisplay({ illustration, isZh, title }: { illustratio
 
   return (
     <div className="space-y-3">
-      <div ref={frameRef} className="relative mx-auto aspect-[4/3] w-full max-w-[820px] overflow-hidden rounded-[2rem] bg-slate-900 sm:rounded-[2.5rem]" onClick={() => { setActiveKey(null); setHoveredKey(null); }}>
+      <div ref={frameRef} className="relative mx-auto aspect-[4/3] w-full max-w-[820px] overflow-hidden rounded-[2rem] bg-white sm:rounded-[2.5rem]" onClick={() => { setActiveKey(null); setHoveredKey(null); }}>
+        <div aria-hidden="true" className="pointer-events-none absolute inset-0 z-30 rounded-[2rem] border border-slate-200 sm:rounded-[2.5rem]" />
         <div
           className="absolute left-1/2 top-1/2 origin-center"
           style={{
