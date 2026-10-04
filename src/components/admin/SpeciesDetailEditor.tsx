@@ -347,7 +347,7 @@ function SpeciesGalleryPicker({ value, credits, metadata, photos, taxaId, supaba
                   className={`overflow-hidden rounded-xl border border-emerald-100 bg-white shadow-sm ${draggedIndex === index ? 'opacity-40' : ''} cursor-grab active:cursor-grabbing`}
                 >
                   <div className="relative aspect-square bg-slate-100">
-                    <Image src={photo?.small_url || url} alt="" fill unoptimized className="object-cover" sizes="160px" />
+                    <Image src={photo?.small_url || url} alt="" fill unoptimized draggable={false} className="object-cover" sizes="160px" />
                     {index === 0 && (
                       <span className="absolute left-1.5 top-1.5 rounded-md bg-emerald-700 px-1.5 py-1 text-[9px] font-black text-white">
                         {language === 'zh' ? '封面' : 'COVER'}
@@ -1989,7 +1989,7 @@ export default function SpeciesDetailEditor({ table, data, originalData, publish
     const definedKeys = new Set(baseGroups.flatMap(g => g.fields.map(f => f.key)));
     
     // 排除系統內建主鍵與索引、時間欄位
-    const ignoredKeys = ['id', 'taxa_id', 'fts', 'created_at', 'updated_at', 'flowering_months', 'fruiting_months'];
+    const ignoredKeys = ['id', 'taxa_id', 'fts', 'created_at', 'updated_at', 'flowering_months', 'fruiting_months', 'reference_codes', 'gallery_images'];
     if (table === 'plant_species') {
       ignoredKeys.push('ebird_species_code', 'species_eng');
     }
