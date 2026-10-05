@@ -165,7 +165,7 @@ export default function SidebarFilter({
           return { level, data: res.data, error: res.error };
         });
 
-        // IUCN 仍然使用全過濾統計
+        // Keep the other filters in the facet count, but don't filter out other IUCN choices.
         const iucnParams: any = {
           p_phylum_eng: selected.taxonomy.phylum_eng,
           p_class_eng: selected.taxonomy.class_eng,
@@ -173,7 +173,7 @@ export default function SidebarFilter({
           p_family_eng: selected.taxonomy.family_eng,
           p_genus_eng: selected.taxonomy.genus_eng,
           p_informal_group_eng: selected.taxonomy.informal_group_eng,
-          p_iucn: selected.iucn,
+          p_iucn: [],
           p_search: searchQuery,
         };
 
