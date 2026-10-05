@@ -105,6 +105,11 @@ export default function HomeClient() {
 
   const totalPages = Math.ceil(totalResultCount / itemsPerPage);
 
+  const handleSidebarFilterChange = (filters: SelectedFilters) => {
+    setSelectedFilters(filters);
+    setCurrentPage(1);
+  };
+
   // Fetch Flora Metadata with basic counts (Cross-filtering support)
   useEffect(() => {
     if (taxaType === 'flora') {
@@ -265,30 +270,21 @@ export default function HomeClient() {
         }
 
         if (taxaType === 'fauna' || taxaType === 'fungi') {
-            // 合併側邊欄與表格過濾器
-            const finalTaxonomy = {
-                phylum_eng: (tableFilters.phylum?.length > 0) ? tableFilters.phylum : selectedFilters.taxonomy.phylum_eng,
-                class_eng: (tableFilters.class?.length > 0) ? tableFilters.class : selectedFilters.taxonomy.class_eng,
-                order_eng: (tableFilters.order?.length > 0) ? tableFilters.order : selectedFilters.taxonomy.order_eng,
-                family_eng: (tableFilters.family?.length > 0) ? tableFilters.family : selectedFilters.taxonomy.family_eng,
-                genus_eng: (tableFilters.genus?.length > 0) ? tableFilters.genus : selectedFilters.taxonomy.genus_eng,
-                informal_group_eng: (tableFilters.informal_group?.length > 0) ? tableFilters.informal_group : selectedFilters.taxonomy.informal_group_eng
-            };
-
-            Object.entries(finalTaxonomy).forEach(([level, values]) => {
+            // Sidebar filters apply in every view; table filters are handled below in table mode only.
+            Object.entries(selectedFilters.taxonomy).forEach(([level, values]) => {
                 if (values && values.length > 0) {
                     query = query.in(level, values);
                 }
             });
 
             // IUCN Filters
-            const finalIucn = (tableFilters.iucn?.length > 0) ? tableFilters.iucn : selectedFilters.iucn;
+            const finalIucn = selectedFilters.iucn;
             if (finalIucn && finalIucn.length > 0) {
                 query = query.in('iucn', finalIucn);
             }
             
             // Native Status
-            const finalNative = (tableFilters.native_status?.length > 0) ? tableFilters.native_status : ((selectedFilters as any).status?.native_status || []);
+            const finalNative = (selectedFilters as any).status?.native_status || [];
             if (finalNative && finalNative.length > 0) {
                 query = query.in('native_status', finalNative);
             }
@@ -303,13 +299,6 @@ export default function HomeClient() {
               }
             }
 
-            // Scientific & Common Name Table Filters
-            if (tableFilters.scientific_name?.length > 0) {
-                query = query.in('scientific_name', tableFilters.scientific_name);
-            }
-            if (tableFilters.common_name?.length > 0) {
-                query = query.in('common_name_chi', tableFilters.common_name);
-            }
         } else {
             // Flora Filters
             // 1. Search Logic
@@ -765,7 +754,7 @@ export default function HomeClient() {
                 <SidebarFilter
                     isOpen={isFilterOpen}
                     onClose={() => setIsFilterOpen(false)}
-                    onFilterChange={setSelectedFilters}
+                    onFilterChange={handleSidebarFilterChange}
                     onSearchSubmit={setSearchQuery}
                     searchQuery={searchQuery}
                     selectedFilters={selectedFilters}
