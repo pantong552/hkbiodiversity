@@ -41,6 +41,7 @@ const getInatRewriteUrl = (url: string, size: 'square' | 'small' | 'medium' | 'l
 interface SpeciesMapProps {
   taxonId?: number;
   scientificName?: string;
+  hkbihScientificName?: string;
   chineseName?: string;
   taxaGroup?: string;
   ebirdSpeciesCode?: string;
@@ -86,10 +87,10 @@ const observationStatsCache: Record<string, { bgis: ObservationStats; ebird: Obs
 // Temporarily disabled while the eBird points endpoint is failing upstream.
 const EBIRD_API_ENABLED = true;
 
-function getSpeciesDataKey({ taxonId, scientificName, chineseName, taxaGroup, ebirdSpeciesCode }: SpeciesMapProps): string {
+function getSpeciesDataKey({ taxonId, scientificName, hkbihScientificName, chineseName, taxaGroup, ebirdSpeciesCode }: SpeciesMapProps): string {
   // Bump this when spatial filtering rules change so stale processed grids
   // cannot keep displaying records filtered by the previous rules.
-  return [taxonId || 0, scientificName || '', chineseName || '', taxaGroup || '', ebirdSpeciesCode || '', 'map-filter-v6'].join('|');
+  return [taxonId || 0, scientificName || '', hkbihScientificName || '', chineseName || '', taxaGroup || '', ebirdSpeciesCode || '', 'map-filter-v6'].join('|');
 }
 
 function getMonotoneSplinePath(coords: { x: number; y: number }[], baseY: number, topY: number): string {
@@ -176,6 +177,7 @@ export interface ObservationChartProps {
   taxonId?: number;
   observations?: InatObservation[];
   scientificName?: string;
+  hkbihScientificName?: string;
   chineseName?: string;
   ebirdSpeciesCode?: string;
   isBirdGroup?: boolean;
@@ -187,12 +189,14 @@ export function ObservationChart({
   taxonId,
   observations: propObservations,
   scientificName,
+  hkbihScientificName,
   chineseName,
   ebirdSpeciesCode,
   isBirdGroup = false,
   language = 'zh',
   enabled = true
 }: ObservationChartProps) {
+  const bgisScientificName = hkbihScientificName?.trim() || scientificName || '';
   const [inatObservations, setInatObservations] = useState<InatObservation[]>(propObservations || []);
 
   useEffect(() => {
@@ -217,12 +221,12 @@ export function ObservationChart({
   // the map's grid aggregation below.
   const observations = propObservations ?? inatObservations;
 
-  const statsKey = `${scientificName || ''}|${chineseName || ''}|${ebirdSpeciesCode || ''}|${isBirdGroup}`;
+  const statsKey = `${bgisScientificName}|${chineseName || ''}|${ebirdSpeciesCode || ''}|${isBirdGroup}`;
   const initialCache = observationStatsCache[statsKey];
   const [mode, setMode] = useState<'seasonality' | 'history'>('seasonality');
   const [bgisStats, setBgisStats] = useState<ObservationStats>(initialCache?.bgis || { seasonality: [], history: [] });
   const [ebirdStats, setEbirdStats] = useState<ObservationStats>(EBIRD_API_ENABLED ? (initialCache?.ebird || { seasonality: [], history: [] }) : { seasonality: [], history: [] });
-  const [isBgisLoading, setIsBgisLoading] = useState(!initialCache?.bgis && !!(scientificName || chineseName));
+  const [isBgisLoading, setIsBgisLoading] = useState(!initialCache?.bgis && !!(bgisScientificName || chineseName));
   const [isEbirdLoading, setIsEbirdLoading] = useState(EBIRD_API_ENABLED && !initialCache?.ebird && isBirdGroup && !!ebirdSpeciesCode);
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
   const [activeSources, setActiveSources] = useState<Set<'inat' | 'bgis' | 'ebird'>>(new Set(['inat', 'bgis', 'ebird']));
@@ -249,7 +253,7 @@ export function ObservationChart({
 
   useEffect(() => {
     if (!enabled) return;
-    const statsKey = `${scientificName || ''}|${chineseName || ''}|${ebirdSpeciesCode || ''}|${isBirdGroup}`;
+    const statsKey = `${bgisScientificName}|${chineseName || ''}|${ebirdSpeciesCode || ''}|${isBirdGroup}`;
     const cachedStats = observationStatsCache[statsKey];
     if (cachedStats) {
       setBgisStats(cachedStats.bgis);
@@ -260,9 +264,9 @@ export function ObservationChart({
     }
 
     let cancelled = false;
-    if (scientificName || chineseName) {
+    if (bgisScientificName || chineseName) {
       setIsBgisLoading(true);
-      fetchBgisObservationStats(scientificName || '', chineseName)
+      fetchBgisObservationStats(bgisScientificName, chineseName)
         .then(nextBgis => {
           if (cancelled) return;
           setBgisStats(nextBgis);
@@ -290,14 +294,14 @@ export function ObservationChart({
     }
 
     return () => { cancelled = true; };
-  }, [scientificName, chineseName, ebirdSpeciesCode, isBirdGroup, enabled]);
+  }, [bgisScientificName, chineseName, ebirdSpeciesCode, isBirdGroup, enabled]);
 
   useEffect(() => {
     if (!isBgisLoading && !isEbirdLoading) {
-      const statsKey = `${scientificName || ''}|${chineseName || ''}|${ebirdSpeciesCode || ''}|${isBirdGroup}`;
+      const statsKey = `${bgisScientificName}|${chineseName || ''}|${ebirdSpeciesCode || ''}|${isBirdGroup}`;
       observationStatsCache[statsKey] = { bgis: bgisStats, ebird: ebirdStats };
     }
-  }, [isBgisLoading, isEbirdLoading, bgisStats, ebirdStats, scientificName, chineseName, ebirdSpeciesCode, isBirdGroup]);
+  }, [isBgisLoading, isEbirdLoading, bgisStats, ebirdStats, bgisScientificName, chineseName, ebirdSpeciesCode, isBirdGroup]);
 
   const toggleSource = (src: 'inat' | 'bgis' | 'ebird') => {
     setActiveSources(prev => {
@@ -1233,7 +1237,8 @@ const translations = {
   }
 };
 
-export default function SpeciesMap({ taxonId, scientificName, chineseName, taxaGroup, ebirdSpeciesCode, iucn }: SpeciesMapProps) {
+export default function SpeciesMap({ taxonId, scientificName, hkbihScientificName, chineseName, taxaGroup, ebirdSpeciesCode, iucn }: SpeciesMapProps) {
+  const bgisScientificName = hkbihScientificName?.trim() || scientificName || '';
   const { language } = useLanguage();
   const { profile } = useAuth();
   const isAdmin = profile?.role === 'admin';
@@ -1380,10 +1385,10 @@ export default function SpeciesMap({ taxonId, scientificName, chineseName, taxaG
       setStageCounts({ inat: 0, bgis: 0, ebird: 0 });
       setProgress({ current: 0, total: 0 });
 
-      console.log('SpeciesMap: 啟動分步載入程序...', { taxonId, scientificName, chineseName, ebirdSpeciesCode, isBirdGroup });
+      console.log('SpeciesMap: 啟動分步載入程序...', { taxonId, scientificName, hkbihScientificName, chineseName, ebirdSpeciesCode, isBirdGroup });
 
       try {
-        const speciesDataKey = `${getSpeciesDataKey({ taxonId, scientificName, chineseName, taxaGroup, ebirdSpeciesCode })}|ebird-summary-v2`;
+        const speciesDataKey = `${getSpeciesDataKey({ taxonId, scientificName, hkbihScientificName, chineseName, taxaGroup, ebirdSpeciesCode })}|ebird-summary-v2`;
         const cachedData = speciesMapCache[speciesDataKey];
         if (cachedData) {
           setObservations(cachedData.observations);
@@ -1395,7 +1400,7 @@ export default function SpeciesMap({ taxonId, scientificName, chineseName, taxaG
             ebird: cachedData.ebirdSummary?.total_records || 0
           });
           setInatStatus(taxonId && taxonId > 0 ? 'done' : 'skipped');
-          setBgisStatus(scientificName || chineseName ? 'done' : 'skipped');
+          setBgisStatus(bgisScientificName || chineseName ? 'done' : 'skipped');
           setEbirdStatus(EBIRD_API_ENABLED && isBirdGroup && ebirdSpeciesCode ? 'done' : 'skipped');
           setGridStatus('done');
           setAllProcessedFeatures(cachedData.processedFeatures);
@@ -1409,8 +1414,8 @@ export default function SpeciesMap({ taxonId, scientificName, chineseName, taxaG
           }))
           : Promise.resolve([] as InatObservation[]);
 
-        const bgisPromise = scientificName || chineseName
-          ? (setBgisStatus('loading'), fetchBgisSpeciesList(scientificName || '', chineseName))
+        const bgisPromise = bgisScientificName || chineseName
+          ? (setBgisStatus('loading'), fetchBgisSpeciesList(bgisScientificName, chineseName))
           : Promise.resolve([] as BgisGridRecord[]);
 
         const ebirdPromise = EBIRD_API_ENABLED && isBirdGroup && ebirdSpeciesCode
@@ -1444,7 +1449,7 @@ export default function SpeciesMap({ taxonId, scientificName, chineseName, taxaG
         const bgisMap: Record<string, BgisGridRecord> = {};
         let realBgisTotal = 0;
 
-        if (scientificName || chineseName) {
+        if (bgisScientificName || chineseName) {
           setBgisStatus('done');
 
           bgisList.forEach(item => {
@@ -1564,10 +1569,10 @@ export default function SpeciesMap({ taxonId, scientificName, chineseName, taxaG
       }
     }
 
-    if (taxonId || scientificName || chineseName || ebirdSpeciesCode) {
+    if (taxonId || scientificName || hkbihScientificName || chineseName || ebirdSpeciesCode) {
       loadData();
     }
-  }, [taxonId, scientificName, chineseName, isBirdGroup, ebirdSpeciesCode, isSensitiveSpecies]);
+  }, [taxonId, scientificName, hkbihScientificName, bgisScientificName, chineseName, taxaGroup, isBirdGroup, ebirdSpeciesCode, isSensitiveSpecies]);
 
   const containerRef = useRef<HTMLDivElement>(null);
 

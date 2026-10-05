@@ -481,10 +481,11 @@ export default function SpeciesContent({ species, showBreadcrumb = true, refresh
                 <span>{language === 'zh' ? '地理分布' : 'Distribution'}</span>
               </h2>
               
-              {species.inat_id || species.scientific_name || species.ebird_species_code ? (
+              {species.inat_id || species.scientific_name || species.hkbih_scientific_name || species.ebird_species_code ? (
                 <SpeciesMap
                   taxonId={species.inat_id ?? 0}
                   scientificName={species.scientific_name}
+                  hkbihScientificName={species.hkbih_scientific_name}
                   chineseName={species.common_name_chi}
                   taxaGroup={species.taxa_group}
                   ebirdSpeciesCode={species.ebird_species_code}
@@ -514,10 +515,11 @@ export default function SpeciesContent({ species, showBreadcrumb = true, refresh
             </section>
 
             {/* Temporal Observation Trends Card - Placed above Conservation Status */}
-            {(species.inat_id || species.scientific_name || species.ebird_species_code) && (
+            {(species.inat_id || species.scientific_name || species.hkbih_scientific_name || species.ebird_species_code) && (
               <ObservationChart
                 taxonId={species.inat_id ?? 0}
                 scientificName={species.scientific_name}
+                hkbihScientificName={species.hkbih_scientific_name}
                 chineseName={species.common_name_chi}
                 ebirdSpeciesCode={species.ebird_species_code}
                 isBirdGroup={String(species.taxa_group || '').trim().toUpperCase() === 'BIRD'}

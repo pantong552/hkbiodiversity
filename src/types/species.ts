@@ -26,6 +26,7 @@ export interface Species {
   common_name_chi: string; // 中文俗名
   common_name_eng: string; // 英文俗名
   scientific_name: string;
+  hkbih_scientific_name?: string;
   alias_scientific_name?: string;
   alias_common_name_chi?: string;
   alias_common_name_eng?: string;

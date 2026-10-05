@@ -1998,7 +1998,8 @@ export default function SpeciesDetailEditor({ table, data, originalData, publish
     }
 
     const otherLabelMap: Record<string, { labelChi: string; labelEng: string }> = {
-      similar_species: { labelChi: '相似物種 (taxa_id清單)', labelEng: 'Similar Species (taxa_ids)' }
+      similar_species: { labelChi: '相似物種 (taxa_id清單)', labelEng: 'Similar Species (taxa_ids)' },
+      hkbih_scientific_name: { labelChi: 'HKBIH 學名 (選填)', labelEng: 'HKBIH Scientific Name (Optional)' }
     };
 
     ignoredKeys.push('profile_picture');
