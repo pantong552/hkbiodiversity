@@ -46,6 +46,7 @@ type SortDirection = 'asc' | 'desc';
 // Define the mapping between internal ranks and database columns
 const RANK_FIELD_MAP = {
   fauna: {
+    taxa_group: 'taxa_group',
     informal_group: 'informal_group_eng',
     class: 'class_eng',
     order: 'order_eng',
@@ -176,7 +177,7 @@ export default function TaxonomyMappingsManager({ mode, onRequestConfirm }: Taxo
   const uniqueRanks = useMemo(() => {
     const ranks = Array.from(new Set(data.map(d => d.rank)));
     return ranks.sort((a, b) => {
-      const order = ['informal_group', 'category', 'class', 'order', 'family', 'genus'];
+      const order = ['taxa_group', 'informal_group', 'category', 'class', 'order', 'family', 'genus'];
       return order.indexOf(a) - order.indexOf(b);
     });
   }, [data]);
@@ -366,6 +367,7 @@ export default function TaxonomyMappingsManager({ mode, onRequestConfirm }: Taxo
             ...d, 
             id: savedId || d.id,
             name_eng: newNameEng || d.name_eng, 
+            taxa_group: item.rank === 'taxa_group' ? newNameEng : d.taxa_group,
             name_chi: newNameChi,
             is_from_mappings: true
           };
@@ -732,13 +734,13 @@ export default function TaxonomyMappingsManager({ mode, onRequestConfirm }: Taxo
                           type="text"
                           value={editValues.name_eng || ''}
                           onChange={(e) => handleEditChange('name_eng', e.target.value)}
-                          className={`bg-white border border-emerald-300 rounded-lg px-2 py-0.5 text-xs font-bold text-emerald-700 outline-none shadow-inner w-full focus:ring-1 focus:ring-emerald-500 ${item.rank !== 'informal_group' ? 'italic' : ''}`}
+                          className={`bg-white border border-emerald-300 rounded-lg px-2 py-0.5 text-xs font-bold text-emerald-700 outline-none shadow-inner w-full focus:ring-1 focus:ring-emerald-500 ${item.rank !== 'informal_group' && item.rank !== 'taxa_group' ? 'italic' : ''}`}
                           onKeyDown={handleKeyDown}
                           autoFocus
                           onClick={(e) => e.stopPropagation()}
                         />
                       ) : (
-                        <span className={`font-bold text-slate-700 text-xs ${item.rank !== 'informal_group' ? 'italic' : ''}`}>{item.name_eng}</span>
+                        <span className={`font-bold text-slate-700 text-xs ${item.rank !== 'informal_group' && item.rank !== 'taxa_group' ? 'italic' : ''}`}>{item.name_eng}</span>
                       )}
                     </td>
 

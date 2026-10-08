@@ -23,6 +23,7 @@ interface SidebarFilterProps {
 
 export interface SelectedFilters {
   taxonomy: Record<TaxonomyLevel, string[]>;
+  majorGroup: string[];
   iucn: string[];
   isCap170?: boolean | null;
   isCap586?: boolean | null;
@@ -47,7 +48,7 @@ export default function SidebarFilter({
     order_eng: language === 'zh' ? '目 (Order)' : 'Order',
     family_eng: language === 'zh' ? '科 (Family)' : 'Family',
     genus_eng: language === 'zh' ? '屬 (Genus)' : 'Genus',
-    informal_group_eng: language === 'zh' ? '分類群 (Taxa Group)' : 'Taxa Group',
+    informal_group_eng: language === 'zh' ? '次分類群 (Sub-group)' : 'Sub-group',
   };
 
   const IUCN_STATUSES = Object.keys(IUCN_CONFIG);
@@ -75,6 +76,7 @@ export default function SidebarFilter({
       genus_eng: [],
       informal_group_eng: [],
     },
+    majorGroup: [],
     iucn: [],
     isCap170: null,
     isCap586: null,
@@ -101,6 +103,7 @@ export default function SidebarFilter({
   const [taxonomyOptions, setTaxonomyOptions] = useState<Record<TaxonomyLevel, { name: string; display: string; count: number }[]>>({
     phylum_eng: [], class_eng: [], order_eng: [], family_eng: [], genus_eng: [], informal_group_eng: []
   });
+  const [majorGroupOptions, setMajorGroupOptions] = useState<{ name: string; display: string; count: number }[]>([]);
   const [iucnCounts, setIucnCounts] = useState<Record<string, number>>({});
   const fetchIdRef = useRef(0);
 
@@ -109,6 +112,7 @@ export default function SidebarFilter({
     setTaxonomyOptions({
       phylum_eng: [], class_eng: [], order_eng: [], family_eng: [], genus_eng: [], informal_group_eng: []
     });
+    setMajorGroupOptions([]);
     setIucnCounts({});
   }, [activeTaxaType]);
 
@@ -119,7 +123,7 @@ export default function SidebarFilter({
 
       try {
         const isFungi = activeTaxaType === 'fungi';
-        const rpcName = isFungi ? 'get_fungi_species_stats' : 'get_species_stats';
+        const rpcName = isFungi ? 'get_fungi_species_stats' : 'get_species_filter_stats';
 
         // 為每個層級獨立獲取統計，排除該層級自身的選取值
         const levelPromises = levels.map(async (level) => {
@@ -135,6 +139,7 @@ export default function SidebarFilter({
           };
 
           if (!isFungi) {
+            rpcParams.p_taxa_group = selected.majorGroup || [];
             rpcParams.p_is_cap170 = selected.isCap170 || null;
             rpcParams.p_is_cap586 = selected.isCap586 || null;
           }
@@ -178,15 +183,24 @@ export default function SidebarFilter({
         };
 
         if (!isFungi) {
+          iucnParams.p_taxa_group = selected.majorGroup || [];
           iucnParams.p_is_cap170 = selected.isCap170 || null;
           iucnParams.p_is_cap586 = selected.isCap586 || null;
         }
 
+        const majorGroupPromise = isFungi
+          ? Promise.resolve(null)
+          : supabase.rpc(rpcName, {
+            ...iucnParams,
+            p_taxa_group: [],
+          });
+
         const iucnPromise = supabase.rpc(rpcName, iucnParams);
 
-        const [levelResults, iucnResult] = await Promise.all([
+        const [levelResults, iucnResult, majorGroupResult] = await Promise.all([
           Promise.all(levelPromises),
-          iucnPromise
+          iucnPromise,
+          majorGroupPromise
         ]);
 
         // 檢查請求是否過時 (Prevent race condition)
@@ -265,6 +279,38 @@ export default function SidebarFilter({
         });
 
         setTaxonomyOptions(newOptions);
+
+        if (majorGroupResult && !majorGroupResult.error && majorGroupResult.data) {
+          const majorGroupData = majorGroupResult.data as {
+            taxa_group?: { name?: string | null; count?: number | string | null }[];
+          };
+          const uniqueGroups = new Map<string, { name: string; display: string; count: number }>();
+          (majorGroupData.taxa_group || []).forEach(item => {
+            const name = item.name || '';
+            if (!name) return;
+            const chiName = language === 'zh'
+              ? getTaxonomyChi('taxa_group', 'fauna', name)
+              : name;
+            const display = language === 'zh' && chiName !== name && !chiName.includes('\ufffd')
+              ? `${chiName} (${name})`
+              : name;
+            uniqueGroups.set(name, { name, display, count: Number(item.count) || 0 });
+          });
+          (selected.majorGroup || []).forEach(name => {
+            if (!uniqueGroups.has(name)) {
+              const chiName = language === 'zh' ? getTaxonomyChi('taxa_group', 'fauna', name) : name;
+              const display = language === 'zh' && chiName !== name && !chiName.includes('\ufffd')
+                ? `${chiName} (${name})`
+                : name;
+              uniqueGroups.set(name, { name, display, count: 0 });
+            }
+          });
+          setMajorGroupOptions(Array.from(uniqueGroups.values()).sort((a, b) => b.count - a.count));
+        } else if (majorGroupResult?.error) {
+          console.error('RPC Error fetching major group stats:', majorGroupResult.error);
+        } else if (isFungi) {
+          setMajorGroupOptions([]);
+        }
 
         if (!iucnResult.error && iucnResult.data) {
           setIucnCounts(iucnResult.data.iucn || {});
@@ -345,6 +391,12 @@ export default function SidebarFilter({
     onFilterChange(newSelected);
   };
 
+  const handleMajorGroupChange = (values: string[]) => {
+    const newSelected = { ...selected, majorGroup: values };
+    setSelected(newSelected);
+    onFilterChange(newSelected);
+  };
+
   const handleIUCNToggle = (value: string) => {
     const isSelected = selected.iucn.includes(value);
     if ((iucnCounts[value] || 0) === 0 && !isSelected) return;
@@ -371,6 +423,7 @@ export default function SidebarFilter({
   const clearFilters = () => {
     const reset = {
       taxonomy: { phylum_eng: [], class_eng: [], order_eng: [], family_eng: [], genus_eng: [], informal_group_eng: [] },
+      majorGroup: [],
       iucn: [],
       isCap170: null,
       isCap586: null,
@@ -381,6 +434,7 @@ export default function SidebarFilter({
   };
 
   const activeCount = Object.values(selected.taxonomy).flat().length 
+    + (selected.majorGroup?.length || 0)
     + selected.iucn.length 
     + (selected.isCap170 ? 1 : 0) 
     + (selected.isCap586 ? 1 : 0) 
@@ -445,7 +499,17 @@ export default function SidebarFilter({
               </button>
 
               {expanded.taxaGroup && (
-                <div className="pt-2">
+                <div className="space-y-3 pt-2">
+                  {activeTaxaType !== 'fungi' && (
+                    <MultiSelectDropdown
+                      label={language === 'zh' ? '主分類群 (Major group)' : 'Major group'}
+                      options={majorGroupOptions}
+                      selectedValues={selected.majorGroup || []}
+                      onChange={handleMajorGroupChange}
+                      placeholder={language === 'zh' ? '主分類群 (Major group)' : 'Major group'}
+                      italicizeEnglish={false}
+                    />
+                  )}
                   <MultiSelectDropdown
                     label={TAXONOMY_LABELS.informal_group_eng}
                     options={taxonomyOptions.informal_group_eng}

@@ -83,6 +83,7 @@ export default function HomeClient() {
   // Fauna Filters
   const [selectedFilters, setSelectedFilters] = useState<SelectedFilters>({
     taxonomy: { phylum_eng: [], class_eng: [], order_eng: [], family_eng: [], genus_eng: [], informal_group_eng: [] },
+    majorGroup: [],
     iucn: []
   });
 
@@ -203,6 +204,7 @@ export default function HomeClient() {
     setTableFilters({}); // 切換物種類型時清空表格篩選，以便 Metadata 重新初始化為全選
     setSelectedFilters({
       taxonomy: { phylum_eng: [], class_eng: [], order_eng: [], family_eng: [], genus_eng: [], informal_group_eng: [] },
+      majorGroup: [],
       iucn: []
     });
     setPlantFilters(INITIAL_PLANT_FILTERS);
@@ -230,6 +232,7 @@ export default function HomeClient() {
 
       setSelectedFilters({
         taxonomy: cleanTaxonomy,
+        majorGroup: [],
         iucn: []
       });
       
@@ -276,6 +279,10 @@ export default function HomeClient() {
                     query = query.in(level, values);
                 }
             });
+
+            if (taxaType === 'fauna' && selectedFilters.majorGroup?.length) {
+                query = query.in('taxa_group', selectedFilters.majorGroup);
+            }
 
             // IUCN Filters
             const finalIucn = selectedFilters.iucn;
@@ -540,6 +547,7 @@ export default function HomeClient() {
         cleanTaxonomy[level] = [value];
         setSelectedFilters({
           taxonomy: cleanTaxonomy,
+          majorGroup: [],
           iucn: []
         });
       } else {
@@ -547,6 +555,7 @@ export default function HomeClient() {
         // 清空動物過濾器，避免衝突
         setSelectedFilters({
           taxonomy: { phylum_eng: [], class_eng: [], order_eng: [], family_eng: [], genus_eng: [], informal_group_eng: [] },
+          majorGroup: [],
           iucn: []
         });
         
@@ -632,6 +641,7 @@ export default function HomeClient() {
         cleanTaxonomy[level] = [val];
         setSelectedFilters({
           taxonomy: cleanTaxonomy,
+          majorGroup: [],
           iucn: []
         });
         setSearchQuery(''); 
