@@ -755,10 +755,10 @@ export default function HomeClient() {
       <Header />
 
       <main className={`max-w-[1920px] mx-auto px-6 md:px-8 lg:px-10 xl:px-16 pt-28 md:pt-36 transition-all duration-500 ${openSpeciesIds.length > 0 ? 'pb-32' : 'pb-10'}`}>
-        <div className="flex flex-col min-[1101px]:flex-row gap-0 min-[1101px]:gap-16">
+        <div className="flex flex-col min-[1101px]:flex-row gap-0 min-[1101px]:gap-6">
 
           {/* Sidebar Area */}
-          <div className="shrink-0 min-[1101px]:w-[320px]">
+          <div className="shrink-0 min-[1101px]:w-[340px]">
             
             {taxaType === 'fauna' || taxaType === 'fungi' ? (
                 <SidebarFilter

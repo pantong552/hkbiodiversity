@@ -451,7 +451,7 @@ export default function SidebarFilter({
 
       <aside className={`
         fixed min-[1101px]:sticky top-0 min-[1101px]:top-8 left-0 h-[100dvh] min-[1101px]:h-[calc(100vh-4rem)]
-        w-[320px] bg-white border-r border-slate-100 min-[1101px]:border min-[1101px]:rounded-3xl
+        w-[320px] min-[1101px]:w-[340px] bg-white border-r border-slate-100 min-[1101px]:border min-[1101px]:rounded-3xl
         shadow-2xl min-[1101px]:shadow-xl overflow-y-auto z-[101] min-[1101px]:z-0
         transition-all duration-500 cubic-bezier(0.4, 0, 0.2, 1)
         ${isOpen ? 'translate-x-0 opacity-100' : '-translate-x-full min-[1101px]:translate-x-0'}
