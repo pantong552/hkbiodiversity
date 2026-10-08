@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useEffect, useMemo } from 'react';
+import { useState, useRef, useEffect, useMemo, type ReactNode } from 'react';
 import { ChevronDown, Search, Check, X, Filter, RotateCcw } from 'lucide-react';
 import { createPortal } from 'react-dom';
 import { useLanguage } from '../../context/LanguageContext';
@@ -21,11 +21,125 @@ interface MultiSelectDropdownProps {
   placeholder?: string;
   align?: 'left' | 'right';
   minWidth?: string;
+  dropdownWidth?: string;
   variant?: 'default' | 'minimal';
   inferredValue?: string;
   getDisplayLabel?: (val: string) => string;
   /** When false, bilingual English in parentheses is not italic (e.g. taxa group common names). Default true. */
   italicizeEnglish?: boolean;
+}
+
+interface DesktopDropdownOptionProps {
+  option: Option;
+  displayLabel: ReactNode;
+  isSelected: boolean;
+  italicizeEnglish: boolean;
+  onToggle: (name: string) => void;
+}
+
+function DesktopDropdownOption({
+  option,
+  displayLabel,
+  isSelected,
+  italicizeEnglish,
+  onToggle,
+}: DesktopDropdownOptionProps) {
+  const [isMarqueeActive, setIsMarqueeActive] = useState(false);
+  const [marqueeDistance, setMarqueeDistance] = useState(0);
+  const viewportRef = useRef<HTMLSpanElement>(null);
+  const textRef = useRef<HTMLSpanElement>(null);
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const isHoveredRef = useRef(false);
+  const isFocusedRef = useRef(false);
+
+  const displayText = typeof displayLabel === 'string' ? displayLabel : '';
+  const bilingualMatch = displayText.match(/^([^(]+)\s*\((.+)\)$/);
+  const chineseName = bilingualMatch?.[1].trim();
+  const englishName = bilingualMatch?.[2].trim() ?? displayText;
+
+  const startMarquee = () => {
+    if (timeoutRef.current) clearTimeout(timeoutRef.current);
+    timeoutRef.current = setTimeout(() => {
+      const viewport = viewportRef.current;
+      const text = textRef.current;
+      if (viewport && text && text.scrollWidth > viewport.clientWidth) {
+        setMarqueeDistance(text.scrollWidth - viewport.clientWidth);
+        setIsMarqueeActive(true);
+      }
+    }, 500);
+  };
+
+  const stopMarqueeIfInactive = () => {
+    if (isHoveredRef.current || isFocusedRef.current) return;
+    if (timeoutRef.current) clearTimeout(timeoutRef.current);
+    timeoutRef.current = null;
+    setIsMarqueeActive(false);
+  };
+
+  useEffect(() => () => {
+    if (timeoutRef.current) clearTimeout(timeoutRef.current);
+  }, []);
+
+  return (
+    <button
+      type="button"
+      onClick={() => onToggle(option.name)}
+      onMouseEnter={() => {
+        isHoveredRef.current = true;
+        startMarquee();
+      }}
+      onMouseLeave={() => {
+        isHoveredRef.current = false;
+        stopMarqueeIfInactive();
+      }}
+      onFocus={() => {
+        isFocusedRef.current = true;
+        startMarquee();
+      }}
+      onBlur={() => {
+        isFocusedRef.current = false;
+        stopMarqueeIfInactive();
+      }}
+      className={`w-full flex items-center justify-between gap-3 px-3 py-2 rounded-xl transition-all text-left group/item ${
+        isSelected
+          ? 'bg-emerald-50/50 text-emerald-700'
+          : 'text-slate-600 hover:bg-slate-50 hover:text-emerald-900'
+      }`}
+    >
+      <div className="flex items-center gap-2 overflow-hidden flex-1 min-w-0">
+        <div className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 transition-all ${isSelected ? 'bg-emerald-600 border-emerald-600 text-white' : 'bg-white border-slate-200 text-transparent group-hover/item:border-emerald-300'}`}>
+          <Check className="w-3 h-3 stroke-[3px]" />
+        </div>
+        <div className="flex items-baseline gap-1.5 min-w-0 flex-1">
+          {chineseName && (
+            <span className={`text-xs font-bold truncate shrink-0 max-w-[45%] ${isSelected ? 'text-emerald-800' : 'text-slate-800 group-hover/item:text-slate-900'}`}>
+              {chineseName}
+            </span>
+          )}
+          <span ref={viewportRef} className="text-[11px] min-w-0 flex-1 overflow-hidden whitespace-nowrap">
+            <span
+              ref={textRef}
+              className={`${chineseName
+                ? `${isSelected ? 'text-emerald-600/80 font-medium' : 'text-slate-400 font-normal'} ${italicizeEnglish ? 'italic' : 'not-italic'} tracking-tight text-[11px]`
+                : `text-xs font-bold ${isSelected ? 'text-emerald-700' : 'text-slate-700'}`
+              } inline-block whitespace-nowrap`}
+              style={{
+                transform: isMarqueeActive ? `translateX(-${marqueeDistance}px)` : 'translateX(0)',
+                transition: isMarqueeActive
+                  ? `transform ${Math.max(2, marqueeDistance / 45)}s linear`
+                  : 'transform 150ms linear',
+              }}
+            >
+              {chineseName ? `(${englishName})` : displayLabel}
+            </span>
+          </span>
+        </div>
+      </div>
+      <span className={`text-[9px] font-bold shrink-0 ${isSelected ? 'text-emerald-600/70' : 'text-slate-300'}`}>
+        {option.count}
+      </span>
+    </button>
+  );
 }
 
 export default function MultiSelectDropdown({
@@ -36,6 +150,7 @@ export default function MultiSelectDropdown({
   placeholder,
   align = 'left',
   minWidth = '240px',
+  dropdownWidth,
   variant = 'default',
   inferredValue,
   getDisplayLabel,
@@ -235,6 +350,8 @@ export default function MultiSelectDropdown({
                 left: align === 'right' ? (coords.left + coords.width) : coords.left,
                 x: align === 'right' ? '-100%' : '0%',
                 minWidth,
+                width: dropdownWidth,
+                maxWidth: 'calc(100vw - 2rem)',
                 pointerEvents: 'auto'
               }}
             >
@@ -273,49 +390,17 @@ export default function MultiSelectDropdown({
                 ) : (
                   <>
                     {filteredOptions.slice(0, 500).map((opt) => {
-                      const isSelected = localSelected.includes(opt.name);
                       const isScientific = label.toLowerCase().includes('scientific name') || label.includes('學名');
                       const displayLabel = isScientific ? formatScientificName(opt.display) : opt.display;
                       return (
-                        <button
+                        <DesktopDropdownOption
                           key={opt.name}
-                          onClick={() => toggleOption(opt.name)}
-                          className={`w-full flex items-center justify-between px-3 py-2 rounded-xl transition-all text-left group/item ${
-                            isSelected 
-                              ? 'bg-emerald-50/50 text-emerald-700' 
-                              : 'text-slate-600 hover:bg-slate-50 hover:text-emerald-900'
-                          }`}
-                        >
-                          <div className="flex items-center gap-2 overflow-hidden flex-1 min-w-0">
-                            <div className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 transition-all ${isSelected ? 'bg-emerald-600 border-emerald-600 text-white' : 'bg-white border-slate-200 text-transparent group-hover/item:border-emerald-300'}`}>
-                              <Check className="w-3 h-3 stroke-[3px]" />
-                            </div>
-                            {(() => {
-                              const bilingualMatch = typeof displayLabel === 'string' ? displayLabel.match(/^([^(]+)\s*\((.+)\)$/) : null;
-                              if (bilingualMatch) {
-                                const [, chi, en] = bilingualMatch;
-                                return (
-                                  <div className="flex items-baseline gap-1.5 truncate min-w-0">
-                                    <span className={`text-xs font-bold truncate ${isSelected ? 'text-emerald-800' : 'text-slate-800 group-hover/item:text-slate-900'}`}>
-                                      {chi.trim()}
-                                    </span>
-                                    <span className={`text-[11px] ${isSelected ? 'text-emerald-600/80 font-medium' : 'text-slate-400 font-normal'} ${italicizeEnglish ? 'italic' : 'not-italic'} tracking-tight truncate shrink-0`}>
-                                      ({en.trim()})
-                                    </span>
-                                  </div>
-                                );
-                              }
-                              return (
-                                <span className={`text-xs font-bold truncate ${isSelected ? 'text-emerald-700' : 'text-slate-700'}`}>
-                                  {displayLabel}
-                                </span>
-                              );
-                            })()}
-                          </div>
-                          <span className={`text-[9px] font-bold shrink-0 ${isSelected ? 'text-emerald-600/70' : 'text-slate-300'}`}>
-                            {opt.count}
-                          </span>
-                        </button>
+                          option={opt}
+                          displayLabel={displayLabel}
+                          isSelected={localSelected.includes(opt.name)}
+                          italicizeEnglish={italicizeEnglish}
+                          onToggle={toggleOption}
+                        />
                       );
                     })}
                     {filteredOptions.length > 500 && (
@@ -436,11 +521,11 @@ export default function MultiSelectDropdown({
                           if (bilingualMatch) {
                             const [, chi, en] = bilingualMatch;
                             return (
-                              <div className="flex items-baseline gap-2 truncate min-w-0">
-                                <span className={`font-black text-sm ${isSelected ? 'text-emerald-950' : 'text-slate-800'}`}>
+                              <div className="flex items-baseline gap-2 min-w-0 flex-1">
+                                <span className={`font-black text-sm truncate shrink-0 max-w-[45%] ${isSelected ? 'text-emerald-950' : 'text-slate-800'}`}>
                                   {chi.trim()}
                                 </span>
-                                <span className={`text-xs ${isSelected ? 'text-emerald-700/80 font-medium' : 'text-slate-400 font-normal'} ${italicizeEnglish ? 'italic' : 'not-italic'} tracking-tight truncate shrink-0`}>
+                                <span className={`text-xs min-w-0 flex-1 ${isSelected ? 'text-emerald-700/80 font-medium' : 'text-slate-400 font-normal'} ${italicizeEnglish ? 'italic' : 'not-italic'} tracking-tight truncate`}>
                                   ({en.trim()})
                                 </span>
                               </div>

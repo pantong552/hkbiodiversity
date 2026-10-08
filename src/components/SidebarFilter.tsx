@@ -507,6 +507,7 @@ export default function SidebarFilter({
                       selectedValues={selected.majorGroup || []}
                       onChange={handleMajorGroupChange}
                       placeholder={language === 'zh' ? '主分類群 (Major group)' : 'Major group'}
+                      dropdownWidth="280px"
                       italicizeEnglish={false}
                     />
                   )}
@@ -516,6 +517,7 @@ export default function SidebarFilter({
                     selectedValues={selected.taxonomy.informal_group_eng}
                     onChange={(values) => handleTaxonomyChange('informal_group_eng', values)}
                     placeholder={TAXONOMY_LABELS.informal_group_eng}
+                    dropdownWidth="280px"
                     inferredValue={inferredParents.informal_group_eng}
                     italicizeEnglish={false}
                     getDisplayLabel={(val) => {
@@ -551,6 +553,7 @@ export default function SidebarFilter({
                           selectedValues={selected.taxonomy[level]}
                           onChange={(values) => handleTaxonomyChange(level, values)}
                           placeholder={TAXONOMY_LABELS[level]}
+                          dropdownWidth="280px"
                           inferredValue={inferredParents[level]}
                           getDisplayLabel={(val) => {
                             if (language !== 'zh') return val;
