@@ -8,6 +8,7 @@ import QuickFilterSearch from './ui/QuickFilterSearch';
 import { getIUCNConfig, IUCN_CONFIG } from '../constants/statusStyles';
 import MultiSelectDropdown from './ui/MultiSelectDropdown';
 import TaxaGroupSwitcher from './search/TaxaGroupSwitcher';
+import { useMobileBackHandler } from '../hooks/useMobileBackHandler';
 
 
 interface SidebarFilterProps {
@@ -41,6 +42,7 @@ export default function SidebarFilter({
 }: SidebarFilterProps) {
   const { language, t } = useLanguage();
   const { getTaxonomyChi } = useTaxonomy();
+  useMobileBackHandler(isOpen, onClose);
 
   const TAXONOMY_LABELS: Record<TaxonomyLevel, string> = {
     phylum_eng: language === 'zh' ? '門 (Phylum)' : 'Phylum',
