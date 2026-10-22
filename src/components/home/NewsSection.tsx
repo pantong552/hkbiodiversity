@@ -8,9 +8,24 @@ interface NewsItem {
   id: string | number;
   title: string;
   date: string;
+  dateMonth?: string;
+  dateDay?: number;
   type: 'announcement' | 'new_species';
   link: string;
   category?: string;
+}
+
+function getDateDisplay(value: string | null | undefined) {
+  if (!value) return { date: '' };
+
+  const parsedDate = new Date(value);
+  if (Number.isNaN(parsedDate.getTime())) return { date: '' };
+
+  return {
+    date: parsedDate.toISOString().split('T')[0],
+    dateMonth: parsedDate.toLocaleString('en-US', { month: 'short' }),
+    dateDay: parsedDate.getDate()
+  };
 }
 
 interface NewsSectionProps {
@@ -22,7 +37,7 @@ interface NewsSectionProps {
     created_at?: string | null;
     type: 'fauna' | 'flora';
   }[];
-  news: { id: string | number; title_chi: string; title_eng: string; published_at: string; category: string }[];
+  news: { id: string | number; title_chi: string; title_eng: string; published_at: string | null; category: string }[];
 }
 
 export default function NewsSection({ latestSpecies, news }: NewsSectionProps) {
@@ -31,7 +46,7 @@ export default function NewsSection({ latestSpecies, news }: NewsSectionProps) {
   const announcements: NewsItem[] = news.map(n => ({
     id: n.id,
     title: language === 'zh' ? n.title_chi : n.title_eng,
-    date: new Date(n.published_at).toISOString().split('T')[0],
+    ...getDateDisplay(n.published_at),
     type: 'announcement',
     link: `/news?id=${n.id}`,
     category: language === 'zh' ? (
@@ -46,7 +61,7 @@ export default function NewsSection({ latestSpecies, news }: NewsSectionProps) {
   const speciesNews: NewsItem[] = latestSpecies.map(s => ({
     id: s.taxa_id,
     title: (language === 'zh' ? (s.common_name_chi || s.scientific_name) : (s.common_name_eng || s.scientific_name)),
-    date: s.created_at ? new Date(s.created_at).toISOString().split('T')[0] : '',
+    ...getDateDisplay(s.created_at),
     type: 'new_species',
     link: `/database?species=${s.taxa_id}`,
     category: s.type === 'fauna' ? t('home.fauna') : t('home.flora')
@@ -101,23 +116,27 @@ export default function NewsSection({ latestSpecies, news }: NewsSectionProps) {
                   href={item.link}
                   className="flex items-center gap-4 p-3.5 bg-white rounded-2xl border border-slate-200/60 hover:border-slate-900/20 hover:shadow-xl hover:shadow-slate-900/5 transition-all duration-300 group overflow-hidden box-border"
                 >
-                   <div className="hidden md:flex flex-col items-center justify-center w-12 h-12 bg-slate-50 rounded-xl border border-slate-100 group-hover:bg-slate-900 group-hover:border-slate-900 transition-colors shrink-0" suppressHydrationWarning>
-                    <span className="text-[9px] font-black text-slate-400 group-hover:text-slate-300 uppercase tracking-tighter leading-none">
-                      {new Date(item.date).toLocaleString('en-US', { month: 'short' })}
-                    </span>
-                    <span className="text-lg font-black text-slate-700 group-hover:text-white leading-none mt-0.5">
-                      {new Date(item.date).getDate()}
-                    </span>
-                  </div>
+                  {item.dateDay !== undefined && (
+                    <div className="hidden md:flex flex-col items-center justify-center w-12 h-12 bg-slate-50 rounded-xl border border-slate-100 group-hover:bg-slate-900 group-hover:border-slate-900 transition-colors shrink-0" suppressHydrationWarning>
+                      <span className="text-[9px] font-black text-slate-400 group-hover:text-slate-300 uppercase tracking-tighter leading-none">
+                        {item.dateMonth}
+                      </span>
+                      <span className="text-lg font-black text-slate-700 group-hover:text-white leading-none mt-0.5">
+                        {item.dateDay}
+                      </span>
+                    </div>
+                  )}
 
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-1">
                       <span className={`px-2 py-0.5 rounded-md text-[8px] font-black uppercase tracking-widest border ${getCategoryStyles(item.category, 'announcement')}`}>
                         {item.category}
                       </span>
-                      <span className="md:hidden text-[10px] font-bold text-slate-400" suppressHydrationWarning>
-                        {item.date}
-                      </span>
+                      {item.date && (
+                        <span className="md:hidden text-[10px] font-bold text-slate-400" suppressHydrationWarning>
+                          {item.date}
+                        </span>
+                      )}
                     </div>
                     <h3 className={`${language === 'en' ? 'text-xs md:text-sm' : 'text-sm md:text-base'} font-black text-slate-800 group-hover:text-slate-900 transition-colors truncate`}>
                       {item.title}
@@ -159,23 +178,27 @@ export default function NewsSection({ latestSpecies, news }: NewsSectionProps) {
                   href={item.link}
                   className="flex items-center gap-4 p-3.5 bg-white rounded-2xl border border-slate-200/60 hover:border-emerald-500/30 hover:shadow-xl hover:shadow-emerald-500/5 transition-all duration-300 group overflow-hidden box-border"
                 >
-                  <div className="hidden md:flex flex-col items-center justify-center w-12 h-12 bg-emerald-50 rounded-xl border border-emerald-100 group-hover:bg-emerald-600 group-hover:border-emerald-600 transition-colors shrink-0" suppressHydrationWarning>
-                    <span className="text-[9px] font-black text-emerald-400 group-hover:text-emerald-100 uppercase tracking-tighter leading-none">
-                      {new Date(item.date).toLocaleString('en-US', { month: 'short' })}
-                    </span>
-                    <span className="text-lg font-black text-emerald-700 group-hover:text-white leading-none mt-0.5">
-                      {new Date(item.date).getDate()}
-                    </span>
-                  </div>
+                  {item.dateDay !== undefined && (
+                    <div className="hidden md:flex flex-col items-center justify-center w-12 h-12 bg-emerald-50 rounded-xl border border-emerald-100 group-hover:bg-emerald-600 group-hover:border-emerald-600 transition-colors shrink-0" suppressHydrationWarning>
+                      <span className="text-[9px] font-black text-emerald-400 group-hover:text-emerald-100 uppercase tracking-tighter leading-none">
+                        {item.dateMonth}
+                      </span>
+                      <span className="text-lg font-black text-emerald-700 group-hover:text-white leading-none mt-0.5">
+                        {item.dateDay}
+                      </span>
+                    </div>
+                  )}
 
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-1">
                       <span className={`px-2 py-0.5 rounded-md text-[8px] font-black uppercase tracking-widest border ${getCategoryStyles(item.category, 'new_species')}`}>
                         {item.category}
                       </span>
-                      <span className="md:hidden text-[10px] font-bold text-slate-400" suppressHydrationWarning>
-                        {item.date}
-                      </span>
+                      {item.date && (
+                        <span className="md:hidden text-[10px] font-bold text-slate-400" suppressHydrationWarning>
+                          {item.date}
+                        </span>
+                      )}
                     </div>
                     <div className="flex flex-col">
                       <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider leading-none mb-1">{t('home.added_species')}</span>
