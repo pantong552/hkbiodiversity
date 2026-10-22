@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { createPortal } from 'react-dom';
-import { animate, motion, AnimatePresence, useAnimation, useMotionValue } from 'framer-motion';
+import { animate, motion, AnimatePresence, useMotionValue } from 'framer-motion';
 import { 
   X, 
   ChevronLeft, 
@@ -15,7 +15,6 @@ import {
   Pause, 
   Maximize,
   Minimize,
-  Info,
   Calendar,
   ExternalLink,
   Loader2,
@@ -48,11 +47,10 @@ export default function EnrichedLightbox({
   onNavigate,
   commonName,
   scientificName,
-  taxaId,
   onDeletePhoto
 }: EnrichedLightboxProps) {
   const { profile } = useAuth();
-  const { t, language } = useLanguage();
+  const { language } = useLanguage();
   const [isDeleting, setIsDeleting] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [scale, setScale] = useState(1);
@@ -66,7 +64,6 @@ export default function EnrichedLightbox({
   const uiTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const autoplayTimerRef = useRef<NodeJS.Timeout | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
-  const imageRef = useRef<HTMLDivElement>(null);
   const scaleRef = useRef(1);
   const imageX = useMotionValue(0);
   const imageY = useMotionValue(0);
@@ -419,10 +416,6 @@ export default function EnrichedLightbox({
             drag={scale > 1}
             dragConstraints={scale > 1 ? undefined : { left: 0, right: 0, top: 0, bottom: 0 }}
             style={{ x: imageX, y: imageY, scale: imageScale }}
-            onDragEnd={(_, info) => {
-               // 這裡可以加入邊界檢查，防止圖片飛出去
-               // 暫時保持靈活
-            }}
             className="relative w-full h-full flex items-center justify-center cursor-grab active:cursor-grabbing"
             onDoubleClick={resetZoom}
           >

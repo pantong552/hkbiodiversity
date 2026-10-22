@@ -1,7 +1,8 @@
 'use client';
 
-import { useState, useEffect, useLayoutEffect, useRef } from 'react';
-import { Leaf, Menu, X, User, LogOut, Settings, Globe, Camera, Sparkles } from 'lucide-react';
+import Image from 'next/image';
+import { useState, useEffect, useRef, useSyncExternalStore } from 'react';
+import { Menu, X, User, LogOut, Settings, Globe, Camera } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { motion } from 'framer-motion';
@@ -17,17 +18,29 @@ interface HeaderProps {
 export default function Header({ isHomePage: propIsHomePage }: HeaderProps = {}) {
   const { language, setLanguage, t } = useLanguage();
   const { user, profile, signOut, requireAuth, isLoading: isAuthLoading } = useAuth();
+  const { openSpeciesIds, isExpanded, isGalleryOpen, isUploadModalOpen, isEditModalOpen, isLightboxOpen, toggleExpand, setIsAccountOpen, isAccountOpen, setAutoIdOpen } = useSpeciesPanel();
   const pathname = usePathname();
-  const [isScrolled, setIsScrolled] = useState(false);
+  const currentScrollY = useSyncExternalStore(
+    (onChange) => {
+      window.addEventListener('scroll', onChange, { passive: true });
+      const panel = isExpanded ? document.getElementById('species-panel-scroll-container') : null;
+      panel?.addEventListener('scroll', onChange, { passive: true });
+      return () => {
+        window.removeEventListener('scroll', onChange);
+        panel?.removeEventListener('scroll', onChange);
+      };
+    },
+    () => {
+      if (isExpanded) {
+        return document.getElementById('species-panel-scroll-container')?.scrollTop ?? 0;
+      }
+      return window.scrollY;
+    },
+    () => 0
+  );
+  const isScrolled = currentScrollY > 20;
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const [isVisible, setIsVisible] = useState(true);
-
-  // 在瀏覽器繪製前立即同步 isScrolled 狀態，防止「閃白」
-  useLayoutEffect(() => {
-    setIsScrolled(window.scrollY > 20);
-  }, []);
-
-  const { openSpeciesIds, isExpanded, isGalleryOpen, isUploadModalOpen, isFilterOpen, isEditModalOpen, isLightboxOpen, toggleExpand, setIsAccountOpen, isAccountOpen, setAutoIdOpen } = useSpeciesPanel();
+  const [isVisible, setIsVisible] = useState(currentScrollY <= 50);
 
   const openAutoId = (featureName: string) => {
     if (isAuthLoading) {
@@ -48,20 +61,16 @@ export default function Header({ isHomePage: propIsHomePage }: HeaderProps = {})
   const menuToggleRef = useRef<HTMLButtonElement>(null);
   const isMobileMenuOpenRef = useRef(isMobileMenuOpen);
 
-  // 保持 isMobileMenuOpenRef 與最新 state 同步，且開啟 Menu 時確保 Header 保持顯示
+  // 保持 isMobileMenuOpenRef 與最新 state 同步
   useEffect(() => {
     isMobileMenuOpenRef.current = isMobileMenuOpen;
-    if (isMobileMenuOpen) {
-      setIsVisible(true);
-    }
   }, [isMobileMenuOpen]);
 
   // 監聽 BFCache（Back-Forward Cache）頁面恢復事件
   // 當 Refresh 或返回時從快取恢復頁面，強制重新同步 scroll 狀態
   useEffect(() => {
-    const handlePageShow = (e: PageTransitionEvent) => {
+    const handlePageShow = () => {
       // e.persisted === true 代表從 BFCache 恢復（不是全新加載）
-      setIsScrolled(window.scrollY > 20);
       setIsVisible(true);
     };
     window.addEventListener('pageshow', handlePageShow);
@@ -88,9 +97,6 @@ export default function Header({ isHomePage: propIsHomePage }: HeaderProps = {})
         isNearBottom = (documentHeight - (currentScrollY + windowHeight)) <= 30;
       }
 
-      // 切換透明度/高度
-      setIsScrolled(currentScrollY > 20);
-
       // 智慧顯示/隱藏邏輯
       const deltaY = currentScrollY - lastScrollYRef.current;
 
@@ -114,15 +120,6 @@ export default function Header({ isHomePage: propIsHomePage }: HeaderProps = {})
       : (typeof window !== 'undefined' ? window.scrollY : 0);
     
     lastScrollYRef.current = currentScrollY;
-    setIsScrolled(currentScrollY > 20);
-
-    // 根據切換後的目標頁面/容器是否在頂部，自動決定顯示或隱藏 Header
-    if (currentScrollY > 50) {
-      setIsVisible(false);
-    } else {
-      setIsVisible(true);
-    }
-
     window.addEventListener('scroll', handleScroll, { passive: true });
     
     let panelContainer: HTMLElement | null = null;
@@ -201,9 +198,11 @@ export default function Header({ isHomePage: propIsHomePage }: HeaderProps = {})
             {/* Ambient Glow Background */}
             <div className="absolute inset-0 bg-emerald-500/10 blur-2xl rounded-full group-hover:bg-emerald-500/20 transition-all duration-700" />
 
-            <img
+            <Image
               src="/logo.svg"
               alt="HKBC Logo"
+              fill
+              sizes="(max-width: 768px) 56px, 64px"
               className="w-full h-full object-contain relative z-10 filter drop-shadow-[0_4px_12px_rgba(103,151,88,0.15)] group-hover:drop-shadow-[0_8px_24px_rgba(103,151,88,0.25)] transition-all duration-500"
             />
           </motion.div>
@@ -319,9 +318,12 @@ export default function Header({ isHomePage: propIsHomePage }: HeaderProps = {})
                 className={`flex items-center gap-2 px-4 py-2 rounded-2xl border transition-all duration-500 cursor-pointer group ${isHeaderTransparent ? 'bg-white/10 border-white/20 hover:bg-white/20' : 'bg-slate-50 border-slate-100 hover:border-emerald-200 hover:bg-emerald-50/50'}`}
               >
                 {user.user_metadata.avatar_url ? (
-                  <img
+                  <Image
                     src={user.user_metadata.avatar_url}
                     alt="User Avatar"
+                    width={24}
+                    height={24}
+                    unoptimized
                     className="w-6 h-6 rounded-full"
                   />
                 ) : (
@@ -444,9 +446,12 @@ export default function Header({ isHomePage: propIsHomePage }: HeaderProps = {})
                     className="flex items-center gap-3 px-4 py-3 w-full bg-slate-50 rounded-2xl border border-slate-100 hover:border-emerald-200 hover:bg-emerald-50/50 transition-all duration-300 cursor-pointer"
                   >
                     {user.user_metadata.avatar_url ? (
-                      <img
+                      <Image
                         src={user.user_metadata.avatar_url}
                         alt="User Avatar"
+                        width={40}
+                        height={40}
+                        unoptimized
                         className="w-10 h-10 rounded-full"
                       />
                     ) : (
@@ -481,4 +486,3 @@ export default function Header({ isHomePage: propIsHomePage }: HeaderProps = {})
     </div>
   );
 }
-

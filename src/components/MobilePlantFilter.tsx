@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect } from 'react';
-import { X, Filter } from 'lucide-react';
+import { X } from 'lucide-react';
 import { useLanguage } from '@/context/LanguageContext';
 import { PlantFilterState } from '@/types/plants';
 import PlantFilterPanel from './plants/PlantFilterPanel';
@@ -12,9 +12,9 @@ interface MobilePlantFilterProps {
   onClose: () => void;
   filters: PlantFilterState;
   setFilters: React.Dispatch<React.SetStateAction<PlantFilterState>>;
-  availableCategories: any[];
-  availableFamilies: any[];
-  availableGenuses: any[];
+  availableCategories: { name: string; display: string; count?: number }[];
+  availableFamilies: { name: string; display: string; count?: number }[];
+  availableGenuses: { name: string; display: string; count?: number }[];
   onReset: () => void;
   onSearchSubmit?: (val: string) => void;
   activeTaxaType?: TaxaType;

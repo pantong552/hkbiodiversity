@@ -1,5 +1,6 @@
 'use client';
 
+import Image from 'next/image';
 import React, { useRef, useState, useEffect } from 'react';
 
 interface SpectrogramViewerProps {
@@ -102,9 +103,12 @@ export function SpectrogramViewer({
         }`}
       >
         <div className="relative inline-block min-w-full">
-          <img
+          <Image
             src={sonoImgUrl}
             alt={`Full Spectrogram for XC${recId}`}
+            width={1200}
+            height={400}
+            unoptimized
             className="w-auto max-w-none block rounded-md pointer-events-none"
             onError={(e) => {
               (e.target as HTMLElement).style.display = 'none';

@@ -281,7 +281,7 @@ export function formatNativeStatus(status: string | undefined | null, language: 
  * @param size 所需尺寸 ('square' | 'medium' | 'large')
  * @returns 最終圖片 URL
  */
-export function getSpeciesImageUrl(species: any, size: 'square' | 'medium' | 'large' = 'medium'): string {
+export function getSpeciesImageUrl(species: { profile_picture?: string | null; inat_id?: number | string | null } | null | undefined, size: 'square' | 'medium' | 'large' = 'medium'): string {
   const profilePic = species?.profile_picture;
   const inatId = species?.inat_id;
   const placeholder = '/images/placeholder/no-species-image.svg';
@@ -370,5 +370,3 @@ export function renderFormattedText(text: string | undefined | null): React.Reac
 
   return <>{parts}</>;
 }
-
-

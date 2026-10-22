@@ -1,5 +1,6 @@
 import { supabase } from './supabase';
 import { Species } from '@/types/species';
+import { PlantSpecies } from '@/types/plants';
 
 /**
  * Fetch a single species by ID (Supports taxa_id, numeric ID, or legacy inat_id)
@@ -49,7 +50,7 @@ export async function getSpeciesById(id: string | number): Promise<Species | nul
 }
 
 // 輔助函數：將植物資料映射為 Species 結構以便 Metadata 使用
-function mapPlantToSpecies(plantData: any): Species {
+function mapPlantToSpecies(plantData: PlantSpecies): Species {
   return {
     ...plantData,
     taxa_group: 'FLORA',

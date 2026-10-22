@@ -1,11 +1,12 @@
 'use client';
 
 import React, { useState } from 'react';
-import { X, Plus, Edit2, Trash2, FolderPlus, Check, AlertCircle } from 'lucide-react';
+import { X, Edit2, Trash2, FolderPlus, Check, AlertCircle } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { EcoCategory } from '@/types/journal';
 import { useLanguage } from '@/context/LanguageContext';
 import { supabase } from '@/lib/supabase';
+import { getErrorMessage } from '@/utils/errors';
 
 interface CategoryAdminModalProps {
   isOpen: boolean;
@@ -90,9 +91,9 @@ export default function CategoryAdminModal({
 
       handleResetForm();
       onRefresh();
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Error saving category:', err);
-      setErrorMsg(err.message || 'Failed to save category.');
+      setErrorMsg(getErrorMessage(err, 'Failed to save category.'));
     } finally {
       setIsSubmitting(false);
     }
@@ -104,8 +105,8 @@ export default function CategoryAdminModal({
       const { error } = await supabase.from('eco_categories').delete().eq('id', id);
       if (error) throw error;
       onRefresh();
-    } catch (err: any) {
-      alert(err.message || 'Failed to delete category.');
+    } catch (err: unknown) {
+      alert(getErrorMessage(err, 'Failed to delete category.'));
     }
   };
 

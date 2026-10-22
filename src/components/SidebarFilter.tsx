@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
-import { ChevronDown, ChevronRight, Search, Filter, X, CheckCircle2, RotateCcw, Shield } from 'lucide-react';
-import { Species, TaxonomyLevel } from '../types/species';
+import { ChevronDown, ChevronRight, X, CheckCircle2, Shield } from 'lucide-react';
+import { TaxonomyLevel } from '../types/species';
 import { useLanguage } from '../context/LanguageContext';
 import { useTaxonomy } from '../context/TaxonomyContext';
 import { supabase } from '@/lib/supabase';
@@ -29,6 +29,8 @@ export interface SelectedFilters {
   isCap170?: boolean | null;
   isCap586?: boolean | null;
 }
+type TaxonomyOption = { name: string; display: string; count: number };
+type StatsRow = { name?: string; chi?: string; count?: number | string };
 
 export default function SidebarFilter({
   isOpen,
@@ -56,7 +58,7 @@ export default function SidebarFilter({
   const IUCN_STATUSES = Object.keys(IUCN_CONFIG);
 
 
-  const [expanded, setExpanded] = useState<Record<string, boolean>>({
+  const [expandedState, setExpandedState] = useState<Record<string, boolean>>({
     taxonomy: true,
     protection: true,
     iucn: true,
@@ -69,7 +71,7 @@ export default function SidebarFilter({
     informal_group_eng: false
   });
 
-  const [selected, setSelected] = useState<SelectedFilters>(selectedFilters || {
+  const [internalSelected, setInternalSelected] = useState<SelectedFilters>(selectedFilters || {
     taxonomy: {
       phylum_eng: [],
       class_eng: [],
@@ -84,39 +86,29 @@ export default function SidebarFilter({
     isCap586: null,
   });
 
-  // 1. Sync local selected state with external selectedFilters prop
-  useEffect(() => {
-    if (selectedFilters) {
-      setSelected(selectedFilters);
-
-      // Auto-expand levels that have selected items
-      const newExpanded = { ...expanded };
-      let hasChange = false;
-      Object.entries(selectedFilters.taxonomy).forEach(([level, values]) => {
-        if (values.length > 0 && !expanded[level]) {
-          newExpanded[level] = true;
-          hasChange = true;
-        }
-      });
-      if (hasChange) setExpanded(newExpanded);
-    }
-  }, [selectedFilters]);
+  const selected = selectedFilters ?? internalSelected;
+  const expanded = useMemo(() => {
+    if (!selectedFilters) return expandedState;
+    const nextExpanded = { ...expandedState };
+    Object.entries(selectedFilters.taxonomy).forEach(([level, values]) => {
+      if (values.length > 0) nextExpanded[level] = true;
+    });
+    return nextExpanded;
+  }, [expandedState, selectedFilters]);
 
   const [taxonomyOptions, setTaxonomyOptions] = useState<Record<TaxonomyLevel, { name: string; display: string; count: number }[]>>({
     phylum_eng: [], class_eng: [], order_eng: [], family_eng: [], genus_eng: [], informal_group_eng: []
   });
   const [majorGroupOptions, setMajorGroupOptions] = useState<{ name: string; display: string; count: number }[]>([]);
   const [iucnCounts, setIucnCounts] = useState<Record<string, number>>({});
+  const [statsTaxaType, setStatsTaxaType] = useState(activeTaxaType);
   const fetchIdRef = useRef(0);
 
-  // 當 activeTaxaType 改變時，立即重設選項以避免殘留上一物種群組的資料
-  useEffect(() => {
-    setTaxonomyOptions({
-      phylum_eng: [], class_eng: [], order_eng: [], family_eng: [], genus_eng: [], informal_group_eng: []
-    });
-    setMajorGroupOptions([]);
-    setIucnCounts({});
-  }, [activeTaxaType]);
+  const activeTaxonomyOptions = useMemo(() => statsTaxaType === activeTaxaType ? taxonomyOptions : {
+    phylum_eng: [], class_eng: [], order_eng: [], family_eng: [], genus_eng: [], informal_group_eng: []
+  }, [statsTaxaType, activeTaxaType, taxonomyOptions]);
+  const activeMajorGroupOptions = statsTaxaType === activeTaxaType ? majorGroupOptions : [];
+  const activeIucnCounts = statsTaxaType === activeTaxaType ? iucnCounts : {};
 
   useEffect(() => {
     async function fetchStats() {
@@ -129,7 +121,7 @@ export default function SidebarFilter({
 
         // 為每個層級獨立獲取統計，排除該層級自身的選取值
         const levelPromises = levels.map(async (level) => {
-          const rpcParams: any = {
+          const rpcParams: Record<string, string[] | string | boolean | null> = {
             p_phylum_eng: level === 'phylum_eng' ? [] : selected.taxonomy.phylum_eng,
             p_class_eng: level === 'class_eng' ? [] : selected.taxonomy.class_eng,
             p_order_eng: level === 'order_eng' ? [] : selected.taxonomy.order_eng,
@@ -155,15 +147,15 @@ export default function SidebarFilter({
                 .select(level);
               if (dbData) {
                 const countMap = new Map<string, number>();
-                dbData.forEach((row: any) => {
-                  const val = (row[level] as string || '').trim();
+                dbData.forEach((row: Record<string, unknown>) => {
+                  const val = typeof row[level] === 'string' ? row[level].trim() : '';
                   if (val) countMap.set(val, (countMap.get(val) || 0) + 1);
                 });
                 const fakeLevelData = Array.from(countMap.entries()).map(([name, count]) => ({ name, count }));
                 res = {
                   data: { ...(res.data || {}), [level]: fakeLevelData },
                   error: null
-                } as any;
+                };
               }
             } catch (fbErr) {
               console.warn('Fallback failed for', level, fbErr);
@@ -173,7 +165,7 @@ export default function SidebarFilter({
         });
 
         // Keep the other filters in the facet count, but don't filter out other IUCN choices.
-        const iucnParams: any = {
+        const iucnParams: Record<string, string[] | string | boolean | null> = {
           p_phylum_eng: selected.taxonomy.phylum_eng,
           p_class_eng: selected.taxonomy.class_eng,
           p_order_eng: selected.taxonomy.order_eng,
@@ -207,22 +199,30 @@ export default function SidebarFilter({
 
         // 檢查請求是否過時 (Prevent race condition)
         if (currentFetchId !== fetchIdRef.current) return;
+        setStatsTaxaType(activeTaxaType);
 
-        const newOptions: any = {};
+        const newOptions: Record<TaxonomyLevel, TaxonomyOption[]> = {
+          phylum_eng: [],
+          class_eng: [],
+          order_eng: [],
+          family_eng: [],
+          genus_eng: [],
+          informal_group_eng: [],
+        };
 
         levelResults.forEach(({ level, data, error }) => {
           if (!error && data) {
             const rawData = data[level] || [];
             const uniqueItems = new Map<string, { name: string; display: string; count: number }>();
 
-            rawData.forEach((item: any) => {
+            rawData.forEach((item: StatsRow) => {
               const name = item.name || 'Unknown';
-              const count = parseInt(item.count) || 0;
+              const count = Number.parseInt(String(item.count ?? 0), 10) || 0;
               
               // 優先從 TaxonomyContext 獲取中文名稱
               let chiName = item.chi || name;
               if (language === 'zh') {
-                const rank = level.replace('_eng', '') as any;
+                const rank = level.replace('_eng', '');
                 const mappedChi = getTaxonomyChi(rank, activeTaxaType === 'fungi' ? 'fungi' : 'fauna', name);
                 if (mappedChi && mappedChi !== name) {
                   chiName = mappedChi;
@@ -257,7 +257,7 @@ export default function SidebarFilter({
               if (!uniqueItems.has(selName)) {
                 let chiName = selName;
                 if (language === 'zh') {
-                  const rank = level.replace('_eng', '') as any;
+                  const rank = level.replace('_eng', '');
                   const mappedChi = getTaxonomyChi(rank, activeTaxaType === 'fungi' ? 'fungi' : 'fauna', selName);
                   if (mappedChi && mappedChi !== selName) chiName = mappedChi;
                 }
@@ -325,8 +325,6 @@ export default function SidebarFilter({
     fetchStats();
   }, [selected, language, searchQuery, getTaxonomyChi, activeTaxaType]);
 
-  const filterOptions = taxonomyOptions;
-
   useEffect(() => {
     const isMobile = window.innerWidth <= 1100;
     if (isOpen && isMobile) {
@@ -340,7 +338,7 @@ export default function SidebarFilter({
   }, [isOpen]);
 
   const toggleExpand = (key: string) => {
-    setExpanded(prev => ({ ...prev, [key]: !prev[key] }));
+    setExpandedState(prev => ({ ...prev, [key]: !prev[key] }));
   };
 
   // 計算推導出的父級名稱 (Inferred parent display label)
@@ -360,8 +358,8 @@ export default function SidebarFilter({
     const hasTaxonomySelection = levels.some(lvl => selected.taxonomy[lvl]?.length > 0);
 
     // 物種類群 (informal_group_eng) 自動推導
-    if (hasTaxonomySelection && (!selected.taxonomy.informal_group_eng || selected.taxonomy.informal_group_eng.length === 0) && taxonomyOptions.informal_group_eng?.length > 0) {
-      const opts = taxonomyOptions.informal_group_eng;
+    if (hasTaxonomySelection && (!selected.taxonomy.informal_group_eng || selected.taxonomy.informal_group_eng.length === 0) && activeTaxonomyOptions.informal_group_eng?.length > 0) {
+      const opts = activeTaxonomyOptions.informal_group_eng;
       if (opts.length <= 3) {
         inferred.informal_group_eng = opts.map(o => o.display).join(', ');
       } else {
@@ -373,8 +371,8 @@ export default function SidebarFilter({
       // 只有當「更下級的層次（idx + 1 以後）」有手動選擇時，才向上推導父級標籤
       const hasLowerSelection = levels.slice(idx + 1).some(lowerLevel => selected.taxonomy[lowerLevel]?.length > 0);
 
-      if (hasLowerSelection && (!selected.taxonomy[level] || selected.taxonomy[level].length === 0) && taxonomyOptions[level]?.length > 0) {
-        const opts = taxonomyOptions[level];
+      if (hasLowerSelection && (!selected.taxonomy[level] || selected.taxonomy[level].length === 0) && activeTaxonomyOptions[level]?.length > 0) {
+        const opts = activeTaxonomyOptions[level];
         if (opts.length <= 3) {
           inferred[level] = opts.map(o => o.display).join(', ');
         } else {
@@ -384,24 +382,24 @@ export default function SidebarFilter({
     });
 
     return inferred;
-  }, [selected.taxonomy, taxonomyOptions, language]);
+  }, [selected.taxonomy, activeTaxonomyOptions, language]);
 
   const handleTaxonomyChange = (level: TaxonomyLevel, values: string[]) => {
     const newSelected = { ...selected };
     newSelected.taxonomy[level] = values;
-    setSelected(newSelected);
+    setInternalSelected(newSelected);
     onFilterChange(newSelected);
   };
 
   const handleMajorGroupChange = (values: string[]) => {
     const newSelected = { ...selected, majorGroup: values };
-    setSelected(newSelected);
+    setInternalSelected(newSelected);
     onFilterChange(newSelected);
   };
 
   const handleIUCNToggle = (value: string) => {
     const isSelected = selected.iucn.includes(value);
-    if ((iucnCounts[value] || 0) === 0 && !isSelected) return;
+    if ((activeIucnCounts[value] || 0) === 0 && !isSelected) return;
 
     const newSelected = { ...selected };
     if (isSelected) {
@@ -409,7 +407,7 @@ export default function SidebarFilter({
     } else {
       newSelected.iucn = [...newSelected.iucn, value];
     }
-    setSelected(newSelected);
+    setInternalSelected(newSelected);
     onFilterChange(newSelected);
   };
 
@@ -418,7 +416,7 @@ export default function SidebarFilter({
       ...selected,
       [key]: selected[key] === true ? null : true
     };
-    setSelected(newSelected);
+    setInternalSelected(newSelected);
     onFilterChange(newSelected);
   };
 
@@ -430,7 +428,7 @@ export default function SidebarFilter({
       isCap170: null,
       isCap586: null,
     };
-    setSelected(reset);
+    setInternalSelected(reset);
     onFilterChange(reset);
     onSearchSubmit('');
   };
@@ -505,7 +503,7 @@ export default function SidebarFilter({
                   {activeTaxaType !== 'fungi' && (
                     <MultiSelectDropdown
                       label={language === 'zh' ? '主分類群 (Major group)' : 'Major group'}
-                      options={majorGroupOptions}
+                      options={activeMajorGroupOptions}
                       selectedValues={selected.majorGroup || []}
                       onChange={handleMajorGroupChange}
                       placeholder={language === 'zh' ? '主分類群 (Major group)' : 'Major group'}
@@ -515,7 +513,7 @@ export default function SidebarFilter({
                   )}
                   <MultiSelectDropdown
                     label={TAXONOMY_LABELS.informal_group_eng}
-                    options={taxonomyOptions.informal_group_eng}
+                    options={activeTaxonomyOptions.informal_group_eng}
                     selectedValues={selected.taxonomy.informal_group_eng}
                     onChange={(values) => handleTaxonomyChange('informal_group_eng', values)}
                     placeholder={TAXONOMY_LABELS.informal_group_eng}
@@ -524,7 +522,7 @@ export default function SidebarFilter({
                     italicizeEnglish={false}
                     getDisplayLabel={(val) => {
                       if (language !== 'zh') return val;
-                      const chi = getTaxonomyChi('informal_group' as any, activeTaxaType === 'fungi' ? 'fungi' : 'fauna', val);
+                      const chi = getTaxonomyChi('informal_group', activeTaxaType === 'fungi' ? 'fungi' : 'fauna', val);
                       return chi && chi !== val && !chi.includes('\ufffd') ? `${chi} (${val})` : val;
                     }}
                   />
@@ -546,12 +544,12 @@ export default function SidebarFilter({
                   {(Object.keys(TAXONOMY_LABELS) as TaxonomyLevel[])
                     .filter(level => level !== 'informal_group_eng')
                     .map((level) => {
-                      const rank = level.replace('_eng', '') as any;
+                      const rank = level.replace('_eng', '');
                       return (
                         <MultiSelectDropdown
                           key={level}
                           label={TAXONOMY_LABELS[level]}
-                          options={taxonomyOptions[level]}
+                          options={activeTaxonomyOptions[level]}
                           selectedValues={selected.taxonomy[level]}
                           onChange={(values) => handleTaxonomyChange(level, values)}
                           placeholder={TAXONOMY_LABELS[level]}
@@ -647,7 +645,7 @@ export default function SidebarFilter({
               {expanded.iucn && (
                 <div className="flex flex-wrap gap-2 pt-2">
                   {IUCN_STATUSES.map((status) => {
-                    const count = iucnCounts[status] || 0;
+                    const count = activeIucnCounts[status] || 0;
                     const isSelected = selected.iucn.includes(status);
                     const config = getIUCNConfig(status);
                     const label = language === 'zh' ? config.label.zh : config.label.en;

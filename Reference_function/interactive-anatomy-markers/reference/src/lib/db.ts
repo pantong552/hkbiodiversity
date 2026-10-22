@@ -145,6 +145,74 @@ interface SupabaseSpeciesRow {
 }
 
 // 將 Supabase 的關聯資料 map 成前端能直接使用的 Species 格式
+interface GalleryPhoto {
+  url: string;
+  credit?: string | null;
+  originalUrl?: string;
+}
+
+interface GalleryData {
+  photos?: GalleryPhoto[];
+}
+
+interface ChecklistSpeciesRow {
+  id: string;
+  checklist_id: string;
+  species_id: string | null;
+  species_code: string;
+  scientific_name: string;
+  common_name_zh: string | null;
+  common_name_en: string | null;
+  family_zh: string | null;
+  family_en: string | null;
+  genus_zh: string | null;
+  genus_en: string | null;
+  additional_fields: Record<string, string> | null;
+  sort_order: number | null;
+  created_at: string;
+}
+
+interface CoreSpeciesRow {
+  id: string;
+  species_code: string;
+  scientific_name: string;
+  genera: {
+    scientific_name: string;
+    genus_translations: Array<{ lang: string; common_name: string }> | null;
+    families: {
+      scientific_name: string;
+      family_translations: Array<{ lang: string; common_name: string }> | null;
+    } | null;
+  } | null;
+  species_translations: Array<{ lang: string; common_name: string }> | null;
+}
+
+type CoreSpeciesDetails = {
+  id: string;
+  scientific_name: string;
+  common_name_zh: string;
+  common_name_en: string;
+  family_zh: string;
+  family_en: string;
+  genus_zh: string;
+  genus_en: string;
+};
+
+type ChecklistSpeciesUpsert = {
+  checklist_id: string;
+  species_id: string | null;
+  species_code: string;
+  scientific_name: string;
+  common_name_zh: string;
+  common_name_en: string | null;
+  family_zh: string;
+  family_en: string | null;
+  genus_zh: string;
+  genus_en: string | null;
+  additional_fields: Record<string, string>;
+  sort_order: number;
+};
+
 function mapSupabaseToSpecies(row: SupabaseSpeciesRow): Species {
   const zhTrans = row.species_translations.find((t) => t.lang === "zh");
   const enTrans = row.species_translations.find((t) => t.lang === "en");
@@ -162,7 +230,7 @@ function mapSupabaseToSpecies(row: SupabaseSpeciesRow): Species {
     title_en: d.title_en || "",
     source: d.source || "",
     sourceUrl: d.source_url || undefined,
-    items: (d.items || []).map((item: any) => ({
+    items: (d.items || []).map((item) => ({
       name_zh: item.name_zh || "",
       name_en: item.name_en || "",
       percentage: Number(item.percentage || 0)
@@ -179,7 +247,7 @@ function mapSupabaseToSpecies(row: SupabaseSpeciesRow): Species {
     title_en: r.title_en || "",
     source: r.source || "",
     sourceUrl: r.source_url || undefined,
-    items: (r.items || []).map((item: any) => ({
+    items: (r.items || []).map((item) => ({
       plant_zh: item.plant_zh || "",
       plant_en: item.plant_en || "",
       location_zh: item.location_zh || "",
@@ -197,7 +265,7 @@ function mapSupabaseToSpecies(row: SupabaseSpeciesRow): Species {
     title_en: d.title_en || "",
     source: d.source || "",
     sourceUrl: d.source_url || undefined,
-    items: (d.items || []).map((item: any) => ({
+    items: (d.items || []).map((item) => ({
       plant_zh: item.plant_zh || "",
       plant_en: item.plant_en || "",
       food_zh: item.food_zh || "",
@@ -425,9 +493,9 @@ function mapSupabaseToSpecies(row: SupabaseSpeciesRow): Species {
     }));
   } else {
     // Fallback 讀取 JSON
-    const galleryData = (speciesGalleries as any)[row.species_code];
+    const galleryData = (speciesGalleries as Record<string, GalleryData | undefined>)[row.species_code];
     if (galleryData && galleryData.photos) {
-      result.photos = galleryData.photos.map((p: any) => ({
+      result.photos = galleryData.photos.map((p) => ({
         url: p.url,
         credit: p.credit || undefined,
         originalUrl: p.originalUrl || undefined,
@@ -657,7 +725,8 @@ export async function getChecklistSpecies(checklistId: string): Promise<Checklis
 
     if (!data) return [];
 
-    return data.map((item: any) => {
+    const rows = data as unknown as ChecklistSpeciesRow[];
+    return rows.map((item) => {
       return {
         id: item.id,
         checklist_id: item.checklist_id,
@@ -748,13 +817,13 @@ export async function upsertChecklistSpeciesBatch(
     }
 
     // 2. 建立核心物種 Map 對照表
-    const speciesMap = new Map<string, any>();
-    allSpecies.forEach((s: any) => {
-      const zhTrans = s.species_translations?.find((t: any) => t.lang === "zh");
-      const enTrans = s.species_translations?.find((t: any) => t.lang === "en");
+    const speciesMap = new Map<string, CoreSpeciesDetails>();
+    (allSpecies as unknown as CoreSpeciesRow[]).forEach((s) => {
+      const zhTrans = s.species_translations?.find((t) => t.lang === "zh");
+      const enTrans = s.species_translations?.find((t) => t.lang === "en");
       
-      const genZh = s.genera?.genus_translations?.find((t: any) => t.lang === "zh")?.common_name || "";
-      const famZh = s.genera?.families?.family_translations?.find((t: any) => t.lang === "zh")?.common_name || "";
+      const genZh = s.genera?.genus_translations?.find((t) => t.lang === "zh")?.common_name || "";
+      const famZh = s.genera?.families?.family_translations?.find((t) => t.lang === "zh")?.common_name || "";
 
       speciesMap.set(s.species_code.toLowerCase().trim(), {
         id: s.id,
@@ -774,15 +843,15 @@ export async function upsertChecklistSpeciesBatch(
       .select("*")
       .eq("checklist_id", checklistId);
 
-    const existingMap = new Map<string, any>();
+    const existingMap = new Map<string, ChecklistSpeciesRow>();
     if (!clSpError && existingChecklistSpecies) {
-      existingChecklistSpecies.forEach((item) => {
+      (existingChecklistSpecies as unknown as ChecklistSpeciesRow[]).forEach((item) => {
         existingMap.set(item.species_code.toLowerCase().trim(), item);
       });
     }
 
     // 4. 轉換資料
-    const toUpsert: any[] = [];
+    const toUpsert: ChecklistSpeciesUpsert[] = [];
     const errors: string[] = [];
 
     items.forEach((item, index) => {
@@ -841,8 +910,8 @@ export async function upsertChecklistSpeciesBatch(
     }
 
     return { success: true, message: msg };
-  } catch (err: any) {
-    return { success: false, message: `發生錯誤: ${err?.message || err}` };
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : String(err);
+    return { success: false, message: `發生錯誤: ${message}` };
   }
 }
-

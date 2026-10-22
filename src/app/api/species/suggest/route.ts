@@ -16,6 +16,11 @@ export interface SuggestionItem {
   photo_url?: string | null;
 }
 
+type SpeciesSuggestionRow = Pick<SuggestionItem,
+  'taxa_id' | 'id' | 'common_name_chi' | 'common_name_eng' | 'scientific_name' |
+  'class_eng' | 'family_eng' | 'order_eng' | 'inat_id'
+> & { category_eng?: string | null };
+
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
   const q = searchParams.get('q')?.trim() || '';
@@ -43,7 +48,7 @@ export async function GET(req: NextRequest) {
         .limit(limit);
 
       if (!faunaErr && faunaData) {
-        faunaResults = faunaData.map((item: any) => ({
+        faunaResults = faunaData.map((item: SpeciesSuggestionRow) => ({
           ...item,
           taxa_group: 'FAUNA' as const,
           category: item.class_eng || item.order_eng || item.family_eng || 'Fauna',
@@ -60,7 +65,7 @@ export async function GET(req: NextRequest) {
         .limit(limit);
 
       if (!floraErr && floraData) {
-        floraResults = floraData.map((item: any) => ({
+        floraResults = floraData.map((item: SpeciesSuggestionRow) => ({
           taxa_id: item.taxa_id || `flora_${item.id}`,
           id: item.id,
           common_name_chi: item.common_name_chi,
@@ -83,7 +88,7 @@ export async function GET(req: NextRequest) {
           .limit(limit);
 
         if (!fungiErr && fungiData) {
-          fungiResults = fungiData.map((item: any) => ({
+          fungiResults = fungiData.map((item: SpeciesSuggestionRow) => ({
             taxa_id: item.taxa_id || `fungi_${item.id}`,
             id: item.id,
             common_name_chi: item.common_name_chi,
@@ -94,7 +99,7 @@ export async function GET(req: NextRequest) {
             inat_id: item.inat_id,
           }));
         }
-      } catch (e) {
+      } catch {
         // Safe ignore if table not created yet
       }
     }
@@ -118,8 +123,8 @@ export async function GET(req: NextRequest) {
     const suggestions = combined.slice(0, limit);
 
     return NextResponse.json({ suggestions });
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error('[Suggest API Error]:', err);
-    return NextResponse.json({ suggestions: [], error: err.message }, { status: 500 });
+    return NextResponse.json({ suggestions: [], error: err instanceof Error ? err.message : 'Internal error' }, { status: 500 });
   }
 }

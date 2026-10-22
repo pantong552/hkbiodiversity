@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef } from 'react';
 import { Info, X, HelpCircle, Sparkles, BookOpen } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useLanguage } from '@/context/LanguageContext';
@@ -9,13 +9,14 @@ export default function HkbwsCategoryInfoModal() {
   const { language } = useLanguage();
   const [isOpen, setIsOpen] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
-  const [activeTab, setActiveTab] = useState<'zh' | 'en'>(language === 'zh' ? 'zh' : 'en');
+  const [tabSelection, setTabSelection] = useState<{ language: string; tab: 'zh' | 'en' }>(
+    () => ({ language, tab: language === 'zh' ? 'zh' : 'en' })
+  );
+  const activeTab =
+    tabSelection.language === language
+      ? tabSelection.tab
+      : language === 'zh' ? 'zh' : 'en';
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
-
-  // Sync tab with global language on mount or change
-  useEffect(() => {
-    setActiveTab(language === 'zh' ? 'zh' : 'en');
-  }, [language]);
 
   const handleMouseEnter = () => {
     if (timeoutRef.current) clearTimeout(timeoutRef.current);
@@ -172,7 +173,7 @@ export default function HkbwsCategoryInfoModal() {
                 <div className="flex bg-slate-200/70 p-1 rounded-xl gap-1 text-xs font-bold w-full sm:w-auto">
                   <button
                     type="button"
-                    onClick={() => setActiveTab('zh')}
+                    onClick={() => setTabSelection({ language, tab: 'zh' })}
                     className={`flex-1 sm:flex-initial px-4 py-1.5 rounded-lg transition-all cursor-pointer ${activeTab === 'zh' ? 'bg-white text-emerald-700 shadow-sm font-black' : 'text-slate-600 hover:text-slate-900'
                       }`}
                   >
@@ -180,7 +181,7 @@ export default function HkbwsCategoryInfoModal() {
                   </button>
                   <button
                     type="button"
-                    onClick={() => setActiveTab('en')}
+                    onClick={() => setTabSelection({ language, tab: 'en' })}
                     className={`flex-1 sm:flex-initial px-4 py-1.5 rounded-lg transition-all cursor-pointer ${activeTab === 'en' ? 'bg-white text-emerald-700 shadow-sm font-black' : 'text-slate-600 hover:text-slate-900'
                       }`}
                   >

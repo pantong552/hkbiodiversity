@@ -34,7 +34,7 @@ interface TaxaGroupSwitcherProps {
   variant?: 'default' | 'header';
 }
 
-export default function TaxaGroupSwitcher({ activeType, onChange, compact = false, variant = 'default' }: TaxaGroupSwitcherProps) {
+export default function TaxaGroupSwitcher({ activeType, onChange }: TaxaGroupSwitcherProps) {
   const { language } = useLanguage();
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -153,7 +153,6 @@ export default function TaxaGroupSwitcher({ activeType, onChange, compact = fals
     </div>
   );
 }
-
 
 
 

@@ -87,10 +87,10 @@ export async function POST(request: NextRequest) {
 
     const data = await response.json();
     return NextResponse.json(data);
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('[iNatProxy] Internal Server Error:', error);
     return NextResponse.json(
-      { error: error.message || 'Failed to process species recognition request' },
+      { error: error instanceof Error ? error.message : 'Failed to process species recognition request' },
       { status: 500 }
     );
   }

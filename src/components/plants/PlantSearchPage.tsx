@@ -6,8 +6,7 @@ import { PlantSpecies, PlantFilterState } from '@/types/plants';
 import PlantFilterPanel from './PlantFilterPanel';
 import { useLanguage } from '@/context/LanguageContext';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Leaf, Calendar, MapPin, Loader2, Info } from 'lucide-react';
-import Image from 'next/image';
+import { Leaf, MapPin, Loader2, Info } from 'lucide-react';
 
 import { useTaxonomy } from '@/context/TaxonomyContext';
 
@@ -107,7 +106,7 @@ const PlantCard = ({ plant }: { plant: PlantSpecies }) => {
 export default function PlantSearchPage() {
   const { language } = useLanguage();
   const { getTaxonomyChi } = useTaxonomy();
-  const supabase = createClient();
+  const [supabase] = useState(() => createClient());
   const [plants, setPlants] = useState<PlantSpecies[]>([]);
   const [loading, setLoading] = useState(true);
   const [filters, setFilters] = useState<PlantFilterState>(INITIAL_FILTERS);
@@ -122,11 +121,11 @@ export default function PlantSearchPage() {
       const { data } = await supabase.from('plant_species').select('category_eng, family_eng, genus_eng').not('category_eng', 'is', null);
       if (data) {
         const uniqueKeys = new Set();
-        const cats: any[] = [];
+        const cats: { name: string; display: string; count: number }[] = [];
         const famCounts = new Map<string, { display: string; count: number }>();
         const genCounts = new Map<string, { display: string; count: number }>();
 
-        data.forEach((item: any) => {
+        data.forEach((item: { category_eng: string | null; family_eng: string | null; genus_eng: string | null }) => {
           if (item.category_eng && !uniqueKeys.has(item.category_eng)) {
             uniqueKeys.add(item.category_eng);
             cats.push({
@@ -167,7 +166,7 @@ export default function PlantSearchPage() {
       }
     };
     fetchMeta();
-  }, [language, getTaxonomyChi]); // 加入 getTaxonomyChi 作為依賴項
+  }, [language, getTaxonomyChi, supabase]);
 
   useEffect(() => {
     const fetchPlants = async () => {
@@ -201,7 +200,7 @@ export default function PlantSearchPage() {
 
     const timer = setTimeout(fetchPlants, 500);
     return () => clearTimeout(timer);
-  }, [filters]); // Removed supabase to prevent re-fetching on render
+  }, [filters, supabase]);
 
   return (
     <div className="max-w-7xl mx-auto px-6 py-12 space-y-12">

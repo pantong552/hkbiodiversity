@@ -151,12 +151,13 @@ export function fetchAllInatObservations(
   onProgress?: (current: number, total: number) => void,
   _options?: { includeObscured?: boolean }
 ): Promise<InatObservation[]> {
-  const cacheKey = `${taxonId}|observation-fields-v2`;
+  const includeObscured = _options?.includeObscured ?? true;
+  const cacheKey = `${taxonId}|observation-fields-v2|${includeObscured}`;
   if (!completeInatFetchCache[cacheKey]) {
     completeInatFetchCache[cacheKey] = fetchAllInatObservationsUncached(
       taxonId,
       onProgress,
-      { includeObscured: true }
+      { includeObscured }
     );
   }
   return completeInatFetchCache[cacheKey];

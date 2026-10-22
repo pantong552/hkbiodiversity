@@ -60,10 +60,10 @@ export async function POST(request: NextRequest) {
     const plantnetData = await plantnetRes.json();
 
     return NextResponse.json(plantnetData);
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('[PlantNet Proxy Error]:', error);
     return NextResponse.json(
-      { error: error.message || 'Pl@ntNet 辨識請求處理失敗' },
+      { error: error instanceof Error ? error.message : 'Pl@ntNet 辨識請求處理失敗' },
       { status: 500 }
     );
   }

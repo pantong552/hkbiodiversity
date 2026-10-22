@@ -1,6 +1,6 @@
 'use client';
 
- import { useMemo, useEffect, useState } from 'react';
+ import { useMemo } from 'react';
 import { ChevronUp, ChevronDown, ArrowUpDown } from 'lucide-react';
 import { Species } from '@/types/species';
 import { PlantSpecies } from '@/types/plants';
@@ -17,9 +17,9 @@ interface SpeciesTableProps {
   species: (Species | PlantSpecies)[];
   sortBy: string;
   sortOrder: 'asc' | 'desc';
-  filters: Record<string, any>;
-  metadata: Record<string, any[]>;
-  onFilterChange: (filters: Record<string, any>) => void;
+  filters: Record<string, string[]>;
+  metadata: Record<string, { name: string; display: string; count?: number; en?: string }[]>;
+  onFilterChange: (filters: Record<string, string[]>) => void;
   onSort: (field: string) => void;
   isLoading?: boolean;
 }
@@ -39,16 +39,8 @@ export default function SpeciesTable({
   const { getTaxonomyChi } = useTaxonomy();
   const { addSpecies } = useSpeciesPanel();
   const isPlant = taxaType === 'flora';
-  const [loadSession, setLoadSession] = useState(0);
-
-  useEffect(() => {
-    if (isLoading) {
-      setLoadSession(s => s + 1);
-    }
-  }, [isLoading]);
-
   const handleSelectChange = (key: string, value: string | string[]) => {
-    onFilterChange({ ...filters, [key]: value });
+    onFilterChange({ ...filters, [key]: Array.isArray(value) ? value : [value] });
   };
 
   const iucnOptions = [
@@ -98,7 +90,7 @@ export default function SpeciesTable({
       >
         {isLoading && (
           <div 
-            key={loadSession}
+            key={isLoading ? 'loading' : 'idle'}
             className="h-full w-[35%] bg-gradient-to-r from-transparent via-emerald-500 to-transparent shadow-[0_0_10px_rgba(16,185,129,0.8)] rounded-full animate-constant-rolling" 
           />
         )}

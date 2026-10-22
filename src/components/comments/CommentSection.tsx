@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { createClient } from '@/utils/supabase/client';
-import { Comment } from '@/types/comments';
+import { Comment, CommentLike } from '@/types/comments';
 import { useLanguage } from '@/context/LanguageContext';
 import { useAuth } from '@/context/AuthContext';
 import { MessageSquare, LogIn, Loader2, AlertCircle } from 'lucide-react';
@@ -13,8 +13,10 @@ interface CommentSectionProps {
   taxaId: string;
 }
 
+type CommentRow = Comment & { comment_likes?: Pick<CommentLike, 'user_id'>[] };
+
 export default function CommentSection({ taxaId }: CommentSectionProps) {
-  const { language, t } = useLanguage();
+  const { language } = useLanguage();
   const { user, profile: userProfile } = useAuth();
   const supabase = useMemo(() => createClient(), []);
   
@@ -54,18 +56,18 @@ export default function CommentSection({ taxaId }: CommentSectionProps) {
 
       if (data) {
         const userId = user?.id;
-        const formatted = data.map((c: any) => ({
+        const formatted: Array<CommentRow & { likes_count: number; user_has_liked: boolean | undefined }> = data.map((c: CommentRow) => ({
           ...c,
           likes_count: c.comment_likes?.length || 0,
-          user_has_liked: c.comment_likes?.some((l: any) => l.user_id === userId)
+          user_has_liked: c.comment_likes?.some((l) => l.user_id === userId)
         }));
 
-        const mainComments = formatted.filter((c: any) => !c.parent_id);
-        const replies = formatted.filter((c: any) => c.parent_id);
+        const mainComments = formatted.filter((c: CommentRow) => !c.parent_id);
+        const replies = formatted.filter((c: CommentRow) => c.parent_id);
 
-        const structured = mainComments.map((main: any) => ({
+        const structured = mainComments.map((main: CommentRow) => ({
           ...main,
-          replies: replies.filter((r: any) => r.parent_id === main.id).reverse()
+          replies: replies.filter((r: CommentRow) => r.parent_id === main.id).reverse()
         }));
 
         setComments(structured);

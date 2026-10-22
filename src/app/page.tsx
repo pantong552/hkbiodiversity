@@ -1,4 +1,5 @@
 import { Metadata } from 'next';
+import Image from 'next/image';
 import HomeHero from '@/components/home/HomeHero';
 import Header from '@/components/Header';
 import SpeciesStats from '@/components/home/SpeciesStats';
@@ -7,7 +8,7 @@ import Leaderboard from '@/components/home/Leaderboard';
 import LatestComments from '@/components/home/LatestComments';
 import { getHomeStats, getLeaderboard, getLatestComments, getLatestSpecies, getLatestNews } from '@/lib/home';
 import Link from 'next/link';
-import { Globe, Mail, ExternalLink, Shield, BookOpen, Users } from 'lucide-react';
+import { Mail, Shield, BookOpen, Users } from 'lucide-react';
 
 export const revalidate = 600; // 每 10 分鐘重新驗證快取一次 (ISR)
 
@@ -81,7 +82,7 @@ export default async function HomePage() {
             <div className="lg:col-span-5 flex flex-col items-center lg:items-start text-center lg:text-left">
               <Link href="/" className="flex items-center gap-4 mb-6 md:mb-8 group">
                 <div className="p-2 md:p-2.5 bg-emerald-500/10 rounded-2xl border border-white/10 group-hover:border-emerald-500/50 transition-all duration-500">
-                  <img src="/logo.svg" alt="Logo" className="w-8 h-8 md:w-10 md:h-10 brightness-110" />
+                  <Image src="/logo.svg" alt="Logo" width={40} height={40} className="w-8 h-8 md:w-10 md:h-10 brightness-110" />
                 </div>
                 {/* Text Identity - Synced with Header */}
                 <div className="flex flex-col justify-center gap-0.5 text-left">

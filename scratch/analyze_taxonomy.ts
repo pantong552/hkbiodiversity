@@ -1,7 +1,6 @@
 
 import { createClient } from '@supabase/supabase-client';
 import dotenv from 'dotenv';
-import path from 'path';
 
 dotenv.config({ path: '.env.local' });
 

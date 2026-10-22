@@ -121,7 +121,7 @@ export default function MobileToolbar({
             ].map((mode) => (
               <button
                 key={mode.id}
-                onClick={() => onDisplayModeChange(mode.id as any)}
+                onClick={() => onDisplayModeChange(mode.id as 'table' | 'detail' | 'photo')}
                 className={`p-2 rounded-xl flex-1 flex justify-center transition-all ${displayMode === mode.id
                     ? 'bg-white text-emerald-600 shadow-sm'
                     : 'text-slate-400 hover:text-slate-600'

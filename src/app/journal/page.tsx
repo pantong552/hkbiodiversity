@@ -1,7 +1,7 @@
 'use client';
 
-import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { useSearchParams, useRouter } from 'next/navigation';
+import Image from 'next/image';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useLanguage } from '@/context/LanguageContext';
 import { useAuth } from '@/context/AuthContext';
 import Header from '@/components/Header';
@@ -22,7 +22,6 @@ import rehypeExternalLinks from 'rehype-external-links';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   BookOpen,
-  Calendar,
   Clock,
   User as UserIcon,
   Tag,
@@ -35,10 +34,7 @@ import {
   XCircle,
   Edit,
   Trash2,
-  Share2,
   Sparkles,
-  ChevronRight,
-  Filter,
   ShieldCheck,
   AlertTriangle,
   List,
@@ -108,14 +104,14 @@ export default function JournalPage() {
       const updated = { ...prev, ...newSettings };
       try {
         localStorage.setItem('hkbio_novel_reader_settings', JSON.stringify(updated));
-      } catch (e) {}
+      } catch {}
       return updated;
     });
   };
 
   // 自動閱讀滾動效果
   useEffect(() => {
-    let interval: any;
+    let interval: ReturnType<typeof setInterval>;
     if (isSelectedArticleNovel && novelSettings.autoScroll) {
       interval = setInterval(() => {
         window.scrollBy({ top: 2, behavior: 'smooth' });
@@ -136,7 +132,7 @@ export default function JournalPage() {
       setCategories((catData as EcoCategory[]) || []);
 
       // 2. Fetch Articles with Profile Author info & Category
-      let query = supabase
+      const query = supabase
         .from('eco_articles')
         .select(`
           *,
@@ -339,8 +335,8 @@ export default function JournalPage() {
 
       if (error) throw error;
       fetchData();
-    } catch (err: any) {
-      alert(err.message || 'Failed to approve article');
+    } catch (err: unknown) {
+      alert(err instanceof Error ? err.message : 'Failed to approve article');
     }
   };
 
@@ -377,8 +373,8 @@ export default function JournalPage() {
 
       if (error) throw error;
       fetchData();
-    } catch (err: any) {
-      alert(err.message || 'Failed to reject article');
+    } catch (err: unknown) {
+      alert(err instanceof Error ? err.message : 'Failed to reject article');
     }
   };
 
@@ -396,19 +392,10 @@ export default function JournalPage() {
         setSelectedArticle(null);
       }
       fetchData();
-    } catch (err: any) {
-      alert(err.message || 'Failed to delete article');
+    } catch (err: unknown) {
+      alert(err instanceof Error ? err.message : 'Failed to delete article');
     }
   };
-
-  // Extract all unique tags
-  const allTags = useMemo(() => {
-    const tagSet = new Set<string>();
-    articles.forEach(art => {
-      if (art.tags) art.tags.forEach(t => tagSet.add(t));
-    });
-    return Array.from(tagSet);
-  }, [articles]);
 
   const pendingCount = useMemo(() => {
     return articles.filter(a => a.status === 'submitted').length;
@@ -556,9 +543,12 @@ export default function JournalPage() {
             <div className="flex flex-wrap items-center justify-between gap-4 py-4 border-y border-slate-200 mb-8 text-xs sm:text-sm text-slate-600">
               <div className="flex items-center gap-3">
                 {selectedArticle.profiles?.avatar_url ? (
-                  <img
+                  <Image
                     src={selectedArticle.profiles.avatar_url}
                     alt="Author"
+                    width={40}
+                    height={40}
+                    unoptimized
                     className="w-10 h-10 rounded-full object-cover ring-2 ring-emerald-500/20"
                   />
                 ) : (
@@ -620,9 +610,12 @@ export default function JournalPage() {
             {/* Cover Image */}
             {selectedArticle.cover_image && (
               <div className="relative rounded-3xl overflow-hidden mb-8 shadow-xl border border-slate-200 max-h-[450px]">
-                <img
+                <Image
                   src={selectedArticle.cover_image}
                   alt="Article Cover"
+                  width={1600}
+                  height={900}
+                  unoptimized
                   className="w-full h-full object-cover"
                 />
               </div>
@@ -795,9 +788,12 @@ export default function JournalPage() {
                   ),
                   img: ({ src, alt }) => (
                     <span className="block my-8">
-                      <img
-                        src={src}
+                      <Image
+                        src={typeof src === 'string' ? src : ''}
                         alt={alt || 'Article illustration'}
+                        width={1200}
+                        height={800}
+                        unoptimized
                         className="w-full rounded-3xl shadow-lg border border-slate-200 object-cover max-h-[500px]"
                       />
                       {alt && (
@@ -1193,9 +1189,12 @@ export default function JournalPage() {
                     {/* Card Cover Image */}
                     {art.cover_image ? (
                       <div className="relative h-48 w-full overflow-hidden bg-slate-100">
-                        <img
+                        <Image
                           src={art.cover_image}
                           alt="Article Cover"
+                          fill
+                          sizes="(max-width: 768px) 100vw, 50vw"
+                          unoptimized
                           className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                         />
                         {art.eco_categories && (
@@ -1349,7 +1348,7 @@ export default function JournalPage() {
         articleToEdit={articleToEdit}
         onSaved={fetchData}
         onRejectTrigger={(art) => handleOpenRejectModal(art)}
-        onApproveTrigger={(art) => handleApproveArticle(art, undefined as any)}
+        onApproveTrigger={(art) => handleApproveArticle(art, undefined)}
       />
 
       {/* Admin Category Modal */}

@@ -10,11 +10,9 @@ import {
   Loader2,
   ChevronDown,
   ChevronUp,
-  RefreshCw,
   AlertCircle,
   Play,
   ExternalLink,
-  Radio,
   Clock,
   Check
 } from 'lucide-react';
@@ -68,7 +66,7 @@ interface Recording {
   dvc?: string;
   mic?: string;
   smp?: string;
-  'annotation-set'?: any[];
+  'annotation-set'?: Record<string, unknown>[];
 }
 
 interface BirdSoundCardProps {
@@ -78,7 +76,7 @@ interface BirdSoundCardProps {
 
 const XENO_CANTO_API_KEY = "060dbba81c2ed20bab7881d4f252afa560c2d2c0";
 
-export default function BirdSoundCard({ scientificName, commonName }: BirdSoundCardProps) {
+export default function BirdSoundCard({ scientificName }: BirdSoundCardProps) {
   const { language } = useLanguage();
   const [rawRecordings, setRawRecordings] = useState<Recording[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
@@ -122,7 +120,7 @@ export default function BirdSoundCard({ scientificName, commonName }: BirdSoundC
     };
   }, []);
 
-  const fetchRecordings = async () => {
+  const fetchRecordings = React.useCallback(async () => {
     if (!scientificName) return;
     setLoading(true);
     setError(null);
@@ -157,17 +155,17 @@ export default function BirdSoundCard({ scientificName, commonName }: BirdSoundC
       }
 
       setRawRecordings(recordingsAcc);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Failed to fetch xeno-canto recordings:', err);
-      setError(err?.message || 'Failed to load recordings');
+      setError(err instanceof Error ? err.message : 'Failed to load recordings');
     } finally {
       setLoading(false);
     }
-  };
+  }, [scientificName]);
 
   useEffect(() => {
     fetchRecordings();
-  }, [scientificName]);
+  }, [fetchRecordings]);
 
   // 提取所有不重複的子 type 分類 (以 ',' 分割)，並計算包含該 type 的錄音數量
   const typeCategories = useMemo(() => {
@@ -679,7 +677,7 @@ export default function BirdSoundCard({ scientificName, commonName }: BirdSoundC
                                   const version = parts[licIndex + 2] ? ` ${parts[licIndex + 2]}` : '';
                                   return `CC ${code}${version}`;
                                 }
-                              } catch (e) {
+                              } catch {
                                 // fallback regexp match
                                 const match = rec.lic.match(/licenses\/([^\/]+)(?:\/([^\/]+))?/i);
                                 if (match && match[1]) {

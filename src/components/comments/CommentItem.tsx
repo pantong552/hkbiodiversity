@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { Comment, Profile } from '@/types/comments';
 import { useLanguage } from '@/context/LanguageContext';
-import { ThumbsUp, Reply, MoreHorizontal, Edit2, Trash2, Heart } from 'lucide-react';
+import { Reply, MoreHorizontal, Edit2, Trash2, Heart } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { zhTW, enUS } from 'date-fns/locale';
 import Image from 'next/image';

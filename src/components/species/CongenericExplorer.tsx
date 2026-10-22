@@ -1,12 +1,14 @@
-'use client';
+﻿'use client';
 
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import Image from 'next/image';
 import { Species } from '@/types/species';
+import { PlantSpecies } from '@/types/plants';
 import { useLanguage } from '@/context/LanguageContext';
 import { useSpeciesPanel } from '@/context/SpeciesPanelContext';
 import { createClient } from '@/utils/supabase/client';
 import { useInaturalistPhoto } from '@/hooks/useInaturalistPhoto';
+import { useIsHydrated } from '@/hooks/useIsHydrated';
 import { formatScientificName, getSpeciesImageUrl } from '@/utils/formatters';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Sparkles, Leaf, ChevronDown, ChevronUp, Maximize2 } from 'lucide-react';
@@ -59,12 +61,7 @@ const HorizontalSpeciesCard = ({ species, index, onOpenLightbox }: { species: Sp
   
   const [imgLoaded, setImgLoaded] = useState(false);
   const [isFullyReady, setIsFullyReady] = useState(false);
-  const [mounted, setMounted] = useState(false);
-
-  useEffect(() => {
-    setMounted(true);
-    return () => setMounted(false);
-  }, []);
+  const mounted = useIsHydrated();
 
   const placeholderImage = '/images/placeholder/no-species-image.svg';
   const commonName = language === 'zh' ? species.common_name_chi : species.common_name_eng;
@@ -91,7 +88,7 @@ const HorizontalSpeciesCard = ({ species, index, onOpenLightbox }: { species: Sp
           const taxaId = species.taxa_id || '';
           const globalProfilePic = taxaId ? profilePictureMap[taxaId] : undefined;
           const effectiveSpecies = globalProfilePic !== undefined ? { ...species, profile_picture: globalProfilePic } : species;
-          const displayImage = getSpeciesImageUrl(effectiveSpecies as any, 'medium') || getSpeciesImageUrl(effectiveSpecies as any, 'square');
+          const displayImage = getSpeciesImageUrl(effectiveSpecies, 'medium') || getSpeciesImageUrl(effectiveSpecies, 'square');
           const finalImage = displayImage || imageUrl || (isInatLoading ? '' : placeholderImage);
           const largeImage = getSpeciesImageUrl({ ...effectiveSpecies, profile_picture: displayImage || imageUrl }, 'large') || finalImage;
           
@@ -195,12 +192,7 @@ const MiniSpeciesCard = ({ species, index, onOpenLightbox }: { species: Species;
   
   const [imgLoaded, setImgLoaded] = useState(false);
   const [isFullyReady, setIsFullyReady] = useState(false);
-  const [mounted, setMounted] = useState(false);
-
-  useEffect(() => {
-    setMounted(true);
-    return () => setMounted(false);
-  }, []);
+  const mounted = useIsHydrated();
 
   const placeholderImage = '/images/placeholder/no-species-image.svg';
   const commonName = language === 'zh' ? species.common_name_chi : species.common_name_eng;
@@ -228,7 +220,7 @@ const MiniSpeciesCard = ({ species, index, onOpenLightbox }: { species: Species;
           const taxaId = species.taxa_id || '';
           const globalProfilePic = taxaId ? profilePictureMap[taxaId] : undefined;
           const effectiveSpecies = globalProfilePic !== undefined ? { ...species, profile_picture: globalProfilePic } : species;
-          const displayImage = getSpeciesImageUrl(effectiveSpecies as any, 'medium') || getSpeciesImageUrl(effectiveSpecies as any, 'square');
+          const displayImage = getSpeciesImageUrl(effectiveSpecies, 'medium') || getSpeciesImageUrl(effectiveSpecies, 'square');
           const finalImage = displayImage || imageUrl || (isInatLoading ? '' : placeholderImage);
           const largeImage = getSpeciesImageUrl({ ...effectiveSpecies, profile_picture: displayImage || imageUrl }, 'large') || finalImage;
           
@@ -357,9 +349,10 @@ export default function CongenericExplorer({ species, isMobile = false }: Congen
             .neq('inat_id', species.inat_id)
             .order('scientific_name', { ascending: true })
             .limit(20);
+          if (error) throw error;
           
           if (data && data.length > 0) {
-            const mappedData = isFlora ? data.map((p: any) => ({
+            const mappedData = isFlora ? data.map((p: PlantSpecies) => ({
               ...p,
               id: p.inat_id,
               common_name_chi: p.common_name_chi,
@@ -389,9 +382,10 @@ export default function CongenericExplorer({ species, isMobile = false }: Congen
             .neq('inat_id', species.inat_id)
             .order('scientific_name', { ascending: true })
             .limit(20);
+          if (error) throw error;
           
           if (data && data.length > 0) {
-            const mappedData = isFlora ? data.map((p: any) => ({
+            const mappedData = isFlora ? data.map((p: PlantSpecies) => ({
               ...p,
               id: p.inat_id,
               common_name_chi: p.common_name_chi,

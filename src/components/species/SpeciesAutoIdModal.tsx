@@ -1,5 +1,6 @@
 'use client';
 
+import Image from 'next/image';
 import React, { useState, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
@@ -9,17 +10,12 @@ import {
   RefreshCw,
   CheckCircle2,
   AlertCircle,
-  ExternalLink,
-  Search,
   Leaf,
-  Bug,
   Camera,
-  CameraOff,
   SwitchCamera,
   Maximize2,
   ChevronRight,
   Info,
-  SlidersHorizontal,
   FileImage,
   Loader2
 } from 'lucide-react';
@@ -32,6 +28,8 @@ import { supabase } from '@/lib/supabase';
 export interface TaxonPhoto {
   id: number;
   url: string;
+  original_url?: string;
+  large_url?: string;
 }
 
 export interface TaxonInfo {
@@ -55,6 +53,23 @@ export interface InatResultItem {
   vision_score: number;
   frequency_score: number;
   taxon: TaxonInfo;
+  photo?: TaxonPhoto;
+}
+
+interface PlantNetResult {
+  score?: number;
+  species?: {
+    commonNames?: string[];
+    secondaryCommonNames?: string[];
+    name?: string;
+    family?: string | { scientificNameWithoutAuthor?: string };
+  };
+  images?: { m?: string; s?: string; o?: string }[];
+}
+
+interface PlantNetResponse {
+  results?: PlantNetResult[];
+  bestMatch?: string;
 }
 
 export interface InatApiResponse {
@@ -69,8 +84,8 @@ export interface InatApiResponse {
 }
 
 // 1. 圖片轉換與 Rewrite 路由處理工具
-function getTransformedImageUrl(url: string | null | undefined): string | undefined {
-  if (!url) return undefined;
+function getTransformedImageUrl(url: string): string {
+  if (!url) return '';
   if (
     url.startsWith('blob:') ||
     url.startsWith('data:') ||
@@ -127,7 +142,7 @@ function getTransformedImageUrl(url: string | null | undefined): string | undefi
 // 1. 前端圖像壓縮與縮放函式 (長邊 1024px 以內，quality 0.85)
 function compressImage(file: File, maxDimension = 1024, quality = 0.85): Promise<Blob> {
   return new Promise((resolve, reject) => {
-    const img = new Image();
+    const img = new window.Image();
     const objectUrl = URL.createObjectURL(file);
     img.src = objectUrl;
 
@@ -182,7 +197,6 @@ export default function SpeciesAutoIdModal() {
   const [engine, setEngine] = useState<AutoIdEngine>('inaturalist');
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
-  const [compressedSize, setCompressedSize] = useState<number | null>(null);
   const [isDragOver, setIsDragOver] = useState(false);
   const [enlargedPhoto, setEnlargedPhoto] = useState<string | null>(null);
   const [navigatingTaxonId, setNavigatingTaxonId] = useState<number | null>(null);
@@ -406,26 +420,27 @@ export default function SpeciesAutoIdModal() {
           });
         }
       }, 100);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.warn('getUserMedia error:', err);
       // 常見權限錯誤處理 (iOS Safari / Android Chrome 權限拒絕等)
       let errorText = '';
-      if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
+      const error = err instanceof Error ? err : new Error(String(err));
+      if (error.name === 'NotAllowedError' || error.name === 'PermissionDeniedError') {
         errorText = isZh
           ? '相機權限已被拒絕。請於瀏覽器或系統設定中允許相機存取權限後再試，或使用系統相機拍照。'
           : 'Camera permission was denied. Please allow camera access in your browser or device settings.';
-      } else if (err.name === 'NotFoundError' || err.name === 'DevicesNotFoundError') {
+      } else if (error.name === 'NotFoundError' || error.name === 'DevicesNotFoundError') {
         errorText = isZh
           ? '未偵測到可用相機設備。'
           : 'No camera device found.';
-      } else if (err.name === 'NotReadableError' || err.name === 'TrackStartError') {
+      } else if (error.name === 'NotReadableError' || error.name === 'TrackStartError') {
         errorText = isZh
           ? '相機正被其他應用程式使用中，無法存取。'
           : 'Camera is currently in use by another application.';
       } else {
         errorText = isZh
-          ? `無法開啟相機：${err.message || '請確認權限設定'}`
-          : `Failed to access camera: ${err.message || 'Please check permissions'}`;
+          ? `無法開啟相機：${error.message || '請確認權限設定'}`
+          : `Failed to access camera: ${error.message || 'Please check permissions'}`;
       }
       setCameraError(errorText);
       stopCameraStream();
@@ -477,7 +492,6 @@ export default function SpeciesAutoIdModal() {
     setSelectedFile(null);
     if (previewUrl) URL.revokeObjectURL(previewUrl);
     setPreviewUrl(null);
-    setCompressedSize(null);
     setCameraError(null);
     setEngineState({
       inaturalist: {
@@ -541,7 +555,6 @@ export default function SpeciesAutoIdModal() {
       }, 150);
 
       const compressedBlob = await compressImage(file, 1024, 0.85);
-      setCompressedSize(compressedBlob.size);
 
       const formData = new FormData();
       formData.append('image', compressedBlob, file.name);
@@ -566,13 +579,16 @@ export default function SpeciesAutoIdModal() {
           throw new Error(errRes.error || `Pl@ntNet API Error ${response.status}`);
         }
 
-        const plantnetRes = await response.json();
+        const plantnetRes = await response.json() as PlantNetResponse;
 
-        const convertedResults: InatResultItem[] = (plantnetRes.results || []).map((pnItem: any) => {
+        const convertedResults: InatResultItem[] = (plantnetRes.results || []).map((pnItem) => {
           const score = Math.round((pnItem.score || 0) * 100);
           const cName = pnItem.species?.commonNames?.[0] || pnItem.species?.secondaryCommonNames?.[0] || '';
           const sName = pnItem.species?.name || '';
-          const family = pnItem.species?.family?.scientificNameWithoutAuthor || pnItem.species?.family || '';
+          const familyInfo = pnItem.species?.family;
+          const family = typeof familyInfo === 'string'
+            ? familyInfo
+            : familyInfo?.scientificNameWithoutAuthor || '';
           const photoUrl = pnItem.images?.[0]?.m || pnItem.images?.[0]?.s || pnItem.images?.[0]?.o || '';
 
           const taxonInfo: TaxonInfo = {
@@ -630,11 +646,11 @@ export default function SpeciesAutoIdModal() {
           resultsData: jsonResult,
         });
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       if (progressInterval) clearInterval(progressInterval);
       console.error(`${targetEngine} identification failed:`, err);
       updateEngineState(targetEngine, {
-        errorMsg: err.message || (isZh ? '辨識服務暫時無法存取，請稍後再試。' : 'Identification failed. Please try again.'),
+        errorMsg: err instanceof Error ? err.message : (isZh ? '辨識服務暫時無法存取，請稍後再試。' : 'Identification failed. Please try again.'),
       });
     } finally {
       if (progressInterval) clearInterval(progressInterval);
@@ -976,10 +992,13 @@ export default function SpeciesAutoIdModal() {
               /* 上傳後的縮圖與狀態卡片 */
               <div className="bg-white border border-slate-200/80 rounded-2xl p-4 shadow-sm flex flex-col sm:flex-row items-center gap-4">
                 <div className="relative w-24 h-24 sm:w-28 sm:h-28 rounded-xl overflow-hidden shrink-0 border border-slate-200 bg-slate-100 group shadow-inner">
-                  <img
+                  <Image
                     src={previewUrl}
                     alt="Uploaded preview"
-                    className="w-full h-full object-cover"
+                    fill
+                    sizes="112px"
+                    unoptimized
+                    className="object-cover"
                   />
                   <button
                     onClick={() => setEnlargedPhoto(previewUrl)}
@@ -1158,8 +1177,8 @@ export default function SpeciesAutoIdModal() {
                   {resultsData.results.map((item, idx) => {
                     const taxon = item.taxon;
                     const score = Math.round(item.vision_score || item.combined_score || 0);
-                    const rawPhotoObj = (item as any).photo || taxon.representative_photo || taxon.default_photo;
-                    const photoUrl = taxon.representative_photo?.url || taxon.default_photo?.url || (item as any).photo?.url;
+                    const rawPhotoObj = item.photo || taxon.representative_photo || taxon.default_photo;
+                    const photoUrl = taxon.representative_photo?.url || taxon.default_photo?.url || item.photo?.url;
 
                     // 優先採用 original_url / large_url，或將 /square. /small. 替換為 /original. 高畫質大圖
                     const originalPhotoUrl = rawPhotoObj?.original_url
@@ -1197,10 +1216,13 @@ export default function SpeciesAutoIdModal() {
                           className="relative w-14 h-14 sm:w-16 sm:h-16 rounded-xl overflow-hidden shrink-0 border border-slate-100 bg-slate-100 cursor-pointer shadow-sm group-hover:scale-105 transition-transform"
                         >
                           {photoUrl ? (
-                            <img
+                            <Image
                               src={getTransformedImageUrl(photoUrl)}
                               alt={commonName}
-                              className="w-full h-full object-cover"
+                              fill
+                              sizes="64px"
+                              unoptimized
+                              className="object-cover"
                             />
                           ) : (
                             <div className="w-full h-full flex items-center justify-center text-slate-300">
@@ -1286,9 +1308,12 @@ export default function SpeciesAutoIdModal() {
             onClick={() => setEnlargedPhoto(null)}
             className="fixed inset-0 z-[120] bg-black/85 flex items-center justify-center p-4 cursor-zoom-out"
           >
-            <img
+            <Image
               src={getTransformedImageUrl(enlargedPhoto)}
               alt="Enlarged view"
+              width={1200}
+              height={1200}
+              unoptimized
               className="max-w-full max-h-[90vh] object-contain rounded-2xl shadow-2xl"
             />
           </div>

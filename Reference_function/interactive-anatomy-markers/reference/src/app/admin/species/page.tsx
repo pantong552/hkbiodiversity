@@ -3,7 +3,6 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { 
-  Database, 
   Save, 
   Loader2, 
   Plus, 
@@ -12,7 +11,6 @@ import {
   Languages, 
   Settings2, 
   Eye, 
-  HelpCircle,
   ArrowUp,
   ArrowDown,
   Trash2,
@@ -30,9 +28,96 @@ import speciesGalleries from "@/data/speciesGalleries.json";
 import illustrationUrls from "@/data/illustrationUrls.json";
 import silhouetteUrls from "@/data/silhouetteUrls.json";
 import CustomDropdown from "@/components/CustomDropdown";
-import { SynonymItem, AnatomyHotspotItem } from "@/types/species";
+import type { SynonymItem, AnatomyHotspotItem } from "@/types/species";
 import { getOptimizedImageUrl } from "@/lib/cloudinary";
 
+type GalleryPhoto = {
+  url: string;
+  credit?: string;
+  originalUrl?: string;
+};
+
+type GalleryData = {
+  photos?: GalleryPhoto[];
+};
+
+type SpeciesOptionRow = {
+  id: string;
+  species_code: string;
+  scientific_name: string;
+  species_translations: Array<{ lang: string; common_name: string | null }> | null;
+};
+
+type PhotoCreditRow = { credit: string | null };
+
+type AnatomyHotspotRow = {
+  hotspot_key: string;
+  x_percent: number | string;
+  y_percent: number | string;
+  placement: string | null;
+  species_anatomy_hotspot_translations: Array<{ lang: string; content: string | null }> | null;
+};
+
+type DietCompositionRow = {
+  id: string;
+  title_zh: string | null;
+  title_en: string | null;
+  source: string | null;
+  source_url: string | null;
+  items: DietStudyForm["items"] | null;
+};
+
+type RoostingStudyRow = {
+  id: string;
+  title_zh: string | null;
+  title_en: string | null;
+  source: string | null;
+  source_url: string | null;
+  items: RoostingStudyForm["items"] | null;
+};
+
+type DietFoodListStudyRow = {
+  id: string;
+  title_zh: string | null;
+  title_en: string | null;
+  source: string | null;
+  source_url: string | null;
+  items: DietFoodListStudyForm["items"] | null;
+};
+
+type InsertedHotspotRow = { id: string; hotspot_key: string };
+type HotspotTranslationInsert = { hotspot_id: string; lang: "zh" | "en"; content: string };
+
+const licenseRegex = /(CC[- ]?BY[- ]?NC[- ]?ND|CC[- ]?BY[- ]?NC[- ]?SA|CC[- ]?BY[- ]?NC|CC[- ]?BY[- ]?ND|CC[- ]?BY[- ]?SA|CC[- ]?BY|All Rights? Reserved)/i;
+
+function parseCreditAndLicense(rawCredit: string) {
+  if (!rawCredit) return { credit: "©", license: "All Rights Reserved" };
+  const match = rawCredit.match(licenseRegex);
+  if (match) {
+    let lic = match[0];
+    if (lic.toUpperCase().startsWith("CC")) {
+      const upper = lic.toUpperCase().replace(/[- ]+/g, " ");
+      if (upper.includes("BY NC ND")) lic = "CC BY-NC-ND";
+      else if (upper.includes("BY NC SA")) lic = "CC BY-NC-SA";
+      else if (upper.includes("BY NC")) lic = "CC BY-NC";
+      else if (upper.includes("BY ND")) lic = "CC BY-ND";
+      else if (upper.includes("BY SA")) lic = "CC BY-SA";
+      else if (upper.includes("BY")) lic = "CC BY";
+      else lic = upper;
+    } else if (lic.toLowerCase().includes("right") && lic.toLowerCase().includes("reserved")) {
+      lic = "All Rights Reserved";
+    }
+    let clean = rawCredit.replace(licenseRegex, "").replace(/\(\s*\)/g, "").trim();
+    clean = clean.replace(/\s*,\s*$/, "").trim();
+    if (!clean) clean = "©";
+    return { credit: clean, license: lic };
+  }
+  return { credit: rawCredit, license: "All Rights Reserved" };
+}
+
+function getErrorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
 
 type SpeciesListOption = {
   id: string;
@@ -93,34 +178,6 @@ export default function SpeciesDataManagement() {
   ]);
 
   // --- Credit & License 處理輔助函數 ---
-  const licenseRegex = /(CC[- ]?BY[- ]?NC[- ]?ND|CC[- ]?BY[- ]?NC[- ]?SA|CC[- ]?BY[- ]?NC|CC[- ]?BY[- ]?ND|CC[- ]?BY[- ]?SA|CC[- ]?BY|All Rights? Reserved)/i;
-  
-  function parseCreditAndLicense(rawCredit: string) {
-    if (!rawCredit) return { credit: "©", license: "All Rights Reserved" };
-    const match = rawCredit.match(licenseRegex);
-    if (match) {
-      let lic = match[0];
-      if (lic.toUpperCase().startsWith("CC")) {
-        // 標準化 CC 格式，例如將 CC-BY NC 或 CC_BY_NC 統一轉換為標準的 CC BY-NC 等
-        const upper = lic.toUpperCase().replace(/[- ]+/g, " ");
-        if (upper.includes("BY NC ND")) lic = "CC BY-NC-ND";
-        else if (upper.includes("BY NC SA")) lic = "CC BY-NC-SA";
-        else if (upper.includes("BY NC")) lic = "CC BY-NC";
-        else if (upper.includes("BY ND")) lic = "CC BY-ND";
-        else if (upper.includes("BY SA")) lic = "CC BY-SA";
-        else if (upper.includes("BY")) lic = "CC BY";
-        else lic = upper;
-      } else if (lic.toLowerCase().includes("right") && lic.toLowerCase().includes("reserved")) {
-        lic = "All Rights Reserved";
-      }
-      let clean = rawCredit.replace(licenseRegex, "").replace(/\(\s*\)/g, "").trim();
-      clean = clean.replace(/\s*,\s*$/, "").trim();
-      if (!clean) clean = "©";
-      return { credit: clean, license: lic };
-    }
-    return { credit: rawCredit, license: "All Rights Reserved" };
-  }
-
   function combineCreditAndLicense(credit: string, license: string): string {
     if (!license) return credit;
     if (license === "All Rights Reserved") {
@@ -525,8 +582,8 @@ export default function SpeciesDataManagement() {
           `);
         if (error) throw error;
 
-        const options = (data || []).map((s: any) => {
-          const zh = s.species_translations?.find((t: any) => t.lang === "zh");
+        const options = ((data || []) as unknown as SpeciesOptionRow[]).map((s) => {
+          const zh = s.species_translations?.find((t) => t.lang === "zh");
           return {
             id: s.id,
             species_code: s.species_code,
@@ -557,7 +614,7 @@ export default function SpeciesDataManagement() {
               "CC BY-ND",
               "CC BY-SA"
             ]);
-            pData.forEach((p: any) => {
+            (pData as unknown as PhotoCreditRow[]).forEach((p) => {
               if (p.credit) {
                 const match = p.credit.match(licenseRegex);
                 if (match) {
@@ -701,9 +758,9 @@ export default function SpeciesDataManagement() {
         } else {
           // fallback 讀取 json 預設照片
           const code = sp.species_code;
-          const galleryData = (speciesGalleries as any)[code];
+          const galleryData = (speciesGalleries as Record<string, GalleryData | undefined>)[code];
           if (galleryData && galleryData.photos) {
-            setPhotosForm(galleryData.photos.map((p: any) => {
+            setPhotosForm(galleryData.photos.map((p) => {
               const parsed = parseCreditAndLicense(p.credit || "");
               return {
                 url: p.url,
@@ -736,9 +793,9 @@ export default function SpeciesDataManagement() {
         if (hsErr) throw hsErr;
 
         if (hsData) {
-          const mapped = hsData.map((item: any) => {
-            const zhContent = item.species_anatomy_hotspot_translations?.find((t: any) => t.lang === "zh")?.content || "";
-            const enContent = item.species_anatomy_hotspot_translations?.find((t: any) => t.lang === "en")?.content || "";
+          const mapped = (hsData as unknown as AnatomyHotspotRow[]).map((item) => {
+            const zhContent = item.species_anatomy_hotspot_translations?.find((t) => t.lang === "zh")?.content || "";
+            const enContent = item.species_anatomy_hotspot_translations?.find((t) => t.lang === "en")?.content || "";
             return {
               key: item.hotspot_key,
               x: Number(item.x_percent),
@@ -762,13 +819,13 @@ export default function SpeciesDataManagement() {
         if (dietErr) throw dietErr;
 
         if (dietData && dietData.length > 0) {
-          const mapped: DietStudyForm[] = dietData.map((d: any) => ({
+          const mapped: DietStudyForm[] = (dietData as unknown as DietCompositionRow[]).map((d) => ({
             _key: d.id || Math.random().toString(36).slice(2, 11),
             title_zh: d.title_zh || "",
             title_en: d.title_en || "",
             source: d.source || "",
             source_url: d.source_url || "",
-            items: (d.items || []) as { name_zh: string; name_en: string; percentage: number }[],
+            items: d.items || [],
           }));
           setDietForm(mapped);
           const newItems: Record<string, { name_zh: string; name_en: string; pct: string }> = {};
@@ -787,13 +844,13 @@ export default function SpeciesDataManagement() {
         if (roostingErr) throw roostingErr;
 
         if (roostingData && roostingData.length > 0) {
-          const mapped: RoostingStudyForm[] = roostingData.map((r: any) => ({
+          const mapped: RoostingStudyForm[] = (roostingData as unknown as RoostingStudyRow[]).map((r) => ({
             _key: r.id || Math.random().toString(36).slice(2, 11),
             title_zh: r.title_zh || "",
             title_en: r.title_en || "",
             source: r.source || "",
             source_url: r.source_url || "",
-            items: (r.items || []) as { plant_zh: string; plant_en: string; location_zh: string; location_en: string }[],
+            items: r.items || [],
           }));
           setRoostingForm(mapped);
           const newItems: Record<string, { plant_zh: string; plant_en: string; location_zh: string; location_en: string }> = {};
@@ -812,13 +869,13 @@ export default function SpeciesDataManagement() {
         if (dietFoodListErr) throw dietFoodListErr;
 
         if (dietFoodListData && dietFoodListData.length > 0) {
-          const mapped: DietFoodListStudyForm[] = dietFoodListData.map((d: any) => ({
+          const mapped: DietFoodListStudyForm[] = (dietFoodListData as unknown as DietFoodListStudyRow[]).map((d) => ({
             _key: d.id || Math.random().toString(36).slice(2, 11),
             title_zh: d.title_zh || "",
             title_en: d.title_en || "",
             source: d.source || "",
             source_url: d.source_url || "",
-            items: (d.items || []) as { plant_zh: string; plant_en: string; food_zh: string; food_en: string }[],
+            items: d.items || [],
           }));
           setDietFoodListForm(mapped);
           const newItems: Record<string, { plant_zh: string; plant_en: string; food_zh: string; food_en: string }> = {};
@@ -829,9 +886,9 @@ export default function SpeciesDataManagement() {
           setDietFoodListNewItems({});
         }
 
-      } catch (err: any) {
+      } catch (err: unknown) {
         console.error("Failed to load species detailed data:", err);
-        showToast("載入物種詳細資料失敗: " + (err.message || String(err)), "error");
+        showToast("載入物種詳細資料失敗: " + getErrorMessage(err), "error");
       } finally {
         setLoading(false);
       }
@@ -1010,8 +1067,8 @@ export default function SpeciesDataManagement() {
         if (insHSErr) throw insHSErr;
 
         if (insertedRows && insertedRows.length > 0) {
-          const insertTranslations: any[] = [];
-          insertedRows.forEach((row: any) => {
+          const insertTranslations: HotspotTranslationInsert[] = [];
+          (insertedRows as unknown as InsertedHotspotRow[]).forEach((row) => {
             const matchedForm = hotspotsForm.find(hs => hs.key === row.hotspot_key);
             if (matchedForm) {
               insertTranslations.push({
@@ -1112,8 +1169,8 @@ export default function SpeciesDataManagement() {
       }
 
       showToast("儲存成功！", "success");
-    } catch (err: any) {
-      showToast("儲存失敗: " + err.message, "error");
+    } catch (err: unknown) {
+      showToast("儲存失敗: " + getErrorMessage(err), "error");
     } finally {
       setSaving(false);
     }
@@ -1147,7 +1204,7 @@ export default function SpeciesDataManagement() {
           original_url: ""
         }
       ]);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error(err);
       alert("上傳失敗 (可能未配置 Cloudinary 無簽名上傳 Preset 'hkbr_preset')。您可以直接在下方輸入圖片網址加入相片！");
     } finally {
@@ -1183,9 +1240,9 @@ export default function SpeciesDataManagement() {
       (silhouetteUrls as Record<string, string>)[selectedSpeciesCode] = newUrl;
 
       showToast("飛行剪影上傳成功！", "success");
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error(err);
-      alert("上傳失敗: " + (err.message || err));
+      alert("上傳失敗: " + getErrorMessage(err));
     } finally {
       setUploadingSilhouette(false);
       e.target.value = ""; // 重設 input
@@ -1210,9 +1267,9 @@ export default function SpeciesDataManagement() {
       setSilhouetteUrl("");
       delete (silhouetteUrls as Record<string, string>)[selectedSpeciesCode];
       showToast("飛行剪影已刪除！", "success");
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error(err);
-      alert("刪除失敗: " + (err.message || err));
+      alert("刪除失敗: " + getErrorMessage(err));
     } finally {
       setUploadingSilhouette(false);
     }
@@ -3144,7 +3201,7 @@ export default function SpeciesDataManagement() {
                       />
                     </label>
                     <p className="text-[10px] text-admin-text-secondary italic">
-                      提示：飛行剪影會儲存至 Cloudinary 對應物種資料夾的 "silhouettes" Folder 內。
+                      提示：飛行剪影會儲存至 Cloudinary 對應物種資料夾的 &quot;silhouettes&quot; Folder 內。
                     </p>
                   </div>
 

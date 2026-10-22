@@ -1,8 +1,7 @@
 async function getEdgeConfig<T>(key: string): Promise<T | undefined> {
   try {
-    // @ts-ignore
-    const edgeConfig: any = await import('@vercel/edge-config');
-    return await edgeConfig.get(key);
+    const edgeConfig = await import('@vercel/edge-config');
+    return await edgeConfig.get(key) as T | undefined;
   } catch {
     return undefined;
   }
@@ -52,7 +51,7 @@ async function sessionFetch(url: string, options: RequestInit = {}, cookieJar = 
     });
 
     // 解析並收集 Cookie
-    const getSetCookieFunc = (res.headers as any).getSetCookie;
+    const getSetCookieFunc = res.headers.getSetCookie;
     const rawCookies: string[] = getSetCookieFunc
       ? getSetCookieFunc.call(res.headers)
       : [res.headers.get('set-cookie') || ''];

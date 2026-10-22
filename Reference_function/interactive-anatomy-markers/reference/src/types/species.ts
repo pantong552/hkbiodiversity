@@ -3,6 +3,50 @@ export interface SynonymItem {
   author: string;
 }
 
+export interface DietCompositionItem {
+  name_zh: string;
+  name_en: string;
+  percentage: number;
+}
+
+export interface DietCompositionStudy {
+  title_zh: string;
+  title_en: string;
+  source: string;
+  sourceUrl?: string;
+  items: DietCompositionItem[];
+}
+
+export interface RoostingPlantItem {
+  plant_zh: string;
+  plant_en: string;
+  location_zh: string;
+  location_en: string;
+}
+
+export interface RoostingPlantStudy {
+  title_zh: string;
+  title_en: string;
+  source: string;
+  sourceUrl?: string;
+  items: RoostingPlantItem[];
+}
+
+export interface DietFoodListItem {
+  plant_zh: string;
+  plant_en: string;
+  food_zh: string;
+  food_en: string;
+}
+
+export interface DietFoodListStudy {
+  title_zh: string;
+  title_en: string;
+  source: string;
+  sourceUrl?: string;
+  items: DietFoodListItem[];
+}
+
 export interface Species {
   code: string;
   scientificName: string;
@@ -81,9 +125,9 @@ export interface Species {
       migration?: string;
       homeRange?: string;
       vocalizations?: string;
-      dietComposition?: any[];
-      roostingPlants?: any[];
-      dietFoodLists?: any[];
+      dietComposition?: DietCompositionStudy[];
+      roostingPlants?: RoostingPlantStudy[];
+      dietFoodLists?: DietFoodListStudy[];
     };
     distribution: {
       local: string;
@@ -117,9 +161,9 @@ export interface Species {
       migration?: string;
       homeRange?: string;
       vocalizations?: string;
-      dietComposition?: any[];
-      roostingPlants?: any[];
-      dietFoodLists?: any[];
+      dietComposition?: DietCompositionStudy[];
+      roostingPlants?: RoostingPlantStudy[];
+      dietFoodLists?: DietFoodListStudy[];
     };
     distribution: {
       local: string;
@@ -180,5 +224,4 @@ export interface EcholocationItem {
     referenceUrl?: string;
   };
 }
-
 

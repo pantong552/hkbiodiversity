@@ -3,8 +3,9 @@
 import React from 'react';
 import Image from 'next/image';
 import { Species } from '@/types/species';
+import { PlantSpecies } from '@/types/plants';
 import { useLanguage } from '@/context/LanguageContext';
-import { Bookmark, Map, ExternalLink, Shield, Image as ImageIcon, Leaf, Compass, Loader2 } from 'lucide-react';
+import { Bookmark, Map, ExternalLink, Leaf, Compass, Loader2 } from 'lucide-react';
 import { createClient } from '@/utils/supabase/client';
 import TaxonomyDisplay from './TaxonomyDisplay';
 import ConservationStatus from './ConservationStatus';
@@ -15,7 +16,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useRef } from 'react';
 import SpeciesMap, { ObservationChart } from './SpeciesMap';
 import GbifGlobalMap from './GbifGlobalMap';
-import { formatScientificName, parseAliases, renderFormattedText } from '@/utils/formatters';
+import { formatScientificName, renderFormattedText } from '@/utils/formatters';
 import CongenericExplorer from './CongenericExplorer';
 import SimilarSpeciesExplorer from './SimilarSpeciesExplorer';
 import BirdSoundCard from './BirdSoundCard';
@@ -32,6 +33,8 @@ interface SpeciesContentProps {
   refreshTrigger?: number;
   anatomyCard?: React.ReactNode;
 }
+type SpeciesWithPlantTaxonomy = Species & Partial<Pick<PlantSpecies, 'family_eng' | 'family_chi' | 'genus_eng' | 'genus_chi'>>;
+type SpeciesReference = { code: string; zh: string | null; en: string | null; url: string | null };
 
 const SpeciesHeroBackground = ({ photos, defaultImage, isLoading }: { photos: InatGalleryPhoto[], defaultImage: string, isLoading: boolean }) => {
   const [index, setIndex] = React.useState(0);
@@ -39,9 +42,10 @@ const SpeciesHeroBackground = ({ photos, defaultImage, isLoading }: { photos: In
   const [isFullyReady, setIsFullyReady] = React.useState(false);
   const [mounted, setMounted] = React.useState(false);
   const [isVisible, setIsVisible] = React.useState(true);
+  const photoSelectionSeed = React.useId();
   
   const containerRef = useRef<HTMLDivElement>(null);
-  const lastValidPhotosRef = useRef<InatGalleryPhoto[]>([]);
+  const [lastValidPhotos, setLastValidPhotos] = React.useState<InatGalleryPhoto[]>([]);
 
   // 1. 隨機挑選最多 5 張相片，固定留在 memory/disk cache 進行輪播
   const selectedPhotos = React.useMemo(() => {
@@ -49,13 +53,16 @@ const SpeciesHeroBackground = ({ photos, defaultImage, isLoading }: { photos: In
     if (photos.length <= 5) return photos;
     
     // 使用費雪-葉茲演算法亂數隨機洗牌，挑選前 5 張
-    const shuffled = [...photos];
-    for (let i = shuffled.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
-    }
-    return shuffled.slice(0, 5);
-  }, [photos]);
+    const getPhotoOrder = (photo: InatGalleryPhoto) => {
+      const value = `${photoSelectionSeed}:${JSON.stringify(photo)}`;
+      let hash = 2166136261;
+      for (let i = 0; i < value.length; i++) {
+        hash = Math.imul(hash ^ value.charCodeAt(i), 16777619);
+      }
+      return hash >>> 0;
+    };
+    return [...photos].sort((a, b) => getPhotoOrder(a) - getPhotoOrder(b)).slice(0, 5);
+  }, [photos, photoSelectionSeed]);
 
   React.useEffect(() => {
     setMounted(true);
@@ -85,11 +92,11 @@ const SpeciesHeroBackground = ({ photos, defaultImage, isLoading }: { photos: In
     }
   }, [imgLoaded, isLoading, photos.length, mounted]);
 
-  if (selectedPhotos.length > 0) {
-    lastValidPhotosRef.current = selectedPhotos;
+  if (selectedPhotos.length > 0 && selectedPhotos !== lastValidPhotos) {
+    setLastValidPhotos(selectedPhotos);
   }
 
-  const displayPhotos = selectedPhotos.length > 0 ? selectedPhotos : lastValidPhotosRef.current;
+  const displayPhotos = selectedPhotos.length > 0 ? selectedPhotos : lastValidPhotos;
   const hasPhotos = displayPhotos.length > 0;
 
   // 3. 切換定時器：只有當 displayPhotos > 1 且 Hero Banner 在可視範圍內 (isVisible) 才倒數切換
@@ -208,7 +215,8 @@ export default function SpeciesContent({ species, showBreadcrumb = true, refresh
   const { photos, isLoading } = useInaturalistSpeciesPhotos(species.inat_id);
 
   const handleBreadcrumbClick = (levelId: string, value: string, chiValue?: string) => {
-    const isPlantSpecies = species.taxa_group === 'FLORA' || (!species.phylum_eng && !!(species as any).family_chi);
+    const plant = species as SpeciesWithPlantTaxonomy;
+    const isPlantSpecies = species.taxa_group === 'FLORA' || (!species.phylum_eng && !!plant.family_chi);
     const searchValue = isPlantSpecies ? (chiValue || value) : value;
     if (!searchValue) return;
 
@@ -221,7 +229,7 @@ export default function SpeciesContent({ species, showBreadcrumb = true, refresh
   };
 
 
-  const [refsList, setRefsList] = React.useState<any[]>([]);
+  const [refsList, setRefsList] = React.useState<SpeciesReference[]>([]);
   const [refsLoading, setRefsLoading] = React.useState(false);
 
   // 載入關聯的參考文獻
@@ -247,7 +255,7 @@ export default function SpeciesContent({ species, showBreadcrumb = true, refresh
 
         if (!error && data) {
           // 依照 codes 的順序排列文獻
-          const sorted = codes.map(code => data.find((r: any) => r.code === code)).filter(Boolean);
+          const sorted = codes.map(code => data.find((r: SpeciesReference) => r.code === code)).filter((item): item is SpeciesReference => Boolean(item));
           setRefsList(sorted);
         }
       } catch (err) {
@@ -259,7 +267,8 @@ export default function SpeciesContent({ species, showBreadcrumb = true, refresh
     fetchReferences();
   }, [species.reference_codes]);
 
-  const isPlant = species.taxa_group === 'FLORA' || (!species.phylum_eng && !!(species as any).family_chi);
+  const plant = species as SpeciesWithPlantTaxonomy;
+  const isPlant = species.taxa_group === 'FLORA' || (!species.phylum_eng && !!plant.family_chi);
   const taxaType = isPlant ? 'flora' : 'fauna';
 
   const commonName = language === 'zh' ? species.common_name_chi : species.common_name_eng;
@@ -281,17 +290,17 @@ export default function SpeciesContent({ species, showBreadcrumb = true, refresh
             {isPlant ? (
               <>
                 <span 
-                  onClick={() => handleBreadcrumbClick('families', (species as any).family_eng, (species as any).family_chi)}
+                  onClick={() => handleBreadcrumbClick('families', plant.family_eng || '', plant.family_chi)}
                   className="text-emerald-600 hover:text-emerald-700 hover:underline cursor-pointer transition-colors"
                 >
-                  {language === 'zh' ? getTaxonomyChi('family', taxaType, (species as any).family_eng) : (species as any).family_eng}
+                  {language === 'zh' ? getTaxonomyChi('family', taxaType, plant.family_eng || '') : plant.family_eng}
                 </span>
                 <span>/</span>
                 <span 
-                  onClick={() => handleBreadcrumbClick('genuses', (species as any).genus_eng, (species as any).genus_chi)}
+                  onClick={() => handleBreadcrumbClick('genuses', plant.genus_eng || '', plant.genus_chi)}
                   className="hover:text-emerald-600 hover:underline cursor-pointer transition-colors"
                 >
-                  {language === 'zh' ? getTaxonomyChi('genus', taxaType, (species as any).genus_eng) : (species as any).genus_eng}
+                  {language === 'zh' ? getTaxonomyChi('genus', taxaType, plant.genus_eng || '') : plant.genus_eng}
                 </span>
               </>
             ) : (

@@ -3,7 +3,25 @@
 import { useState, useEffect } from 'react';
 
 const PHOTO_CACHE_KEY = 'inat_photo_cache_v2';
-const pendingRequests = new Map<string, Promise<any>>();
+interface InatApiPhoto {
+  id: string | number;
+  url: string;
+  square_url?: string;
+  medium_url?: string;
+  native_page_url?: string;
+  license_code: string | null;
+  attribution?: string | null;
+  attribution_name?: string | null;
+}
+interface InatTaxonResult {
+  default_photo?: InatApiPhoto;
+  taxon_photos?: { photo: InatApiPhoto }[];
+  photos?: InatApiPhoto[];
+}
+interface InatApiResponse {
+  results?: InatTaxonResult[];
+}
+const pendingRequests = new Map<string, Promise<InatApiResponse>>();
 
 // --- Concurrency Control Queue ---
 const MAX_CONCURRENT = 3; 
@@ -82,7 +100,7 @@ const getRewriteUrl = (url: string, size: 'square' | 'small' | 'medium' | 'large
  * Helper to fetch with retry, exponential backoff, AND concurrency control
 
  */
-async function fetchWithRetry(url: string, retries = 3, delay = 1000): Promise<any> {
+async function fetchWithRetry(url: string, retries = 3, delay = 1000): Promise<InatApiResponse> {
   // Wait for our turn in the queue
   await enqueueRequest();
   
@@ -97,7 +115,7 @@ async function fetchWithRetry(url: string, retries = 3, delay = 1000): Promise<a
       }
       throw new Error(`HTTP error! status: ${response.status}`);
     }
-    const data = await response.json();
+    const data = await response.json() as InatApiResponse;
     return data;
   } catch (error) {
     if (retries > 0) {
@@ -138,7 +156,7 @@ export function useInaturalistPhoto(
       try {
         setPhotoData(JSON.parse(cached));
         return;
-      } catch (e) {
+      } catch {
         sessionStorage.removeItem(cacheKey);
       }
     }
@@ -167,11 +185,11 @@ export function useInaturalistPhoto(
 
         const allTaxonPhotos = [
           result.default_photo,
-          ...(result.taxon_photos || []).map((tp: any) => tp.photo)
-        ].filter(p => p !== undefined && p !== null);
+          ...(result.taxon_photos || []).map(tp => tp.photo)
+        ].filter((p): p is InatApiPhoto => p !== undefined && p !== null);
 
         // 優先從 Taxa 官方圖中找有授權的
-        let validPhoto = allTaxonPhotos.find((p: any) => p.license_code !== null);
+        let validPhoto = allTaxonPhotos.find(p => p.license_code !== null);
 
         // --- FALLBACK: Try Observations API ---
         if (!validPhoto) {
@@ -181,7 +199,7 @@ export function useInaturalistPhoto(
           
           if (hkObsData.results && hkObsData.results.length > 0) {
             for (const obs of hkObsData.results) {
-              const p = obs.photos?.find((p: any) => p.license_code !== null);
+              const p = obs.photos?.find(p => p.license_code !== null);
               if (p) {
                 validPhoto = p;
                 break;
@@ -196,7 +214,7 @@ export function useInaturalistPhoto(
             
             if (globalObsData.results && globalObsData.results.length > 0) {
               for (const obs of globalObsData.results) {
-                const p = obs.photos?.find((p: any) => p.license_code !== null);
+                const p = obs.photos?.find(p => p.license_code !== null);
                 if (p) {
                   validPhoto = p;
                   break;
@@ -255,7 +273,7 @@ export function useInaturalistPhoto(
 
     fetchPhoto();
     return () => { isMounted = false; };
-  }, [taxonId]);
+  }, [taxonId, size, useRewrite]);
 
   return { 
     imageUrl: photoData?.url || null, 

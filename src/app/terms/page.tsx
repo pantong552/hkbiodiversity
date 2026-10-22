@@ -127,7 +127,7 @@ export default function TermsPage() {
           </div>
 
           <p className="text-lg text-slate-600 mb-12 leading-relaxed italic">
-            "{currentContent.intro}"
+            &quot;{currentContent.intro}&quot;
           </p>
 
           <div className="space-y-12">

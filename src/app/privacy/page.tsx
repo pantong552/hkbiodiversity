@@ -3,7 +3,7 @@
 import { useLanguage } from '@/context/LanguageContext';
 import Header from '@/components/Header';
 import { motion } from 'framer-motion';
-import { Shield, Lock, Eye, ArrowLeft } from 'lucide-react';
+import { Shield, Lock, ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
 
 export default function PrivacyPage() {
@@ -137,7 +137,7 @@ export default function PrivacyPage() {
           </div>
 
           <p className="text-lg text-slate-600 mb-12 leading-relaxed italic">
-            "{currentContent.intro}"
+            &quot;{currentContent.intro}&quot;
           </p>
 
           <div className="space-y-12">

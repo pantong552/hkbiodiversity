@@ -170,8 +170,7 @@ const ebirdPendingPromises = new Map<string, Promise<{ seasonality: { month: num
  * 獲取 eBird 的季節性 (1-12月) 及歷史年份觀察統計
  */
 export async function fetchEbirdObservationStats(
-  ebirdSpeciesCode: string,
-  mode: 'seasonality' | 'history' | 'both' = 'both'
+  ebirdSpeciesCode: string
 ): Promise<{
   seasonality: { month: number; count: number }[];
   history: { year: number; count: number }[];

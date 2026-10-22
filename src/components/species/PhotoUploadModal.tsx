@@ -2,14 +2,13 @@
 
 import React, { useState, useCallback, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { getErrorMessage } from '@/utils/errors';
 import { 
   X, 
   Upload, 
   User, 
-  Clipboard, 
   CheckCircle2, 
   Loader2, 
-  Image as ImageIcon,
   AlertCircle,
   FileImage,
   Camera,
@@ -18,6 +17,7 @@ import {
 } from 'lucide-react';
 import Image from 'next/image';
 import { createClient } from '@/utils/supabase/client';
+import type { User as SupabaseUser } from '@supabase/supabase-js';
 
 interface PhotoUploadModalProps {
   isOpen: boolean;
@@ -43,7 +43,7 @@ export default function PhotoUploadModal({
   onUploadSuccess,
   language 
 }: PhotoUploadModalProps) {
-  const supabase = createClient();
+  const [supabase] = useState(() => createClient());
   const [file, setFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [author, setAuthor] = useState('');
@@ -51,7 +51,7 @@ export default function PhotoUploadModal({
   const [isUploading, setIsUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isSuccess, setIsSuccess] = useState(false);
-  const [user, setUser] = useState<any>(null);
+  const [user, setUser] = useState<SupabaseUser | null>(null);
   const [isCheckingAuth, setIsCheckingAuth] = useState(true);
 
   // 獲取當前用戶資訊
@@ -72,14 +72,7 @@ export default function PhotoUploadModal({
     if (isOpen) fetchUser();
   }, [supabase, isOpen]);
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const selectedFile = e.target.files?.[0];
-    if (selectedFile) {
-      processFile(selectedFile);
-    }
-  };
-
-  const processFile = (selectedFile: File) => {
+  const processFile = useCallback((selectedFile: File) => {
     if (!['image/jpeg', 'image/png', 'image/webp', 'image/avif'].includes(selectedFile.type)) {
       setError(language === 'zh' ? '僅支援 JPG, PNG, WEBP, AVIF 格式' : 'Only JPG, PNG, WEBP, AVIF formats are supported');
       return;
@@ -91,6 +84,13 @@ export default function PhotoUploadModal({
     setFile(selectedFile);
     setPreviewUrl(URL.createObjectURL(selectedFile));
     setError(null);
+  }, [language]);
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const selectedFile = e.target.files?.[0];
+    if (selectedFile) {
+      processFile(selectedFile);
+    }
   };
 
   const onDrop = useCallback((e: React.DragEvent) => {
@@ -99,7 +99,7 @@ export default function PhotoUploadModal({
     if (droppedFile) {
       processFile(droppedFile);
     }
-  }, [language]);
+  }, [processFile]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -160,9 +160,9 @@ export default function PhotoUploadModal({
         if (onUploadSuccess) onUploadSuccess();
       }, 1000);
 
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error(err);
-      setError(err.message || 'Upload failed');
+      setError(getErrorMessage(err, 'Upload failed'));
     } finally {
       setIsUploading(false);
     }

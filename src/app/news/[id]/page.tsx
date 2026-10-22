@@ -1,7 +1,6 @@
 import { getNewsById } from '@/lib/home';
 import Header from '@/components/Header';
-import { useLanguage } from '@/context/LanguageContext';
-import { Calendar, Tag, ArrowLeft } from 'lucide-react';
+import { Calendar, ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
 import ReactMarkdown from 'react-markdown';
 import rehypeRaw from 'rehype-raw';
@@ -33,7 +32,7 @@ export default async function NewsDetailPage({ params }: { params: Promise<{ id:
 
 // 由於我們需要使用 useLanguage (Client Context)，我們建立一個 Client Component 封裝內容
 // 或者更簡單地，我們在 Server Component 中處理翻譯邏輯
-function NewsDetailClient({ news }: { news: any }) {
+function NewsDetailClient({ news }: { news: { id: string | number; title_chi?: string | null; title_eng?: string | null; content_chi?: string | null; content_eng?: string | null; published_at?: string | null; category?: string | null } }) {
   // 這裡我們直接在頁面內部處理語言邏輯，避免過度複雜化
   // 雖然我們是在 Server Component，但我們可以傳遞給一個 Client Component 渲染
   return (
@@ -56,7 +55,7 @@ function NewsDetailClient({ news }: { news: any }) {
               </span>
               <span className="text-sm font-bold text-slate-400 flex items-center gap-2">
                 <Calendar className="w-4 h-4" /> 
-                {new Date(news.published_at).toLocaleDateString('zh-HK', { year: 'numeric', month: 'long', day: 'numeric' })}
+                {news.published_at ? new Date(news.published_at).toLocaleDateString('zh-HK', { year: 'numeric', month: 'long', day: 'numeric' }) : ''}
               </span>
             </div>
             
@@ -82,7 +81,7 @@ function NewsDetailClient({ news }: { news: any }) {
                   ]}
                   remarkPlugins={[remarkBreaks]}
                 >
-                  {news.content_chi.replace(/\\n/g, '\n')}
+                  {(news.content_chi || '').replace(/\\n/g, '\n')}
                 </ReactMarkdown>
               </div>
             </div>
@@ -100,7 +99,7 @@ function NewsDetailClient({ news }: { news: any }) {
                   ]}
                   remarkPlugins={[remarkBreaks]}
                 >
-                  {news.content_eng.replace(/\\n/g, '\n')}
+                  {(news.content_eng || '').replace(/\\n/g, '\n')}
                 </ReactMarkdown>
               </div>
             </div>

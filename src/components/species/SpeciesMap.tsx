@@ -1,16 +1,18 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
-import Map, { Source, Layer, MapLayerMouseEvent, NavigationControl } from 'react-map-gl/maplibre';
+import Map, { Source, Layer, MapLayerMouseEvent } from 'react-map-gl/maplibre';
+import type { Feature, FeatureCollection, MultiPolygon, Point, Polygon } from 'geojson';
+import type { StyleSpecification } from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import * as turf from '@turf/turf';
 import { fetchAllInatObservations, InatObservation } from '@/utils/inaturalist';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Calendar, User, ExternalLink, MapPin, Loader2, Info, Bird, Maximize, MousePointer2, Layers, Shield, Link as LinkIcon, Filter, Building2, Camera, ChevronDown, Check, CheckCircle2, Database, Sparkles, TrendingUp, BarChart3, Activity, Eye, EyeOff } from 'lucide-react';
+import { X, Calendar, ExternalLink, MapPin, Loader2, Info, Bird, Layers, Shield, Link as LinkIcon, Filter, Building2, Camera, ChevronDown, Check, CheckCircle2, Sparkles, TrendingUp, BarChart3, Activity, Eye, EyeOff } from 'lucide-react';
 import Image from 'next/image';
 import { useLanguage } from '@/context/LanguageContext';
 import { useAuth } from '@/context/AuthContext';
-import { FullscreenControl, NavigationControl as MapNavControl, Popup } from 'react-map-gl/maplibre';
+import { FullscreenControl, NavigationControl as MapNavControl } from 'react-map-gl/maplibre';
 
 import { fetchBgisSpeciesList, fetchBgisObservationStats, BgisGridRecord, BgisDatasetItem, BGIS_DATASETS } from '@/utils/bgis';
 import { fetchEbirdGridSummary, getEbirdObservationStats, EbirdGridSummary } from '@/utils/ebird';
@@ -20,7 +22,7 @@ import { fetchEbirdGridSummary, getEbirdObservationStats, EbirdGridSummary } fro
  */
 const getInatRewriteUrl = (url: string, size: 'square' | 'small' | 'medium' | 'large' | 'original' = 'square') => {
   if (!url) return '';
-  let sizedUrl = url
+  const sizedUrl = url
     .replace('/square.', `/${size}.`)
     .replace('/medium.', `/${size}.`)
     .replace('/large.', `/${size}.`)
@@ -50,12 +52,50 @@ interface SpeciesMapProps {
 
 interface GridFeatureProperties {
   grid_id: string | number;
-  grid_no?: string;
+  grid_no?: string | number;
   count: number;
   observations: InatObservation[];
   bgisCount?: number;
   bgisDataset?: BgisDatasetItem[];
   ebirdCount?: number;
+  ebirdRecords?: unknown[];
+  totalCount?: number;
+}
+
+type GridGeometry = Polygon | MultiPolygon;
+type GridFeature = Feature<GridGeometry, GridFeatureProperties>;
+type GridFeatureCollection = FeatureCollection<GridGeometry, GridFeatureProperties>;
+type ObservationPoint = Feature<Point, InatObservation>;
+
+function isInatObservation(value: unknown): value is InatObservation {
+  return typeof value === 'object'
+    && value !== null
+    && 'id' in value
+    && typeof value.id === 'number'
+    && 'location' in value
+    && typeof value.location === 'string';
+}
+
+function isBgisDatasetItem(value: unknown): value is BgisDatasetItem {
+  return typeof value === 'object'
+    && value !== null
+    && 'datasetID' in value
+    && typeof value.datasetID === 'number'
+    && 'count' in value
+    && typeof value.count === 'number';
+}
+
+function parseFeatureArray<T>(value: unknown, isItem: (item: unknown) => item is T): T[] {
+  let parsed: unknown = value;
+  if (typeof value === 'string') {
+    try {
+      parsed = JSON.parse(value) as unknown;
+    } catch (error) {
+      console.error('SpeciesMap: 無法解析地圖網格資料:', error);
+      return [];
+    }
+  }
+  return Array.isArray(parsed) ? parsed.filter(isItem) : [];
 }
 
 type ObservationChartPoint = { label: string; inat: number; bgis: number; ebird: number };
@@ -68,7 +108,7 @@ type SpeciesMapCacheEntry = {
   observations: InatObservation[];
   bgisList: BgisGridRecord[];
   ebirdSummary: EbirdGridSummary | null;
-  processedFeatures: any[];
+  processedFeatures: GridFeature[];
   totalBgisCount: number;
 };
 
@@ -200,10 +240,6 @@ export function ObservationChart({
   const [inatObservations, setInatObservations] = useState<InatObservation[]>(propObservations || []);
 
   useEffect(() => {
-    if (propObservations && propObservations.length > 0) {
-      setInatObservations(propObservations);
-      return;
-    }
     if (!taxonId || taxonId <= 0) return;
 
     let cancelled = false;
@@ -224,10 +260,23 @@ export function ObservationChart({
   const statsKey = `${bgisScientificName}|${chineseName || ''}|${ebirdSpeciesCode || ''}|${isBirdGroup}`;
   const initialCache = observationStatsCache[statsKey];
   const [mode, setMode] = useState<'seasonality' | 'history'>('seasonality');
-  const [bgisStats, setBgisStats] = useState<ObservationStats>(initialCache?.bgis || { seasonality: [], history: [] });
-  const [ebirdStats, setEbirdStats] = useState<ObservationStats>(EBIRD_API_ENABLED ? (initialCache?.ebird || { seasonality: [], history: [] }) : { seasonality: [], history: [] });
-  const [isBgisLoading, setIsBgisLoading] = useState(!initialCache?.bgis && !!(bgisScientificName || chineseName));
-  const [isEbirdLoading, setIsEbirdLoading] = useState(EBIRD_API_ENABLED && !initialCache?.ebird && isBirdGroup && !!ebirdSpeciesCode);
+  const [loadedBgisStats, setLoadedBgisStats] = useState<{ key: string; stats: ObservationStats } | null>(null);
+  const [loadedEbirdStats, setLoadedEbirdStats] = useState<{ key: string; stats: ObservationStats } | null>(null);
+  const [resolvedBgisKey, setResolvedBgisKey] = useState<string | null>(null);
+  const [resolvedEbirdKey, setResolvedEbirdKey] = useState<string | null>(null);
+  const emptyStats: ObservationStats = { seasonality: [], history: [] };
+  const bgisStats = loadedBgisStats?.key === statsKey
+    ? loadedBgisStats.stats
+    : initialCache?.bgis ?? emptyStats;
+  const ebirdStats = EBIRD_API_ENABLED
+    ? loadedEbirdStats?.key === statsKey
+      ? loadedEbirdStats.stats
+      : initialCache?.ebird ?? emptyStats
+    : emptyStats;
+  const shouldFetchBgis = enabled && !initialCache?.bgis && !!(bgisScientificName || chineseName);
+  const shouldFetchEbird = enabled && EBIRD_API_ENABLED && !initialCache?.ebird && isBirdGroup && !!ebirdSpeciesCode;
+  const isBgisLoading = shouldFetchBgis && resolvedBgisKey !== statsKey;
+  const isEbirdLoading = shouldFetchEbird && resolvedEbirdKey !== statsKey;
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
   const [activeSources, setActiveSources] = useState<Set<'inat' | 'bgis' | 'ebird'>>(new Set(['inat', 'bgis', 'ebird']));
   const [isFilterDropdownOpen, setIsFilterDropdownOpen] = useState(false);
@@ -256,41 +305,35 @@ export function ObservationChart({
     const statsKey = `${bgisScientificName}|${chineseName || ''}|${ebirdSpeciesCode || ''}|${isBirdGroup}`;
     const cachedStats = observationStatsCache[statsKey];
     if (cachedStats) {
-      setBgisStats(cachedStats.bgis);
-      setEbirdStats(EBIRD_API_ENABLED ? cachedStats.ebird : { seasonality: [], history: [] });
-      setIsBgisLoading(false);
-      setIsEbirdLoading(false);
       return;
     }
 
     let cancelled = false;
     if (bgisScientificName || chineseName) {
-      setIsBgisLoading(true);
       fetchBgisObservationStats(bgisScientificName, chineseName)
         .then(nextBgis => {
           if (cancelled) return;
-          setBgisStats(nextBgis);
-          setIsBgisLoading(false);
+          setLoadedBgisStats({ key: statsKey, stats: nextBgis });
+          setResolvedBgisKey(statsKey);
         })
         .catch(() => {
-          if (!cancelled) setIsBgisLoading(false);
+          if (!cancelled) setResolvedBgisKey(statsKey);
         });
     }
 
     if (EBIRD_API_ENABLED && isBirdGroup && ebirdSpeciesCode) {
-      setIsEbirdLoading(true);
       fetchEbirdGridSummary(ebirdSpeciesCode)
         .then(summary => {
           if (cancelled) return;
-          setEbirdStats(getEbirdObservationStats(summary?.monthly_counts as Record<string, number> | null));
-          setIsEbirdLoading(false);
+          setLoadedEbirdStats({
+            key: statsKey,
+            stats: getEbirdObservationStats(summary?.monthly_counts as Record<string, number> | null),
+          });
+          setResolvedEbirdKey(statsKey);
         })
         .catch(() => {
-          if (!cancelled) setIsEbirdLoading(false);
+          if (!cancelled) setResolvedEbirdKey(statsKey);
         });
-    } else {
-      setEbirdStats({ seasonality: [], history: [] });
-      setIsEbirdLoading(false);
     }
 
     return () => { cancelled = true; };
@@ -1264,8 +1307,8 @@ export default function SpeciesMap({ taxonId, scientificName, hkbihScientificNam
   const [showEbird, setShowEbird] = useState(true);
   const [isFilterDropdownOpen, setIsFilterDropdownOpen] = useState(false);
   const filterRef = useRef<HTMLDivElement>(null);
-  const [allProcessedFeatures, setAllProcessedFeatures] = useState<any[]>([]);
-  const [gridData, setGridData] = useState<any>(null);
+  const [allProcessedFeatures, setAllProcessedFeatures] = useState<GridFeature[]>([]);
+  const [gridData, setGridData] = useState<GridFeatureCollection | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [progress, setProgress] = useState({ current: 0, total: 0 });
 
@@ -1351,7 +1394,7 @@ export default function SpeciesMap({ taxonId, scientificName, hkbihScientificNam
           }
         };
       })
-      .filter(f => f.properties.totalCount > 0);
+      .filter(f => (f.properties?.totalCount ?? 0) > 0);
 
     setGridData({
       type: 'FeatureCollection',
@@ -1480,10 +1523,9 @@ export default function SpeciesMap({ taxonId, scientificName, hkbihScientificNam
           setGridStatus('done');
           return;
         }
-        const geojson = await response.json();
+        const geojson = await response.json() as GridFeatureCollection;
 
         let totalInatCounted = 0;
-        let totalBgisCounted = 0;
         let totalEbirdCounted = 0;
 
         // 建構 iNat 點位
@@ -1497,41 +1539,45 @@ export default function SpeciesMap({ taxonId, scientificName, hkbihScientificNam
           if (parts.length < 2) return null;
           const [lat, lng] = parts;
           return turf.point([lng, lat], { ...o });
-        }).filter(Boolean) as any;
+        }).filter((point): point is ObservationPoint => point !== null);
 
         const ebirdGridCounts = (ebirdSummaryData?.grid_json && typeof ebirdSummaryData.grid_json !== 'string'
           ? ebirdSummaryData.grid_json
           : {}) as Record<string, number>;
 
         // 遍歷所有網格並匹配兩者與 eBird 數據
-        geojson.features.forEach((feature: any, idx: number) => {
-          const rawId = feature.properties?.grid_no ?? feature.properties?.grid_id;
+        geojson.features.forEach((feature, idx) => {
+          const properties = feature.properties ?? (feature.properties = {
+            grid_id: '',
+            count: 0,
+            observations: [],
+          });
+          const rawId = properties.grid_no ?? properties.grid_id;
           const cleanId = rawId !== undefined && rawId !== null
             ? (isNaN(Number(rawId)) ? String(rawId) : String(parseFloat(String(rawId))))
             : String(idx + 1);
 
-          feature.properties.grid_id = cleanId;
-          feature.properties.grid_no = cleanId;
+          properties.grid_id = cleanId;
+          properties.grid_no = cleanId;
 
           // 1. iNaturalist 點位匹配
-          const ptsInPoly = obsPoints.filter((pt: any) =>
+          const ptsInPoly = obsPoints.filter((pt) =>
             turf.booleanPointInPolygon(pt, feature)
           );
           // Map counts are spatial counts only. This must not be reused by
           // ObservationChart, which counts the complete `obs` array above.
-          feature.properties.count = ptsInPoly.length;
-          feature.properties.observations = ptsInPoly.map((p: any) => p.properties);
+          properties.count = ptsInPoly.length;
+          properties.observations = ptsInPoly.map((point) => point.properties);
           totalInatCounted += ptsInPoly.length;
 
           // 2. BGIS 數據匹配
           const bgisRecord = bgisMap[cleanId];
           if (bgisRecord) {
-            feature.properties.bgisCount = bgisRecord.count;
-            feature.properties.bgisDataset = bgisRecord.dataset;
-            totalBgisCounted += bgisRecord.count;
+            properties.bgisCount = bgisRecord.count;
+            properties.bgisDataset = bgisRecord.dataset;
           } else {
-            feature.properties.bgisCount = 0;
-            feature.properties.bgisDataset = [];
+            properties.bgisCount = 0;
+            properties.bgisDataset = [];
           }
 
           // 3. eBird 點位匹配
@@ -1539,12 +1585,12 @@ export default function SpeciesMap({ taxonId, scientificName, hkbihScientificNam
             const normalizedKey = isNaN(Number(key)) ? key : String(parseFloat(key));
             return normalizedKey === cleanId;
           });
-          feature.properties.ebirdCount = Number(ebirdGridKey ? ebirdGridCounts[ebirdGridKey] : 0);
-          feature.properties.ebirdRecords = [];
-          totalEbirdCounted += feature.properties.ebirdCount;
+          properties.ebirdCount = Number(ebirdGridKey ? ebirdGridCounts[ebirdGridKey] : 0);
+          properties.ebirdRecords = [];
+          totalEbirdCounted += properties.ebirdCount;
 
           // 綜合計數
-          feature.properties.totalCount = feature.properties.count + feature.properties.bgisCount + feature.properties.ebirdCount;
+          properties.totalCount = (properties.count ?? 0) + (properties.bgisCount ?? 0) + properties.ebirdCount;
         });
 
         console.log(`SpeciesMap: 數據聚合完成 (iNat 匹配點: ${totalInatCounted}, BGIS 總紀錄: ${realBgisTotal}, eBird 匹配紀錄: ${totalEbirdCounted})`);
@@ -1579,14 +1625,9 @@ export default function SpeciesMap({ taxonId, scientificName, hkbihScientificNam
   const onMapClick = (event: MapLayerMouseEvent) => {
     const feature = event.features && event.features[0];
     if (feature && feature.layer.id === 'grid-layer') {
-      const props = feature.properties as any;
-      const obsList = typeof props.observations === 'string'
-        ? JSON.parse(props.observations)
-        : (props.observations || []);
-
-      const bgisDatasetList = typeof props.bgisDataset === 'string'
-        ? JSON.parse(props.bgisDataset)
-        : (props.bgisDataset || []);
+      const props = feature.properties ?? {};
+      const obsList = parseFeatureArray(props.observations, isInatObservation);
+      const bgisDatasetList = parseFeatureArray(props.bgisDataset, isBgisDatasetItem);
 
       const rawId = props.grid_no ?? props.grid_id;
       const cleanId = rawId !== undefined && rawId !== null
@@ -1973,7 +2014,7 @@ export default function SpeciesMap({ taxonId, scientificName, hkbihScientificNam
           latitude: 22.365,
           zoom: 10
         }}
-        mapStyle={currentStyle as any}
+        mapStyle={currentStyle as StyleSpecification}
         onClick={onMapClick}
         onMouseMove={onMouseMove}
         onMouseLeave={onMouseLeave}

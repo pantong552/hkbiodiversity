@@ -16,8 +16,6 @@ import {
   ShieldCheck,
   Edit2,
   AlertCircle,
-  ChevronRight,
-  Database,
   X
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -67,14 +65,13 @@ const RANK_FIELD_MAP = {
   } as Record<string, string>
 };
 
-export default function TaxonomyMappingsManager({ mode, onRequestConfirm }: TaxonomyMappingsManagerProps) {
+export default function TaxonomyMappingsManager({ mode }: TaxonomyMappingsManagerProps) {
   const { language, t } = useLanguage();
   const { getTaxonomyChi } = useTaxonomy();
-  const supabase = createClient();
+  const supabase = useMemo(() => createClient(), []);
   const [data, setData] = useState<TaxonomyMapping[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
-  const [actionLoading, setActionLoading] = useState<string | number | null>(null);
 
   // Inline Editing State (New Row-based system)
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -127,7 +124,7 @@ export default function TaxonomyMappingsManager({ mode, onRequestConfirm }: Taxo
   }, [isDirty, cancelEditing]);
 
   // Click Outside Refs
-  const rankFilterRef = useClickOutside(() => setShowRankFilter(false));
+  const rankFilterRef = useClickOutside<HTMLTableCellElement>(() => setShowRankFilter(false));
   const groupFilterRef = useClickOutside(() => setShowGroupFilter(false));
   const editingRowRef = useClickOutside(() => {
     if (editingId && !showDiscardConfirm) {
@@ -197,11 +194,7 @@ export default function TaxonomyMappingsManager({ mode, onRequestConfirm }: Taxo
     }
   }, [mode]);
 
-  useEffect(() => {
-    fetchData();
-  }, [mode]);
-
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     setLoading(true);
     try {
       const taxaType = mode;
@@ -225,10 +218,12 @@ export default function TaxonomyMappingsManager({ mode, onRequestConfirm }: Taxo
           if (error) throw error;
           if (!batchData || batchData.length === 0) break;
 
-          batchData.forEach((item: any) => {
-            const name = (item[field] as string || '').trim();
+          batchData.forEach((item: Record<string, unknown>) => {
+            const rawName = item[field];
+            const name = typeof rawName === 'string' ? rawName.trim() : '';
             if (name) {
-              const group = (item as any).taxa_group || (mode === 'flora' ? (item as any).category_eng : '');
+              const rawGroup = item.taxa_group || (mode === 'flora' ? item.category_eng : '');
+              const group = typeof rawGroup === 'string' ? rawGroup : '';
               const key = `${name}||${group}`;
               
               const current = uniqueMap.get(key) || { group, count: 0 };
@@ -250,7 +245,7 @@ export default function TaxonomyMappingsManager({ mode, onRequestConfirm }: Taxo
       const speciesTaxaList = rawResults.flat();
 
       // 2. Fetch all mappings for this taxa_type
-      let allMappings: any[] = [];
+      let allMappings: TaxonomyMapping[] = [];
       let offset = 0;
       const limit = 1000;
       while (true) {
@@ -262,7 +257,7 @@ export default function TaxonomyMappingsManager({ mode, onRequestConfirm }: Taxo
         
         if (error) throw error;
         if (!mappingsData || mappingsData.length === 0) break;
-        allMappings = [...allMappings, ...mappingsData];
+        allMappings = [...allMappings, ...(mappingsData as TaxonomyMapping[])];
         if (mappingsData.length < limit) break;
         offset += limit;
       }
@@ -288,7 +283,11 @@ export default function TaxonomyMappingsManager({ mode, onRequestConfirm }: Taxo
     } finally {
       setLoading(false);
     }
-  };
+  }, [mode, supabase]);
+
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
 
   const startEditing = (rowId: string, item: TaxonomyMapping) => {
     setEditingId(rowId);
@@ -378,18 +377,13 @@ export default function TaxonomyMappingsManager({ mode, onRequestConfirm }: Taxo
       setEditingId(null);
       setOriginalItem(null);
       setEditValues({});
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Error saving edit:', err);
-      // Log more details for Supabase errors
-      if (err.code || err.details || err.hint) {
-        console.error('Supabase Error Details:', {
-          code: err.code,
-          details: err.details,
-          hint: err.hint,
-          message: err.message
-        });
+      const details = typeof err === 'object' && err !== null ? err as Record<string, unknown> : {};
+      if (details.code || details.details || details.hint) {
+        console.error('Supabase Error Details:', details);
       }
-      setErrorMessage(err.message || (typeof err === 'string' ? err : JSON.stringify(err)) || 'An unexpected error occurred while saving.');
+      setErrorMessage(err instanceof Error ? err.message : (typeof err === 'string' ? err : 'An unexpected error occurred while saving.'));
     } finally {
       setSaving(false);
     }
@@ -591,7 +585,7 @@ export default function TaxonomyMappingsManager({ mode, onRequestConfirm }: Taxo
             <thead className="sticky top-0 z-40 bg-slate-50 shadow-sm">
               <tr className="border-b border-slate-100">
                 <th 
-                  ref={rankFilterRef as any} 
+                  ref={rankFilterRef}
                   style={{ width: columnWidths.rank }}
                   className="px-4 py-2.5 text-[10px] font-black text-slate-400 uppercase tracking-widest relative group/header"
                 >

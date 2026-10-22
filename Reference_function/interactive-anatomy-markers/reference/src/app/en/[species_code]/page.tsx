@@ -10,7 +10,7 @@ import lookerStudioUrls from "@/data/lookerStudioUrls.json";
 import silhouetteUrls from "@/data/silhouetteUrls.json";
 
 import { 
-  ArrowLeft, Compass, Shield, Activity, Volume2, 
+  ArrowLeft, Compass, Shield, Activity,
   MapPin, Calendar, HelpCircle, Layers, ExternalLink, Info
 } from "lucide-react";
 import EcholocationSection from "@/components/EcholocationSection";
@@ -602,5 +602,4 @@ export default async function EnSpeciesDetailPage({ params }: PageProps) {
     </div>
   );
 }
-
 

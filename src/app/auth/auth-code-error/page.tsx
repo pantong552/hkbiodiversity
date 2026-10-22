@@ -1,26 +1,25 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useSyncExternalStore } from 'react';
 import Link from 'next/link';
 import { AlertTriangle, ArrowLeft, RefreshCw } from 'lucide-react';
 
-export default function AuthCodeErrorPage() {
-  const [errorInfo, setErrorInfo] = useState<{
-    error: string;
-    errorCode: string;
-    errorDescription: string;
-  }>({ error: '', errorCode: '', errorDescription: '' });
+function subscribeToHashChange(onChange: () => void) {
+  window.addEventListener('hashchange', onChange);
+  return () => window.removeEventListener('hashchange', onChange);
+}
 
-  useEffect(() => {
-    // Supabase 會把錯誤資訊放在 URL hash fragment 中
-    const hash = window.location.hash.substring(1);
-    const params = new URLSearchParams(hash);
-    setErrorInfo({
-      error: params.get('error') || '未知錯誤',
-      errorCode: params.get('error_code') || '',
-      errorDescription: params.get('error_description') || '驗證過程中發生了錯誤',
-    });
-  }, []);
+function getHashSnapshot() {
+  return window.location.hash;
+}
+
+export default function AuthCodeErrorPage() {
+  const hash = useSyncExternalStore(subscribeToHashChange, getHashSnapshot, () => '');
+  const params = new URLSearchParams(hash.substring(1));
+  const error = params.get('error') || '';
+  const errorCode = params.get('error_code') || '';
+  const errorDescription =
+    params.get('error_description') || '驗證過程中發生了錯誤';
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-slate-50 p-6">
@@ -37,23 +36,23 @@ export default function AuthCodeErrorPage() {
 
         {/* 錯誤描述 */}
         <p className="text-slate-500 font-medium mb-6">
-          {errorInfo.errorDescription}
+          {errorDescription}
         </p>
 
         {/* 錯誤詳情 */}
-        {(errorInfo.error || errorInfo.errorCode) && (
+        {(error || errorCode) && (
           <div className="bg-red-50 border border-red-100 rounded-2xl p-4 mb-8 text-left">
             <p className="text-xs font-bold text-red-400 uppercase tracking-widest mb-2">
               錯誤詳情
             </p>
-            {errorInfo.error && (
+            {error && (
               <p className="text-sm text-red-700 font-medium">
-                <span className="text-red-400">Error:</span> {errorInfo.error}
+                <span className="text-red-400">Error:</span> {error}
               </p>
             )}
-            {errorInfo.errorCode && (
+            {errorCode && (
               <p className="text-sm text-red-700 font-medium">
-                <span className="text-red-400">Code:</span> {errorInfo.errorCode}
+                <span className="text-red-400">Code:</span> {errorCode}
               </p>
             )}
           </div>

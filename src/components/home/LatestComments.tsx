@@ -1,5 +1,6 @@
 'use client';
 
+import Image from 'next/image';
 import { motion } from 'framer-motion';
 import { MessageSquare, User, Clock, ChevronRight } from 'lucide-react';
 import { LatestComment } from '@/lib/home';
@@ -41,7 +42,7 @@ export default function LatestComments({ comments }: LatestCommentsProps) {
               <div className="flex items-center gap-2.5">
                 <div className="shrink-0">
                   {comment.profiles?.avatar_url ? (
-                    <img src={comment.profiles.avatar_url} alt={comment.profiles.username} className="w-7 h-7 rounded-lg object-cover ring-2 ring-slate-50" />
+                    <Image src={comment.profiles.avatar_url} alt={comment.profiles.username} width={28} height={28} unoptimized className="w-7 h-7 rounded-lg object-cover ring-2 ring-slate-50" />
                   ) : (
                     <div className="w-7 h-7 bg-slate-100 rounded-lg flex items-center justify-center text-slate-400">
                       <User className="w-4 h-4" />
@@ -58,7 +59,7 @@ export default function LatestComments({ comments }: LatestCommentsProps) {
             </div>
             
             <p className="text-slate-500 text-sm leading-relaxed mb-4 line-clamp-2 italic px-1 border-l-2 border-slate-100 group-hover:border-slate-900/20 transition-colors">
-              "{comment.content}"
+              &quot;{comment.content}&quot;
             </p>
 
             <div className="flex items-center justify-between">

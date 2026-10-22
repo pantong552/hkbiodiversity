@@ -80,7 +80,7 @@ async function fetchLeaderboard(): Promise<LeaderboardUser[]> {
 
   const userMap: Record<string, LeaderboardUser> = {};
 
-  commentStats?.forEach((c: any) => {
+  commentStats?.forEach((c: { user_id: string | null; profiles: { username: string | null; avatar_url: string | null } | null }) => {
     if (!c.user_id) return;
     if (!userMap[c.user_id]) {
       userMap[c.user_id] = {
@@ -95,7 +95,7 @@ async function fetchLeaderboard(): Promise<LeaderboardUser[]> {
     userMap[c.user_id].comment_count++;
   });
 
-  photoStats?.forEach((p: any) => {
+  photoStats?.forEach((p: { user_id: string | null; profiles: { username: string | null; avatar_url: string | null } | null }) => {
     if (!p.user_id) return;
     if (!userMap[p.user_id]) {
       userMap[p.user_id] = {
@@ -148,8 +148,8 @@ async function fetchLatestSpecies() {
     .limit(3);
 
   const combined = [
-    ...(fauna || []).map((s: any) => ({ ...s, type: 'fauna' })),
-    ...(flora || []).map((s: any) => ({ ...s, type: 'flora' }))
+    ...(fauna || []).map((s: { id: number; taxa_id: string | null; common_name_chi: string | null; common_name_eng: string | null; scientific_name: string | null; created_at: string | null }) => ({ ...s, type: 'fauna' })),
+    ...(flora || []).map((s: { id: number; taxa_id: string | null; common_name_chi: string | null; common_name_eng: string | null; scientific_name: string | null; created_at: string | null }) => ({ ...s, type: 'flora' }))
   ];
 
   return combined.sort((a, b) => (Number(b.id) - Number(a.id))).slice(0, 5);

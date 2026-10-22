@@ -6,7 +6,12 @@ import { formatNativeStatus } from '@/utils/formatters';
 import HkbwsCategoryInfoModal from './HkbwsCategoryInfoModal';
 
 interface ConservationStatusProps {
-  species: Species;
+  species: Species & {
+    is_cap96?: string | boolean;
+    is_cap586?: string | boolean;
+    hk_rare_precious_note?: string | null;
+    china_red_data_book_note?: string | null;
+  };
 }
 
 export default function ConservationStatus({ species }: ConservationStatusProps) {
@@ -15,35 +20,35 @@ export default function ConservationStatus({ species }: ConservationStatusProps)
   const isPlant = species.taxa_group === 'FLORA' || ('is_cap96' in species);
 
   // Helper formatting for Cap 96/586 Boolean-like values
-  const formatYesNo = (val: any) => {
+  const formatYesNo = (val: unknown): string | null => {
     if (!val || val === 'No' || val === '沒有列入' || val === '非' || val === 'N' || val === 'n' || val === 'False' || val === false) return null;
     if (val === 'Y' || val === true || val === 'Yes' || val === 'y' || val === 'True') return language === 'zh' ? '是' : 'Yes';
-    return val;
+    return typeof val === 'string' ? val : null;
   };
 
   const rawStatuses = isPlant ? [
     {
       labelChi: '林務條例 (第96章) 保育類',
       labelEng: 'Forests and Countryside Ordinance (Cap. 96)',
-      value: formatYesNo((species as any).is_cap96),
+      value: formatYesNo(species.is_cap96),
       isHkbws: false
     },
     {
       labelChi: '保護瀕危動植物物種條例 (第586章)',
       labelEng: 'Protection of Endangered Species Ordinance (Cap. 586)',
-      value: formatYesNo((species as any).is_cap586),
+      value: formatYesNo(species.is_cap586),
       isHkbws: false
     },
     {
       labelChi: '香港稀有及珍貴植物',
       labelEng: 'HK Rare and Precious Plants',
-      value: (species as any).hk_rare_precious_note === 'No' || !(species as any).hk_rare_precious_note ? null : (species as any).hk_rare_precious_note,
+      value: species.hk_rare_precious_note === 'No' || !species.hk_rare_precious_note ? null : species.hk_rare_precious_note,
       isHkbws: false
     },
     {
       labelChi: '中國植物紅皮書',
       labelEng: 'China Plant Red Data Book',
-      value: (species as any).china_red_data_book_note === '沒有列入' || (species as any).china_red_data_book_note === 'Not Listed' || !(species as any).china_red_data_book_note ? null : (species as any).china_red_data_book_note,
+      value: species.china_red_data_book_note === '沒有列入' || species.china_red_data_book_note === 'Not Listed' || !species.china_red_data_book_note ? null : species.china_red_data_book_note,
       isHkbws: false
     }
   ] : [

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { createClient } from '@/utils/supabase/client';
 import { useAuth } from '@/context/AuthContext';
 import { useLanguage } from '@/context/LanguageContext';
@@ -10,10 +10,7 @@ import {
   Check, 
   X, 
   AlertTriangle, 
-  Clock, 
-  UserCircle, 
   Loader2, 
-  FileText,
   ChevronRight
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -35,7 +32,7 @@ export default function AdminDraftReviewBanner({
 }: AdminDraftReviewBannerProps) {
   const { user, profile } = useAuth();
   const { language } = useLanguage();
-  const supabase = createClient();
+  const supabase = useMemo(() => createClient(), []);
 
   const [pendingDraft, setPendingDraft] = useState<SpeciesDraft | null>(null);
   const [loading, setLoading] = useState(true);
@@ -45,9 +42,8 @@ export default function AdminDraftReviewBanner({
   const [actionLoading, setActionLoading] = useState(false);
 
   const isAdmin = profile?.role === 'admin';
-  const isCurator = profile?.role === 'curator';
 
-  const fetchPendingDraft = async () => {
+  const fetchPendingDraft = useCallback(async () => {
     if (!speciesId) {
       setLoading(false);
       return;
@@ -73,11 +69,11 @@ export default function AdminDraftReviewBanner({
     } finally {
       setLoading(false);
     }
-  };
+  }, [speciesId, supabase]);
 
   useEffect(() => {
     fetchPendingDraft();
-  }, [speciesId, user?.id, refreshTrigger]);
+  }, [fetchPendingDraft, user?.id, refreshTrigger]);
 
   // 同意 Approve
   const handleApprove = async () => {

@@ -1,7 +1,8 @@
 'use client';
 
+import Image from 'next/image';
 import { useState, useEffect } from 'react';
-import { User, Heart, Calendar, Clock, Mail, X, Settings, ArrowLeft, ShieldCheck, FileEdit, Send, Clock3 } from 'lucide-react';
+import { User, Heart, Calendar, Clock, X, Settings, ShieldCheck, FileEdit, Send, Clock3 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '@/context/AuthContext';
 import { useLanguage } from '@/context/LanguageContext';
@@ -130,9 +131,12 @@ export default function AccountModule() {
                     <div className="relative flex items-center gap-5">
                       <div className="relative flex-shrink-0">
                         {user.user_metadata?.avatar_url ? (
-                          <img
+                          <Image
                             src={user.user_metadata.avatar_url}
                             alt="Avatar"
+                            width={64}
+                            height={64}
+                            unoptimized
                             className="w-16 h-16 rounded-2xl border-2 border-white/30 shadow-lg object-cover"
                           />
                         ) : (

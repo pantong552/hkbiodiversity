@@ -11,7 +11,7 @@ import lookerStudioUrls from "@/data/lookerStudioUrls.json";
 import silhouetteUrls from "@/data/silhouetteUrls.json";
 
 import { 
-  ArrowLeft, Compass, Shield, Activity, Volume2, 
+  ArrowLeft, Compass, Shield, Activity,
   MapPin, Calendar, HelpCircle, Layers, ExternalLink, Info
 } from "lucide-react";
 import EcholocationSection from "@/components/EcholocationSection";
@@ -23,53 +23,8 @@ import ReferencesList from "@/components/ReferencesList";
 import SimilarSpecies from "@/components/SimilarSpecies";
 import PhotoGallery from "@/components/PhotoGallery";
 import ImageLightbox from "@/components/ImageLightbox";
-import React from "react";
 import { getOptimizedImageUrl } from "@/lib/cloudinary";
 import { formatRichText } from "@/lib/utils";
-
-function formatSynonym(syn: string) {
-  const words = syn.split(/\s+/);
-  const formatted: React.ReactNode[] = [];
-  
-  let isNextSubspecies = false;
-
-  words.forEach((word, index) => {
-    const cleanWord = word.replace(/[(),]/g, '');
-    
-    let isItalic = false;
-
-    if (index === 0) {
-      isItalic = true;
-    } else if (index === 1) {
-      if (/^[a-z]/.test(cleanWord) && cleanWord !== 'ssp' && cleanWord !== 'var') {
-        isItalic = true;
-      }
-    } else {
-      if (cleanWord === 'ssp.' || cleanWord === 'ssp' || cleanWord === 'var.' || cleanWord === 'var') {
-        isItalic = false;
-        isNextSubspecies = true;
-      } else if (isNextSubspecies && /^[a-z]/.test(cleanWord)) {
-        isItalic = true;
-        isNextSubspecies = false;
-      } else {
-        isItalic = false;
-      }
-    }
-
-    formatted.push(
-      <span key={index} className={isItalic ? "italic font-medium text-foreground" : "text-muted-accent"}>
-        {word}
-      </span>
-    );
-    
-    if (index < words.length - 1) {
-      formatted.push(<span key={`space-${index}`}> </span>);
-    }
-  });
-
-  return formatted;
-}
-
 
 
 interface PageProps {
@@ -700,5 +655,4 @@ export default async function SpeciesDetailPage({ params }: PageProps) {
     </div>
   );
 }
-
 

@@ -1,10 +1,14 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useSyncExternalStore } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { RotateCcw, AlertTriangle, Trash2, XCircle, Info, LucideIcon } from 'lucide-react';
+import { RotateCcw, Trash2, Info, LucideIcon } from 'lucide-react';
 import { useLanguage } from '@/context/LanguageContext';
+
+const subscribeToMount = () => () => {};
+const getMountedSnapshot = () => true;
+const getServerMountedSnapshot = () => false;
 
 export type AlertType = 'warning' | 'danger' | 'info' | 'success';
 
@@ -36,12 +40,11 @@ export default function AlertModal({
   icon: CustomIcon,
 }: AlertModalProps) {
   const { language } = useLanguage();
-  const [mounted, setMounted] = useState(false);
-
-  useEffect(() => {
-    setMounted(true);
-    return () => setMounted(false);
-  }, []);
+  const mounted = useSyncExternalStore(
+    subscribeToMount,
+    getMountedSnapshot,
+    getServerMountedSnapshot
+  );
 
   const getIcon = () => {
     if (CustomIcon) return <CustomIcon className="w-6 h-6" />;

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { createClient } from '@/utils/supabase/client';
 import { useLanguage } from '@/context/LanguageContext';
 import { useTaxonomy } from '@/context/TaxonomyContext';
@@ -29,11 +29,34 @@ import {
   Upload
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { formatScientificName, getSpeciesImageVariantUrl, parseAliases, renderFormattedText } from '@/utils/formatters';
+import { getSpeciesImageVariantUrl, renderFormattedText } from '@/utils/formatters';
 import { useInaturalistSpeciesPhotos, type InatGalleryPhoto } from '@/hooks/useInaturalistSpeciesPhotos';
 import type { SpeciesGalleryPhotoMetadata } from '@/types/species';
 
 const COMMUNITY_PHOTO_LICENSES = ['CC BY', 'CC BY-SA', 'CC BY-ND', 'CC BY-NC', 'CC BY-NC-SA', 'CC BY-NC-ND'];
+export type SpeciesEditorData = Record<string, unknown> & {
+  taxa_id?: string | number;
+  inat_id?: number;
+  taxa_group?: string;
+  scientific_name?: string;
+  common_name_chi?: string;
+  common_name_eng?: string;
+  profile_picture?: string | null;
+  gallery_images?: string[];
+  gallery_image_credits?: Record<string, string>;
+  gallery_image_metadata?: Record<string, SpeciesGalleryPhotoMetadata>;
+};
+type SpeciesLookup = { taxa_id: string; scientific_name: string; common_name_chi: string | null; common_name_eng: string | null };
+type ReferenceRow = {
+  code: string;
+  zh: string;
+  en: string;
+  created_by?: string | null;
+  updated_by?: string | null;
+  creator?: { username: string };
+  updater?: { username: string };
+  [key: string]: unknown;
+};
 
 interface SpeciesGalleryPickerProps {
   value: string[];
@@ -41,7 +64,7 @@ interface SpeciesGalleryPickerProps {
   metadata: Record<string, SpeciesGalleryPhotoMetadata>;
   photos: InatGalleryPhoto[];
   taxaId: string;
-  supabase: any;
+  supabase: ReturnType<typeof createClient>;
   isLoading: boolean;
   hasMore: boolean;
   dataScope: 'hongkong' | 'global';
@@ -596,14 +619,14 @@ interface SimilarSpeciesPickerProps {
   value: string;
   onChange: (value: string) => void;
   table: string;
-  supabase: any;
+  supabase: ReturnType<typeof createClient>;
   language: string;
 }
 
 function SimilarSpeciesPicker({ value, onChange, table, supabase, language }: SimilarSpeciesPickerProps) {
   const [searchQuery, setSearchQuery] = useState('');
-  const [searchResults, setSearchResults] = useState<any[]>([]);
-  const [selectedDetails, setSelectedDetails] = useState<any[]>([]);
+  const [searchResults, setSearchResults] = useState<SpeciesLookup[]>([]);
+  const [selectedDetails, setSelectedDetails] = useState<SpeciesLookup[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [showDropdown, setShowDropdown] = useState(false);
   const containerRef = React.useRef<HTMLDivElement>(null);
@@ -635,7 +658,7 @@ function SimilarSpeciesPicker({ value, onChange, table, supabase, language }: Si
       
       if (!error && data) {
         // 保留原 ids 的順序
-        const sorted = ids.map(id => data.find((item: any) => item.taxa_id === id)).filter(Boolean);
+        const sorted = ids.map(id => data.find((item: SpeciesLookup) => item.taxa_id === id)).filter((item): item is SpeciesLookup => Boolean(item));
         setSelectedDetails(sorted);
       }
     }
@@ -645,7 +668,6 @@ function SimilarSpeciesPicker({ value, onChange, table, supabase, language }: Si
   // 搜尋處理
   useEffect(() => {
     if (!searchQuery.trim()) {
-      setSearchResults([]);
       return;
     }
 
@@ -662,7 +684,7 @@ function SimilarSpeciesPicker({ value, onChange, table, supabase, language }: Si
 
       if (!error && data) {
         // 過濾已選中的項目
-        const filtered = data.filter((item: any) => !ids.includes(item.taxa_id));
+        const filtered = data.filter((item: SpeciesLookup) => !ids.includes(item.taxa_id));
         setSearchResults(filtered);
       }
       setIsSearching(false);
@@ -671,8 +693,10 @@ function SimilarSpeciesPicker({ value, onChange, table, supabase, language }: Si
     return () => clearTimeout(timer);
   }, [searchQuery, value, table, supabase]);
 
+  const visibleSearchResults = searchQuery.trim() ? searchResults : [];
+
   // 新增選擇
-  const handleSelect = (item: any) => {
+  const handleSelect = (item: SpeciesLookup) => {
     const ids = value.split(',').map(id => id.trim()).filter(Boolean);
     if (!ids.includes(item.taxa_id)) {
       const newIds = [...ids, item.taxa_id];
@@ -733,12 +757,12 @@ function SimilarSpeciesPicker({ value, onChange, table, supabase, language }: Si
                   <Loader2 className="w-3.5 h-3.5 animate-spin text-emerald-500" />
                   <span>{language === 'zh' ? '搜尋中...' : 'Searching...'}</span>
                 </div>
-              ) : searchResults.length === 0 ? (
+              ) : visibleSearchResults.length === 0 ? (
                 <div className="p-3 text-center text-xs text-slate-400 font-bold">
                   {language === 'zh' ? '未找到符合的物種' : 'No matching species found'}
                 </div>
               ) : (
-                searchResults.map((item) => {
+                visibleSearchResults.map((item) => {
                   const chiName = item.common_name_chi;
                   const engName = item.common_name_eng;
                   const showName = chiName && engName ? `${chiName} (${engName})` : (chiName || engName || '');
@@ -911,12 +935,12 @@ type SourceType = 'journal' | 'book' | 'web';
 interface ReferencePickerProps {
   value: string;
   onChange: (value: string) => void;
-  supabase: any;
+  supabase: ReturnType<typeof createClient>;
   language: string;
 }
 
 function ReferencePicker({ value, onChange, supabase, language }: ReferencePickerProps) {
-  const [allReferences, setAllReferences] = useState<any[]>([]);
+  const [allReferences, setAllReferences] = useState<ReferenceRow[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [isSearching, setIsSearching] = useState(false);
   const [showDropdown, setShowDropdown] = useState(false);
@@ -953,7 +977,7 @@ function ReferencePicker({ value, onChange, supabase, language }: ReferencePicke
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  const loadAllReferences = async () => {
+  const loadAllReferences = useCallback(async () => {
     setIsSearching(true);
     try {
       const { data: refData, error: refError } = await supabase
@@ -972,7 +996,7 @@ function ReferencePicker({ value, onChange, supabase, language }: ReferencePicke
       const userIds = Array.from(
         new Set(
           refData
-            .flatMap((r: any) => [r.created_by, r.updated_by])
+            .flatMap((r: ReferenceRow) => [r.created_by, r.updated_by])
             .filter(Boolean)
         )
       );
@@ -985,14 +1009,14 @@ function ReferencePicker({ value, onChange, supabase, language }: ReferencePicke
           .in('id', userIds);
 
         if (profileData) {
-          profileMap = profileData.reduce((acc: Record<string, string>, p: any) => {
+          profileMap = profileData.reduce((acc: Record<string, string>, p: { id: string; username: string | null }) => {
             if (p.id) acc[p.id] = p.username || '';
             return acc;
           }, {} as Record<string, string>);
         }
       }
 
-      const enrichedRefs = refData.map((r: any) => ({
+      const enrichedRefs = refData.map((r: ReferenceRow) => ({
         ...r,
         creator: r.created_by && profileMap[r.created_by] ? { username: profileMap[r.created_by] } : null,
         updater: r.updated_by && profileMap[r.updated_by] ? { username: profileMap[r.updated_by] } : null
@@ -1004,15 +1028,15 @@ function ReferencePicker({ value, onChange, supabase, language }: ReferencePicke
     } finally {
       setIsSearching(false);
     }
-  };
+  }, [supabase]);
 
   useEffect(() => {
     loadAllReferences();
-  }, [supabase]);
+  }, [loadAllReferences]);
 
   const selectedRefs = useMemo(() => {
     const codes = value.split(',').map(c => c.trim()).filter(Boolean);
-    return codes.map(code => allReferences.find(r => r.code === code)).filter(Boolean);
+    return codes.map(code => allReferences.find(r => r.code === code)).filter((item): item is ReferenceRow => Boolean(item));
   }, [value, allReferences]);
 
   const dropdownResults = useMemo(() => {
@@ -1132,9 +1156,9 @@ function ReferencePicker({ value, onChange, supabase, language }: ReferencePicke
         handleSelect(data.code);
       }
       setIsModalOpen(false);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Error saving reference:', err);
-      setFormError(err.message || (language === 'zh' ? '儲存失敗，請重試' : 'Failed to save reference. Please try again.'));
+      setFormError(err instanceof Error ? err.message : (language === 'zh' ? '儲存失敗，請重試' : 'Failed to save reference. Please try again.'));
     } finally {
       setSubmitting(false);
     }
@@ -1682,10 +1706,10 @@ interface FieldGroup {
 
 interface SpeciesDetailEditorProps {
   table: string;
-  data: any;
-  originalData?: any;
-  publishedOriginal?: any;
-  onSave: (updatedItem: any, affectedUpdates?: Record<string, string>) => void;
+  data: object | null;
+  originalData?: object;
+  publishedOriginal?: object;
+  onSave: (updatedItem: object, affectedUpdates?: Record<string, string>) => void;
   onCancel: () => void;
   onDirtyChange?: (isDirty: boolean) => void;
   saveButtonLabel?: string;
@@ -1705,7 +1729,7 @@ interface SpeciesDetailEditorProps {
 }
 
 // 1. 動物 (species) 欄位組配置
-const faunaFieldGroups = (t: any): FieldGroup[] => [
+const faunaFieldGroups = (): FieldGroup[] => [
   {
     id: 'basic',
     nameChi: '基本資訊',
@@ -1792,7 +1816,7 @@ const faunaFieldGroups = (t: any): FieldGroup[] => [
 ];
 
 // 2. 植物 (plant_species) 欄位組配置
-const floraFieldGroups = (t: any): FieldGroup[] => [
+const floraFieldGroups = (): FieldGroup[] => [
   {
     id: 'basic',
     nameChi: '基本資訊',
@@ -1864,7 +1888,7 @@ const floraFieldGroups = (t: any): FieldGroup[] => [
 ];
 
 // 3. 真菌 (fungi_species) 欄位組配置 (排除 hkbws_cat, afcd, china_vertebrates_red_list, cites, ebird_species_code, cap170, cap586)
-const fungiFieldGroups = (t: any): FieldGroup[] => [
+const fungiFieldGroups = (): FieldGroup[] => [
   {
     id: 'basic',
     nameChi: '基本資訊',
@@ -1940,15 +1964,16 @@ const fungiFieldGroups = (t: any): FieldGroup[] => [
   }
 ];
 
-export default function SpeciesDetailEditor({ table, data, originalData, publishedOriginal: propPublishedOriginal, onSave, onCancel, onDirtyChange, saveButtonLabel, hideHeader, onRegisterSave, disableDirectDatabaseUpdate, externalDirty = false, allowUnchangedSave = false, additionalTab }: SpeciesDetailEditorProps) {
-  const { language, t } = useLanguage();
+export default function SpeciesDetailEditor({ table, data: inputData, originalData, publishedOriginal: propPublishedOriginal, onSave, onCancel, onDirtyChange, saveButtonLabel, hideHeader, onRegisterSave, disableDirectDatabaseUpdate, externalDirty = false, allowUnchangedSave = false, additionalTab }: SpeciesDetailEditorProps) {
+  const data = useMemo(() => (inputData ?? {}) as SpeciesEditorData, [inputData]);
+  const { language } = useLanguage();
   const { profile } = useAuth();
   const { getTaxonomyChi } = useTaxonomy();
   const supabase = useMemo(() => createClient(), []);
-  const { photos: galleryPhotos, isLoading: isLoadingGalleryPhotos, hasMore: hasMoreGalleryPhotos, loadMore: loadMoreGalleryPhotos, dataScope: galleryPhotoScope, setScope: setGalleryPhotoScope, hasHkPhotos: hasHkGalleryPhotos } = useInaturalistSpeciesPhotos(data?.inat_id, data?.taxa_id);
+  const { photos: galleryPhotos, isLoading: isLoadingGalleryPhotos, hasMore: hasMoreGalleryPhotos, loadMore: loadMoreGalleryPhotos, dataScope: galleryPhotoScope, setScope: setGalleryPhotoScope, hasHkPhotos: hasHkGalleryPhotos } = useInaturalistSpeciesPhotos(data?.inat_id, data?.taxa_id == null ? undefined : String(data.taxa_id));
   
-  const [formValues, setFormValues] = useState<any>({});
-  const [originalValues, setOriginalValues] = useState<any>({});
+  const [formValues, setFormValues] = useState<SpeciesEditorData>({});
+  const [originalValues, setOriginalValues] = useState<SpeciesEditorData>({});
   const [activeTab, setActiveTab] = useState<string>('basic');
   const [saving, setSaving] = useState(false);
 
@@ -1961,8 +1986,8 @@ export default function SpeciesDetailEditor({ table, data, originalData, publish
 
   // 使用 useMemo 確保正本發布資料 (propPublishedOriginal / originalData) 不會因為 state 異步落後或被改動
   const publishedOriginal = useMemo(() => {
-    const base = propPublishedOriginal || originalData;
-    return base ? { ...base } : null;
+    const base = propPublishedOriginal ?? originalData;
+    return base ? { ...(base as SpeciesEditorData) } : null;
   }, [propPublishedOriginal, originalData]);
 
   useEffect(() => {
@@ -1976,11 +2001,11 @@ export default function SpeciesDetailEditor({ table, data, originalData, publish
   // 2. 獲取當前資料表預定義的分組
   const baseGroups = useMemo(() => {
     return table === 'plant_species' 
-      ? floraFieldGroups(t) 
+      ? floraFieldGroups()
       : table === 'fungi_species'
-        ? fungiFieldGroups(t)
-        : faunaFieldGroups(t);
-  }, [table, t]);
+        ? fungiFieldGroups()
+        : faunaFieldGroups();
+  }, [table]);
 
   // 3. 收集所有未在預定義分組中列出的欄位 (Others Tab) -> 保證擴展性
   const finalGroups = useMemo(() => {
@@ -2062,7 +2087,7 @@ export default function SpeciesDetailEditor({ table, data, originalData, publish
     });
 
     return groups;
-  }, [additionalTab, baseGroups, data]);
+  }, [additionalTab, baseGroups, data, table]);
 
   // 4. 偵測是否有欄位被修改
   const isDirty = useMemo(() => {
@@ -2074,16 +2099,16 @@ export default function SpeciesDetailEditor({ table, data, originalData, publish
   }, [isDirty, onDirtyChange]);
 
   // 5. 處理欄位異動
-  const handleFieldChange = (key: string, val: any, type: 'text' | 'number' | 'textarea' | 'select') => {
-    let finalVal = val;
+  const handleFieldChange = (key: string, val: string, type: 'text' | 'number' | 'textarea' | 'select') => {
+    let finalVal: string | number | null = val;
     if (type === 'number') {
       finalVal = val === '' ? null : Number(val);
     }
-    setFormValues((prev: any) => ({ ...prev, [key]: finalVal }));
+    setFormValues(prev => ({ ...prev, [key]: finalVal }));
   };
 
   const handleGalleryImagesChange = (images: string[], credits: Record<string, string>, metadata: Record<string, SpeciesGalleryPhotoMetadata>) => {
-    setFormValues((prev: any) => ({
+    setFormValues(prev => ({
       ...prev,
       gallery_images: images,
       gallery_image_credits: credits,
@@ -2098,13 +2123,13 @@ export default function SpeciesDetailEditor({ table, data, originalData, publish
   };
 
   // 7. 儲存變更
-  const handleSave = async () => {
+  const handleSave = useCallback(async () => {
     if ((!isDirty && !allowUnchangedSave) || saving) return;
     setSaving(true);
 
     try {
       // 過濾出僅有修改的欄位以提升性能
-      const updatedFields: any = {};
+      const updatedFields: SpeciesEditorData = {};
       Object.keys(formValues).forEach(key => {
         if (formValues[key] !== originalValues[key]) {
           updatedFields[key] = formValues[key];
@@ -2121,18 +2146,18 @@ export default function SpeciesDetailEditor({ table, data, originalData, publish
         const { error } = await supabase
           .from(table)
           .update(updatedFields)
-          .eq('taxa_id', data.taxa_id);
+          .eq('taxa_id', data.taxa_id ?? '');
 
         if (error) throw error;
 
         // 雙向同步相似物種邏輯 (Bidirectional similar species sync)
         if (Object.keys(updatedFields).includes('similar_species')) {
-          const origList = (originalValues.similar_species || '').split(',').map((id: string) => id.trim()).filter(Boolean);
-          const newList = (formValues.similar_species || '').split(',').map((id: string) => id.trim()).filter(Boolean);
+          const origList = String(originalValues.similar_species || '').split(',').map(id => id.trim()).filter(Boolean);
+          const newList = String(formValues.similar_species || '').split(',').map(id => id.trim()).filter(Boolean);
 
           const added = newList.filter((id: string) => !origList.includes(id));
           const removed = origList.filter((id: string) => !newList.includes(id));
-          const currentTaxaId = data.taxa_id;
+          const currentTaxaId = String(data.taxa_id ?? '');
 
           // 處理新增：把目前物種 A 加到被新增物種 B 的 similar_species 中
           for (const targetId of added) {
@@ -2195,7 +2220,7 @@ export default function SpeciesDetailEditor({ table, data, originalData, publish
     } finally {
       setSaving(false);
     }
-  };
+  }, [isDirty, allowUnchangedSave, saving, formValues, originalValues, disableDirectDatabaseUpdate, originalData, supabase, table, data, onSave, language]);
 
   // 註冊保存觸發函式給外層元件
   useEffect(() => {
@@ -2354,7 +2379,7 @@ export default function SpeciesDetailEditor({ table, data, originalData, publish
                 const engKey = rank === 'informal_group' ? 'informal_group_eng' : `${rank}_eng`;
                 const engVal = formValues[engKey];
                 if (engVal) {
-                  val = getTaxonomyChi(rank, table === 'plant_species' ? 'flora' : 'fauna', engVal) || '';
+                  val = getTaxonomyChi(rank, table === 'plant_species' ? 'flora' : 'fauna', String(engVal)) || '';
                 }
               }
 
@@ -2445,10 +2470,10 @@ export default function SpeciesDetailEditor({ table, data, originalData, publish
                   ) : field.key === 'gallery_images' ? (
                     <SpeciesGalleryPicker
                       value={selectedGalleryImages}
-                      credits={formValues.gallery_image_credits || {}}
-                      metadata={formValues.gallery_image_metadata || {}}
+                      credits={formValues.gallery_image_credits ?? {}}
+                      metadata={formValues.gallery_image_metadata ?? {}}
                       photos={galleryPhotos}
-                      taxaId={data.taxa_id}
+                      taxaId={String(data.taxa_id ?? '')}
                       supabase={supabase}
                       isLoading={isLoadingGalleryPhotos}
                       hasMore={hasMoreGalleryPhotos}

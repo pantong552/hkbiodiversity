@@ -7,7 +7,7 @@ export interface SpeciesDraft {
   curator_id: string | null;
   curator_name: string | null;
   curator_avatar: string | null;
-  draft_data: any;
+  draft_data: Record<string, unknown>;
   status: SpeciesDraftStatus;
   rejection_reason?: string | null;
   approved_by?: string | null;

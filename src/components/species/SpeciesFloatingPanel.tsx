@@ -1,8 +1,9 @@
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
+import Image from 'next/image';
+import React, { useState, useEffect, useRef, useSyncExternalStore } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, ChevronUp, ChevronDown, Loader2, Share2, Check } from 'lucide-react';
+import { X, ChevronUp, Loader2, Share2, Check } from 'lucide-react';
 import { useSpeciesPanel } from '@/context/SpeciesPanelContext';
 import { useLanguage } from '@/context/LanguageContext';
 import { supabase } from '@/lib/supabase';
@@ -22,9 +23,17 @@ import { SpeciesDraft } from '@/types/speciesDraft';
 import { AnatomyIllustration, EMPTY_ANATOMY_ILLUSTRATION } from '@/types/anatomy';
 import { anatomyIllustrationToDatabase, anatomyIllustrationToLegacyColumns, mapAnatomyIllustrations } from '@/utils/anatomy';
 
+type SpeciesWithPlantCategory = Species & { category_chi?: string | null };
+
+const subscribeToWindowResize = (onChange: () => void) => {
+  window.addEventListener('resize', onChange);
+  return () => window.removeEventListener('resize', onChange);
+};
+const getWindowWidth = () => window.innerWidth;
+const getServerWindowWidth = () => 0;
+
 // --- Subcomponent: Species Tab Preview (Tooltip) ---
 function SpeciesTabPreview({ 
-  id, 
   species, 
   language, 
   visible,
@@ -39,40 +48,25 @@ function SpeciesTabPreview({
   const { getTaxonomyChi } = useTaxonomy();
   const { imageUrl, isLoading } = useInaturalistPhoto(species?.inat_id || undefined);
   const { profilePictureMap } = useSpeciesPanel();
-  const containerRef = useRef<HTMLDivElement>(null);
-  const [shiftX, setShiftX] = useState(0);
-
-  // 防溢邏輯：當 Tooltip 靠近邊緣時自動位移
-  useEffect(() => {
-    if (visible && typeof window !== 'undefined') {
-      const timer = setTimeout(() => {
-        const tooltipWidth = 224; // w-56 = 14rem = 224px
-        const margin = 16; // 安全邊距
-        
-        // xOffset 是分頁中心點在容器內的位置
-        // 我們預設是以 -translate-x-1/2 對齊中心
-        const leftEdge = xOffset - (tooltipWidth / 2);
-        const rightEdge = xOffset + (tooltipWidth / 2);
-        
-        let shift = 0;
-        if (leftEdge < margin) {
-          shift = margin - leftEdge;
-        } else if (rightEdge > window.innerWidth - margin) {
-          shift = (window.innerWidth - margin) - rightEdge;
-        }
-        setShiftX(shift);
-      }, 0);
-      return () => clearTimeout(timer);
-    } else {
-      setShiftX(0);
-    }
-  }, [visible, xOffset]);
+  const windowWidth = useSyncExternalStore(
+    subscribeToWindowResize,
+    getWindowWidth,
+    getServerWindowWidth
+  );
+  const leftEdge = xOffset - 112;
+  const rightEdge = xOffset + 112;
+  const shiftX = !visible || windowWidth === 0
+    ? 0
+    : leftEdge < 16
+      ? 16 - leftEdge
+      : rightEdge > windowWidth - 16
+        ? windowWidth - 16 - rightEdge
+        : 0;
 
   return (
     <AnimatePresence>
       {visible && (
         <motion.div
-          ref={containerRef}
           initial={{ opacity: 0, scale: 0.9, y: 10 }}
           animate={{ opacity: 1, scale: 1, y: 0 }}
           exit={{ opacity: 0, scale: 0.9, y: 10 }}
@@ -104,23 +98,28 @@ function SpeciesTabPreview({
                 const finalImage = displayImage || imageUrl;
                 if (finalImage) {
                   return (
-                    <img 
+                    <Image
                       src={finalImage} 
                       alt={species?.common_name_chi || 'Species'} 
-                      className="w-full h-full object-cover"
+                      fill
+                      sizes="224px"
+                      unoptimized
+                      className="object-cover"
                       onError={(e) => {
                         // 當圖片代理或載入失敗時降級為預設圖片
-                        (e.target as HTMLImageElement).src = '/images/placeholder/no-species-image.svg';
+                        (e.currentTarget as HTMLImageElement).src = '/images/placeholder/no-species-image.svg';
                       }}
                     />
                   );
                 }
                 return (
                   <div className="absolute inset-0 flex items-center justify-center bg-slate-50">
-                    <img 
+                    <Image
                       src="/images/placeholder/no-species-image.svg" 
                       alt="No species image" 
-                      className="w-full h-full object-cover opacity-80"
+                      fill
+                      sizes="224px"
+                      className="object-cover opacity-80"
                     />
                   </div>
                 );
@@ -196,17 +195,15 @@ export default function SpeciesFloatingPanel() {
 
   } = useSpeciesPanel();
   
-  const { language, t } = useLanguage();
+  const { language } = useLanguage();
   const { profile } = useAuth();
-  const { getTaxonomyChi } = useTaxonomy();
   const pathname = usePathname();
-  const [speciesData, setSpeciesData] = useState<Record<string, Species>>({});
+  const [speciesData, setSpeciesData] = useState<Record<string, SpeciesWithPlantCategory>>({});
   const [isLoading, setIsLoading] = useState<Record<string, boolean>>({});
   const [hoveredTabId, setHoveredTabId] = useState<string | null>(null);
   const [tooltipX, setTooltipX] = useState<number>(0);
   const [showRightGradient, setShowRightGradient] = useState(false);
   const tabsRef = useRef<HTMLDivElement>(null);
-  const lastScrollYRef = useRef(0);
   const { share, isCopied } = useShare();
 
   const isCanEdit = profile?.role === 'admin' || profile?.role === 'curator';
@@ -214,10 +211,10 @@ export default function SpeciesFloatingPanel() {
   const [reviewDraft, setReviewDraft] = useState<SpeciesDraft | null>(null);
   const [bannerRefreshKey, setBannerRefreshKey] = useState(0);
 
-  const handleApproveDraft = async (draft: SpeciesDraft, updatedData?: any) => {
+  const handleApproveDraft = async (draft: SpeciesDraft, updatedData?: Record<string, unknown>) => {
     if (!activeSpecies || !profile) return;
-    const targetTable = activeSpecies.taxa_group === 'FLORA' || (activeSpecies as any).category_chi ? 'plant_species' : activeSpecies.taxa_group === 'FUNGI' || String(activeSpecies.taxa_id || '').startsWith('fungi_') ? 'fungi_species' : 'species';
-    const finalData = { ...(updatedData || draft.draft_data) };
+    const targetTable = activeSpecies.taxa_group === 'FLORA' || activeSpecies.category_chi ? 'plant_species' : activeSpecies.taxa_group === 'FUNGI' || String(activeSpecies.taxa_id || '').startsWith('fungi_') ? 'fungi_species' : 'species';
+    const finalData: Record<string, unknown> = { ...(updatedData || draft.draft_data) };
     const savedAnatomy = finalData.anatomy_illustrations ?? finalData.anatomy_illustration;
     const anatomyIllustrations: AnatomyIllustration[] | undefined = savedAnatomy === undefined
       ? undefined
@@ -273,7 +270,7 @@ export default function SpeciesFloatingPanel() {
 
   const handleRejectDraft = async (draft: SpeciesDraft, reason: string) => {
     if (!profile || !activeSpecies) return;
-    const targetTable = activeSpecies.taxa_group === 'FLORA' || (activeSpecies as any).category_chi ? 'plant_species' : activeSpecies.taxa_group === 'FUNGI' || String(activeSpecies.taxa_id || '').startsWith('fungi_') ? 'fungi_species' : 'species';
+    const targetTable = activeSpecies.taxa_group === 'FLORA' || activeSpecies.category_chi ? 'plant_species' : activeSpecies.taxa_group === 'FUNGI' || String(activeSpecies.taxa_id || '').startsWith('fungi_') ? 'fungi_species' : 'species';
     
     const { error } = await supabase
       .from('species_drafts')
@@ -342,7 +339,7 @@ export default function SpeciesFloatingPanel() {
     };
 
     // --- Browser Back Hijacking ---
-    const handlePopState = (event: PopStateEvent) => {
+    const handlePopState = () => {
       // When user presses back button, the browser pops the state.
       // If our dummy state is gone but the panel is still open in UI, close the UI.
       if (isExpanded) {
@@ -469,7 +466,7 @@ export default function SpeciesFloatingPanel() {
           const isFlora = id.startsWith('flora_');
           const isFungi = id.startsWith('fungi_');
           
-          let data: any = null;
+          let data: SpeciesWithPlantCategory | null = null;
 
           if (isFauna) {
             const { data: faunaData } = await supabase
@@ -545,7 +542,7 @@ export default function SpeciesFloatingPanel() {
     });
     // 去除 speciesData 與 isLoading 的依賴項，避免無限地歸觸發
     // 我們只在 ID 列表變動時檢查是否需要抓取
-  }, [openSpeciesIds, activeSpeciesId, supabase]); 
+  }, [openSpeciesIds, activeSpeciesId, speciesData, isLoading]);
 
   // 2. Prevent Background Scroll & Double Scrollbar
   useEffect(() => {
@@ -636,14 +633,14 @@ export default function SpeciesFloatingPanel() {
                 <>
                   <AdminDraftReviewBanner
                     speciesId={String(speciesData[activeSpeciesId].id || speciesData[activeSpeciesId].taxa_id || activeSpeciesId)}
-                    tableName={speciesData[activeSpeciesId].taxa_group === 'FLORA' || (speciesData[activeSpeciesId] as any).category_chi ? 'plant_species' : speciesData[activeSpeciesId].taxa_group === 'FUNGI' || String(speciesData[activeSpeciesId].taxa_id || '').startsWith('fungi_') ? 'fungi_species' : 'species'}
+                    tableName={speciesData[activeSpeciesId].taxa_group === 'FLORA' || speciesData[activeSpeciesId].category_chi ? 'plant_species' : speciesData[activeSpeciesId].taxa_group === 'FUNGI' || String(speciesData[activeSpeciesId].taxa_id || '').startsWith('fungi_') ? 'fungi_species' : 'species'}
                     refreshTrigger={bannerRefreshKey}
                     onApproved={async () => {
                       // 重新載入物種資料
-                      const targetTable = speciesData[activeSpeciesId].taxa_group === 'FLORA' || (speciesData[activeSpeciesId] as any).category_chi ? 'plant_species' : speciesData[activeSpeciesId].taxa_group === 'FUNGI' || String(speciesData[activeSpeciesId].taxa_id || '').startsWith('fungi_') ? 'fungi_species' : 'species';
+                      const targetTable = speciesData[activeSpeciesId].taxa_group === 'FLORA' || speciesData[activeSpeciesId].category_chi ? 'plant_species' : speciesData[activeSpeciesId].taxa_group === 'FUNGI' || String(speciesData[activeSpeciesId].taxa_id || '').startsWith('fungi_') ? 'fungi_species' : 'species';
                       const { data } = await supabase.from(targetTable).select('*').eq('id', speciesData[activeSpeciesId].id).maybeSingle();
                       if (data) {
-                        setSpeciesData(prev => ({ ...prev, [activeSpeciesId]: data as Species }));
+                        setSpeciesData(prev => ({ ...prev, [activeSpeciesId]: data as SpeciesWithPlantCategory }));
                       }
                       setBannerRefreshKey(prev => prev + 1);
                     }}
@@ -658,7 +655,7 @@ export default function SpeciesFloatingPanel() {
                     refreshTrigger={bannerRefreshKey}
                     anatomyCard={
                       <SpeciesAnatomyCard
-                      tableName={speciesData[activeSpeciesId].taxa_group === 'FLORA' || (speciesData[activeSpeciesId] as any).category_chi ? 'plant_species' : speciesData[activeSpeciesId].taxa_group === 'FUNGI' || String(speciesData[activeSpeciesId].taxa_id || '').startsWith('fungi_') ? 'fungi_species' : 'species'}
+                      tableName={speciesData[activeSpeciesId].taxa_group === 'FLORA' || speciesData[activeSpeciesId].category_chi ? 'plant_species' : speciesData[activeSpeciesId].taxa_group === 'FUNGI' || String(speciesData[activeSpeciesId].taxa_id || '').startsWith('fungi_') ? 'fungi_species' : 'species'}
                       speciesTaxaId={String(speciesData[activeSpeciesId].taxa_id || speciesData[activeSpeciesId].id)}
                       refreshKey={bannerRefreshKey}
                       />
@@ -869,13 +866,13 @@ export default function SpeciesFloatingPanel() {
             setReviewDraft(null);
           }}
           species={activeSpecies}
-          tableName={activeSpecies.taxa_group === 'FLORA' || (activeSpecies as any).category_chi ? 'plant_species' : activeSpecies.taxa_group === 'FUNGI' || String(activeSpecies.taxa_id || '').startsWith('fungi_') ? 'fungi_species' : 'species'}
+          tableName={activeSpecies.taxa_group === 'FLORA' || activeSpecies.category_chi ? 'plant_species' : activeSpecies.taxa_group === 'FUNGI' || String(activeSpecies.taxa_id || '').startsWith('fungi_') ? 'fungi_species' : 'species'}
           reviewDraft={reviewDraft}
           onApproveDraft={handleApproveDraft}
           onRejectDraft={handleRejectDraft}
           onSuccess={async () => {
             if (activeSpeciesId) {
-              const targetTable = activeSpecies.taxa_group === 'FLORA' || (activeSpecies as any).category_chi ? 'plant_species' : activeSpecies.taxa_group === 'FUNGI' || String(activeSpecies.taxa_id || '').startsWith('fungi_') ? 'fungi_species' : 'species';
+              const targetTable = activeSpecies.taxa_group === 'FLORA' || activeSpecies.category_chi ? 'plant_species' : activeSpecies.taxa_group === 'FUNGI' || String(activeSpecies.taxa_id || '').startsWith('fungi_') ? 'fungi_species' : 'species';
               const { data } = await supabase.from(targetTable).select('*').eq('id', activeSpecies.id).maybeSingle();
               if (data) {
                 setSpeciesData(prev => ({ ...prev, [activeSpeciesId]: data as Species }));

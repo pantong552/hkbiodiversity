@@ -1,6 +1,7 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import Image from 'next/image';
+import React, { useState, useEffect, useCallback } from 'react';
 import { createClient } from '@/utils/supabase/client';
 import { useLanguage } from '@/context/LanguageContext';
 import { useAuth } from '@/context/AuthContext';
@@ -15,22 +16,19 @@ import {
   Clock, 
   ShieldAlert, 
   CheckCircle2, 
-  AlertCircle, 
   UserCircle, 
   ChevronRight, 
   Loader2, 
   RefreshCw,
-  Sparkles,
   Layers,
   Leaf,
   Bug
 } from 'lucide-react';
-import { motion, AnimatePresence } from 'framer-motion';
 
 export default function DraftManager() {
   const { language } = useLanguage();
   const { profile } = useAuth();
-  const supabase = createClient();
+  const [supabase] = useState(() => createClient());
 
   const [drafts, setDrafts] = useState<SpeciesDraft[]>([]);
   const [loading, setLoading] = useState(true);
@@ -49,7 +47,7 @@ export default function DraftManager() {
   const [loadingSpecies, setLoadingSpecies] = useState(false);
 
   // 抓取所有草稿記錄
-  const fetchDrafts = async () => {
+  const fetchDrafts = useCallback(async () => {
     setLoading(true);
     try {
       const { data, error } = await supabase
@@ -66,11 +64,11 @@ export default function DraftManager() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [supabase]);
 
   useEffect(() => {
     fetchDrafts();
-  }, []);
+  }, [fetchDrafts]);
 
   // 點擊草稿行或操作按鈕，開啟 SpeciesEditModal 進行審核
   const handleOpenDraftModal = async (draft: SpeciesDraft) => {
@@ -85,11 +83,11 @@ export default function DraftManager() {
         setIsModalOpen(true);
       } else {
         // 若完全查無此紀錄，建立包含全量草稿鍵值的 fallback
-        const fallbackSpecies: any = {
+        const fallbackSpecies = {
           id: draft.species_id,
           taxa_id: draft.species_id,
           ...draft.draft_data
-        };
+        } as unknown as Species;
         setTargetSpecies(fallbackSpecies);
         setIsModalOpen(true);
       }
@@ -115,7 +113,7 @@ export default function DraftManager() {
   // 篩選出的草稿清單
   const filteredDrafts = drafts.filter(draft => {
     // 1. 分類群 Tab 篩選 (Fauna vs Flora)
-    const isPlant = draft.table_name === 'plant_species' || String(draft.species_id || '').startsWith('flora_') || (draft.draft_data as any)?.category_chi;
+    const isPlant = draft.table_name === 'plant_species' || String(draft.species_id || '').startsWith('flora_') || typeof draft.draft_data.category_chi === 'string';
     if (taxaTab === 'fauna' && isPlant) return false;
     if (taxaTab === 'flora' && !isPlant) return false;
 
@@ -130,9 +128,9 @@ export default function DraftManager() {
     // 3. 關鍵字搜尋 (物種中文名、英文名、學名、Curator 姓名)
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase();
-      const chi = (draft.draft_data?.common_name_chi || '').toLowerCase();
-      const eng = (draft.draft_data?.common_name_eng || '').toLowerCase();
-      const sci = (draft.draft_data?.scientific_name || draft.species_id || '').toLowerCase();
+      const chi = typeof draft.draft_data.common_name_chi === 'string' ? draft.draft_data.common_name_chi.toLowerCase() : '';
+      const eng = typeof draft.draft_data.common_name_eng === 'string' ? draft.draft_data.common_name_eng.toLowerCase() : '';
+      const sci = (typeof draft.draft_data.scientific_name === 'string' ? draft.draft_data.scientific_name : draft.species_id).toLowerCase();
       const curator = (draft.curator_name || '').toLowerCase();
       return chi.includes(q) || eng.includes(q) || sci.includes(q) || curator.includes(q);
     }
@@ -222,7 +220,7 @@ export default function DraftManager() {
           <div className="relative w-full sm:w-auto">
             <select
               value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value as any)}
+              onChange={(e) => setStatusFilter(e.target.value as 'processing' | 'pending' | 'rejected' | 'approved' | 'all')}
               className="w-full sm:w-auto appearance-none bg-white border border-slate-200 text-slate-700 font-bold text-xs px-4 py-2.5 pr-8 rounded-2xl shadow-xs focus:outline-none focus:border-emerald-500 cursor-pointer"
             >
               <option value="processing">{language === 'zh' ? '進行中草稿 (Pending + Rejected)' : 'Processing (Pending + Rejected)'}</option>
@@ -281,9 +279,9 @@ export default function DraftManager() {
               <tbody className="divide-y divide-slate-100 text-xs">
                 {filteredDrafts.map((draft) => {
                   const isPlant = draft.table_name === 'plant_species' || String(draft.species_id || '').startsWith('flora_');
-                  const chiName = draft.draft_data?.common_name_chi || '未有名稱';
-                  const engName = draft.draft_data?.common_name_eng;
-                  const sciName = draft.draft_data?.scientific_name || draft.species_id;
+                  const chiName = typeof draft.draft_data.common_name_chi === 'string' ? draft.draft_data.common_name_chi : '未有名稱';
+                  const engName = typeof draft.draft_data.common_name_eng === 'string' ? draft.draft_data.common_name_eng : '';
+                  const sciName = typeof draft.draft_data.scientific_name === 'string' ? draft.draft_data.scientific_name : draft.species_id;
 
                   return (
                     <tr
@@ -318,7 +316,7 @@ export default function DraftManager() {
                       <td className="py-4 px-6">
                         <div className="flex items-center gap-2.5">
                           {draft.curator_avatar ? (
-                            <img src={draft.curator_avatar} alt={draft.curator_name || (language === 'zh' ? '策展人' : 'Curator')} className="w-6 h-6 rounded-full object-cover border border-slate-200" />
+                            <Image src={draft.curator_avatar} alt={draft.curator_name || (language === 'zh' ? '策展人' : 'Curator')} width={24} height={24} unoptimized className="w-6 h-6 rounded-full object-cover border border-slate-200" />
                           ) : (
                             <UserCircle className="w-6 h-6 text-slate-300" />
                           )}

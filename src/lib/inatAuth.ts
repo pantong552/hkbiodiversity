@@ -1,8 +1,7 @@
 async function getEdgeConfig<T>(key: string): Promise<T | undefined> {
   try {
-    // @ts-ignore
-    const edgeConfig: any = await import('@vercel/edge-config');
-    return await edgeConfig.get(key);
+    const edgeConfig = await import('@vercel/edge-config');
+    return await edgeConfig.get(key) as T | undefined;
   } catch {
     return undefined;
   }

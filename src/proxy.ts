@@ -66,9 +66,7 @@ export async function proxy(request: NextRequest) {
   // 重要：不要移除 auth.getUser()
   // 此呼叫會刷新 auth token 並確保 server/client 的 auth state 一致
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+  await supabase.auth.getUser()
 
   return supabaseResponse
 }

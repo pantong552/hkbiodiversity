@@ -1,5 +1,4 @@
 import { Metadata } from 'next';
-import { Species } from '@/types/species';
 import { getSpeciesById } from '@/lib/species';
 import SpeciesDetailClient from './SpeciesDetailClient';
 

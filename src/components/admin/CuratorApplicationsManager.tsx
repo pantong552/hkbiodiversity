@@ -1,5 +1,6 @@
 'use client';
 
+import Image from 'next/image';
 import { useEffect, useMemo, useState } from 'react';
 import { AlertCircle, Check, CheckCircle2, Clock3, Loader2, Search, ShieldX, User, X } from 'lucide-react';
 import { createClient } from '@/utils/supabase/client';
@@ -148,7 +149,7 @@ export default function CuratorApplicationsManager({ onRequestConfirm, onApplica
             <tbody>
               {visibleProfiles.map((profile) => (
                 <tr key={profile.id} className="border-b border-slate-100/80 align-top transition-colors hover:bg-emerald-50/40">
-                  <td className="px-4 py-4"><div className="flex items-center gap-3"><div className="h-9 w-9 shrink-0 overflow-hidden rounded-xl border border-slate-100 bg-slate-50"><>{profile.avatar_url ? <img src={profile.avatar_url} alt="" className="h-full w-full object-cover" onError={(event) => { event.currentTarget.style.display = 'none'; }} /> : <User className="h-full w-full p-2 text-slate-300" />}</></div><div><div className="font-black text-sm text-slate-800">{profile.username || 'Anonymous'}</div><div className="mt-1 text-[11px] text-slate-400">{profile.email}</div></div></div></td>
+                  <td className="px-4 py-4"><div className="flex items-center gap-3"><div className="relative h-9 w-9 shrink-0 overflow-hidden rounded-xl border border-slate-100 bg-slate-50"><>{profile.avatar_url ? <Image src={profile.avatar_url} alt="" fill sizes="36px" unoptimized className="object-cover" onError={(event) => { event.currentTarget.style.display = 'none'; }} /> : <User className="h-full w-full p-2 text-slate-300" />}</></div><div><div className="font-black text-sm text-slate-800">{profile.username || 'Anonymous'}</div><div className="mt-1 text-[11px] text-slate-400">{profile.email}</div></div></div></td>
                   <td className="max-w-[300px] px-4 py-4 text-xs leading-relaxed text-slate-600"><div className="whitespace-pre-wrap">{profile.curator_application_reason || '—'}</div>{profile.curator_application_rejection_reason && <div className="mt-2 rounded-lg bg-rose-50 p-2 text-rose-700"><strong>{language === 'zh' ? '拒絕原因：' : 'Rejection: '}</strong>{profile.curator_application_rejection_reason}</div>}</td>
                   <td className="whitespace-nowrap px-4 py-4 text-xs font-medium text-slate-500">{formatDate(profile.curator_application_submitted_at)}</td>
                   <td className="px-4 py-4"><span className={`inline-flex items-center gap-1 rounded-lg px-2 py-1 text-[10px] font-black ${profile.curator_application_status === 'pending' ? 'bg-amber-50 text-amber-700' : profile.curator_application_status === 'approved' ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700'}`}>{profile.curator_application_status === 'pending' ? <Clock3 className="w-3 h-3" /> : profile.curator_application_status === 'approved' ? <CheckCircle2 className="w-3 h-3" /> : <ShieldX className="w-3 h-3" />}{statusLabel(profile.curator_application_status)}</span></td>

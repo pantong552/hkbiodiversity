@@ -1,11 +1,11 @@
 'use client';
 
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
 import { createClient } from '@/utils/supabase/client';
-import { User } from '@supabase/supabase-js';
+import { User, Session, AuthChangeEvent } from '@supabase/supabase-js';
 import { Profile } from '@/types/comments';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ShieldAlert, X } from 'lucide-react';
+import { ShieldAlert } from 'lucide-react';
 import AuthReminderModal from '@/components/ui/AuthReminderModal';
 
 interface AuthContextType {
@@ -32,9 +32,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [showReminderModal, setShowReminderModal] = useState(false);
   const [reminderFeatureName, setReminderFeatureName] = useState<string | undefined>(undefined);
 
-  const supabase = createClient();
+  const [supabase] = useState(() => createClient());
 
-  const fetchProfile = async (userId: string, currentUser?: User | null) => {
+  const fetchProfile = useCallback(async (userId: string, currentUser?: User | null) => {
     try {
       const { data, error } = await supabase
         .from('profiles')
@@ -66,9 +66,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       console.error('Error fetching profile:', err);
       return null;
     }
-  };
+  }, [supabase]);
 
-  const updateLastOnline = async (userId: string) => {
+  const updateLastOnline = useCallback(async (userId: string) => {
     try {
       await supabase
         .from('profiles')
@@ -77,14 +77,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     } catch (err) {
       console.error('Error updating last online:', err);
     }
-  };
+  }, [supabase]);
 
-  const signOut = async () => {
+  const signOut = useCallback(async () => {
     await supabase.auth.signOut();
     setUser(null);
     setProfile(null);
     setShowBlockedModal(false);
-  };
+  }, [supabase]);
 
   useEffect(() => {
     let mounted = true;
@@ -96,7 +96,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
     }, 3500);
 
-    const handleSession = async (session: any) => {
+    const handleSession = async (session: Session | null) => {
       if (!mounted) return;
       authEventTriggered = true;
       clearTimeout(safetyTimeout);
@@ -127,7 +127,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (mounted) setIsLoading(false);
     };
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event: any, session: any) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event: AuthChangeEvent, session: Session | null) => {
       handleSession(session);
     });
 
@@ -139,7 +139,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }, 500);
 
     const handleFocus = async () => {
-      if (mounted && !user) {
+      if (mounted) {
         const { data: sessionData } = await supabase.auth.getSession();
         if (sessionData?.session) handleSession(sessionData.session);
       }
@@ -153,23 +153,24 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       window.removeEventListener('focus', handleFocus);
       subscription.unsubscribe();
     };
-  }, []);
+  }, [fetchProfile, updateLastOnline, supabase.auth]);
 
   // Realtime 封鎖監聽
+  const currentUserId = user?.id;
   useEffect(() => {
-    if (!user) return;
+    if (!currentUserId) return;
 
     const channel = supabase
-      .channel(`profile-status-${user.id}`)
+      .channel(`profile-status-${currentUserId}`)
       .on(
         'postgres_changes',
         {
           event: 'UPDATE',
           schema: 'public',
           table: 'profiles',
-          filter: `id=eq.${user.id}`
+          filter: `id=eq.${currentUserId}`
         },
-        (payload: any) => {
+        (payload: { new: { status?: string } }) => {
           if (payload.new.status === 'blocked') {
             signOut();
             setShowBlockedModal(true);
@@ -181,7 +182,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [user?.id]);
+  }, [currentUserId, signOut, supabase]);
 
   const refreshProfile = async () => {
     if (user) {

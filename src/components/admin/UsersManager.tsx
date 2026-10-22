@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import Image from 'next/image';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { createClient } from '@/utils/supabase/client';
 import { useLanguage } from '@/context/LanguageContext';
 import { useClickOutside } from '@/hooks/useClickOutside';
@@ -28,6 +29,7 @@ import {
 import { motion, AnimatePresence } from 'framer-motion';
 import { format } from 'date-fns';
 import { zhTW, enUS } from 'date-fns/locale';
+import type { LucideIcon } from 'lucide-react';
 
 interface UsersManagerProps {
   onRequestConfirm: (onConfirm: () => void) => void;
@@ -49,7 +51,7 @@ function RoleSelectDropdown({ currentRole, onRoleChange, disabled, openUpward = 
   const { t } = useLanguage();
   const ref = useClickOutside(() => setIsOpen(false));
 
-  const roleOptions: { role: UserRole; label: string; icon: any; badgeStyle: string; activeStyle: string }[] = [
+  const roleOptions: { role: UserRole; label: string; icon: LucideIcon; badgeStyle: string; activeStyle: string }[] = [
     {
       role: 'admin',
       label: t('account.role_admin'),
@@ -77,7 +79,7 @@ function RoleSelectDropdown({ currentRole, onRoleChange, disabled, openUpward = 
   const Icon = currentOption.icon;
 
   return (
-    <div ref={ref as any} className="relative inline-block text-left" onClick={(e) => e.stopPropagation()}>
+    <div ref={ref} className="relative inline-block text-left" onClick={(e) => e.stopPropagation()}>
       <button
         type="button"
         disabled={disabled}
@@ -132,7 +134,7 @@ function RoleSelectDropdown({ currentRole, onRoleChange, disabled, openUpward = 
 
 export default function UsersManager({ onRequestConfirm }: UsersManagerProps) {
   const { language, t } = useLanguage();
-  const supabase = createClient();
+  const [supabase] = useState(() => createClient());
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [managerTab, setManagerTab] = useState<ManagerTab>('users');
   const [loading, setLoading] = useState(true);
@@ -152,14 +154,10 @@ export default function UsersManager({ onRequestConfirm }: UsersManagerProps) {
   const [showStatusFilter, setShowStatusFilter] = useState(false);
 
   // Click Outside Refs
-  const roleFilterRef = useClickOutside(() => setShowRoleFilter(false));
-  const statusFilterRef = useClickOutside(() => setShowStatusFilter(false));
+  const roleFilterRef = useClickOutside<HTMLTableCellElement>(() => setShowRoleFilter(false));
+  const statusFilterRef = useClickOutside<HTMLTableCellElement>(() => setShowStatusFilter(false));
 
-  useEffect(() => {
-    fetchProfiles();
-  }, []);
-
-  const fetchProfiles = async () => {
+  const fetchProfiles = useCallback(async () => {
     setLoading(true);
     try {
       let allProfiles: Profile[] = [];
@@ -187,7 +185,11 @@ export default function UsersManager({ onRequestConfirm }: UsersManagerProps) {
     } finally {
       setLoading(false);
     }
-  };
+  }, [supabase]);
+
+  useEffect(() => {
+    fetchProfiles();
+  }, [fetchProfiles]);
 
   const handleRoleChange = async (userId: string, newRole: UserRole) => {
     setActionLoading(userId);
@@ -307,17 +309,6 @@ export default function UsersManager({ onRequestConfirm }: UsersManagerProps) {
     }
   };
 
-  const getRoleBadge = (role: UserRole) => {
-    switch (role) {
-      case 'admin':
-        return <span className="flex items-center gap-1 px-1.5 py-0.5 bg-red-50 text-red-600 rounded-lg text-[8px] font-black uppercase ring-1 ring-red-100"><ShieldCheck className="w-2.5 h-2.5" /> {t('account.role_admin')}</span>;
-      case 'curator':
-        return <span className="flex items-center gap-1 px-1.5 py-0.5 bg-amber-50 text-amber-600 rounded-lg text-[8px] font-black uppercase ring-1 ring-amber-100"><Shield className="w-2.5 h-2.5" /> {t('account.role_curator')}</span>;
-      default:
-        return <span className="flex items-center gap-1 px-1.5 py-0.5 bg-slate-50 text-slate-500 rounded-lg text-[8px] font-black uppercase ring-1 ring-slate-100"><UserCircle className="w-2.5 h-2.5" /> {t('account.role_guest')}</span>;
-    }
-  };
-
   const getStatusBadge = (status: UserStatus) => {
     if (status === 'blocked') {
       return <span className="px-1.5 py-0.5 bg-slate-900 text-white rounded-md text-[8px] font-black tracking-wider">{t('admin.status_blocked')}</span>;
@@ -430,7 +421,7 @@ export default function UsersManager({ onRequestConfirm }: UsersManagerProps) {
                       <SortIcon column="last_online_at" />
                     </div>
                   </th>
-                  <th ref={roleFilterRef as any} className="px-4 py-2.5 text-[9px] font-black text-slate-400 uppercase tracking-widest relative">
+                  <th ref={roleFilterRef} className="px-4 py-2.5 text-[9px] font-black text-slate-400 uppercase tracking-widest relative">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
                         {t('admin.role')}
@@ -466,7 +457,7 @@ export default function UsersManager({ onRequestConfirm }: UsersManagerProps) {
                       )}
                     </AnimatePresence>
                   </th>
-                  <th ref={statusFilterRef as any} className="px-4 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center relative">
+                  <th ref={statusFilterRef} className="px-4 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center relative">
                     <div className="flex items-center justify-center gap-2">
                       <div className="flex items-center gap-2 cursor-pointer group" onClick={() => requestSort('status')}>
                         {t('admin.status')}
@@ -513,9 +504,9 @@ export default function UsersManager({ onRequestConfirm }: UsersManagerProps) {
                   >
                     <td className="px-4 py-2 border-b border-white/10">
                       <div className="flex items-center gap-2.5">
-                        <div className="w-8 h-8 rounded-full overflow-hidden border border-white/20 bg-slate-100/50 shadow-inner">
+                        <div className="relative w-8 h-8 rounded-full overflow-hidden border border-white/20 bg-slate-100/50 shadow-inner">
                           {profile.avatar_url && !imageErrors[profile.id] ? (
-                            <img src={profile.avatar_url} alt="" className="w-full h-full object-cover" onError={() => setImageErrors(prev => ({ ...prev, [profile.id]: true }))}/>
+                            <Image src={profile.avatar_url} alt="" fill sizes="32px" unoptimized className="object-cover" onError={() => setImageErrors(prev => ({ ...prev, [profile.id]: true }))}/>
                           ) : (
                             <User className="w-full h-full p-1.5 text-slate-300" />
                           )}
@@ -562,9 +553,9 @@ export default function UsersManager({ onRequestConfirm }: UsersManagerProps) {
                   className="p-3 flex items-center justify-between cursor-pointer group"
                 >
                   <div className="flex items-center gap-3 min-w-0">
-                    <div className="w-9 h-9 rounded-xl overflow-hidden border border-slate-100 bg-slate-50 shrink-0 shadow-inner">
+                    <div className="relative w-9 h-9 rounded-xl overflow-hidden border border-slate-100 bg-slate-50 shrink-0 shadow-inner">
                       {profile.avatar_url && !imageErrors[profile.id] ? (
-                        <img src={profile.avatar_url} alt="" className="w-full h-full object-cover" onError={() => setImageErrors(prev => ({ ...prev, [profile.id]: true }))}/>
+                        <Image src={profile.avatar_url} alt="" fill sizes="36px" unoptimized className="object-cover" onError={() => setImageErrors(prev => ({ ...prev, [profile.id]: true }))}/>
                       ) : (
                         <User className="w-full h-full p-2 text-slate-300" />
                       )}

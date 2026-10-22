@@ -1,6 +1,6 @@
 'use client';
 
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useSyncExternalStore, useCallback } from 'react';
 
 type Language = 'zh' | 'en';
 
@@ -551,20 +551,36 @@ const translations: Record<Language, Record<string, string>> = {
 
 const LanguageContext = createContext<LanguageContextType | undefined>(undefined);
 
-export function LanguageProvider({ children }: { children: React.ReactNode }) {
-  const [language, setLanguageState] = useState<Language>('zh');
+const LANGUAGE_STORAGE_KEY = 'hkbc-lang';
 
-  useEffect(() => {
-    const savedLang = localStorage.getItem('hkbc-lang') as Language;
-    if (savedLang && (savedLang === 'zh' || savedLang === 'en')) {
-      setLanguageState(savedLang);
-    }
-  }, []);
-
-  const setLanguage = (lang: Language) => {
-    setLanguageState(lang);
-    localStorage.setItem('hkbc-lang', lang);
+function subscribeToLanguage(onStoreChange: () => void) {
+  window.addEventListener('storage', onStoreChange);
+  window.addEventListener('hkbc-language-change', onStoreChange);
+  return () => {
+    window.removeEventListener('storage', onStoreChange);
+    window.removeEventListener('hkbc-language-change', onStoreChange);
   };
+}
+
+function getLanguageSnapshot(): Language {
+  return localStorage.getItem(LANGUAGE_STORAGE_KEY) === 'en' ? 'en' : 'zh';
+}
+
+function getServerLanguageSnapshot(): Language {
+  return 'zh';
+}
+
+export function LanguageProvider({ children }: { children: React.ReactNode }) {
+  const language = useSyncExternalStore(
+    subscribeToLanguage,
+    getLanguageSnapshot,
+    getServerLanguageSnapshot
+  );
+
+  const setLanguage = useCallback((lang: Language) => {
+    localStorage.setItem(LANGUAGE_STORAGE_KEY, lang);
+    window.dispatchEvent(new Event('hkbc-language-change'));
+  }, []);
 
   const t = (key: string) => {
     return translations[language][key] || key;

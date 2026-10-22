@@ -7,6 +7,7 @@ import { useLanguage } from '@/context/LanguageContext';
 import { createClient } from '@/utils/supabase/client';
 import { User } from '@supabase/supabase-js';
 import { Profile } from '@/types/comments';
+import { getErrorMessage } from '@/utils/errors';
 
 interface AuthReminderModalProps {
   isOpen: boolean;
@@ -38,8 +39,8 @@ export default function AuthReminderModal({
       });
 
       if (error) throw error;
-    } catch (error: any) {
-      console.error('登入失敗:', error.message);
+    } catch (error: unknown) {
+      console.error('登入失敗:', getErrorMessage(error, '登入失敗'));
       setIsLoading(false);
     }
   };

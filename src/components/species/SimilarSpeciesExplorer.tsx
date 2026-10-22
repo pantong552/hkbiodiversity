@@ -1,12 +1,14 @@
-'use client';
+﻿'use client';
 
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import Image from 'next/image';
 import { Species } from '@/types/species';
+import { PlantSpecies } from '@/types/plants';
 import { useLanguage } from '@/context/LanguageContext';
 import { useSpeciesPanel } from '@/context/SpeciesPanelContext';
 import { createClient } from '@/utils/supabase/client';
 import { useInaturalistPhoto } from '@/hooks/useInaturalistPhoto';
+import { useIsHydrated } from '@/hooks/useIsHydrated';
 import { formatScientificName, getSpeciesImageUrl } from '@/utils/formatters';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Sparkles, Leaf } from 'lucide-react';
@@ -45,12 +47,7 @@ const HorizontalSpeciesCard = ({ species, index }: { species: Species; index: nu
   
   const [imgLoaded, setImgLoaded] = useState(false);
   const [isFullyReady, setIsFullyReady] = useState(false);
-  const [mounted, setMounted] = useState(false);
-
-  useEffect(() => {
-    setMounted(true);
-    return () => setMounted(false);
-  }, []);
+  const mounted = useIsHydrated();
 
   const placeholderImage = '/images/placeholder/no-species-image.svg';
   const commonName = language === 'zh' ? species.common_name_chi : species.common_name_eng;
@@ -77,7 +74,7 @@ const HorizontalSpeciesCard = ({ species, index }: { species: Species; index: nu
           const taxaId = species.taxa_id || '';
           const globalProfilePic = taxaId ? profilePictureMap[taxaId] : undefined;
           const effectiveSpecies = globalProfilePic !== undefined ? { ...species, profile_picture: globalProfilePic } : species;
-          const displayImage = getSpeciesImageUrl(effectiveSpecies as any, 'square');
+          const displayImage = getSpeciesImageUrl(effectiveSpecies, 'square');
           const finalImage = displayImage || imageUrl || (isInatLoading ? '' : placeholderImage);
           
           if (!finalImage) return null;
@@ -162,12 +159,7 @@ const MiniSpeciesCard = ({ species, index }: { species: Species; index: number }
   
   const [imgLoaded, setImgLoaded] = useState(false);
   const [isFullyReady, setIsFullyReady] = useState(false);
-  const [mounted, setMounted] = useState(false);
-
-  useEffect(() => {
-    setMounted(true);
-    return () => setMounted(false);
-  }, []);
+  const mounted = useIsHydrated();
 
   const placeholderImage = '/images/placeholder/no-species-image.svg';
   const commonName = language === 'zh' ? species.common_name_chi : species.common_name_eng;
@@ -195,7 +187,7 @@ const MiniSpeciesCard = ({ species, index }: { species: Species; index: number }
           const taxaId = species.taxa_id || '';
           const globalProfilePic = taxaId ? profilePictureMap[taxaId] : undefined;
           const effectiveSpecies = globalProfilePic !== undefined ? { ...species, profile_picture: globalProfilePic } : species;
-          const displayImage = getSpeciesImageUrl(effectiveSpecies as any, 'square');
+          const displayImage = getSpeciesImageUrl(effectiveSpecies, 'square');
           const finalImage = displayImage || imageUrl || (isInatLoading ? '' : placeholderImage);
           
           if (!finalImage) return null;
@@ -257,7 +249,7 @@ const MiniSpeciesCard = ({ species, index }: { species: Species; index: number }
 };
 
 // 輔助函數：將植物資料映射為 Species 結構
-function mapPlantToSpecies(plantData: any): Species {
+function mapPlantToSpecies(plantData: PlantSpecies): Species {
   return {
     ...plantData,
     taxa_group: 'FLORA',
@@ -308,16 +300,16 @@ export default function SimilarSpeciesExplorer({ species }: SimilarSpeciesExplor
         const faunaIds = taxaIds.filter(id => id.startsWith('fauna_'));
         const floraIds = taxaIds.filter(id => id.startsWith('flora_'));
 
-        let faunaData: any[] = [];
+        let faunaData: Species[] = [];
         if (faunaIds.length > 0) {
           const { data } = await supabase
             .from('species')
             .select('*')
             .in('taxa_id', faunaIds);
-          faunaData = data || [];
+          faunaData = (data || []) as Species[];
         }
 
-        let floraData: any[] = [];
+        let floraData: Species[] = [];
         if (floraIds.length > 0) {
           const { data } = await supabase
             .from('plant_species')

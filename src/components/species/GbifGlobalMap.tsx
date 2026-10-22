@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useRef, useState } from 'react';
-import Map, { Source, Layer, NavigationControl as MapNavControl, FullscreenControl } from 'react-map-gl/maplibre';
+import Map, { Source, Layer, NavigationControl as MapNavControl, FullscreenControl, type MapRef } from 'react-map-gl/maplibre';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import { Globe2, Loader2, AlertCircle, Layers, Info, ExternalLink } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -106,7 +106,7 @@ const BASEMAPS = [
 
 export default function GbifGlobalMap({ scientificName }: GbifGlobalMapProps) {
   const { language } = useLanguage();
-  const mapRef = useRef<any>(null);
+  const mapRef = useRef<MapRef | null>(null);
   const attributionRef = useRef<HTMLDivElement>(null);
 
   const [loading, setLoading] = useState<boolean>(true);
@@ -174,7 +174,7 @@ export default function GbifGlobalMap({ scientificName }: GbifGlobalMapProps) {
           setTaxonKey(matchData.usageKey);
           setLoading(false);
         }
-      } catch (err) {
+      } catch {
         if (isMounted) {
           setError(language === 'zh' ? '無法載入 GBIF 地圖數據' : 'Failed to load GBIF map');
           setLoading(false);
@@ -187,7 +187,7 @@ export default function GbifGlobalMap({ scientificName }: GbifGlobalMapProps) {
     return () => {
       isMounted = false;
     };
-  }, [scientificName]);
+  }, [scientificName, language]);
 
   return (
     <div id="gbif-map-container" className="rounded-[2rem] sm:rounded-[2.5rem] shadow-sm relative w-full h-[550px] overflow-hidden bg-slate-100 border border-slate-200 group">
@@ -212,7 +212,7 @@ export default function GbifGlobalMap({ scientificName }: GbifGlobalMapProps) {
           zoom: isMobile ? 0 : 0.6
         }}
         maxZoom={7}
-        mapStyle={currentStyle as any}
+        mapStyle={currentStyle as unknown as import('maplibre-gl').StyleSpecification}
         attributionControl={false}
       >
         {!isMobile && <MapNavControl position="top-right" showCompass={false} />}

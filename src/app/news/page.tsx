@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, Suspense, useMemo } from 'react';
-import { useSearchParams, useRouter } from 'next/navigation';
+import { useSearchParams } from 'next/navigation';
 import { useLanguage } from '@/context/LanguageContext';
 import Header from '@/components/Header';
 import { Calendar, ArrowLeft, Megaphone, ChevronRight, Clock, ChevronDown, ChevronUp, Filter, X, ChevronLeft } from 'lucide-react';
@@ -13,7 +13,7 @@ import { supabase } from '@/lib/supabase';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '@/context/AuthContext';
 import NewsEditor from '@/components/news/NewsEditor';
-import { Plus, Settings, Edit2 } from 'lucide-react';
+import { Plus, Edit2 } from 'lucide-react';
 
 const ITEMS_PER_PAGE = 10;
 
@@ -28,7 +28,7 @@ interface NewsItem {
 }
 
 function NewsContent() {
-  const { language, t } = useLanguage();
+  const { language } = useLanguage();
   const searchParams = useSearchParams();
   const [allNews, setAllNews] = useState<NewsItem[]>([]);
   const [selectedNews, setSelectedNews] = useState<NewsItem | null>(null);
@@ -76,10 +76,6 @@ function NewsContent() {
     initialFetch();
   }, [searchParams]);
 
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [filterCategory]);
-
   const filteredNews = useMemo(() => {
     if (!filterCategory) return allNews;
     return allNews.filter(n => n.category === filterCategory);
@@ -93,7 +89,7 @@ function NewsContent() {
 
   const getCategoryName = (cat: string) => {
     if (language !== 'zh') return cat;
-    const mapping: any = {
+    const mapping: Record<string, string> = {
       'System': '系統維護',
       'Community': '社群消息',
       'Taxonomy': '物種更新',
@@ -104,7 +100,7 @@ function NewsContent() {
   };
 
   const getCategoryColor = (cat: string) => {
-    const mapping: any = {
+    const mapping: Record<string, string> = {
       'System': 'bg-slate-100 text-slate-600 border-slate-200',
       'Community': 'bg-emerald-50 text-emerald-700 border-emerald-100',
       'Taxonomy': 'bg-amber-50 text-amber-700 border-amber-100',
@@ -117,6 +113,11 @@ function NewsContent() {
   const handlePageChange = (page: number) => {
     setCurrentPage(page);
     window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const handleCategoryChange = (category: string | null) => {
+    setFilterCategory(category);
+    setCurrentPage(1);
   };
 
   if (loading) {
@@ -254,7 +255,7 @@ function NewsContent() {
                   {/* All News Toggle */}
                   <button
                     onClick={() => {
-                      setFilterCategory(null);
+                      handleCategoryChange(null);
                       setIsNavOpen(false);
                     }}
                     className={`w-full flex items-center justify-between p-3 rounded-xl transition-all ${!filterCategory ? 'bg-emerald-50 text-emerald-700' : 'text-slate-500 hover:bg-slate-50'}`}
@@ -267,7 +268,7 @@ function NewsContent() {
                     <button 
                       key={cat} 
                       onClick={() => {
-                        setFilterCategory(cat);
+                        handleCategoryChange(cat);
                         setIsNavOpen(false);
                       }}
                       className={`w-full flex items-center justify-between p-3 rounded-xl transition-all ${filterCategory === cat ? 'bg-emerald-50 text-emerald-700' : 'text-slate-500 hover:bg-slate-50'}`}
@@ -296,7 +297,7 @@ function NewsContent() {
                     </span>
                   </div>
                   <button 
-                    onClick={() => setFilterCategory(null)}
+                    onClick={() => handleCategoryChange(null)}
                     className="text-slate-400 hover:text-rose-500 transition-colors p-1"
                   >
                     <X className="w-4 h-4" />

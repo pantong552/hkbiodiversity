@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { createClient } from '@/utils/supabase/client';
 import { useAuth } from '@/context/AuthContext';
 import { useLanguage } from '@/context/LanguageContext';
@@ -15,15 +15,15 @@ import {
   CheckCircle2, 
   Loader2, 
   ChevronRight, 
-  AlertCircle,
   RefreshCw
 } from 'lucide-react';
 import { motion } from 'framer-motion';
 
 export default function CuratorDraftsSection() {
-  const { user, profile } = useAuth();
+  const { user } = useAuth();
   const { language } = useLanguage();
-  const supabase = createClient();
+  const [supabase] = useState(() => createClient());
+  const userId = user?.id;
 
   const [drafts, setDrafts] = useState<SpeciesDraft[]>([]);
   const [loading, setLoading] = useState(true);
@@ -35,8 +35,8 @@ export default function CuratorDraftsSection() {
   const [loadingSpecies, setLoadingSpecies] = useState(false);
 
   // 抓取屬於當前 Curator 的所有草稿紀錄
-  const fetchMyDrafts = async () => {
-    if (!user) {
+  const fetchMyDrafts = useCallback(async () => {
+    if (!userId) {
       setLoading(false);
       return;
     }
@@ -46,7 +46,7 @@ export default function CuratorDraftsSection() {
       const { data, error } = await supabase
         .from('species_drafts')
         .select('*')
-        .eq('curator_id', user.id)
+        .eq('curator_id', userId)
         .order('submitted_at', { ascending: false });
 
       if (!error && data) {
@@ -57,11 +57,11 @@ export default function CuratorDraftsSection() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [supabase, userId]);
 
   useEffect(() => {
     fetchMyDrafts();
-  }, [user?.id]);
+  }, [fetchMyDrafts]);
 
   // 點擊草稿 Row，拉取正本資料並開啟 SpeciesEditModal
   const handleOpenModal = async (draft: SpeciesDraft) => {
@@ -76,11 +76,11 @@ export default function CuratorDraftsSection() {
         setIsModalOpen(true);
       } else {
         // 若找不到資料庫正本，建立 fallback 物件供 modal 呈現草稿
-        const fallbackSpecies: any = {
+        const fallbackSpecies = {
           id: draft.species_id,
           taxa_id: draft.species_id,
           ...draft.draft_data
-        };
+        } as unknown as Species;
         setTargetSpecies(fallbackSpecies);
         setIsModalOpen(true);
       }
@@ -148,9 +148,9 @@ export default function CuratorDraftsSection() {
       {/* 草稿列表 */}
       <div className="space-y-3">
         {drafts.map((draft) => {
-          const chiName = draft.draft_data?.common_name_chi || '未指定物種';
-          const engName = draft.draft_data?.common_name_eng;
-          const sciName = draft.draft_data?.scientific_name || draft.species_id;
+          const chiName = typeof draft.draft_data.common_name_chi === 'string' ? draft.draft_data.common_name_chi : '未指定物種';
+          const engName = typeof draft.draft_data.common_name_eng === 'string' ? draft.draft_data.common_name_eng : '';
+          const sciName = typeof draft.draft_data.scientific_name === 'string' ? draft.draft_data.scientific_name : draft.species_id;
           const isRejected = draft.status === 'rejected';
           const isPending = draft.status === 'pending';
           const isApproved = draft.status === 'approved';
@@ -207,7 +207,7 @@ export default function CuratorDraftsSection() {
                     {language === 'zh' ? '退回原因：' : 'Rejection Reason: '}
                   </span>
                   <p className="text-[11px] italic">
-                    "{draft.rejection_reason || (language === 'zh' ? '未提供理由' : 'No reason provided')}"
+                    &quot;{draft.rejection_reason || (language === 'zh' ? '未提供理由' : 'No reason provided')}&quot;
                   </p>
                 </div>
               )}

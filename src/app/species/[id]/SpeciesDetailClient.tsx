@@ -50,7 +50,7 @@ export default function SpeciesDetailClient({
   // 全面重新整理物種數據與草稿狀態 (用於 Admin Approve / Reject 及 Curator 提交草稿後自動更新)
   const reloadSpeciesAndDrafts = async () => {
     if (!species) return;
-    const isPlant = species.taxa_group === 'FLORA' || (species as any).category_chi || String(species.taxa_id || '').startsWith('flora_');
+    const isPlant = species.taxa_group === 'FLORA' || (species as Species & { category_chi?: string }).category_chi || String(species.taxa_id || '').startsWith('flora_');
     const targetTable = isPlant ? 'plant_species' : 'species';
     
     let query = supabase.from(targetTable).select('*');
@@ -70,7 +70,7 @@ export default function SpeciesDetailClient({
   const handleApproveDraft = async (draft: SpeciesDraft) => {
     if (!species || !user) return;
     const isFungi = species.taxa_group === 'FUNGI' || String(species.taxa_id || '').startsWith('fungi_');
-    const isPlant = species.taxa_group === 'FLORA' || (species as any).category_chi || String(species.taxa_id || '').startsWith('flora_');
+    const isPlant = species.taxa_group === 'FLORA' || (species as Species & { category_chi?: string }).category_chi || String(species.taxa_id || '').startsWith('flora_');
     const targetTable = isFungi ? 'fungi_species' : (isPlant ? 'plant_species' : 'species');
 
     // 1. 更新正式物種表
@@ -130,8 +130,8 @@ export default function SpeciesDetailClient({
         if (data) {
           setSpecies(data);
         }
-      } catch (err: any) {
-        console.error('fetchSpeciesDetail 發生錯誤:', err.message || err);
+      } catch (err: unknown) {
+        console.error('fetchSpeciesDetail 發生錯誤:', err instanceof Error ? err.message : err);
       } finally {
         setIsLoading(false);
       }
@@ -251,7 +251,7 @@ export default function SpeciesDetailClient({
           tableName={
             species.taxa_group === 'FUNGI' || String(species.taxa_id || '').startsWith('fungi_')
               ? 'fungi_species'
-              : species.taxa_group === 'FLORA' || (species as any).category_chi || String(species.taxa_id || '').startsWith('flora_')
+              : species.taxa_group === 'FLORA' || (species as Species & { category_chi?: string }).category_chi || String(species.taxa_id || '').startsWith('flora_')
                 ? 'plant_species'
                 : 'species'
           }

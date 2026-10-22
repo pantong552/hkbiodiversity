@@ -1,18 +1,19 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { createClient } from '@/utils/supabase/client'
+import { getErrorMessage } from '@/utils/errors'
 
 export default function PopupPage() {
   const [message, setMessage] = useState('Google 登入中...')
-  const [isProcessing, setIsProcessing] = useState(false)
-  const supabase = createClient()
+  const isProcessing = useRef(false)
+  const supabase = useMemo(() => createClient(), [])
 
   useEffect(() => {
     const handleOAuth = async () => {
       // 防止重複執行
-      if (isProcessing) return
-      setIsProcessing(true)
+      if (isProcessing.current) return
+      isProcessing.current = true
 
       try {
         const { searchParams } = new URL(window.location.href)
@@ -81,21 +82,21 @@ export default function PopupPage() {
         if (data?.url) {
           window.location.href = data.url
         }
-      } catch (error: any) {
+      } catch (error: unknown) {
         console.error('OAuth error:', error)
         if (window.opener) {
           window.opener.postMessage(
-            { type: 'auth:error', error: error.message || 'OAuth flow failed' },
+            { type: 'auth:error', error: getErrorMessage(error, 'OAuth flow failed') },
             window.location.origin
           )
         }
-        setMessage(`發生錯誤: ${error.message}`)
+        setMessage(`發生錯誤: ${getErrorMessage(error, 'OAuth flow failed')}`)
         setTimeout(() => window.close(), 2000)
       }
     }
 
     handleOAuth()
-  }, [])
+  }, [supabase])
 
   return (
     <div className="flex items-center justify-center min-h-screen bg-slate-900">

@@ -1,7 +1,8 @@
+import Image from 'next/image';
 import { useState } from 'react';
 import { Species } from '@/types/species';
 import { useLanguage } from '@/context/LanguageContext';
-import { Layers, ChevronDown, Dna, Search, Loader2, Sparkles, AlertCircle, Info, Tag, BookOpen, ExternalLink } from 'lucide-react';
+import { Layers, ChevronDown, Loader2, Sparkles, AlertCircle, Info, Tag, BookOpen, ExternalLink } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useSpeciesPanel } from '@/context/SpeciesPanelContext';
 import { formatScientificName, parseAliases } from '@/utils/formatters';
@@ -9,7 +10,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useTaxonomy } from '@/context/TaxonomyContext';
 
 interface TaxonomyDisplayProps {
-  species: Species;
+  species: Species & { category_eng?: string | null };
 }
 
 interface FullTaxonomyData {
@@ -37,22 +38,22 @@ export default function TaxonomyDisplay({ species }: TaxonomyDisplayProps) {
   const [error, setError] = useState<string | null>(null);
 
   // 判斷是否為植物或真菌
-  const isPlant = species.taxa_group === 'FLORA' || (!species.phylum_eng && !!(species as any).family_chi);
+  const isPlant = species.taxa_group === 'FLORA' || (!species.phylum_eng && !!species.family_chi);
   const isFungi = species.taxa_group === 'FUNGI' || String(species.taxa_id || '').startsWith('fungi_');
   const taxaType = isPlant ? 'flora' : (isFungi ? 'fungi' : 'fauna');
 
   const levels = isPlant ? [
     {
       id: 'categories', labelChi: '類別', labelEng: 'Category',
-      chi: getTaxonomyChi('category', taxaType, (species as any).category_eng), eng: (species as any).category_eng
+      chi: getTaxonomyChi('category', taxaType, species.category_eng || ''), eng: species.category_eng
     },
     {
       id: 'families', labelChi: '科', labelEng: 'Family',
-      chi: getTaxonomyChi('family', taxaType, (species as any).family_eng), eng: (species as any).family_eng
+      chi: getTaxonomyChi('family', taxaType, species.family_eng), eng: species.family_eng
     },
     {
       id: 'genuses', labelChi: '屬', labelEng: 'Genus',
-      chi: getTaxonomyChi('genus', taxaType, (species as any).genus_eng), eng: (species as any).genus_eng,
+      chi: getTaxonomyChi('genus', taxaType, species.genus_eng), eng: species.genus_eng,
       isScientific: true
     },
     {
@@ -122,8 +123,8 @@ export default function TaxonomyDisplay({ species }: TaxonomyDisplayProps) {
         setFullData(data);
 
 
-      } catch (err: any) {
-        setError(err.message);
+      } catch (err: unknown) {
+        setError(err instanceof Error ? err.message : 'Failed to load taxonomy data');
       } finally {
         setIsLoading(false);
       }
@@ -154,7 +155,7 @@ export default function TaxonomyDisplay({ species }: TaxonomyDisplayProps) {
               rel="noopener noreferrer"
               className="w-8 h-8 flex items-center justify-center bg-white border border-slate-200 rounded-xl shadow-sm active:bg-slate-50 transition-colors"
             >
-              <img src="/INaturalist_logo.svg" alt="iNaturalist" className="w-4 h-4 object-contain" />
+              <Image src="/INaturalist_logo.svg" alt="iNaturalist" width={16} height={16} className="w-4 h-4 object-contain" />
             </a>
           </div>
         </h2>
@@ -167,9 +168,11 @@ export default function TaxonomyDisplay({ species }: TaxonomyDisplayProps) {
             className="flex items-center gap-3 px-4 py-2 bg-white hover:bg-emerald-50 border border-slate-200 hover:border-emerald-200 rounded-xl transition-all duration-300 shadow-sm hover:shadow-md group overflow-hidden"
           >
             <div className="relative w-5 h-5 flex items-center justify-center">
-              <img
+              <Image
                 src="/INaturalist_logo.svg"
                 alt="iNaturalist"
+                fill
+                sizes="20px"
                 className="w-full h-full object-contain group-hover:scale-110 transition-transform duration-300"
               />
             </div>
@@ -369,7 +372,7 @@ export default function TaxonomyDisplay({ species }: TaxonomyDisplayProps) {
                 return (
                   <div key={idx} className="relative flex items-center py-0.5">
                     <div
-                      onClick={() => isClickable && handleTaxonomyClick(level.id, level.eng, level.chi)}
+                      onClick={() => isClickable && handleTaxonomyClick(level.id, level.eng || '', level.chi)}
                       className={`flex-1 py-2 px-3.5 rounded-xl border transition-all ${
                         level.isCurrent 
                           ? 'bg-emerald-50/90 border-emerald-200 shadow-sm ring-1 ring-emerald-500/20' 

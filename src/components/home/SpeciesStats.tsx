@@ -9,7 +9,7 @@ interface SpeciesStatsProps {
   stats: HomeStats;
 }
 
-const iconMap: Record<string, any> = {
+const iconMap: Record<string, import('lucide-react').LucideIcon> = {
   'Birds': Bird,
   'Butterflies': Bug,
   'Odonates': Bug,

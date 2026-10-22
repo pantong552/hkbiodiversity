@@ -1,5 +1,6 @@
 'use client';
 
+import Image from 'next/image';
 import { Trophy, MessageSquare, Camera, User, Star, ChevronRight } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { LeaderboardUser } from '@/lib/home';
@@ -48,7 +49,7 @@ export default function Leaderboard({ users }: LeaderboardProps) {
             {/* Avatar */}
             <div className="relative shrink-0">
               {user.avatar_url ? (
-                <img src={user.avatar_url} alt={user.username} className="w-11 h-11 rounded-xl object-cover shadow-sm ring-2 ring-slate-50" />
+                <Image src={user.avatar_url} alt={user.username} width={44} height={44} unoptimized className="w-11 h-11 rounded-xl object-cover shadow-sm ring-2 ring-slate-50" />
               ) : (
                 <div className="w-11 h-11 bg-slate-100 rounded-xl flex items-center justify-center text-slate-300">
                   <User className="w-6 h-6" />

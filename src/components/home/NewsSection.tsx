@@ -1,7 +1,6 @@
 'use client';
 
-import { motion } from 'framer-motion';
-import { Megaphone, Sparkles, ArrowRight, Calendar, ChevronRight } from 'lucide-react';
+import { Megaphone, Sparkles, ChevronRight } from 'lucide-react';
 import Link from 'next/link';
 import { useLanguage } from '@/context/LanguageContext';
 
@@ -15,8 +14,15 @@ interface NewsItem {
 }
 
 interface NewsSectionProps {
-  latestSpecies: any[];
-  news: any[];
+  latestSpecies: {
+    taxa_id: string | number;
+    common_name_chi?: string | null;
+    common_name_eng?: string | null;
+    scientific_name: string;
+    created_at?: string | null;
+    type: 'fauna' | 'flora';
+  }[];
+  news: { id: string | number; title_chi: string; title_eng: string; published_at: string; category: string }[];
 }
 
 export default function NewsSection({ latestSpecies, news }: NewsSectionProps) {
@@ -40,7 +46,7 @@ export default function NewsSection({ latestSpecies, news }: NewsSectionProps) {
   const speciesNews: NewsItem[] = latestSpecies.map(s => ({
     id: s.taxa_id,
     title: (language === 'zh' ? (s.common_name_chi || s.scientific_name) : (s.common_name_eng || s.scientific_name)),
-    date: new Date(s.created_at || Date.now()).toISOString().split('T')[0],
+    date: s.created_at ? new Date(s.created_at).toISOString().split('T')[0] : '',
     type: 'new_species',
     link: `/database?species=${s.taxa_id}`,
     category: s.type === 'fauna' ? t('home.fauna') : t('home.flora')
@@ -50,7 +56,7 @@ export default function NewsSection({ latestSpecies, news }: NewsSectionProps) {
     if (type === 'new_species') {
       return 'bg-emerald-50 text-emerald-700 border-emerald-100';
     }
-    const mapping: any = {
+    const mapping: Record<string, string> = {
       'System': 'bg-slate-100 text-slate-600 border-slate-200',
       '系統維護': 'bg-slate-100 text-slate-600 border-slate-200',
       'Community': 'bg-blue-50 text-blue-700 border-blue-100',

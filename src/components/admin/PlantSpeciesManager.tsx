@@ -10,8 +10,6 @@ import {
   ArrowUpDown,
   ArrowUp,
   ArrowDown,
-  Check,
-  ChevronDown,
   ChevronLeft,
   ChevronRight,
   Database,
@@ -301,14 +299,14 @@ export default function PlantSpeciesManager() {
     // 2. Multi-column Filters
     Object.entries(multiFilters).forEach(([key, values]) => {
       if (values && values.length > 0) {
-        result = result.filter(item => values.includes(String((item as any)[key] || '')));
+        result = result.filter(item => values.includes(String(item[key as keyof PlantSpeciesData] || '')));
       }
     });
 
     // 3. Sort
     result.sort((a, b) => {
-      let aVal: any = a[sortConfig.key];
-      let bVal: any = b[sortConfig.key];
+      let aVal: string = String(a[sortConfig.key]);
+      let bVal: string = String(b[sortConfig.key]);
 
       // Natural Sort for taxa_id (Handle "flora_")
       if (sortConfig.key === 'taxa_id') {
@@ -400,13 +398,13 @@ export default function PlantSpeciesManager() {
 
         return Object.entries(otherFilters).every(([fKey, fValues]) => {
           if (!fValues || fValues.length === 0) return true;
-          return fValues.includes(String((item as any)[fKey] || ''));
+          return fValues.includes(String(item[fKey as keyof PlantSpeciesData] || ''));
         });
       });
 
       const counts: Record<string, number> = {};
       intermediateResult.forEach(item => {
-        const val = String((item as any)[key] || '');
+        const val = String(item[key as keyof PlantSpeciesData] || '');
         counts[val] = (counts[val] || 0) + 1;
       });
 
@@ -663,7 +661,7 @@ export default function PlantSpeciesManager() {
 
                       {!isDetailEditMode && ['family_eng', 'genus_eng', 'species_eng'].map((key) => {
                         const rank = key.replace('_eng', '');
-                        const englishValue = (item as any)[key];
+                        const englishValue = item[key as keyof PlantSpeciesData];
                         const chineseValue = (isBilingual && key !== 'species_eng') ? getTaxonomyChi(rank, 'flora', englishValue) : null;
 
                         return (
@@ -671,7 +669,7 @@ export default function PlantSpeciesManager() {
                             {isEditing ? (
                               <input 
                                 value={englishValue || ''} 
-                                onChange={(e) => handleEditChange(key as any, e.target.value)}
+                                onChange={(e) => handleEditChange(key as keyof PlantSpeciesData, e.target.value)}
                                 className="w-full bg-white border border-emerald-200 rounded px-2 py-1 text-[11px] focus:outline-none focus:ring-1 focus:ring-emerald-500"
                                 onKeyDown={handleKeyDown}
                               />
@@ -747,16 +745,17 @@ export default function PlantSpeciesManager() {
                   table="plant_species"
                   data={selectedSpecies}
                   onSave={(updatedItem, affectedUpdates) => {
+                    const updatedSpecies = updatedItem as PlantSpeciesData;
                     setData(prev => prev.map(item => {
-                      if (item.taxa_id === updatedItem.taxa_id) {
-                        return updatedItem as PlantSpeciesData;
+                      if (item.taxa_id === updatedSpecies.taxa_id) {
+                        return updatedSpecies;
                       }
                       if (affectedUpdates && affectedUpdates[item.taxa_id] !== undefined) {
                         return { ...item, similar_species: affectedUpdates[item.taxa_id] };
                       }
                       return item;
                     }));
-                    setSelectedSpecies(updatedItem);
+                    setSelectedSpecies(updatedSpecies);
                     setIsEditorDirty(false);
                   }}
                   onCancel={() => {

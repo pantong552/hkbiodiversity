@@ -980,10 +980,13 @@ export function SpeciesAnatomyEditor({ value, inatId, taxaId, disabled = false, 
                   transform: `translate(calc(-50% + ${value.offsetX}%), calc(-50% + ${value.offsetY}%)) scale(${value.zoom})`
                 }}
               >
-                <img
+                <Image
                   src={value.photoUrl}
                   alt={isZh ? '特徵插圖預覽' : 'Anatomy illustration preview'}
-                  className={`block size-full select-none ${imageSize.width ? 'object-fill' : 'object-contain opacity-0'}`}
+                  fill
+                  sizes="100vw"
+                  unoptimized
+                  className={`size-full select-none ${imageSize.width ? 'object-fill' : 'object-contain opacity-0'}`}
                   draggable={false}
                   onLoad={onImageLoad}
                   onError={() => setImageErrorUrl(value.photoUrl)}
@@ -1294,7 +1297,7 @@ function AnatomyIllustrationDisplay({ illustration, isZh, title }: { illustratio
             transform: `translate(calc(-50% + ${illustration.offsetX}%), calc(-50% + ${illustration.offsetY}%)) scale(${illustration.zoom})`
           }}
         >
-          <img src={illustration.photoUrl} alt={isZh ? '物種特徵插圖' : 'Species anatomy illustration'} className={`block size-full select-none ${imageSize.width ? 'object-fill' : 'object-contain opacity-0'}`} onLoad={onImageLoad} onError={() => setImageError(true)} />
+          <Image src={illustration.photoUrl} alt={isZh ? '物種特徵插圖' : 'Species anatomy illustration'} fill sizes="100vw" unoptimized className={`size-full select-none ${imageSize.width ? 'object-fill' : 'object-contain opacity-0'}`} onLoad={onImageLoad} onError={() => setImageError(true)} />
           {imageSize.width > 0 && (
             <svg
               aria-hidden="true"

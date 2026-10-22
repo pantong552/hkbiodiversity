@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { 
   Sun, 
   Minus, 
@@ -8,12 +8,7 @@ import {
   Play, 
   Pause, 
   Check, 
-  AlignJustify, 
   Sliders, 
-  ChevronUp, 
-  ChevronDown,
-  Sparkles,
-  BookOpen
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useLanguage } from '@/context/LanguageContext';
@@ -345,7 +340,7 @@ export default function NovelReaderControlPanel({
                       <button
                         key={theme.id}
                         type="button"
-                        onClick={() => onUpdateSettings({ theme: theme.id as any })}
+                        onClick={() => onUpdateSettings({ theme: theme.id as NovelReaderSettings['theme'] })}
                         className={`relative flex-1 aspect-square max-w-[40px] rounded-xl transition-all shadow-sm border flex items-center justify-center cursor-pointer ${
                           isSelected
                             ? 'ring-2 ring-emerald-600 ring-offset-2 scale-105 shadow-md border-emerald-600'

@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { Heart, Trash2, Loader2, BookmarkX } from 'lucide-react';
+import { Trash2, Loader2, BookmarkX } from 'lucide-react';
 import Image from 'next/image';
 import { createClient } from '@/utils/supabase/client';
 import { useAuth } from '@/context/AuthContext';
@@ -68,9 +68,11 @@ function BookmarkItem({
             {isInatLoading ? (
               <Loader2 className="w-4 h-4 text-emerald-300 animate-spin" />
             ) : !displayImage ? (
-              <img 
+              <Image
                 src="/images/placeholder/no-species-image.svg" 
                 alt="No species image" 
+                width={56}
+                height={56}
                 className="w-full h-full object-cover opacity-80"
               />
             ) : null}
@@ -153,13 +155,13 @@ export default function BookmarksSection() {
       }
 
       // 使用 taxa_id 全局獲取功能獲取物種細節
-      const fetchPromises = data.map(async (fav: any) => {
+      const fetchPromises = data.map(async (fav: { id: string; taxa_id: string; created_at: string }) => {
           if (!fav.taxa_id) return null;
           
           const isFauna = fav.taxa_id.startsWith('fauna_');
           const isFlora = fav.taxa_id.startsWith('flora_');
           
-          let speciesInfo: any = null;
+          let speciesInfo: BookmarkedSpecies | null = null;
           if (isFauna) {
               const { data: s } = await supabase.from('species').select('*').eq('taxa_id', fav.taxa_id).maybeSingle();
               if (s) {
@@ -167,7 +169,7 @@ export default function BookmarksSection() {
                       ...s,
                       favorite_id: fav.id,
                       bookmarked_at: fav.created_at
-                  };
+                  } as BookmarkedSpecies;
               }
           } else if (isFlora) {
               const { data: p } = await supabase.from('plant_species').select('*').eq('taxa_id', fav.taxa_id).maybeSingle();
@@ -185,7 +187,7 @@ export default function BookmarksSection() {
                       profile_picture: p.profile_picture,
                       favorite_id: fav.id,
                       bookmarked_at: fav.created_at,
-                  };
+                  } as BookmarkedSpecies;
               }
           }
           return speciesInfo;

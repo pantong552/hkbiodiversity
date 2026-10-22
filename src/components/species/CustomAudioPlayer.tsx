@@ -14,6 +14,13 @@ interface CustomAudioPlayerProps {
   onToggleSpectrogram?: () => void;
 }
 
+function formatTime(seconds: number) {
+  if (!seconds || isNaN(seconds) || !isFinite(seconds) || seconds < 0) return '0:00';
+  const mins = Math.floor(seconds / 60);
+  const secs = Math.floor(seconds % 60);
+  return `${mins}:${secs < 10 ? '0' : ''}${secs}`;
+}
+
 export function CustomAudioPlayer({
   src,
   autoPlay = true,
@@ -25,11 +32,19 @@ export function CustomAudioPlayer({
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
-  const [isLoading, setIsLoading] = useState(true);
   const [isMuted, setIsMuted] = useState(false);
 
   const [blobUrl, setBlobUrl] = useState<string | null>(null);
-  const [downloadError, setDownloadError] = useState<string | null>(null);
+  const [downloadState, setDownloadState] = useState<{
+    src: string;
+    status: 'loading' | 'loaded' | 'error';
+    error: string | null;
+  }>(() => ({ src, status: 'loading', error: null }));
+  const isLoading = downloadState.src !== src || downloadState.status === 'loading';
+  const downloadError =
+    downloadState.src === src && downloadState.status === 'error'
+      ? downloadState.error
+      : null;
   const isDraggingRef = useRef(false);
 
   // DOM refs for 60fps direct updates (no re-render during playback)
@@ -40,8 +55,6 @@ export function CustomAudioPlayer({
   // 1. Fetch to Blob URL
   useEffect(() => {
     let isCancelled = false;
-    setIsLoading(true);
-    setDownloadError(null);
 
     fetch(src)
       .then((res) => {
@@ -52,19 +65,26 @@ export function CustomAudioPlayer({
         if (isCancelled) return;
         const objectUrl = URL.createObjectURL(blob);
         setBlobUrl(objectUrl);
-        setIsLoading(false);
+        setDownloadState({ src, status: 'loaded', error: null });
       })
       .catch((err) => {
         if (isCancelled) return;
-        setDownloadError(err.message || 'Download failed');
-        setIsLoading(false);
+        setDownloadState({
+          src,
+          status: 'error',
+          error: err.message || 'Download failed',
+        });
       });
 
     return () => {
       isCancelled = true;
-      if (blobUrl) URL.revokeObjectURL(blobUrl);
     };
   }, [src]);
+
+  useEffect(() => {
+    if (!blobUrl) return;
+    return () => URL.revokeObjectURL(blobUrl);
+  }, [blobUrl]);
 
   // 2. Bind audio events — only React state updates for play/pause/end/metadata
   useEffect(() => {
@@ -85,7 +105,7 @@ export function CustomAudioPlayer({
     // timeupdate → only update React state for the slider range value when NOT playing
     // (during playing, rAF below handles everything without touching React state)
     const onTimeUpdate = () => {
-      if (!isDraggingRef.current && !isPlaying) {
+      if (!isDraggingRef.current && audio.paused) {
         setCurrentTime(audio.currentTime);
       }
     };
@@ -126,7 +146,7 @@ export function CustomAudioPlayer({
       audio.removeEventListener('ended', onEnded);
       if (audioElementRef) audioElementRef.current = null;
     };
-  }, [blobUrl, autoPlay]);
+  }, [blobUrl, autoPlay, audioElementRef]);
 
   // 3. rAF loop — 60fps, ZERO React state writes during playback
   useEffect(() => {
@@ -237,13 +257,6 @@ export function CustomAudioPlayer({
     setTimeout(() => {
       isDraggingRef.current = false;
     }, 50);
-  };
-
-  const formatTime = (seconds: number) => {
-    if (!seconds || isNaN(seconds) || !isFinite(seconds) || seconds < 0) return '0:00';
-    const mins = Math.floor(seconds / 60);
-    const secs = Math.floor(seconds % 60);
-    return `${mins}:${secs < 10 ? '0' : ''}${secs}`;
   };
 
   const progressPercent = duration > 0 ? Math.min(100, (currentTime / duration) * 100) : 0;

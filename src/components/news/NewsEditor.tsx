@@ -1,12 +1,12 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useLanguage } from '@/context/LanguageContext';
 import { supabase } from '@/lib/supabase';
 import { 
   X, Save, Bold, Italic, List, Link as LinkIcon, 
   Heading1, Heading2, Quote, Code, Eye, Edit3, 
-  Globe, Languages, ChevronDown, CheckCircle2, AlertCircle,
+  Globe, Languages, AlertCircle,
   Palette, Type, Undo, Redo, ListOrdered, ArrowLeft, Calendar, EyeOff 
 } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
@@ -21,14 +21,24 @@ import 'react-quill-new/dist/quill.snow.css';
 import { marked } from 'marked';
 import TurndownService from 'turndown';
 import { useRef } from 'react';
+import React from 'react';
+import type { Attributor } from 'parchment';
 
+interface QuillHandle {
+  getEditor(): {
+    root: HTMLElement;
+    getSelection(): { index: number; length: number } | null;
+    getFormat(range: { index: number; length: number }): Record<string, unknown>;
+    format(name: string, value: string | number | boolean): void;
+  };
+}
 const ReactQuill = dynamic(
   async () => {
     const { default: RQ, Quill } = await import('react-quill-new');
     
     // Register Style Attributors so Quill applies style="color: ..." and style="font-size: ..." inline
-    const SizeStyle = Quill.import('attributors/style/size') as any;
-    const ColorStyle = Quill.import('attributors/style/color') as any;
+    const SizeStyle = Quill.import('attributors/style/size') as Attributor;
+    const ColorStyle = Quill.import('attributors/style/color') as Attributor;
     const fontSizesPx = Array.from({ length: 120 }, (_, i) => `${i + 1}px`).concat(['0.875rem', '1rem', '1.25rem', '1.5rem', '2rem']);
     SizeStyle.whitelist = fontSizesPx;
     
@@ -36,7 +46,8 @@ const ReactQuill = dynamic(
     Quill.register(ColorStyle, true);
 
     // eslint-disable-next-line react/display-name
-    return ({ forwardedRef, ...props }: any) => <RQ ref={forwardedRef} {...props} />;
+    return ({ forwardedRef, ...props }: React.ComponentProps<typeof RQ> & { forwardedRef?: React.Ref<QuillHandle> }) =>
+      React.createElement(RQ as React.ComponentType<Record<string, unknown>>, { ...props, ref: forwardedRef });
   },
   { 
     ssr: false,
@@ -49,7 +60,7 @@ const turndownService = new TurndownService({
   codeBlockStyle: 'fenced'
 });
 
-turndownService.keep(['span' as any]);
+turndownService.keep(['span']);
 
 // Preserve <span> tags with style attribute (for text colors & font sizes) when converting HTML to Markdown
 turndownService.addRule('keepInlineSpans', {
@@ -57,7 +68,7 @@ turndownService.addRule('keepInlineSpans', {
     const tag = node.nodeName ? node.nodeName.toLowerCase() : '';
     return (tag === 'span' || tag === 'font') && (node.hasAttribute('style') || node.hasAttribute('class') || node.hasAttribute('color'));
   },
-  replacement: (content, node: any) => {
+  replacement: (content, node: HTMLElement) => {
     const style = node.getAttribute('style');
     const className = node.getAttribute('class');
     const color = node.getAttribute('color');
@@ -117,8 +128,9 @@ export default function NewsEditor({ news, onClose, onSave }: NewsEditorProps) {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [openDropdown]);
   const [confirmAction, setConfirmAction] = useState<'cancel' | 'save' | null>(null);
-  const quillRefChi = useRef<any>(null);
-  const quillRefEng = useRef<any>(null);
+  const quillRefChi = useRef<QuillHandle>(null);
+  const quillRefEng = useRef<QuillHandle>(null);
+  const historyTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // 初始化時將 Markdown 轉為 HTML
   const [formData, setFormData] = useState<NewsItem>(() => {
@@ -163,30 +175,29 @@ export default function NewsEditor({ news, onClose, onSave }: NewsEditorProps) {
     setHistoryIndex(newHistory.length - 1);
   };
 
-  const undo = () => {
+  const undo = useCallback(() => {
     if (historyIndex > 0) {
       const prevIndex = historyIndex - 1;
       setHistoryIndex(prevIndex);
       setFormData(JSON.parse(JSON.stringify(history[prevIndex])));
     }
-  };
+  }, [history, historyIndex]);
 
-  const redo = () => {
+  const redo = useCallback(() => {
     if (historyIndex < history.length - 1) {
       const nextIndex = historyIndex + 1;
       setHistoryIndex(nextIndex);
       setFormData(JSON.parse(JSON.stringify(history[nextIndex])));
     }
-  };
+  }, [history, historyIndex]);
 
   const handleInputChange = (field: keyof NewsItem, value: string, skipHistory = false) => {
     const newData = { ...formData, [field]: value };
     setFormData(newData);
     if (!skipHistory) {
       // Use a timeout to debounce typing history
-      const timeoutId = (window as any)._historyTimeout;
-      if (timeoutId) clearTimeout(timeoutId);
-      (window as any)._historyTimeout = setTimeout(() => {
+      if (historyTimeoutRef.current) clearTimeout(historyTimeoutRef.current);
+      historyTimeoutRef.current = setTimeout(() => {
         addToHistory(newData);
       }, 500);
     }
@@ -209,60 +220,7 @@ export default function NewsEditor({ news, onClose, onSave }: NewsEditorProps) {
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [historyIndex, history]);
-
-  const handleTextareaKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      const textarea = e.currentTarget;
-      const start = textarea.selectionStart;
-      const text = textarea.value;
-      
-      // Get current line
-      const lines = text.substring(0, start).split('\n');
-      const currentLine = lines[lines.length - 1];
-      
-      // Check for unordered list
-      const ulMatch = currentLine.match(/^(\s*)-\s+(.*)/);
-      if (ulMatch) {
-        if (ulMatch[2].trim() === '') {
-          // Empty list item, remove it (backspace behavior)
-          e.preventDefault();
-          const newText = text.substring(0, start - ulMatch[0].length) + text.substring(start);
-          handleInputChange(activeTab === 'chi' ? 'content_chi' : 'content_eng', newText);
-          return;
-        }
-        e.preventDefault();
-        const insertion = `\n${ulMatch[1]}- `;
-        const newText = text.substring(0, start) + insertion + text.substring(start);
-        handleInputChange(activeTab === 'chi' ? 'content_chi' : 'content_eng', newText);
-        setTimeout(() => {
-          textarea.setSelectionRange(start + insertion.length, start + insertion.length);
-        }, 0);
-        return;
-      }
-
-      // Check for ordered list
-      const olMatch = currentLine.match(/^(\s*)(\d+)\.\s+(.*)/);
-      if (olMatch) {
-        if (olMatch[3].trim() === '') {
-          // Empty list item, remove it
-          e.preventDefault();
-          const newText = text.substring(0, start - olMatch[0].length) + text.substring(start);
-          handleInputChange(activeTab === 'chi' ? 'content_chi' : 'content_eng', newText);
-          return;
-        }
-        e.preventDefault();
-        const nextNum = parseInt(olMatch[2]) + 1;
-        const insertion = `\n${olMatch[1]}${nextNum}. `;
-        const newText = text.substring(0, start) + insertion + text.substring(start);
-        handleInputChange(activeTab === 'chi' ? 'content_chi' : 'content_eng', newText);
-        setTimeout(() => {
-          textarea.setSelectionRange(start + insertion.length, start + insertion.length);
-        }, 0);
-        return;
-      }
-    }
-  };
+  }, [historyIndex, history, redo, undo]);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -328,7 +286,7 @@ export default function NewsEditor({ news, onClose, onSave }: NewsEditorProps) {
     setIsSaving(true);
     try {
       // 儲存前將 HTML 轉回 Markdown 以保持資料格式一致性
-      const payload: any = { 
+      const payload: NewsItem = {
         ...formData
       };
       
@@ -343,11 +301,12 @@ export default function NewsEditor({ news, onClose, onSave }: NewsEditorProps) {
 
       if (error) throw error;
       onSave();
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Error saving news details:', err);
+      const errorMessage = err instanceof Error ? err.message : 'Unknown error';
       alert(language === 'zh' 
-        ? `儲存失敗: ${err.message || err.details || '未知錯誤'}` 
-        : `Failed to save: ${err.message || err.details || 'Unknown error'}`);
+        ? `儲存失敗: ${errorMessage || '未知錯誤'}`
+        : `Failed to save: ${errorMessage || 'Unknown error'}`);
     } finally {
       setIsSaving(false);
     }

@@ -3,6 +3,18 @@ import { NextRequest, NextResponse } from 'next/server';
 const BASE_URL = 'https://api.checklistbank.org';
 const DATASET_KEY = '3LXR';
 
+type JsonObject = Record<string, unknown>;
+
+function asObject(value: unknown): JsonObject | null {
+  return value !== null && typeof value === 'object' && !Array.isArray(value)
+    ? value as JsonObject
+    : null;
+}
+
+function asObjectArray(value: unknown): JsonObject[] {
+  return Array.isArray(value) ? value.map(asObject).filter((item): item is JsonObject => item !== null) : [];
+}
+
 
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
@@ -34,9 +46,9 @@ export async function GET(req: NextRequest) {
     ]);
 
     const classification = await classRes.json();
-    let synonymsData = await synRes.json();
+    const synonymsData = await synRes.json();
     const childrenData = await childRes.json();
-    const infoData = await infoRes.json();
+    await infoRes.json();
     const datasetData = await datasetRes.json();
 
 
@@ -45,14 +57,16 @@ export async function GET(req: NextRequest) {
     // 3. Process Synonyms from /synonyms endpoint
     const categories = ['heterotypic', 'homotypic', 'misapplied'];
     categories.forEach(cat => {
-      const items = synonymsData[cat] || [];
-      items.forEach((item: any) => {
-        if (item.label) {
+      const items = asObjectArray(asObject(synonymsData)?.[cat]);
+      items.forEach((item) => {
+        if (typeof item.label === 'string') {
           synonyms.push(item.label);
         } else {
-          const nameObj = item.usage?.name || item.name;
-          if (nameObj) {
-            synonyms.push(`${nameObj.scientificName} ${nameObj.authorship || ''}`.trim());
+          const usage = asObject(item.usage);
+          const nameObj = asObject(usage?.name) ?? asObject(item.name);
+          if (nameObj && typeof nameObj.scientificName === 'string') {
+            const authorship = typeof nameObj.authorship === 'string' ? nameObj.authorship : '';
+            synonyms.push(`${nameObj.scientificName} ${authorship}`.trim());
           }
         }
       });
@@ -63,12 +77,13 @@ export async function GET(req: NextRequest) {
       const altSynUrl = `${BASE_URL}/dataset/${DATASET_KEY}/nameusage/search?TAXON_ID=${usageId}&STATUS=synonym`;
       const altSynRes = await fetch(altSynUrl);
       if (altSynRes.ok) {
-        const altSynData = await altSynRes.json();
-        const altItems = altSynData.result || [];
-        altItems.forEach((item: any) => {
-          if (item.usage?.label) {
-            synonyms.push(item.usage.label);
-          } else if (item.label) {
+        const altSynData: unknown = await altSynRes.json();
+        const altItems = asObjectArray(asObject(altSynData)?.result);
+        altItems.forEach((item) => {
+          const usageLabel = asObject(item.usage)?.label;
+          if (typeof usageLabel === 'string') {
+            synonyms.push(usageLabel);
+          } else if (typeof item.label === 'string') {
             synonyms.push(item.label);
           }
         });
@@ -78,13 +93,18 @@ export async function GET(req: NextRequest) {
 
     // 6. Process Subspecies (Children) - Ensure authors are included
     const subspecies: string[] = [];
-    const children = Array.isArray(childrenData) ? childrenData : (childrenData.result || []);
-    children.forEach((child: any) => {
+    const children = Array.isArray(childrenData) ? asObjectArray(childrenData) : asObjectArray(asObject(childrenData)?.result);
+    children.forEach((child) => {
       if (child.rank === 'subspecies') {
-        let subLabel = child.label;
+        let subLabel = typeof child.label === 'string' ? child.label : '';
         if (!subLabel || !subLabel.includes(' ')) {
-          const sName = child.name?.scientificName || child.name || '';
-          const auth = child.authorship || child.name?.authorship || '';
+          const childName = asObject(child.name);
+          const sName = typeof childName?.scientificName === 'string'
+            ? childName.scientificName
+            : typeof child.name === 'string' ? child.name : '';
+          const auth = typeof child.authorship === 'string'
+            ? child.authorship
+            : typeof childName?.authorship === 'string' ? childName.authorship : '';
           subLabel = `${sName} ${auth}`.trim();
         }
         if (subLabel) subspecies.push(subLabel);
@@ -112,7 +132,7 @@ export async function GET(req: NextRequest) {
     });
 
 
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error fetching taxonomy from COL:', error);
     return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
   }

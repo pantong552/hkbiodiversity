@@ -53,7 +53,6 @@ export default function SpeciesManager() {
   
   const [data, setData] = useState<SpeciesData[]>([]);
   const [loading, setLoading] = useState(true);
-  const [totalCount, setTotalCount] = useState(0);
   const [currentPage, setCurrentPage] = useState(1);
   
   // Search & Filters
@@ -190,7 +189,7 @@ export default function SpeciesManager() {
         
         if (!data || data.length === 0) break;
         
-        (data as any[]).forEach(d => {
+        data.forEach((d: { taxa_group?: string | null }) => {
           if (d.taxa_group) allGroups.add(d.taxa_group);
         });
 
@@ -226,7 +225,6 @@ export default function SpeciesManager() {
       }
       
       setData(allSpecies);
-      setTotalCount(allSpecies.length);
     } catch (err) {
       console.error('Error fetching species data:', err);
     } finally {
@@ -361,14 +359,14 @@ export default function SpeciesManager() {
     // 2. Multi-column Filters (MultiSelectDropdown)
     Object.entries(multiFilters).forEach(([key, values]) => {
       if (values && values.length > 0) {
-        result = result.filter(item => values.includes(String((item as any)[key] || '')));
+        result = result.filter(item => values.includes(String(item[key as keyof SpeciesData] || '')));
       }
     });
 
     // 3. Sort
     result.sort((a, b) => {
-      let aVal: any = a[sortConfig.key];
-      let bVal: any = b[sortConfig.key];
+      let aVal: string | number = a[sortConfig.key];
+      let bVal: string | number = b[sortConfig.key];
 
       // Natural Sort for taxa_id (Handle "fauna_")
       if (sortConfig.key === 'taxa_id') {
@@ -471,13 +469,13 @@ export default function SpeciesManager() {
         // Apply all other multi-select filters
         return Object.entries(otherFilters).every(([fKey, fValues]) => {
           if (!fValues || fValues.length === 0) return true;
-          return fValues.includes(String((item as any)[fKey] || ''));
+          return fValues.includes(String(item[fKey as keyof SpeciesData] || ''));
         });
       });
 
       const counts: Record<string, number> = {};
       intermediateResult.forEach(item => {
-        const val = String((item as any)[key] || '');
+        const val = String(item[key as keyof SpeciesData] || '');
         counts[val] = (counts[val] || 0) + 1;
       });
 
@@ -793,7 +791,7 @@ export default function SpeciesManager() {
   
                         {!isDetailEditMode && ['class_eng', 'order_eng', 'family_eng', 'genus_eng', 'species_eng'].map((key) => {
                           const rank = key.replace('_eng', '');
-                          const englishValue = (item as any)[key];
+                          const englishValue = String(item[key as keyof SpeciesData] ?? '');
                           const chineseValue = (isBilingual && key !== 'species_eng') ? getTaxonomyChi(rank, 'fauna', englishValue) : null;
   
                           return (
@@ -801,7 +799,7 @@ export default function SpeciesManager() {
                               {isEditing ? (
                                 <input 
                                   value={englishValue || ''} 
-                                  onChange={(e) => handleEditChange(key as any, e.target.value)}
+                                  onChange={(e) => handleEditChange(key as keyof SpeciesData, e.target.value)}
                                   className="w-full bg-white border border-emerald-200 rounded px-2 py-1 text-[11px] focus:outline-none focus:ring-1 focus:ring-emerald-500"
                                   onKeyDown={handleKeyDown}
                                 />
@@ -878,16 +876,17 @@ export default function SpeciesManager() {
                     table="species"
                     data={selectedSpecies}
                     onSave={(updatedItem, affectedUpdates) => {
+                      const updatedSpecies = updatedItem as SpeciesData;
                       setData(prev => prev.map(item => {
-                        if (item.taxa_id === updatedItem.taxa_id) {
-                          return updatedItem;
+                        if (item.taxa_id === updatedSpecies.taxa_id) {
+                          return updatedSpecies;
                         }
                         if (affectedUpdates && affectedUpdates[item.taxa_id] !== undefined) {
                           return { ...item, similar_species: affectedUpdates[item.taxa_id] };
                         }
                         return item;
                       }));
-                      setSelectedSpecies(updatedItem);
+                      setSelectedSpecies(updatedSpecies);
                       setIsEditorDirty(false);
                     }}
                     onCancel={() => {

@@ -7,10 +7,8 @@ import {
   ChevronLeft, 
   ChevronRight, 
   Maximize2, 
-  X, 
   ImageIcon, 
   Loader2,
-  Plus,
   ExternalLink,
   Calendar,
   Star,
@@ -59,7 +57,7 @@ export default function SpeciesPhotoGallery({
   galleryImageCredits = {},
   galleryImageMetadata = {}
 }: SpeciesPhotoGalleryProps) {
-  const { language, t } = useLanguage();
+  const { language } = useLanguage();
   const { profile } = useAuth();
   const { setGalleryOpen, isUploadModalOpen, setUploadModalOpen } = useSpeciesPanel();
   const { photos: fetchedPhotos, isLoading, hasMore, loadMore, dataScope, setScope, hasHkPhotos, deletePhoto } = useInaturalistSpeciesPhotos(inatId, taxaId);
@@ -325,7 +323,7 @@ export default function SpeciesPhotoGallery({
         });
       }
     }
-  }, [currentIndex]);
+  }, [currentIndex, isDragging]);
 
   if (isLoading && photos.length === 0) {
     return (

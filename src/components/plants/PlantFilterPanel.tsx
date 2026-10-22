@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useMemo } from 'react';
-import { Calendar, Shield, RotateCcw, Star, BookOpen, Filter, Search, ChevronDown, ChevronRight, CheckCircle2 } from 'lucide-react';
+import { Calendar, Shield, Star, BookOpen, ChevronDown, ChevronRight, CheckCircle2 } from 'lucide-react';
 import { useLanguage } from '@/context/LanguageContext';
 import { PlantFilterState } from '@/types/plants';
 import MultiSelectDropdown from '@/components/ui/MultiSelectDropdown';
@@ -15,6 +15,8 @@ interface Option {
   display: string;
   count?: number;
 }
+
+type StatusFilterKey = 'isCap96' | 'isCap586' | 'isRare' | 'isInChinaRedBook';
 
 interface PlantFilterPanelProps {
   filters: PlantFilterState;
@@ -265,11 +267,12 @@ export default function PlantFilterPanel({
                 { id: 'isRare', label: t.isRare, icon: Star },
                 { id: 'isInChinaRedBook', label: t.redBook, icon: BookOpen },
               ].map(item => {
-                const isSelected = (filters as any)[item.id] === true;
+                const key = item.id as StatusFilterKey;
+                const isSelected = filters[key] === true;
                 return (
                   <button
                     key={item.id}
-                    onClick={() => setFilters(prev => ({ ...prev, [item.id as any]: (prev as any)[item.id] === true ? null : true }))}
+                    onClick={() => setFilters(prev => ({ ...prev, [key]: prev[key] === true ? null : true }))}
                     className={`flex flex-col items-center justify-center gap-1.5 p-3 rounded-2xl text-[11px] font-black transition-all border ${
                       isSelected
                         ? 'bg-emerald-600 border-emerald-600 text-white shadow-md'
@@ -291,11 +294,12 @@ export default function PlantFilterPanel({
                 { id: 'isRare', label: t.isRare },
                 { id: 'isInChinaRedBook', label: t.redBook },
               ].map(item => {
-                const isSelected = (filters as any)[item.id] === true;
+                const key = item.id as StatusFilterKey;
+                const isSelected = filters[key] === true;
                 return (
                   <button
                     key={item.id}
-                    onClick={() => setFilters(prev => ({ ...prev, [item.id as any]: (prev as any)[item.id] === true ? null : true }))}
+                    onClick={() => setFilters(prev => ({ ...prev, [key]: prev[key] === true ? null : true }))}
                     className={`
                       px-3 py-1.5 rounded-xl text-[11px] font-black transition-all border shadow-sm flex items-center gap-1.5 uppercase tracking-wider
                       ${isSelected

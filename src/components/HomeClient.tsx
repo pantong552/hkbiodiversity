@@ -1,17 +1,18 @@
 'use client';
 
+import Image from 'next/image';
 import { useState, useMemo, useEffect, useRef, useCallback } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { Search, X, FilterX, LayoutGrid, List, ChevronLeft, ChevronRight, Filter, Table as TableIcon, Lock, Sparkles } from 'lucide-react';
+import { motion } from 'framer-motion';
+import { FilterX, LayoutGrid, List, ChevronLeft, ChevronRight, Filter, Table as TableIcon, Lock, Sparkles } from 'lucide-react';
 import SpeciesCard from '@/components/SpeciesCard';
 import SpeciesTable from '@/components/species/SpeciesTable';
 import SidebarFilter, { SelectedFilters } from '@/components/SidebarFilter';
 import PlantFilterPanel from '@/components/plants/PlantFilterPanel';
-import TaxaGroupSwitcher, { TaxaType } from '@/components/search/TaxaGroupSwitcher';
+import { TaxaType } from '@/components/search/TaxaGroupSwitcher';
 import Header from '@/components/Header';
 import MobilePlantFilter from '@/components/MobilePlantFilter';
 import CustomDropdown from '@/components/ui/CustomDropdown';
-import { Species } from '@/types/species';
+import { Species, TaxonomyLevel } from '@/types/species';
 import { PlantSpecies, PlantFilterState } from '@/types/plants';
 import { useLanguage } from '@/context/LanguageContext';
 import { supabase as supabaseSingleton } from '@/lib/supabase';
@@ -43,6 +44,22 @@ const INITIAL_PLANT_FILTERS: PlantFilterState = {
   isInChinaRedBook: null,
 };
 
+type PlantStatsItem = { en?: string; name: string; count: number };
+type PlantMetadataItem = { name: string; display: string; count: number };
+
+function parsePlantStats(value: unknown): PlantStatsItem[] {
+  if (!Array.isArray(value)) return [];
+  return value.flatMap((item: unknown) => {
+    if (!item || typeof item !== 'object') return [];
+    const record = item as Record<string, unknown>;
+    if (typeof record.count !== 'number') return [];
+    const en = typeof record.en === 'string' ? record.en : undefined;
+    const name = typeof record.name === 'string' ? record.name : undefined;
+    const displayName = name ?? en;
+    return displayName ? [{ en, name: displayName, count: record.count }] : [];
+  });
+}
+
 export default function HomeClient() {
   const { language, t } = useLanguage();
   const { getTaxonomyChi } = useTaxonomy();
@@ -52,9 +69,8 @@ export default function HomeClient() {
   const router = useRouter();
 
   const [taxaType, setTaxaType] = useState<TaxaType>('fauna');
-  const [species, setSpecies] = useState<any[]>([]); 
+  const [species, setSpecies] = useState<(Species | PlantSpecies)[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [totalResultCount, setTotalResultCount] = useState(0);
   const [toolbarWidth, setToolbarWidth] = useState(0);
@@ -70,7 +86,7 @@ export default function HomeClient() {
   useEffect(() => {
     if (!toolbarRef.current) return;
     const observer = new ResizeObserver((entries) => {
-      for (let entry of entries) {
+      for (const entry of entries) {
         setToolbarWidth(entry.contentRect.width);
       }
     });
@@ -89,13 +105,9 @@ export default function HomeClient() {
 
   // Flora Filters
   const [plantFilters, setPlantFilters] = useState<PlantFilterState>(INITIAL_PLANT_FILTERS);
-  const [availablePlantMeta, setAvailablePlantMeta] = useState<{
-    categories: any[];
-    families: any[];
-    genuses: any[];
-  }>({ categories: [], families: [], genuses: [] });
-  const [tableMetadata, setTableMetadata] = useState<Record<string, any[]>>({});
-  const [tableFilters, setTableFilters] = useState<Record<string, any>>({});
+  const [availablePlantMeta, setAvailablePlantMeta] = useState<Record<'categories' | 'families' | 'genuses', PlantMetadataItem[]>>({ categories: [], families: [], genuses: [] });
+  const [tableMetadata, setTableMetadata] = useState<Record<string, PlantMetadataItem[]>>({});
+  const [tableFilters, setTableFilters] = useState<Record<string, string[]>>({});
 
   // Sorting and Pagination State
   const [sortBy, setSortBy] = useState<string>('common_name');
@@ -115,7 +127,7 @@ export default function HomeClient() {
   useEffect(() => {
     if (taxaType === 'flora') {
         const fetchMeta = async () => {
-            const levels = ['categories', 'families', 'genuses'];
+            const levels: Array<'categories' | 'families' | 'genuses'> = ['categories', 'families', 'genuses'];
             try {
                 const levelPromises = levels.map(async (level) => {
                     const rpcParams = {
@@ -140,23 +152,18 @@ export default function HomeClient() {
 
                 const results = await Promise.all(levelPromises);
                 
-                interface PlantMeta {
-                    categories: any[];
-                    families: any[];
-                    genuses: any[];
-                    [key: string]: any[];
-                }
+                type PlantMeta = Record<'categories' | 'families' | 'genuses', PlantMetadataItem[]>;
                 
                 const newMeta: PlantMeta = { categories: [], families: [], genuses: [] };
                 
                 results.forEach(({ level, data, error }) => {
                     if (data && !error) {
-                        const items = level === 'categories' ? (data.categories || []) : (level === 'families' ? (data.families || []) : (data.genuses || []));
+                        const items = parsePlantStats(level === 'categories' ? data.categories : level === 'families' ? data.families : data.genuses);
                         const rankKey = level === 'categories' ? 'category' : (level === 'families' ? 'family' : 'genus');
 
                         const uniqueMap = new Map<string, { name: string; display: string; count: number }>();
 
-                        items.forEach((i: any) => {
+                        items.forEach((i) => {
                             const nameEng = i.en || i.name;
                             const chi = getTaxonomyChi(rankKey, 'flora', nameEng);
                             const hasChi = language === 'zh' && chi && chi !== nameEng && !chi.includes('\ufffd');
@@ -183,7 +190,7 @@ export default function HomeClient() {
                             }
                         });
 
-                        newMeta[level] = Array.from(uniqueMap.values()).sort((a: any, b: any) => b.count - a.count);
+                        newMeta[level] = Array.from(uniqueMap.values()).sort((a, b) => b.count - a.count);
                     }
                 });
                 
@@ -225,10 +232,10 @@ export default function HomeClient() {
       // 強制切換至動物模式（如果目前不在動物模式）
       if (taxaType !== 'fauna') setTaxaType('fauna');
 
-      const cleanTaxonomy: any = { 
+      const cleanTaxonomy: SelectedFilters['taxonomy'] = {
         phylum_eng: [], class_eng: [], order_eng: [], family_eng: [], genus_eng: [], informal_group_eng: [] 
       };
-      cleanTaxonomy[level] = [value];
+      if (level in cleanTaxonomy) cleanTaxonomy[level as TaxonomyLevel] = [value];
 
       setSelectedFilters({
         taxonomy: cleanTaxonomy,
@@ -260,7 +267,6 @@ export default function HomeClient() {
 
       const currentFetchId = ++fetchIdRef.current; // 更新目前請求 ID
       setIsLoading(true);
-      setError(null);
 
       try {
         const table = taxaType === 'fauna' ? 'species' : (taxaType === 'fungi' ? 'fungi_species' : 'plant_species');
@@ -291,11 +297,6 @@ export default function HomeClient() {
             }
             
             // Native Status
-            const finalNative = (selectedFilters as any).status?.native_status || [];
-            if (finalNative && finalNative.length > 0) {
-                query = query.in('native_status', finalNative);
-            }
-
             // Protection Filters (Cap. 170 & Cap. 586) - 僅在動物類別生效
             if (taxaType === 'fauna') {
               if (selectedFilters.isCap170) {
@@ -355,7 +356,7 @@ export default function HomeClient() {
         // Apply Table Filters (for list mode)
         if (displayMode === 'table') {
           Object.entries(tableFilters).forEach(([key, value]) => {
-            if (!value || (Array.isArray(value) && value.length === 0)) return;
+            if (value.length === 0) return;
             
             // Map table keys to actual DB columns - 統一使用英文欄位作為 Filter Key
             const dbKey = key === 'common_name' 
@@ -424,13 +425,12 @@ export default function HomeClient() {
         ) {
           setIsFilterOpen(true);
         }
-      } catch (err: any) {
-        setError(err.message || '連線錯誤');
+      } catch {
       } finally {
         setIsLoading(false);
       }
     };
-  }, [taxaType, searchQuery, selectedFilters, plantFilters, tableFilters, currentPage, itemsPerPage, sortBy, sortOrder, language, isAuthLoading]);
+  }, [taxaType, searchQuery, selectedFilters, plantFilters, tableFilters, currentPage, itemsPerPage, sortBy, sortOrder, language, isAuthLoading, displayMode, setIsFilterOpen]);
 
   // 獲取表格專用的中繼資料 (All unique values for filters)
   useEffect(() => {
@@ -457,7 +457,7 @@ export default function HomeClient() {
         p_scientific_name: tableFilters.scientific_name || [],
         p_common_name: tableFilters.common_name || [],
         p_iucn: (tableFilters.iucn?.length > 0) ? tableFilters.iucn : (selectedFilters.iucn || []),
-        p_native_status: (tableFilters.native_status?.length > 0) ? tableFilters.native_status : ((selectedFilters as any).status?.native_status || []),
+        p_native_status: tableFilters.native_status?.length ? tableFilters.native_status : [],
         p_is_cap170: selectedFilters.isCap170 || false,
         p_is_cap586: selectedFilters.isCap586 || false
       } : taxaType === 'fungi' ? {
@@ -468,7 +468,7 @@ export default function HomeClient() {
         p_scientific_name: tableFilters.scientific_name || [],
         p_common_name: tableFilters.common_name || [],
         p_iucn: (tableFilters.iucn?.length > 0) ? tableFilters.iucn : (selectedFilters.iucn || []),
-        p_native_status: (tableFilters.native_status?.length > 0) ? tableFilters.native_status : ((selectedFilters as any).status?.native_status || [])
+        p_native_status: (tableFilters.native_status?.length > 0) ? tableFilters.native_status : []
       } : {
         p_search: currentSearch,
         p_categories: (tableFilters.category?.length > 0) ? tableFilters.category : (plantFilters.categories || []),
@@ -487,13 +487,14 @@ export default function HomeClient() {
         // Data 為一個包含了各個欄位統計資訊的 JSON 對象
         const metadata = data || {};
         
-        const safeMetadata: Record<string, any[]> = {};
+        const safeMetadata: Record<string, PlantMetadataItem[]> = {};
         const keys = (taxaType === 'fauna' || taxaType === 'fungi')
             ? ['order', 'family', 'scientific_name', 'common_name', 'iucn', 'native_status']
             : ['family', 'genus', 'scientific_name', 'common_name', 'iucn', 'native_status'];
         
         keys.forEach(key => {
-            safeMetadata[key] = metadata[key] || [];
+            const values = metadata[key];
+            safeMetadata[key] = Array.isArray(values) ? values as PlantMetadataItem[] : [];
         });
 
         setTableMetadata(safeMetadata);
@@ -541,10 +542,10 @@ export default function HomeClient() {
         setTaxaType('fauna');
         setPlantFilters(INITIAL_PLANT_FILTERS); // 清空植物過濾器，避免衝突
         
-        const cleanTaxonomy: any = { 
+        const cleanTaxonomy: SelectedFilters['taxonomy'] = {
           phylum_eng: [], class_eng: [], order_eng: [], family_eng: [], genus_eng: [], informal_group_eng: [] 
         };
-        cleanTaxonomy[level] = [value];
+        if (level in cleanTaxonomy) cleanTaxonomy[level as TaxonomyLevel] = [value];
         setSelectedFilters({
           taxonomy: cleanTaxonomy,
           majorGroup: [],
@@ -635,10 +636,10 @@ export default function HomeClient() {
       const val = searchParams.get(level);
       if (val) {
         setTaxaType('fauna');
-        const cleanTaxonomy: any = { 
+        const cleanTaxonomy: SelectedFilters['taxonomy'] = {
           phylum_eng: [], class_eng: [], order_eng: [], family_eng: [], genus_eng: [], informal_group_eng: [] 
         };
-        cleanTaxonomy[level] = [val];
+        if (level in cleanTaxonomy) cleanTaxonomy[level as TaxonomyLevel] = [val];
         setSelectedFilters({
           taxonomy: cleanTaxonomy,
           majorGroup: [],
@@ -682,7 +683,7 @@ export default function HomeClient() {
     }, 1000); // 延遲清理，確保面板已穩定開啟
 
     return () => clearTimeout(timer);
-  }, [searchParams, addSpecies, setIsFilterOpen, router]);
+  }, [searchParams, addSpecies, setIsFilterOpen, router, taxaType]);
 
   // 權限管制防護：未登入或 user status !== 'active' 時顯示存取限制鎖定頁面
   if (!isAuthLoading && !isAuthorized) {
@@ -693,9 +694,12 @@ export default function HomeClient() {
         {/* Background Ambience */}
         <div className="absolute inset-0 z-0 pointer-events-none">
           <div className="absolute inset-0 bg-gradient-to-b from-slate-900/90 via-slate-900/95 to-slate-950 z-10" />
-          <img 
+          <Image
             src="/cloudinary/dpvdoeoc0/image/upload/f_auto,q_auto/v1786118511/hero_bg/photo-1518173946687-a4c8892bbd9f.jpg" 
             alt="Nature Background"
+            fill
+            sizes="100vw"
+            unoptimized
             className="w-full h-full object-cover blur-md opacity-25 scale-105"
           />
         </div>
@@ -870,7 +874,7 @@ export default function HomeClient() {
                         ].map((mode) => (
                           <button
                             key={mode.id}
-                            onClick={() => handleDisplayModeChange(mode.id as any)}
+                            onClick={() => handleDisplayModeChange(mode.id as 'detail' | 'photo' | 'table')}
                             title={mode.title}
                             className={`p-1.5 rounded-md transition-all ${displayMode === mode.id ? 'bg-emerald-600 text-white shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
                           >

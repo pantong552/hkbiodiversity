@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo, useRef } from 'react';
+import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { createClient } from '@/utils/supabase/client';
 import { useLanguage } from '@/context/LanguageContext';
 import { 
@@ -29,6 +29,8 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { renderFormattedText } from '@/utils/formatters';
+import { getErrorMessage } from '@/utils/errors';
+import type { LucideIcon } from 'lucide-react';
 
 interface Reference {
   id: string;
@@ -36,12 +38,17 @@ interface Reference {
   zh: string;
   en: string;
   url?: string;
-  created_by?: string;
-  updated_by?: string;
+  created_by?: string | null;
+  updated_by?: string | null;
   created_at: string;
   updated_at?: string;
   creator?: { username: string | null } | null;
   updater?: { username: string | null } | null;
+}
+
+interface ReferenceRecord extends Reference {
+  created_by?: string | null;
+  updated_by?: string | null;
 }
 
 // 支援單個作者的中英文結構
@@ -68,7 +75,7 @@ interface SourceTypeOption {
   labelEn: string;
   descriptionZh: string;
   descriptionEn: string;
-  icon: any;
+  icon: LucideIcon;
 }
 
 const SOURCE_TYPE_OPTIONS: SourceTypeOption[] = [
@@ -139,8 +146,8 @@ const SOURCE_TYPE_OPTIONS: SourceTypeOption[] = [
 ];
 
 export default function ReferenceManager() {
-  const { language, t } = useLanguage();
-  const supabase = createClient();
+  const { language } = useLanguage();
+  const supabase = useMemo(() => createClient(), []);
   
   const [references, setReferences] = useState<Reference[]>([]);
   const [loading, setLoading] = useState(true);
@@ -224,11 +231,7 @@ export default function ReferenceManager() {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  useEffect(() => {
-    fetchReferences();
-  }, []);
-
-  const fetchReferences = async () => {
+  const fetchReferences = useCallback(async () => {
     setLoading(true);
     try {
       const { data: refData, error: refError } = await supabase
@@ -245,8 +248,8 @@ export default function ReferenceManager() {
 
       const userIds = Array.from(
         new Set(
-          refData
-            .flatMap((r: any) => [r.created_by, r.updated_by])
+          (refData as ReferenceRecord[])
+            .flatMap((r) => [r.created_by, r.updated_by])
             .filter(Boolean)
         )
       );
@@ -259,14 +262,14 @@ export default function ReferenceManager() {
           .in('id', userIds);
 
         if (profileData) {
-          profileMap = profileData.reduce((acc: Record<string, string>, p: any) => {
+          profileMap = profileData.reduce((acc: Record<string, string>, p: { id: string; username: string | null }) => {
             if (p.id) acc[p.id] = p.username || '';
             return acc;
           }, {} as Record<string, string>);
         }
       }
 
-      const enrichedRefs = refData.map((r: any) => ({
+      const enrichedRefs = (refData as ReferenceRecord[]).map((r) => ({
         ...r,
         creator: r.created_by && profileMap[r.created_by] ? { username: profileMap[r.created_by] } : null,
         updater: r.updated_by && profileMap[r.updated_by] ? { username: profileMap[r.updated_by] } : null
@@ -278,7 +281,11 @@ export default function ReferenceManager() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [supabase]);
+
+  useEffect(() => {
+    fetchReferences();
+  }, [fetchReferences]);
 
   // 搜尋與過濾
   const filteredReferences = useMemo(() => {
@@ -775,9 +782,9 @@ export default function ReferenceManager() {
         await fetchReferences();
       }
       setIsModalOpen(false);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Error saving reference:', err);
-      setFormError(err.message || (language === 'zh' ? '儲存失敗，請重試' : 'Failed to save reference. Please try again.'));
+      setFormError(getErrorMessage(err, language === 'zh' ? '儲存失敗，請重試' : 'Failed to save reference. Please try again.'));
     } finally {
       setSubmitting(false);
     }
@@ -1877,7 +1884,3 @@ export default function ReferenceManager() {
     </div>
   );
 }
-
-
-
-

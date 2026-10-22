@@ -1,11 +1,12 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { createClient } from '@/utils/supabase/client';
 import { useAuth } from '@/context/AuthContext';
 import { useLanguage } from '@/context/LanguageContext';
 import { fetchSpeciesOrPlantRow } from '@/utils/speciesQuery';
 import { Species } from '@/types/species';
+import { getErrorMessage } from '@/utils/errors';
 import { SpeciesDraft } from '@/types/speciesDraft';
 import SpeciesDetailEditor from '@/components/admin/SpeciesDetailEditor';
 import { SpeciesAnatomyCollectionEditor } from './SpeciesAnatomyCard';
@@ -13,7 +14,6 @@ import { AnatomyIllustration, EMPTY_ANATOMY_ILLUSTRATION } from '@/types/anatomy
 import { anatomyIllustrationToDatabase, anatomyIllustrationToLegacyColumns, isValidAnatomyIllustrations, mapAnatomyIllustrations } from '@/utils/anatomy';
 import { 
   X, 
-  Save, 
   Send, 
   AlertCircle, 
   CheckCircle2, 
@@ -29,12 +29,16 @@ import { motion, AnimatePresence } from 'framer-motion';
 interface SpeciesEditModalProps {
   isOpen: boolean;
   onClose: () => void;
-  species: any;
+  species: Species & { category_chi?: string | null };
   tableName?: string; // 'species' | 'plant_species'
   onSuccess?: () => void;
   reviewDraft?: SpeciesDraft | null;
-  onApproveDraft?: (draft: SpeciesDraft, updatedData?: any) => Promise<void>;
+  onApproveDraft?: (draft: SpeciesDraft, updatedData?: Record<string, unknown>) => Promise<void>;
   onRejectDraft?: (draft: SpeciesDraft, reason: string) => Promise<void>;
+}
+
+interface SpeciesEditorPayload extends Record<string, unknown> {
+  anatomy_illustrations: AnatomyIllustration[];
 }
 
 export default function SpeciesEditModal({
@@ -49,19 +53,18 @@ export default function SpeciesEditModal({
 }: SpeciesEditModalProps) {
   const { user, profile } = useAuth();
   const { language } = useLanguage();
-  const supabase = createClient();
+  const supabase = useMemo(() => createClient(), []);
 
   const [loadingDraft, setLoadingDraft] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const isApprovingRef = React.useRef(false);
   const [activeDraft, setActiveDraft] = useState<SpeciesDraft | null>(null);
-  const [editorData, setEditorData] = useState<any>(species);
+  const [editorData, setEditorData] = useState<Species & { category_chi?: string | null }>(species);
   const [anatomyIllustrations, setAnatomyIllustrations] = useState<AnatomyIllustration[]>([]);
   const [originalAnatomyIllustrations, setOriginalAnatomyIllustrations] = useState<AnatomyIllustration[]>([]);
   const [loadingAnatomy, setLoadingAnatomy] = useState(false);
   const [anatomyLoadError, setAnatomyLoadError] = useState(false);
   const [toastMessage, setToastMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
-  const [isEditorDirty, setIsEditorDirty] = useState(false);
   const [showRejectModal, setShowRejectModal] = useState(false);
   const [showDeleteConfirmModal, setShowDeleteConfirmModal] = useState(false);
   const [deletingDraft, setDeletingDraft] = useState(false);
@@ -70,7 +73,6 @@ export default function SpeciesEditModal({
 
   // 判斷角色與草稿擁有人權限
   const isAdmin = profile?.role === 'admin';
-  const isCurator = profile?.role === 'curator';
   const speciesId = species?.id || species?.taxa_id;
 
   const currentDraft = reviewDraft || activeDraft;
@@ -89,11 +91,11 @@ export default function SpeciesEditModal({
       setLoadingDraft(true);
       try {
         const isFungi = tableName === 'fungi_species' || species?.taxa_group === 'FUNGI' || String(species?.taxa_id || '').startsWith('fungi_') || String(speciesId || '').startsWith('fungi_');
-        const isPlant = tableName === 'plant_species' || species?.taxa_group === 'FLORA' || (species as any)?.category_chi || String(species?.taxa_id || '').startsWith('flora_') || String(speciesId || '').startsWith('flora_');
+        const isPlant = tableName === 'plant_species' || species?.taxa_group === 'FLORA' || species?.category_chi || String(species?.taxa_id || '').startsWith('flora_') || String(speciesId || '').startsWith('flora_');
         const targetTable = isFungi ? 'fungi_species' : (isPlant ? 'plant_species' : 'species');
 
         // 1. 調用強健查詢函數抓取 Supabase 正式資料庫中最純淨的正本行數據
-        const pubData = await fetchSpeciesOrPlantRow(speciesId, targetTable);
+        const pubData = await fetchSpeciesOrPlantRow(String(speciesId), targetTable);
         const basePub = pubData || species;
         setPublishedSpecies(basePub);
 
@@ -165,7 +167,7 @@ export default function SpeciesEditModal({
     }
 
     loadLatestDraftAndPublished();
-  }, [isOpen, speciesId, reviewDraft]);
+  }, [isOpen, speciesId, species, reviewDraft, supabase, tableName]);
 
   const formatDate = (isoString?: string | null) => {
     if (!isoString) return language === 'zh' ? '未知時間' : 'Unknown';
@@ -181,7 +183,7 @@ export default function SpeciesEditModal({
         second: '2-digit',
         hour12: false
       });
-    } catch (e) {
+    } catch {
       return isoString;
     }
   };
@@ -223,16 +225,16 @@ export default function SpeciesEditModal({
       setShowDeleteConfirmModal(false);
       if (onSuccess) onSuccess();
       setTimeout(() => onClose(), 1200);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Error deleting species draft:', err);
-      showToast('error', err.message || (language === 'zh' ? '刪除草稿失敗，請檢查資料庫權限' : 'Failed to delete draft'));
+      showToast('error', getErrorMessage(err, language === 'zh' ? '刪除草稿失敗，請檢查資料庫權限' : 'Failed to delete draft'));
     } finally {
       setDeletingDraft(false);
     }
   };
 
   // 處理提交/更新草稿 (Curator 打包提交草稿，Admin 也可直接 Save)
-  const handleSave = async (updatedData: any) => {
+  const handleSave = async (updatedData: object) => {
     if (!user || !profile) {
       showToast('error', language === 'zh' ? '請先登入帳號' : 'Please sign in first');
       return;
@@ -243,10 +245,9 @@ export default function SpeciesEditModal({
       return;
     }
 
-    const finalUpdatedData = {
-      ...updatedData,
+    const finalUpdatedData: SpeciesEditorPayload = Object.assign({}, updatedData, {
       anatomy_illustrations: anatomyIllustrations.map((illustration) => ({ ...illustration, photoUrl: illustration.photoUrl.trim() }))
-    };
+    });
     if (!isValidAnatomyIllustrations(finalUpdatedData.anatomy_illustrations)) {
       showToast('error', language === 'zh' ? '請確認所有圖片 URL、標記 key 唯一，以及 X/Y 座標介乎 0 至 100。' : 'Check each image URL, unique marker keys, and X/Y values between 0 and 100.');
       return;
@@ -264,9 +265,9 @@ export default function SpeciesEditModal({
       }
 
       const isFungi = tableName === 'fungi_species' || species?.taxa_group === 'FUNGI' || String(species?.taxa_id || '').startsWith('fungi_') || String(speciesId || '').startsWith('fungi_');
-      const isPlant = tableName === 'plant_species' || species?.taxa_group === 'FLORA' || (species as any)?.category_chi || String(species?.taxa_id || '').startsWith('flora_') || String(speciesId || '').startsWith('flora_');
+      const isPlant = tableName === 'plant_species' || species?.taxa_group === 'FLORA' || species?.category_chi || String(species?.taxa_id || '').startsWith('flora_') || String(speciesId || '').startsWith('flora_');
       const targetTable = isFungi ? 'fungi_species' : (isPlant ? 'plant_species' : 'species');
-      const speciesFields = { ...finalUpdatedData };
+      const speciesFields: Record<string, unknown> = { ...finalUpdatedData };
       delete speciesFields.anatomy_illustrations;
 
       if (isAdmin) {
@@ -358,18 +359,9 @@ export default function SpeciesEditModal({
         if (onSuccess) onSuccess();
         setTimeout(() => onClose(), 1400);
       }
-    } catch (err: any) {
-      const errorMessage = typeof err?.message === 'string' && err.message
-        ? err.message
-        : (language === 'zh' ? '儲存失敗，請重試' : 'Save failed, please try again');
-      console.error('Error saving species detail:', {
-        name: err?.name,
-        message: errorMessage,
-        code: err?.code,
-        details: err?.details,
-        hint: err?.hint,
-        stack: err?.stack
-      });
+    } catch (err: unknown) {
+      const errorMessage = getErrorMessage(err, language === 'zh' ? '儲存失敗，請重試' : 'Save failed, please try again');
+      console.error('Error saving species detail:', err);
       showToast('error', errorMessage);
     } finally {
       setSubmitting(false);
@@ -487,7 +479,7 @@ export default function SpeciesEditModal({
                           showToast('success', language === 'zh' ? '已成功批准修訂並發布！' : 'Draft approved and published!');
                           if (onSuccess) onSuccess();
                           setTimeout(() => onClose(), 1200);
-                        } catch (err) {
+                        } catch {
                           showToast('error', language === 'zh' ? '審核失敗' : 'Approval failed');
                         } finally {
                           setSubmitting(false);
@@ -610,7 +602,7 @@ export default function SpeciesEditModal({
               </p>
               <p className="text-rose-700 font-bold mt-1">
                 {language === 'zh' ? '退回原因：' : 'Rejection Reason: '}
-                <span className="italic">"{ currentDraft.rejection_reason || (language === 'zh' ? '未提供特定理由' : 'No specific reason provided') }"</span>
+                <span className="italic">&quot;{ currentDraft.rejection_reason || (language === 'zh' ? '未提供特定理由' : 'No specific reason provided') }&quot;</span>
               </p>
               <p className="text-[11px] text-rose-500 mt-1">
                 {language === 'zh' ? '策展人可根據退回原因重新修正內容後按右上角「重新提交草稿 (Resubmit Draft)」，或點擊右上角「刪除」撤回此草稿。' : 'Curator may update the fields to resubmit or click "Delete" at top right to remove this draft.'}
@@ -663,7 +655,7 @@ export default function SpeciesEditModal({
               table={
                 tableName === 'fungi_species' || species?.taxa_group === 'FUNGI' || String(species?.taxa_id || '').startsWith('fungi_') || String(speciesId || '').startsWith('fungi_')
                   ? 'fungi_species'
-                  : tableName === 'plant_species' || species?.taxa_group === 'FLORA' || (species as any)?.category_chi || String(species?.taxa_id || '').startsWith('flora_') || String(speciesId || '').startsWith('flora_')
+                  : tableName === 'plant_species' || species?.taxa_group === 'FLORA' || species?.category_chi || String(species?.taxa_id || '').startsWith('flora_') || String(speciesId || '').startsWith('flora_')
                     ? 'plant_species'
                     : 'species'
               }
@@ -679,7 +671,6 @@ export default function SpeciesEditModal({
               onRegisterSave={(saveFn) => {
                 triggerSaveRef.current = saveFn;
               }}
-              onDirtyChange={(dirty) => setIsEditorDirty(dirty)}
               additionalTab={{
                 id: 'anatomy',
                 nameChi: '圖鑑',
@@ -770,7 +761,7 @@ export default function SpeciesEditModal({
                         showToast('success', language === 'zh' ? '草稿已退回' : 'Draft rejected');
                         if (onSuccess) onSuccess();
                         setTimeout(() => onClose(), 1200);
-                      } catch (err) {
+                      } catch {
                         showToast('error', language === 'zh' ? '退回草稿失敗' : 'Reject failed');
                       } finally {
                         setSubmitting(false);

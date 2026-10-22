@@ -29,6 +29,22 @@ interface CommunityPhoto {
   user_id: string;
 }
 
+interface InatPhotoApi {
+  id: string | number;
+  url: string;
+  small_url?: string;
+  medium_url?: string;
+  large_url?: string;
+  original_url?: string;
+  attribution?: string | null;
+  license_code: string | null;
+}
+
+interface InatObservationsResponse {
+  results?: { id: number; observed_on?: string | null; photos?: InatPhotoApi[] }[];
+  total_results?: number;
+}
+
 const convertInatUrl = (url: string, size: 'square' | 'small' | 'medium' | 'large' | 'original') => {
   if (!url) return '';
   return url
@@ -52,12 +68,12 @@ const getProxyUrl = (url: string, id: string | number, size: string = 'medium') 
 };
 
 
-async function fetchWithRetry(url: string, retries = 3): Promise<any> {
+async function fetchWithRetry(url: string, retries = 3): Promise<InatObservationsResponse> {
 
   for (let i = 0; i <= retries; i++) {
     try {
       const response = await fetch(url);
-      if (response.ok) return await response.json();
+      if (response.ok) return await response.json() as InatObservationsResponse;
       if (response.status === 429 && i < retries) {
         await new Promise(r => setTimeout(r, 1000 * (i + 1)));
         continue;
@@ -68,6 +84,7 @@ async function fetchWithRetry(url: string, retries = 3): Promise<any> {
       await new Promise(r => setTimeout(r, 500 * (i + 1)));
     }
   }
+  throw new Error('iNaturalist request failed');
 }
 
 export function useInaturalistSpeciesPhotos(inatId: number | string | undefined, taxaId?: string) {
@@ -132,7 +149,7 @@ export function useInaturalistSpeciesPhotos(inatId: number | string | undefined,
     }
   }, [inatId, taxaId, supabase]);
 
-  const fetchInternal = useCallback(async (pageNum: number, scope: 'hongkong' | 'global', isInitial: boolean) => {
+  const fetchInternal = useCallback(async (pageNum: number, scope: 'hongkong' | 'global') => {
     if (!inatId) return;
     
     // 獲取當前登入使用者的授權資訊
@@ -159,9 +176,9 @@ export function useInaturalistSpeciesPhotos(inatId: number | string | undefined,
 
     const data = await fetchWithRetry(url);
     
-    const mappedPhotos: InatGalleryPhoto[] = (data.results || []).flatMap((obs: any) => 
+    const mappedPhotos: InatGalleryPhoto[] = (data.results || []).flatMap((obs) =>
       (obs.photos || [])
-        .filter((p: any) => {
+        .filter((p) => {
           // 如果照片本身有授權 (非 null)，則允許顯示
           if (p.license_code !== null) return true;
 
@@ -176,7 +193,7 @@ export function useInaturalistSpeciesPhotos(inatId: number | string | undefined,
 
           return false;
         })
-        .map((p: any) => {
+        .map((p) => {
           let author = 'Unknown';
           if (p.attribution) {
             author = p.attribution
@@ -228,8 +245,8 @@ export function useInaturalistSpeciesPhotos(inatId: number | string | undefined,
     }
 
     try {
-      let result = inatId ? await fetchInternal(targetPage, targetScope, isInitial) : null;
-      let communityPhotos: any[] = [];
+      const result = inatId ? await fetchInternal(targetPage, targetScope) : null;
+      let communityPhotos: InatGalleryPhoto[] = [];
       
       if (isInitial) {
         communityPhotos = await fetchCommunityPhotos();
@@ -237,7 +254,7 @@ export function useInaturalistSpeciesPhotos(inatId: number | string | undefined,
       
       // FALLBACK LOGIC: If HK requested but empty
       if (isInitial && targetScope === 'hongkong' && (!result || result.photos.length === 0)) {
-        const globalResult = await fetchInternal(1, 'global', true);
+        const globalResult = await fetchInternal(1, 'global');
         if (globalResult) {
           setState({
             photos: globalResult.photos,
@@ -298,7 +315,7 @@ export function useInaturalistSpeciesPhotos(inatId: number | string | undefined,
     } finally {
       isFetchingRef.current = false;
     }
-  }, [inatId, fetchInternal, fetchCommunityPhotos]);
+  }, [inatId, taxaId, fetchInternal, fetchCommunityPhotos]);
 
   // Keep a ref to current state to avoid stale closure issues in loadMore
   const stateRef = useRef(state);

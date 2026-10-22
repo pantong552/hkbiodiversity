@@ -1,7 +1,8 @@
 'use client';
 
+import Image from 'next/image';
 import React, { useState, useEffect, useRef } from 'react';
-import { Search, RotateCcw, Sparkles, Loader2, Leaf, Bug, ArrowRight } from 'lucide-react';
+import { Search, RotateCcw, Sparkles, Loader2, Leaf, Bug } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useLanguage } from '@/context/LanguageContext';
 import { useAuth } from '@/context/AuthContext';
@@ -30,11 +31,14 @@ function SuggestionItemAvatar({ item, isSelected }: { item: SuggestionItem; isSe
       <div className={`w-9 h-9 rounded-xl overflow-hidden shrink-0 border relative bg-slate-100 ${
         isSelected ? 'border-white/40 shadow-sm' : 'border-slate-100 shadow-sm'
       }`}>
-        <img 
+        <Image
           src={imageUrl} 
           alt={item.common_name_chi || item.scientific_name}
+          fill
+          sizes="36px"
+          unoptimized
           onError={() => setImgError(true)}
-          className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-110"
+          className="object-cover transition-transform duration-300 group-hover:scale-110"
         />
       </div>
     );

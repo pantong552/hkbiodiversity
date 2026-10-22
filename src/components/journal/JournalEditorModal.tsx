@@ -1,11 +1,12 @@
 'use client';
 
+import Image from 'next/image';
 import React, { useState, useEffect, useRef } from 'react';
 import { 
   X, Image as ImageIcon, Tag, Send, CheckCircle2, AlertCircle, FileText,
   Languages, Globe, Undo, Redo, Bold, Italic, Heading1, Heading2, List,
   ListOrdered, Type, Palette, Link as LinkIcon, Quote, Code, Folder, ChevronDown, Check,
-  BookOpen, Sliders, Smartphone, Eye, EyeOff
+  BookOpen, Sliders, Smartphone
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { EcoCategory, EcoArticle, ArticleLanguage } from '@/types/journal';
@@ -16,6 +17,8 @@ import dynamic from 'next/dynamic';
 import 'react-quill-new/dist/quill.snow.css';
 import { marked } from 'marked';
 import TurndownService from 'turndown';
+import { getErrorMessage } from '@/utils/errors';
+import type { Attributor } from 'parchment';
 import { HexColorPicker } from 'react-colorful';
 import NovelReaderControlPanel, { 
   NovelReaderSettings, 
@@ -28,8 +31,8 @@ const ReactQuill = dynamic(
     const { default: RQ, Quill } = await import('react-quill-new');
     
     // Register Style Attributors so Quill applies style="color: ..." and style="font-size: ..." inline
-    const SizeStyle = Quill.import('attributors/style/size') as any;
-    const ColorStyle = Quill.import('attributors/style/color') as any;
+    const SizeStyle = Quill.import('attributors/style/size') as Attributor;
+    const ColorStyle = Quill.import('attributors/style/color') as Attributor;
     const fontSizesPx = Array.from({ length: 120 }, (_, i) => `${i + 1}px`).concat(['0.875rem', '1rem', '1.25rem', '1.5rem', '2rem']);
     SizeStyle.whitelist = fontSizesPx;
     
@@ -37,7 +40,8 @@ const ReactQuill = dynamic(
     Quill.register(ColorStyle, true);
 
     // eslint-disable-next-line react/display-name
-    return ({ forwardedRef, ...props }: any) => <RQ ref={forwardedRef} {...props} />;
+    return ({ forwardedRef, ...props }: React.ComponentProps<typeof RQ> & { forwardedRef?: React.Ref<QuillHandle> }) =>
+      React.createElement(RQ as React.ComponentType<Record<string, unknown>>, { ...props, ref: forwardedRef });
   },
   { 
     ssr: false,
@@ -50,7 +54,7 @@ const turndownService = new TurndownService({
   codeBlockStyle: 'fenced'
 });
 
-turndownService.keep(['span' as any]);
+turndownService.keep(['span']);
 
 // Preserve <span> tags with style attribute (for text colors & font sizes) when converting HTML to Markdown
 turndownService.addRule('keepInlineSpans', {
@@ -58,7 +62,7 @@ turndownService.addRule('keepInlineSpans', {
     const tag = node.nodeName ? node.nodeName.toLowerCase() : '';
     return (tag === 'span' || tag === 'font') && (node.hasAttribute('style') || node.hasAttribute('class') || node.hasAttribute('color'));
   },
-  replacement: (content, node: any) => {
+  replacement: (content, node: HTMLElement) => {
     const style = node.getAttribute('style');
     const className = node.getAttribute('class');
     const color = node.getAttribute('color');
@@ -68,6 +72,15 @@ turndownService.addRule('keepInlineSpans', {
     return `<span${attrStyle}${attrClass}${attrColor}>${content}</span>`;
   }
 });
+
+interface QuillHandle {
+  getEditor(): {
+    history: { undo(): void; redo(): void };
+    getSelection(): { index: number; length: number } | null;
+    getFormat(range: { index: number; length: number }): Record<string, unknown>;
+    format(name: string, value: string | number | boolean): void;
+  };
+}
 
 interface JournalEditorModalProps {
   isOpen: boolean;
@@ -117,8 +130,8 @@ export default function JournalEditorModal({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
-  const quillRefChi = useRef<any>(null);
-  const quillRefEng = useRef<any>(null);
+  const quillRefChi = useRef<QuillHandle | null>(null);
+  const quillRefEng = useRef<QuillHandle | null>(null);
 
   const [customFontSize, setCustomFontSize] = useState('16');
   
@@ -157,14 +170,14 @@ export default function JournalEditorModal({
       const updated = { ...prev, ...newSettings };
       try {
         localStorage.setItem('hkbio_novel_reader_settings', JSON.stringify(updated));
-      } catch (e) {}
+      } catch {}
       return updated;
     });
   };
 
   // 自動閱讀滾動效果
   useEffect(() => {
-    let interval: any;
+    let interval: ReturnType<typeof setInterval> | undefined;
     if (novelSettings.autoScroll) {
       interval = setInterval(() => {
         const previewContainer = document.getElementById('novel-mobile-reader-content');
@@ -194,8 +207,6 @@ export default function JournalEditorModal({
   }, [openDropdown, isCategoryOpen]);
 
   // Undo & Redo History
-  const [history, setHistory] = useState<any[]>([]);
-  const [historyIndex, setHistoryIndex] = useState(-1);
 
   useEffect(() => {
     if (articleToEdit) {
@@ -223,7 +234,12 @@ export default function JournalEditorModal({
       
       setCoverImage(articleToEdit.cover_image || '');
       setTags(articleToEdit.tags || []);
-      setStatus(articleToEdit.status as any || 'submitted');
+      const articleStatus = articleToEdit.status;
+      if (articleStatus === 'submitted' || articleStatus === 'published' || articleStatus === 'rejected') {
+        setStatus(articleStatus);
+      } else {
+        setStatus('submitted');
+      }
     } else {
       setArticleLanguage('bilingual');
       setActiveTab('zh');
@@ -323,7 +339,7 @@ export default function JournalEditorModal({
     try {
       const now = new Date().toISOString();
 
-      const payload: any = {
+      const payload: Partial<EcoArticle> = {
         category_id: categoryId,
         article_language: articleLanguage,
         title_chi: articleLanguage === 'en' ? '' : titleChi.trim(),
@@ -376,9 +392,9 @@ export default function JournalEditorModal({
 
       onSaved();
       onClose();
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Error saving article:', err);
-      setErrorMsg(err.message || 'Failed to save article.');
+      setErrorMsg(getErrorMessage(err, 'Failed to save article.'));
     } finally {
       setIsSubmitting(false);
     }
@@ -1150,8 +1166,8 @@ export default function JournalEditorModal({
                 className="w-full px-4 py-3 rounded-2xl border border-slate-200 focus:border-emerald-500 outline-none text-slate-800 text-sm bg-slate-50/50"
               />
               {coverImage && (
-                <div className="mt-2 h-32 rounded-xl overflow-hidden border border-slate-200 bg-slate-100">
-                  <img src={coverImage} alt="Cover Preview" className="w-full h-full object-cover" />
+                <div className="relative mt-2 h-32 rounded-xl overflow-hidden border border-slate-200 bg-slate-100">
+                  <Image src={coverImage} alt="Cover Preview" fill sizes="(max-width: 768px) 100vw, 384px" unoptimized className="object-cover" />
                 </div>
               )}
             </div>

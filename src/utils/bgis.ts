@@ -1,8 +1,8 @@
 export interface BgisDatasetItem {
   datasetID: number;
   count: number;
-  refs: any;
-  datapoints: any;
+  refs: Record<string, unknown>;
+  datapoints: unknown[];
 }
 
 export interface BgisGridRecord {
@@ -16,7 +16,7 @@ export interface BgisSearchRecord {
   scientific_name: string;
   chinese_name?: string;
   english_name?: string;
-  [key: string]: any;
+  [key: string]: unknown;
 }
 
 export const BGIS_DATASETS: Record<number, { zh: string; en: string }> = {
@@ -160,8 +160,7 @@ const bgisPendingPromises = new Map<string, Promise<{ seasonality: { month: numb
  */
 export async function fetchBgisObservationStats(
   scientificName: string,
-  chineseName?: string,
-  mode: 'seasonality' | 'history' | 'both' = 'both'
+  chineseName?: string
 ): Promise<{
   seasonality: { month: number; count: number }[];
   history: { year: number; count: number }[];
@@ -331,4 +330,3 @@ export async function fetchBgisObservationStats(
   bgisPendingPromises.set(cacheKey, promise);
   return promise;
 }
-

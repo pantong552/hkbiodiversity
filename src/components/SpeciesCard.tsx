@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import Image from 'next/image';
-import { Heart, Info, ExternalLink, Leaf, Loader2, X, Calendar } from 'lucide-react';
+import { Heart, Info, ExternalLink, Leaf, Loader2, X } from 'lucide-react';
 import { Species } from '../types/species';
 import { PlantSpecies } from '../types/plants';
 import { useLanguage } from '../context/LanguageContext';
@@ -16,7 +16,7 @@ import { formatScientificName, formatNativeStatus, getSpeciesImageUrl } from '..
 import { useTaxonomy } from '@/context/TaxonomyContext';
 
 interface SpeciesCardProps {
-  species: any; // Species | PlantSpecies
+  species: Species | PlantSpecies;
   isPlant?: boolean;
   mode?: 'detail' | 'photo';
   priority?: boolean;
@@ -109,16 +109,12 @@ export default function SpeciesCard({
   const placeholderImage = '/images/placeholder/no-species-image.svg';
   
   // Current logic for determining if we should use iNaturalist
-  const isUsingInat = !!normalized.inat_id;
-  
   // Show loader if we are in INAT mode and the fade-out isn't finished
-  const showLoader = isUsingInat && !imgLoaded;
-  
   // 尺寸判斷：圖庫模式使用 medium，詳情卡片使用 large
   const isPhoto = mode === 'photo';
   
   // displayImage 優先序：全局即時狀態 > 資料庫原始資料 > iNaturalist Hook > 佔位圖
-  const globalProfilePic = profilePictureMap[species.taxa_id];
+  const globalProfilePic = species.taxa_id ? profilePictureMap[species.taxa_id] : undefined;
   const effectiveSpecies = globalProfilePic !== undefined ? { ...species, profile_picture: globalProfilePic } : species;
   
   const formattedUrl = getSpeciesImageUrl(effectiveSpecies, isPhoto ? 'medium' : 'large');
@@ -156,7 +152,7 @@ export default function SpeciesCard({
     };
     checkBookmark();
     return () => { isMounted = false; };
-  }, [user?.id, species.taxa_id]);
+  }, [user, species.taxa_id]);
 
   const toggleFavorite = useCallback(async (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -177,7 +173,7 @@ export default function SpeciesCard({
         setIsBookmarked(true);
       }
     } catch (err) { console.error('Favorite error:', err); } finally { setIsUpdating(false); }
-  }, [user, species.taxa_id, normalized.id, isBookmarked, isUpdating, language, isPlant]);
+  }, [user, species.taxa_id, isBookmarked, isUpdating, language]);
 
   const iucnConfig = !isPlant && normalized.iucn ? getIUCNConfig(normalized.iucn) : null;
 
@@ -434,7 +430,7 @@ export default function SpeciesCard({
         <div className="p-3 bg-white flex flex-col gap-2 rounded-b-[1.5rem]">
           {/* Taxonomy Tags - Ultra Compact */}
           <div className="flex flex-wrap gap-1.5 items-center relative z-30">
-            {[normalized.order, normalized.family, normalized.taxa_group].filter(Boolean).map((tax: any, i) => (
+            {[normalized.order, normalized.family, normalized.taxa_group].filter((tax): tax is { label: string; value: string; level: string } => tax !== null && typeof tax === 'object').map((tax, i) => (
               <button 
                 key={i}
                 type="button"

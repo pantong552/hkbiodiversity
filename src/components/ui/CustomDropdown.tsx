@@ -12,7 +12,7 @@ interface Option {
 interface CustomDropdownProps {
   options: Option[];
   value: string;
-  onChange: (value: any) => void;
+  onChange: (value: string) => void;
   label?: string;
   size?: 'normal' | 'sm';
   placeholder?: string;
@@ -25,7 +25,6 @@ export default function CustomDropdown({
   options, 
   value, 
   onChange, 
-  label, 
   size = 'normal',
   placeholder = 'Select...',
   className = '',

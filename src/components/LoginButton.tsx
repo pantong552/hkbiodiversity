@@ -2,6 +2,7 @@
 
 import { createClient } from '@/utils/supabase/client'
 import { useState } from 'react'
+import { getErrorMessage } from '@/utils/errors'
 
 interface LoginButtonProps {
   isTransparent?: boolean;
@@ -22,8 +23,8 @@ export default function LoginButton({ isTransparent = false }: LoginButtonProps)
       })
 
       if (error) throw error
-    } catch (error: any) {
-      console.error('登入失敗:', error.message)
+    } catch (error: unknown) {
+      console.error('登入失敗:', getErrorMessage(error, '登入失敗'))
       setIsLoading(false)
     }
   }

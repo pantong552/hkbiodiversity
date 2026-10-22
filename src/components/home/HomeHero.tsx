@@ -1,8 +1,9 @@
 'use client';
 
-import React, { useState, useEffect, useRef, useCallback, Fragment } from 'react';
+import Image from 'next/image';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { Search, ChevronRight, ChevronDown, Sparkles, Loader2, Leaf, Bug, ArrowRight, CornerDownLeft, Camera, Dog, Check } from 'lucide-react';
+import { Search, ChevronDown, Sparkles, Loader2, Leaf, Bug, ArrowRight, CornerDownLeft, Camera, Dog, Check } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useLanguage } from '@/context/LanguageContext';
 import { useAuth } from '@/context/AuthContext';
@@ -42,11 +43,14 @@ function SuggestionItemAvatar({ item, isSelected }: { item: SuggestionItem; isSe
       <div className={`w-10 h-10 md:w-11 md:h-11 rounded-2xl overflow-hidden shrink-0 border relative bg-slate-100 ${
         isSelected ? 'border-white/40 shadow-sm' : 'border-slate-100 shadow-sm'
       }`}>
-        <img 
+        <Image
           src={imageUrl} 
           alt={item.common_name_chi || item.scientific_name}
+          fill
+          sizes="44px"
+          unoptimized
           onError={() => setImgError(true)}
-          className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-110"
+          className="object-cover transition-transform duration-300 group-hover:scale-110"
         />
       </div>
     );
@@ -275,9 +279,12 @@ export default function HomeHero() {
       {/* Background with Overlay */}
       <div className="absolute inset-0 z-0 overflow-hidden">
         <div className="absolute inset-0 bg-gradient-to-b from-slate-900/60 via-slate-900/40 to-white z-10" />
-        <img 
+        <Image
           src="/cloudinary/dpvdoeoc0/image/upload/f_auto,q_auto/v1786118511/hero_bg/photo-1518173946687-a4c8892bbd9f.jpg" 
           alt="Nature Background"
+          fill
+          sizes="100vw"
+          unoptimized
           className="w-full h-full object-cover scale-105 animate-slow-zoom"
         />
       </div>

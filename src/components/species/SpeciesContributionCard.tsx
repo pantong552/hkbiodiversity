@@ -1,5 +1,6 @@
 'use client';
 
+import Image from 'next/image';
 import React, { useState, useEffect } from 'react';
 import { createClient } from '@/utils/supabase/client';
 import { useLanguage } from '@/context/LanguageContext';
@@ -7,10 +8,7 @@ import { SpeciesDraft } from '@/types/speciesDraft';
 import { 
   Award, 
   UserCircle, 
-  ShieldCheck, 
-  Calendar, 
   Clock, 
-  Sparkles, 
   History,
   CheckCircle2
 } from 'lucide-react';
@@ -24,7 +22,7 @@ interface SpeciesContributionCardProps {
 
 export default function SpeciesContributionCard({ speciesId, refreshTrigger = 0 }: SpeciesContributionCardProps) {
   const { language } = useLanguage();
-  const supabase = createClient();
+  const [supabase] = useState(() => createClient());
 
   const [approvedRevisions, setApprovedRevisions] = useState<SpeciesDraft[]>([]);
   const [loading, setLoading] = useState(true);
@@ -63,7 +61,7 @@ export default function SpeciesContributionCard({ speciesId, refreshTrigger = 0 
     }
 
     fetchApprovedRevisions();
-  }, [speciesId, refreshTrigger]);
+  }, [speciesId, refreshTrigger, supabase]);
 
   if (loading || approvedRevisions.length === 0) {
     return null;
@@ -119,7 +117,7 @@ export default function SpeciesContributionCard({ speciesId, refreshTrigger = 0 
                 {/* Curator Avatar */}
                 <div className="w-10 h-10 rounded-full overflow-hidden border border-emerald-200 bg-slate-100 shrink-0 shadow-inner mt-0.5">
                   {draft.curator_avatar ? (
-                    <img src={draft.curator_avatar} alt="" className="w-full h-full object-cover" />
+                    <Image src={draft.curator_avatar} alt="" width={40} height={40} unoptimized className="w-full h-full object-cover" />
                   ) : (
                     <UserCircle className="w-full h-full p-1 text-slate-300" />
                   )}

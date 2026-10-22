@@ -7,7 +7,6 @@ import { useLanguage } from '@/context/LanguageContext';
 import { 
   Users, 
   Package, 
-  LayoutDashboard, 
   ChevronRight,
   ShieldCheck,
   ArrowLeft,
