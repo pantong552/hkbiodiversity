@@ -722,19 +722,10 @@ export default function SpeciesFloatingPanel() {
                   className={`
                     group relative flex items-center gap-2.5 px-3 md:px-3.5 py-1.5 md:py-1.5 rounded-xl md:rounded-2xl border transition-colors cursor-pointer whitespace-nowrap min-h-[36px] md:min-h-[38px] z-10
                     ${isActive 
-                      ? 'border-slate-800 text-white' 
+                      ? 'border-slate-800 bg-slate-900 text-white shadow-xl shadow-slate-200'
                       : 'bg-white/50 border-slate-100 text-slate-500 hover:bg-white hover:border-emerald-200'}
                   `}
                 >
-                  {/* Magic Move Background Slider */}
-                  {isActive && (
-                    <motion.div
-                      layoutId="active-tab-highlight"
-                      className="absolute inset-0 bg-slate-900 rounded-xl md:rounded-2xl -z-10 shadow-xl shadow-slate-200"
-                      transition={{ type: 'spring', stiffness: 350, damping: 30 }}
-                    />
-                  )}
-
                   {loading ? (
                     <Loader2 className="w-3.5 h-3.5 animate-spin" />
                   ) : (
