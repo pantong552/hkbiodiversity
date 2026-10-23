@@ -5,14 +5,14 @@ import Image from 'next/image';
 import { Species } from '@/types/species';
 import { PlantSpecies } from '@/types/plants';
 import { useLanguage } from '@/context/LanguageContext';
-import { Bookmark, Map, ExternalLink, Leaf, Compass, Loader2 } from 'lucide-react';
+import { Bookmark, Map, ExternalLink, Leaf, Loader2 } from 'lucide-react';
 import { createClient } from '@/utils/supabase/client';
 import TaxonomyDisplay from './TaxonomyDisplay';
 import ConservationStatus from './ConservationStatus';
 import CommentSection from '../comments/CommentSection';
 import SpeciesPhotoGallery from './SpeciesPhotoGallery';
 import { useInaturalistSpeciesPhotos, InatGalleryPhoto } from '@/hooks/useInaturalistSpeciesPhotos';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
 import { useRef } from 'react';
 import SpeciesMap, { ObservationChart } from './SpeciesMap';
 import GbifGlobalMap from './GbifGlobalMap';
@@ -209,6 +209,7 @@ const SpeciesHeroBackground = ({ photos, defaultImage, isLoading }: { photos: In
 };
 
 export default function SpeciesContent({ species, showBreadcrumb = true, refreshTrigger = 0, anatomyCard }: SpeciesContentProps) {
+  const shouldReduceMotion = useReducedMotion();
   const { language } = useLanguage();
   const { getTaxonomyChi } = useTaxonomy();
   const { isLightboxOpen, setPendingTaxonomyFilter, toggleExpand } = useSpeciesPanel();
@@ -285,35 +286,39 @@ export default function SpeciesContent({ species, showBreadcrumb = true, refresh
   const detailSections = [
     {
       title: language === 'zh' ? '物種簡介' : 'Introduction',
-      content: introduction,
-      icon: Bookmark
+      content: introduction
     },
     {
       title: language === 'zh' ? '形態特徵' : 'Description',
-      content: description,
-      icon: Bookmark
+      content: description
     },
     {
       title: language === 'zh' ? '棲息地' : 'Habitat',
-      content: habitat,
-      icon: Map
+      content: habitat
     },
     {
       title: language === 'zh' ? '微棲地' : 'Microhabitat',
-      content: microhabitat,
-      icon: Compass
+      content: microhabitat
     },
     {
       title: language === 'zh' ? '寄主植物' : 'Host Plants',
-      content: hostPlants,
-      icon: Leaf
+      content: hostPlants
     },
     {
       title: language === 'zh' ? '備註' : 'Remarks',
-      content: remarks,
-      icon: Bookmark
+      content: remarks
     }
-  ].filter(section => section.content);
+  ].filter(section => Boolean(section.content?.trim()));
+  const detailContentKey = `${species.id ?? species.taxa_id ?? species.scientific_name}`;
+  const defaultDetailTab = detailSections.length > 0 ? 'supabase' : 'hkbih';
+  const detailTabsId = React.useId();
+  const [detailTabSelection, setDetailTabSelection] = React.useState<{
+    contentKey: string;
+    tab: 'supabase' | 'hkbih';
+  }>({ contentKey: detailContentKey, tab: defaultDetailTab });
+  const activeDetailTab = detailTabSelection.contentKey === detailContentKey
+    ? detailTabSelection.tab
+    : defaultDetailTab;
 
   return (
     <div className="bg-slate-50 min-h-full">
@@ -425,44 +430,127 @@ export default function SpeciesContent({ species, showBreadcrumb = true, refresh
               />
             </section>
 
-            {isFauna && (
-              <HkbihSpeciesCard
-                scientificName={species.scientific_name}
-                hkbihScientificName={species.hkbih_scientific_name}
-                chineseName={species.common_name_chi}
-              />
-            )}
-
             {anatomyCard}
 
 
-            {detailSections.length > 0 && (
+            {(detailSections.length > 0 || isFauna) && (
               <section className="rounded-[2rem] sm:rounded-[2.5rem] border border-slate-100 bg-white p-6 shadow-sm sm:p-8">
-                <div className="mb-5 flex items-center gap-3 sm:mb-6">
-                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-emerald-100/50 bg-emerald-50 text-emerald-600">
-                    <Bookmark className="h-4 w-4 text-emerald-600" />
+                <div className="mb-5 flex flex-wrap items-center justify-between gap-3 sm:mb-6">
+                  <div className="flex min-w-0 items-center gap-3">
+                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-emerald-100/50 bg-emerald-50 text-emerald-600">
+                      <Bookmark className="h-4 w-4 text-emerald-600" />
+                    </div>
+                    <h2 className="text-xl font-black text-slate-800 sm:text-2xl">
+                      {language === 'zh' ? '詳細資料' : 'Species Details'}
+                    </h2>
                   </div>
-                  <h2 className="text-xl font-black text-slate-800 sm:text-2xl">
-                    {language === 'zh' ? '詳細資料' : 'Species Details'}
-                  </h2>
+                  {isFauna && (
+                    <div
+                      className="flex shrink-0 items-center gap-1 rounded-xl border border-slate-200 bg-slate-50 p-1"
+                      role="tablist"
+                      aria-label={language === 'zh' ? '詳細資料來源' : 'Species detail sources'}
+                    >
+                      <button
+                        id={`${detailTabsId}-supabase-tab`}
+                        type="button"
+                        role="tab"
+                        aria-label={language === 'zh' ? 'HKBC 資料' : 'HKBC data'}
+                        aria-selected={activeDetailTab === 'supabase'}
+                        aria-controls={`${detailTabsId}-supabase-panel`}
+                        onClick={() => setDetailTabSelection({ contentKey: detailContentKey, tab: 'supabase' })}
+                        className={`flex min-h-10 items-center justify-center gap-1.5 rounded-lg px-2 py-2 text-sm font-bold transition-all sm:gap-2 sm:px-3 ${
+                          activeDetailTab === 'supabase'
+                            ? 'bg-white text-emerald-800 shadow-sm ring-1 ring-slate-200/80'
+                            : 'text-slate-500 hover:bg-white/70 hover:text-slate-700'
+                        }`}
+                      >
+                        <Image
+                          src="/logo.svg"
+                          alt=""
+                          width={18}
+                          height={18}
+                          className="h-[18px] w-[18px] shrink-0 object-contain"
+                        />
+                        <span className="hidden sm:inline">HKBC</span>
+                      </button>
+                      <button
+                        id={`${detailTabsId}-hkbih-tab`}
+                        type="button"
+                        role="tab"
+                        aria-label="HKBIH"
+                        aria-selected={activeDetailTab === 'hkbih'}
+                        aria-controls={`${detailTabsId}-hkbih-panel`}
+                        onClick={() => setDetailTabSelection({ contentKey: detailContentKey, tab: 'hkbih' })}
+                        className={`flex min-h-10 items-center justify-center gap-1.5 rounded-lg px-2 py-2 text-sm font-bold transition-all sm:gap-2 sm:px-3 ${
+                          activeDetailTab === 'hkbih'
+                            ? 'bg-white text-emerald-800 shadow-sm ring-1 ring-slate-200/80'
+                            : 'text-slate-500 hover:bg-white/70 hover:text-slate-700'
+                        }`}
+                      >
+                        <Image
+                          src="/images/partners/hkbih.webp"
+                          alt=""
+                          width={20}
+                          height={20}
+                          className="h-5 w-5 shrink-0 object-contain"
+                        />
+                        <span className="hidden sm:inline">HKBIH</span>
+                      </button>
+                    </div>
+                  )}
                 </div>
-                <div className="grid gap-3 sm:grid-cols-2 sm:gap-4">
-                  {detailSections.map(section => {
-                    const Icon = section.icon;
-
-                    return (
-                      <article key={section.title} className="rounded-2xl border border-slate-100 bg-slate-50 p-4 sm:p-5">
-                        <h3 className="mb-2 flex items-center gap-2 text-sm font-black text-slate-800">
-                          <Icon className="h-4 w-4 shrink-0 text-[#74a366]" />
-                          {section.title}
-                        </h3>
-                        <p className="whitespace-pre-line text-sm leading-relaxed text-slate-600">
-                          {section.content}
+                <AnimatePresence mode="wait" initial={false}>
+                  {activeDetailTab === 'supabase' ? (
+                    <motion.div
+                      key="supabase-details"
+                      id={`${detailTabsId}-supabase-panel`}
+                      role={isFauna ? 'tabpanel' : undefined}
+                      aria-labelledby={isFauna ? `${detailTabsId}-supabase-tab` : undefined}
+                      initial={shouldReduceMotion ? false : { opacity: 0, y: 8 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: shouldReduceMotion ? 0 : -4 }}
+                      transition={{ duration: shouldReduceMotion ? 0.12 : 0.24, ease: 'easeOut' }}
+                      className="min-h-20"
+                    >
+                      {detailSections.length > 0 ? (
+                        <div className="grid gap-3 sm:grid-cols-2 sm:gap-4">
+                          {detailSections.map(section => (
+                            <article key={section.title} className="rounded-2xl border border-slate-100 bg-slate-50 p-4 sm:p-5">
+                              <h3 className="mb-2 text-sm font-black text-slate-800">
+                                {section.title}
+                              </h3>
+                              <p className="whitespace-pre-line text-sm leading-relaxed text-slate-600">
+                                {section.content}
+                              </p>
+                            </article>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-4 py-6 text-center text-sm text-slate-500">
+                          {language === 'zh' ? '暫無本地詳細資料。' : 'No local details are available.'}
                         </p>
-                      </article>
-                    );
-                  })}
-                </div>
+                      )}
+                    </motion.div>
+                  ) : isFauna ? (
+                    <motion.div
+                      key="hkbih-details"
+                      id={`${detailTabsId}-hkbih-panel`}
+                      role="tabpanel"
+                      aria-labelledby={`${detailTabsId}-hkbih-tab`}
+                      initial={shouldReduceMotion ? false : { opacity: 0, y: 8 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: shouldReduceMotion ? 0 : -4 }}
+                      transition={{ duration: shouldReduceMotion ? 0.12 : 0.24, ease: 'easeOut' }}
+                      className="min-h-20"
+                    >
+                      <HkbihSpeciesCard
+                        scientificName={species.scientific_name}
+                        hkbihScientificName={species.hkbih_scientific_name}
+                        chineseName={species.common_name_chi}
+                      />
+                    </motion.div>
+                  ) : null}
+                </AnimatePresence>
               </section>
             )}
 
