@@ -21,6 +21,7 @@ import CongenericExplorer from './CongenericExplorer';
 import SimilarSpeciesExplorer from './SimilarSpeciesExplorer';
 import BirdSoundCard from './BirdSoundCard';
 import SpeciesContributionCard from './SpeciesContributionCard';
+import HkbihSpeciesCard from './HkbihSpeciesCard';
 import { useRouter } from 'next/navigation';
 import { useSpeciesPanel } from '@/context/SpeciesPanelContext';
 import { useTaxonomy } from '@/context/TaxonomyContext';
@@ -269,6 +270,7 @@ export default function SpeciesContent({ species, showBreadcrumb = true, refresh
 
   const plant = species as SpeciesWithPlantTaxonomy;
   const isPlant = species.taxa_group === 'FLORA' || (!species.phylum_eng && !!plant.family_chi);
+  const isFauna = !isPlant && String(species.taxa_group || '').trim().toUpperCase() !== 'FUNGI';
   const taxaType = isPlant ? 'flora' : 'fauna';
 
   const commonName = language === 'zh' ? species.common_name_chi : species.common_name_eng;
@@ -390,6 +392,14 @@ export default function SpeciesContent({ species, showBreadcrumb = true, refresh
                 galleryImageMetadata={species.gallery_image_metadata || {}}
               />
             </section>
+
+            {isFauna && (
+              <HkbihSpeciesCard
+                scientificName={species.scientific_name}
+                hkbihScientificName={species.hkbih_scientific_name}
+                chineseName={species.common_name_chi}
+              />
+            )}
 
             {anatomyCard}
 
@@ -521,6 +531,7 @@ export default function SpeciesContent({ species, showBreadcrumb = true, refresh
                   <p className="text-slate-600 text-sm">{globalDist || '-'}</p>
                 </div>
               </div>
+
             </section>
 
             {/* Temporal Observation Trends Card - Placed above Conservation Status */}

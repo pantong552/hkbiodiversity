@@ -19,6 +19,59 @@ export interface BgisSearchRecord {
   [key: string]: unknown;
 }
 
+export interface HkbihSpeciesDetails {
+  species_id: number;
+  scientific_name?: string | null;
+  authority_sp?: string | null;
+  synonym?: string | null;
+  common_name?: string | null;
+  alias_common_name?: string | null;
+  chinese_name_tc?: string | null;
+  alias_chinese_name_tc?: string | null;
+  local_distribution_en?: string | null;
+  local_distribution_tc?: string | null;
+  global_distribution_en?: string | null;
+  global_distribution_tc?: string | null;
+  description_en?: string | null;
+  description_tc?: string | null;
+}
+
+interface HkbihSpeciesSearchRecord {
+  species_id: number;
+  scientific_name: string;
+  chinese_name_tc?: string | null;
+  [key: string]: unknown;
+}
+
+function isHkbihSpeciesDetails(value: unknown): value is HkbihSpeciesDetails {
+  if (typeof value !== 'object' || value === null) {
+    return false;
+  }
+
+  const record = value as Record<string, unknown>;
+  if (typeof record.species_id !== 'number') return false;
+
+  return [
+    'scientific_name',
+    'authority_sp',
+    'synonym',
+    'common_name',
+    'alias_common_name',
+    'chinese_name_tc',
+    'alias_chinese_name_tc',
+    'local_distribution_en',
+    'local_distribution_tc',
+    'global_distribution_en',
+    'global_distribution_tc',
+    'description_en',
+    'description_tc'
+  ].every(field => {
+    if (!(field in record)) return true;
+    const fieldValue = record[field];
+    return fieldValue === null || typeof fieldValue === 'string';
+  });
+}
+
 export const BGIS_DATASETS: Record<number, { zh: string; en: string }> = {
   62: {
     zh: '香港生物數據庫',
@@ -33,6 +86,69 @@ export const BGIS_DATASETS: Record<number, { zh: string; en: string }> = {
     en: 'Field trial of juvenile horseshoe crab monitoring in Hong Kong using environmental DNA technique'
   }
 };
+
+export async function fetchHkbihSpeciesDetails(
+  scientificName: string,
+  chineseName?: string,
+  signal?: AbortSignal
+): Promise<HkbihSpeciesDetails | null> {
+  const keywordsToTry = [scientificName, chineseName].filter(Boolean) as string[];
+  let targetItem: HkbihSpeciesSearchRecord | null = null;
+  let lastError: unknown;
+
+  for (const kw of keywordsToTry) {
+    try {
+      const searchParams = new URLSearchParams({
+        action: 'list_species',
+        search_type: 'Animal',
+        kw,
+        page: '1',
+        page_size: '20',
+        order_by: 'family'
+      });
+      const searchRes = await fetch(`/hkbih-database/process.aspx?${searchParams}`, { signal });
+
+      if (!searchRes.ok) {
+        throw new Error(`HKBIH species search failed: ${searchRes.status}`);
+      }
+
+      const searchData: { records?: HkbihSpeciesSearchRecord[] } = await searchRes.json();
+      const records = Array.isArray(searchData.records) ? searchData.records : [];
+      if (records.length > 0) {
+        const normalizedScientificName = scientificName.trim().toLowerCase();
+        const normalizedChineseName = chineseName?.trim();
+        targetItem = records.find(record =>
+          record.scientific_name?.trim().toLowerCase() === normalizedScientificName
+          || (normalizedChineseName && record.chinese_name_tc?.trim() === normalizedChineseName)
+        ) || records[0];
+        break;
+      }
+    } catch (error) {
+      if (signal?.aborted) throw error;
+      lastError = error;
+      console.error(`[HKBIH] Species search failed (kw: ${kw}):`, error);
+    }
+  }
+
+  if (!targetItem) {
+    if (lastError) throw lastError;
+    return null;
+  }
+
+  const detailRes = await fetch(
+    `/hkbih-database/process.aspx?action=get_species&id=${encodeURIComponent(String(targetItem.species_id))}`,
+    { signal }
+  );
+  if (!detailRes.ok) {
+    throw new Error(`HKBIH species details failed: ${detailRes.status}`);
+  }
+
+  const responseData: unknown = await detailRes.json();
+  if (!isHkbihSpeciesDetails(responseData)) {
+    throw new Error('HKBIH returned invalid species details');
+  }
+  return responseData;
+}
 
 /**
  * 透過 BGIS API 獲取指定物種的 1km 網格分佈數據

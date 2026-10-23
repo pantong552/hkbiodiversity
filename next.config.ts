@@ -8,6 +8,10 @@ const nextConfig: NextConfig = {
         destination: 'https://bih.gov.hk/BGIS/API/:path*',
       },
       {
+        source: '/hkbih-database/:path*',
+        destination: 'https://bih.gov.hk/database/:path*',
+      },
+      {
         source: '/ebird-api/:path*',
         destination: 'https://ebird.org/:path*',
       },
@@ -158,6 +162,10 @@ const nextConfig: NextConfig = {
       }
     ],
     localPatterns: [
+      {
+        pathname: '/images/partners/hkbih.webp',
+        search: '',
+      },
       {
         pathname: '/api/image/transform',
         search: '',
