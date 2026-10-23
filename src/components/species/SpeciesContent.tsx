@@ -282,6 +282,38 @@ export default function SpeciesContent({ species, showBreadcrumb = true, refresh
   const globalDist = language === 'zh' ? species.global_distribution_chi : species.global_distribution_eng;
   const introduction = language === 'zh' ? species.introduction_chi : species.introduction_eng;
   const microhabitat = language === 'zh' ? species.microhabitat_chi : species.microhabitat_eng;
+  const detailSections = [
+    {
+      title: language === 'zh' ? '物種簡介' : 'Introduction',
+      content: introduction,
+      icon: Bookmark
+    },
+    {
+      title: language === 'zh' ? '形態特徵' : 'Description',
+      content: description,
+      icon: Bookmark
+    },
+    {
+      title: language === 'zh' ? '棲息地' : 'Habitat',
+      content: habitat,
+      icon: Map
+    },
+    {
+      title: language === 'zh' ? '微棲地' : 'Microhabitat',
+      content: microhabitat,
+      icon: Compass
+    },
+    {
+      title: language === 'zh' ? '寄主植物' : 'Host Plants',
+      content: hostPlants,
+      icon: Leaf
+    },
+    {
+      title: language === 'zh' ? '備註' : 'Remarks',
+      content: remarks,
+      icon: Bookmark
+    }
+  ].filter(section => section.content);
 
   return (
     <div className="bg-slate-50 min-h-full">
@@ -404,90 +436,33 @@ export default function SpeciesContent({ species, showBreadcrumb = true, refresh
             {anatomyCard}
 
 
-            {/* Description, Introduction, Habitat, Microhabitat, Host Plants */}
-            {(introduction || description || habitat || microhabitat || hostPlants) && (
-              <section className="rounded-[2rem] sm:rounded-[2.5rem] shadow-sm bg-white p-6 sm:p-8 border border-slate-100 divide-y divide-slate-50">
-                {introduction && (
-                  <div className="py-8 first:pt-0 last:pb-0">
-                    <h2 className="text-xl sm:text-2xl font-black text-slate-800 mb-6 flex items-center gap-2 sm:gap-3">
-                      <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl sm:rounded-2xl bg-emerald-50 border border-emerald-100/50 flex items-center justify-center text-emerald-600 shrink-0 shadow-xs">
-                        <Bookmark className="w-4 h-4 sm:w-5 sm:h-5 text-emerald-600" />
-                      </div>
-                      <span>{language === 'zh' ? '物種簡介' : 'Introduction'}</span>
-                    </h2>
-                    <div className="prose prose-slate max-w-none text-slate-600 leading-relaxed">
-                      <p>{introduction}</p>
-                    </div>
+            {detailSections.length > 0 && (
+              <section className="rounded-[2rem] sm:rounded-[2.5rem] border border-slate-100 bg-white p-6 shadow-sm sm:p-8">
+                <div className="mb-5 flex items-center gap-3 sm:mb-6">
+                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-emerald-100/50 bg-emerald-50 text-emerald-600">
+                    <Bookmark className="h-4 w-4 text-emerald-600" />
                   </div>
-                )}
+                  <h2 className="text-xl font-black text-slate-800 sm:text-2xl">
+                    {language === 'zh' ? '詳細資料' : 'Species Details'}
+                  </h2>
+                </div>
+                <div className="grid gap-3 sm:grid-cols-2 sm:gap-4">
+                  {detailSections.map(section => {
+                    const Icon = section.icon;
 
-                {description && (
-                  <div className="py-8 first:pt-0 last:pb-0">
-                    <h2 className="text-xl sm:text-2xl font-black text-slate-800 mb-6 flex items-center gap-2 sm:gap-3">
-                      <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl sm:rounded-2xl bg-emerald-50 border border-emerald-100/50 flex items-center justify-center text-emerald-600 shrink-0 shadow-xs">
-                        <Bookmark className="w-4 h-4 sm:w-5 sm:h-5 text-emerald-600" />
-                      </div>
-                      <span>{language === 'zh' ? '形態特徵' : 'Description'}</span>
-                    </h2>
-                    <div className="prose prose-slate max-w-none text-slate-600 leading-relaxed">
-                      <p>{description}</p>
-                    </div>
-                  </div>
-                )}
-
-                {habitat && (
-                  <div className="py-8 first:pt-0 last:pb-0">
-                    <h2 className="text-xl sm:text-2xl font-black text-slate-800 mb-6 flex items-center gap-2 sm:gap-3">
-                      <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl sm:rounded-2xl bg-emerald-50 border border-emerald-100/50 flex items-center justify-center text-emerald-600 shrink-0 shadow-xs">
-                        <Map className="w-4 h-4 sm:w-5 sm:h-5 text-emerald-600" />
-                      </div>
-                      <span>{language === 'zh' ? '棲息地' : 'Habitat'}</span>
-                    </h2>
-                    <div className="prose prose-slate max-w-none text-slate-600 leading-relaxed">
-                      <p>{habitat}</p>
-                    </div>
-                  </div>
-                )}
-
-                {microhabitat && (
-                  <div className="py-8 first:pt-0 last:pb-0">
-                    <h2 className="text-xl sm:text-2xl font-black text-slate-800 mb-6 flex items-center gap-2 sm:gap-3">
-                      <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl sm:rounded-2xl bg-emerald-50 border border-emerald-100/50 flex items-center justify-center text-emerald-600 shrink-0 shadow-xs">
-                        <Compass className="w-4 h-4 sm:w-5 sm:h-5 text-emerald-600" />
-                      </div>
-                      <span>{language === 'zh' ? '微棲地' : 'Microhabitat'}</span>
-                    </h2>
-                    <div className="prose prose-slate max-w-none text-slate-600 leading-relaxed">
-                      <p>{microhabitat}</p>
-                    </div>
-                  </div>
-                )}
-
-                {hostPlants && (
-                  <div className="py-8 first:pt-0 last:pb-0">
-                    <h2 className="text-xl sm:text-2xl font-black text-slate-800 mb-6 flex items-center gap-2 sm:gap-3">
-                      <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl sm:rounded-2xl bg-emerald-50 border border-emerald-100/50 flex items-center justify-center text-emerald-600 shrink-0 shadow-xs">
-                        <Leaf className="w-4 h-4 sm:w-5 sm:h-5 text-emerald-600" />
-                      </div>
-                      <span>{language === 'zh' ? '寄主植物' : 'Host Plants'}</span>
-                    </h2>
-                    <div className="prose prose-slate max-w-none text-slate-600 leading-relaxed">
-                      <p>{hostPlants}</p>
-                    </div>
-                  </div>
-                )}
-              </section>
-            )}
-
-            {/* Remarks */}
-            {remarks && (
-              <section className="rounded-[2rem] sm:rounded-[2.5rem] shadow-sm bg-emerald-50/50 p-8 border border-emerald-100/50">
-                <h2 className="text-xl font-bold text-emerald-900 mb-4">
-                  {language === 'zh' ? '備註' : 'Remarks'}
-                </h2>
-                <p className="text-emerald-800/80 leading-relaxed">
-                  {remarks}
-                </p>
+                    return (
+                      <article key={section.title} className="rounded-2xl border border-slate-100 bg-slate-50 p-4 sm:p-5">
+                        <h3 className="mb-2 flex items-center gap-2 text-sm font-black text-slate-800">
+                          <Icon className="h-4 w-4 shrink-0 text-[#74a366]" />
+                          {section.title}
+                        </h3>
+                        <p className="whitespace-pre-line text-sm leading-relaxed text-slate-600">
+                          {section.content}
+                        </p>
+                      </article>
+                    );
+                  })}
+                </div>
               </section>
             )}
 
