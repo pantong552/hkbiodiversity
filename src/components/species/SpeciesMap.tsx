@@ -1988,6 +1988,13 @@ export default function SpeciesMap({ taxonId, scientificName, hkbihScientificNam
 
       {/* Map View */}
       <Map
+        style={{
+          position: 'absolute',
+          top: -1,
+          left: -1,
+          width: 'calc(100% + 2px)',
+          height: 'calc(100% + 2px)'
+        }}
         initialViewState={{
           longitude: 114.135,
           latitude: 22.365,

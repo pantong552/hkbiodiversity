@@ -206,6 +206,13 @@ export default function GbifGlobalMap({ scientificName }: GbifGlobalMapProps) {
       {/* 地圖 View */}
       <Map
         ref={mapRef}
+        style={{
+          position: 'absolute',
+          top: -1,
+          left: -1,
+          width: 'calc(100% + 2px)',
+          height: 'calc(100% + 2px)'
+        }}
         initialViewState={{
           longitude: 15,
           latitude: 20,
