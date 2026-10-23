@@ -333,7 +333,10 @@ export default function CongenericExplorer({ species, isMobile = false }: Congen
     async function fetchRelated() {
       setIsLoading(true);
       try {
-        const isFlora = species.taxa_group === 'FLORA';
+        const taxaId = String(species.taxa_id || '');
+        const isFlora = species.taxa_group === 'FLORA' || taxaId.startsWith('flora_');
+        const isFungi = species.taxa_group === 'FUNGI' || taxaId.startsWith('fungi_');
+        const tableName = isFlora ? 'plant_species' : isFungi ? 'fungi_species' : 'species';
         const genusField = 'genus_eng';
         const familyField = 'family_eng';
         
@@ -342,11 +345,16 @@ export default function CongenericExplorer({ species, isMobile = false }: Congen
 
         // Step 1: Try Genus
         if (genusValue) {
-          const { data, error } = await supabase
-            .from(isFlora ? 'plant_species' : 'species')
+          let query = supabase
+            .from(tableName)
             .select('*')
-            .eq(genusField, genusValue)
-            .neq('inat_id', species.inat_id)
+            .eq(genusField, genusValue);
+          if (species.taxa_id) {
+            query = query.neq('taxa_id', species.taxa_id);
+          } else if (species.inat_id != null) {
+            query = query.neq('inat_id', species.inat_id);
+          }
+          const { data, error } = await query
             .order('scientific_name', { ascending: true })
             .limit(20);
           if (error) throw error;
@@ -375,11 +383,16 @@ export default function CongenericExplorer({ species, isMobile = false }: Congen
 
         // Step 2: Try Family
         if (familyValue) {
-          const { data, error } = await supabase
-            .from(isFlora ? 'plant_species' : 'species')
+          let query = supabase
+            .from(tableName)
             .select('*')
-            .eq(familyField, familyValue)
-            .neq('inat_id', species.inat_id)
+            .eq(familyField, familyValue);
+          if (species.taxa_id) {
+            query = query.neq('taxa_id', species.taxa_id);
+          } else if (species.inat_id != null) {
+            query = query.neq('inat_id', species.inat_id);
+          }
+          const { data, error } = await query
             .order('scientific_name', { ascending: true })
             .limit(20);
           if (error) throw error;
@@ -411,7 +424,8 @@ export default function CongenericExplorer({ species, isMobile = false }: Congen
         setCongenericSpecies([]);
         setDiscoveryLevel(null);
       } catch (err) {
-        console.error('Error fetching related species:', err);
+        const message = err instanceof Error ? err.message : JSON.stringify(err);
+        console.error(`Error fetching related species: ${message}`, err);
       } finally {
         setIsLoading(false);
       }
