@@ -4,9 +4,11 @@ import { useEffect, useState } from 'react';
 import Image from 'next/image';
 import { ExternalLink, Info, Loader2 } from 'lucide-react';
 import { useLanguage } from '@/context/LanguageContext';
-import { fetchHkbihSpeciesDetails, HkbihSpeciesDetails } from '@/utils/bgis';
+import { fetchHkbihSpeciesDetails, HkbihSpeciesDetails, HkbihSpeciesMedia } from '@/utils/bgis';
 import { renderFormattedText } from '@/utils/formatters';
+import type { InatGalleryPhoto } from '@/hooks/useInaturalistSpeciesPhotos';
 import BgisAttributionModal from './BgisAttributionModal';
+import EnrichedLightbox from '../ui/EnrichedLightbox';
 
 interface HkbihSpeciesCardProps {
   scientificName?: string;
@@ -21,6 +23,11 @@ type LoadResult = {
   details: HkbihSpeciesDetails | null;
 };
 
+function getHkbihMediaUrl(path?: string | null): string | null {
+  if (!path?.startsWith('/Multimedia/multimedia-dataset/')) return null;
+  return `https://bih.gov.hk${path}`;
+}
+
 export default function HkbihSpeciesCard({
   scientificName,
   hkbihScientificName,
@@ -30,6 +37,8 @@ export default function HkbihSpeciesCard({
   const isChinese = language === 'zh';
   const [loadResult, setLoadResult] = useState<LoadResult | null>(null);
   const [isAttributionOpen, setIsAttributionOpen] = useState(false);
+  const [activeMediaIndex, setActiveMediaIndex] = useState<number | null>(null);
+  const [mediaImageStates, setMediaImageStates] = useState<Record<string, 'loaded' | 'error'>>({});
   const preferredName = hkbihScientificName?.trim() || scientificName?.trim() || '';
   const queryKey = `${preferredName}|${chineseName || ''}`;
   const hasSearchName = Boolean(preferredName || chineseName);
@@ -126,6 +135,39 @@ export default function HkbihSpeciesCard({
     }
   ].filter(field => Boolean(field.text)) : [];
   const hasDetails = identityFields.length > 0 || descriptiveFields.length > 0;
+  const media = (details?.media || []).filter(
+    item => item.multimedia_type === 'photo' && getHkbihMediaUrl(item.filename)
+  );
+  const lightboxPhotos: InatGalleryPhoto[] = media.flatMap((item, index) => {
+    const originalUrl = getHkbihMediaUrl(item.filename);
+    const thumbnailUrl = getHkbihMediaUrl(item.filename_t) || originalUrl;
+    if (!originalUrl || !thumbnailUrl) return [];
+    return [{
+      id: `hkbih-${details?.species_id}-${index}`,
+      url: thumbnailUrl,
+      small_url: thumbnailUrl,
+      medium_url: originalUrl,
+      large_url: originalUrl,
+      original_url: originalUrl,
+      attribution: '',
+      licenseCode: null,
+      nativePageUrl: null,
+      observationUrl: null,
+      observedOn: null
+    }];
+  });
+  const activeMedia = activeMediaIndex === null ? null : media[activeMediaIndex] || null;
+
+  const getMediaSummary = (item: HkbihSpeciesMedia) => {
+    const localizedValue = (english?: string | null, chinese?: string | null, simplifiedChinese?: string | null) =>
+      isChinese ? chinese || english || simplifiedChinese : english || chinese || simplifiedChinese;
+    return [
+      { key: 'photographer', label: isChinese ? '攝影者' : 'Photographer', value: localizedValue(item.photographer_en, item.photographer_tc, item.photographer_sc) },
+      { key: 'data-owner', label: isChinese ? '資料擁有人' : 'Data owner', value: localizedValue(item.data_owner_en, item.data_owner_tc, item.data_owner_sc) },
+      { key: 'sex', label: isChinese ? '性別' : 'Sex', value: localizedValue(item.sex_en, item.sex_tc, item.sex_sc) },
+      { key: 'life-stage', label: isChinese ? '生命階段' : 'Life stage', value: localizedValue(item.stage_of_life_en, item.stage_of_life_tc, item.stage_of_life_sc) }
+    ].filter(row => Boolean(row.value?.trim()));
+  };
 
   const statusMessage = loadState === 'loading'
     ? (isChinese ? '正在載入 HKBIH 物種資料…' : 'Loading HKBIH species information…')
@@ -208,9 +250,64 @@ export default function HkbihSpeciesCard({
               <p className="text-sm text-slate-500">{isChinese ? 'HKBIH 暫無所選資料欄位。' : 'The selected HKBIH fields are not available.'}</p>
             )}
 
+            {media.length > 0 && (
+              <div className="mt-5 border-t border-slate-100 pt-5">
+                <div className="-mx-2 flex gap-3 overflow-x-auto px-2 py-2">
+                  {media.map((item, index) => {
+                    const thumbnailUrl = getHkbihMediaUrl(item.filename_t) || getHkbihMediaUrl(item.filename);
+                    if (!thumbnailUrl) return null;
+                    const imageState = mediaImageStates[thumbnailUrl];
+                    return (
+                      <button
+                        key={`${item.filename}-${index}`}
+                        type="button"
+                        onClick={() => setActiveMediaIndex(index)}
+                        aria-label={isChinese ? `放大查看第 ${index + 1} 張圖片` : `View photo ${index + 1}`}
+                        className="group relative aspect-square w-24 shrink-0 cursor-pointer overflow-hidden rounded-2xl bg-slate-100 opacity-80 shadow-sm transition-opacity duration-300 hover:opacity-100 hover:shadow-lg focus:outline-none focus:ring-4 focus:ring-emerald-500 focus:ring-offset-2"
+                      >
+                        {imageState !== 'error' && (
+                          <div className={`absolute inset-0 z-10 flex items-center justify-center bg-slate-100 transition-opacity ${imageState === 'loaded' ? 'pointer-events-none opacity-0' : 'opacity-100'}`}>
+                            <div className="absolute inset-0 -translate-x-full animate-[shimmer_1.5s_infinite] bg-gradient-to-r from-transparent via-white/70 to-transparent" />
+                            <Loader2 className="relative z-10 h-5 w-5 animate-spin text-emerald-500" />
+                          </div>
+                        )}
+                        <Image
+                          src={thumbnailUrl}
+                          alt={details?.scientific_name || ''}
+                          fill
+                          sizes="96px"
+                          className={`pointer-events-none object-cover transition-transform duration-300 group-hover:scale-105 ${imageState === 'loaded' ? 'opacity-100' : 'opacity-0'}`}
+                          onLoad={() => setMediaImageStates(previous => ({ ...previous, [thumbnailUrl]: 'loaded' }))}
+                          onError={() => setMediaImageStates(previous => ({ ...previous, [thumbnailUrl]: 'error' }))}
+                        />
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
           </>
         )}
       </section>
+      <EnrichedLightbox
+        isOpen={activeMediaIndex !== null && lightboxPhotos.length > 0}
+        onClose={() => setActiveMediaIndex(null)}
+        photos={lightboxPhotos}
+        currentIndex={activeMediaIndex ?? 0}
+        onNavigate={setActiveMediaIndex}
+        commonName={details?.common_name || details?.scientific_name || ''}
+        scientificName={details?.scientific_name || ''}
+        footerContent={activeMedia ? (
+          <dl className="grid w-full max-w-3xl grid-cols-2 gap-2 sm:grid-cols-4">
+            {getMediaSummary(activeMedia).map(row => (
+              <div key={row.key} className="min-w-0 rounded-xl border border-white/10 bg-slate-950/70 px-3 py-2 text-left shadow-lg backdrop-blur-xl">
+                <dt className="truncate text-[10px] font-semibold uppercase tracking-wide text-white/55">{row.label}</dt>
+                <dd className="mt-0.5 break-words text-xs font-semibold leading-snug text-white">{row.value}</dd>
+              </div>
+            ))}
+          </dl>
+        ) : null}
+      />
       <BgisAttributionModal
         isOpen={isAttributionOpen}
         onClose={() => setIsAttributionOpen(false)}

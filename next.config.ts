@@ -159,7 +159,12 @@ const nextConfig: NextConfig = {
       {
         protocol: 'https',
         hostname: '*.inaturalist.org',
-      }
+      },
+      {
+        protocol: 'https',
+        hostname: 'bih.gov.hk',
+        pathname: '/Multimedia/multimedia-dataset/**',
+      },
     ],
     localPatterns: [
       {

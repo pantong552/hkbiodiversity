@@ -37,6 +37,7 @@ interface EnrichedLightboxProps {
   scientificName?: string;
   taxaId?: string;
   onDeletePhoto?: (photoId: string | number) => Promise<void>;
+  footerContent?: React.ReactNode;
 }
 
 export default function EnrichedLightbox({
@@ -47,7 +48,8 @@ export default function EnrichedLightbox({
   onNavigate,
   commonName,
   scientificName,
-  onDeletePhoto
+  onDeletePhoto,
+  footerContent
 }: EnrichedLightboxProps) {
   const { profile } = useAuth();
   const { language } = useLanguage();
@@ -459,6 +461,11 @@ export default function EnrichedLightbox({
           animate={{ y: showUI ? 0 : 100, opacity: showUI ? 1 : 0 }}
           className="absolute bottom-0 left-0 right-0 z-[120] p-6 md:p-8 pointer-events-none"
         >
+          {footerContent ? (
+            <div className="mx-auto flex max-w-4xl justify-center">
+              <div className="pointer-events-auto">{footerContent}</div>
+            </div>
+          ) : (
           <div className="max-w-4xl mx-auto flex flex-col items-center gap-4">
              <div className="flex flex-col items-center gap-1.5 p-5 bg-black/40 backdrop-blur-2xl rounded-[2rem] border border-white/10 pointer-events-auto shadow-2xl">
                 <h3 className="text-white text-lg md:text-xl font-black tracking-tight flex items-center gap-2">
@@ -502,6 +509,7 @@ export default function EnrichedLightbox({
                 </div>
              </div>
            </div>
+          )}
 
         </motion.div>
 

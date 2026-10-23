@@ -34,6 +34,42 @@ export interface HkbihSpeciesDetails {
   global_distribution_tc?: string | null;
   description_en?: string | null;
   description_tc?: string | null;
+  media?: HkbihSpeciesMedia[] | null;
+}
+
+export interface HkbihSpeciesMedia {
+  filename?: string | null;
+  filename_t?: string | null;
+  multimedia_order?: string | null;
+  multimedia_type?: string | null;
+  data_provider_en?: string | null;
+  data_provider_tc?: string | null;
+  data_provider_sc?: string | null;
+  data_owner_en?: string | null;
+  data_owner_tc?: string | null;
+  data_owner_sc?: string | null;
+  title_en?: string | null;
+  title_tc?: string | null;
+  title_sc?: string | null;
+  photographer_en?: string | null;
+  photographer_tc?: string | null;
+  photographer_sc?: string | null;
+  date_of_photo?: string | null;
+  location_en?: string | null;
+  location_tc?: string | null;
+  location_sc?: string | null;
+  remark_en?: string | null;
+  remark_tc?: string | null;
+  remark_sc?: string | null;
+  sex_en?: string | null;
+  sex_tc?: string | null;
+  sex_sc?: string | null;
+  stage_of_life_en?: string | null;
+  stage_of_life_tc?: string | null;
+  stage_of_life_sc?: string | null;
+  behaviour_en?: string | null;
+  behaviour_tc?: string | null;
+  behaviour_sc?: string | null;
 }
 
 interface HkbihSpeciesSearchRecord {
@@ -41,6 +77,50 @@ interface HkbihSpeciesSearchRecord {
   scientific_name: string;
   chinese_name_tc?: string | null;
   [key: string]: unknown;
+}
+
+function isHkbihSpeciesMedia(value: unknown): value is HkbihSpeciesMedia {
+  if (typeof value !== 'object' || value === null) return false;
+  const record = value as Record<string, unknown>;
+
+  return [
+    'filename',
+    'filename_t',
+    'multimedia_order',
+    'multimedia_type',
+    'data_provider_en',
+    'data_provider_tc',
+    'data_provider_sc',
+    'data_owner_en',
+    'data_owner_tc',
+    'data_owner_sc',
+    'title_en',
+    'title_tc',
+    'title_sc',
+    'photographer_en',
+    'photographer_tc',
+    'photographer_sc',
+    'date_of_photo',
+    'location_en',
+    'location_tc',
+    'location_sc',
+    'remark_en',
+    'remark_tc',
+    'remark_sc',
+    'sex_en',
+    'sex_tc',
+    'sex_sc',
+    'stage_of_life_en',
+    'stage_of_life_tc',
+    'stage_of_life_sc',
+    'behaviour_en',
+    'behaviour_tc',
+    'behaviour_sc'
+  ].every(field => {
+    if (!(field in record)) return true;
+    const fieldValue = record[field];
+    return fieldValue === null || typeof fieldValue === 'string';
+  });
 }
 
 function isHkbihSpeciesDetails(value: unknown): value is HkbihSpeciesDetails {
@@ -64,10 +144,17 @@ function isHkbihSpeciesDetails(value: unknown): value is HkbihSpeciesDetails {
     'global_distribution_en',
     'global_distribution_tc',
     'description_en',
-    'description_tc'
+    'description_tc',
+    'media'
   ].every(field => {
     if (!(field in record)) return true;
     const fieldValue = record[field];
+    if (field === 'media') {
+      return fieldValue === null || (
+        Array.isArray(fieldValue)
+        && fieldValue.every(isHkbihSpeciesMedia)
+      );
+    }
     return fieldValue === null || typeof fieldValue === 'string';
   });
 }
