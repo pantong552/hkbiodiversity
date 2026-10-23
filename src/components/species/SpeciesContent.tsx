@@ -446,7 +446,7 @@ export default function SpeciesContent({ species, showBreadcrumb = true, refresh
                   </div>
                   {isFauna && (
                     <div
-                      className="flex shrink-0 items-center gap-1 rounded-xl border border-slate-200 bg-slate-50 p-1"
+                      className="flex shrink-0 items-center gap-0.5 rounded-full border border-slate-200/80 bg-slate-100/80 p-0.5 shadow-inner"
                       role="tablist"
                       aria-label={language === 'zh' ? '詳細資料來源' : 'Species detail sources'}
                     >
@@ -458,10 +458,10 @@ export default function SpeciesContent({ species, showBreadcrumb = true, refresh
                         aria-selected={activeDetailTab === 'supabase'}
                         aria-controls={`${detailTabsId}-supabase-panel`}
                         onClick={() => setDetailTabSelection({ contentKey: detailContentKey, tab: 'supabase' })}
-                        className={`flex min-h-10 items-center justify-center gap-1.5 rounded-lg px-2 py-2 text-sm font-bold transition-all sm:gap-2 sm:px-3 ${
+                        className={`flex min-h-9 items-center justify-center gap-1.5 rounded-full px-2.5 py-1.5 text-xs font-bold transition-all duration-200 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-1 motion-reduce:transition-none sm:gap-2 ${
                           activeDetailTab === 'supabase'
-                            ? 'bg-white text-emerald-800 shadow-sm ring-1 ring-slate-200/80'
-                            : 'text-slate-500 hover:bg-white/70 hover:text-slate-700'
+                            ? 'bg-white text-emerald-800 shadow-sm ring-1 ring-emerald-200/80'
+                            : 'text-slate-500 hover:-translate-y-px hover:bg-white hover:text-emerald-700 hover:shadow-sm active:translate-y-0'
                         }`}
                       >
                         <Image
@@ -469,7 +469,7 @@ export default function SpeciesContent({ species, showBreadcrumb = true, refresh
                           alt=""
                           width={18}
                           height={18}
-                          className="h-[18px] w-[18px] shrink-0 object-contain"
+                          className="h-4 w-4 shrink-0 object-contain"
                         />
                         <span className="hidden sm:inline">HKBC</span>
                       </button>
@@ -481,10 +481,10 @@ export default function SpeciesContent({ species, showBreadcrumb = true, refresh
                         aria-selected={activeDetailTab === 'hkbih'}
                         aria-controls={`${detailTabsId}-hkbih-panel`}
                         onClick={() => setDetailTabSelection({ contentKey: detailContentKey, tab: 'hkbih' })}
-                        className={`flex min-h-10 items-center justify-center gap-1.5 rounded-lg px-2 py-2 text-sm font-bold transition-all sm:gap-2 sm:px-3 ${
+                        className={`flex min-h-9 items-center justify-center gap-1.5 rounded-full px-2.5 py-1.5 text-xs font-bold transition-all duration-200 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-1 motion-reduce:transition-none sm:gap-2 ${
                           activeDetailTab === 'hkbih'
-                            ? 'bg-white text-emerald-800 shadow-sm ring-1 ring-slate-200/80'
-                            : 'text-slate-500 hover:bg-white/70 hover:text-slate-700'
+                            ? 'bg-white text-emerald-800 shadow-sm ring-1 ring-emerald-200/80'
+                            : 'text-slate-500 hover:-translate-y-px hover:bg-white hover:text-emerald-700 hover:shadow-sm active:translate-y-0'
                         }`}
                       >
                         <Image
@@ -492,7 +492,7 @@ export default function SpeciesContent({ species, showBreadcrumb = true, refresh
                           alt=""
                           width={20}
                           height={20}
-                          className="h-5 w-5 shrink-0 object-contain"
+                          className="h-4 w-4 shrink-0 object-contain"
                         />
                         <span className="hidden sm:inline">HKBIH</span>
                       </button>
