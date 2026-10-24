@@ -3,12 +3,14 @@
 import React, { useEffect, useRef, useState } from 'react';
 import Image from 'next/image';
 import { AnimatePresence, motion } from 'framer-motion';
-import { AlertCircle, BookOpen, Check, ChevronDown, ChevronLeft, ChevronRight, ExternalLink, Loader2, Mouse, Plus, RotateCcw, Trash2, Upload } from 'lucide-react';
+import { AlertCircle, BookOpen, Check, ChevronDown, ChevronLeft, ChevronRight, ExternalLink, Loader2, Mouse, Plus, RotateCcw, Send, Trash2, Upload } from 'lucide-react';
 import { useLanguage } from '@/context/LanguageContext';
+import { useAuth } from '@/context/AuthContext';
 import { createClient } from '@/utils/supabase/client';
 import { InatGalleryPhoto, useInaturalistSpeciesPhotos } from '@/hooks/useInaturalistSpeciesPhotos';
 import { AnatomyIllustration, AnatomyMarker, EMPTY_ANATOMY_ILLUSTRATION } from '@/types/anatomy';
 import { clampAnatomyPan, fitAnatomyImage, getAnatomyCoordinates, getAnatomyPanLimits, getAnatomyPanOffset, getAnatomyZoomPan, isAllowedAnatomyImageUrl, mapAnatomyIllustrations, normalizeAnatomyMarkers } from '@/utils/anatomy';
+import CuratorApplicationModal from '@/components/profile/CuratorApplicationModal';
 
 interface SpeciesAnatomyCardProps {
   tableName: string;
@@ -1410,6 +1412,8 @@ function AnatomyIllustrationDisplay({ illustration, isZh, title }: { illustratio
 
 export default function SpeciesAnatomyCard({ tableName, speciesTaxaId, refreshKey = 0 }: SpeciesAnatomyCardProps) {
   const { language } = useLanguage();
+  const { profile, isLoading: isAuthLoading, requireAuth } = useAuth();
+  const [isCuratorApplicationOpen, setIsCuratorApplicationOpen] = useState(false);
   const supabase = createClient();
   const [illustrations, setIllustrations] = useState<AnatomyIllustration[]>([]);
   const [activeImageIndex, setActiveImageIndex] = useState(0);
@@ -1478,7 +1482,22 @@ export default function SpeciesAnatomyCard({ tableName, speciesTaxaId, refreshKe
       ) : loadError ? (
         <div role="alert" className="flex min-h-32 items-center justify-center gap-2 text-sm text-rose-700"><AlertCircle className="size-4" />{isZh ? '圖鑑載入失敗，請稍後重試。' : 'Could not load the illustration. Please try again later.'}</div>
       ) : illustrations.length === 0 ? (
-        <div className="flex min-h-28 items-center justify-center text-sm text-slate-400">{isZh ? '此物種尚未提供特徵插圖。' : 'No anatomy illustration is available for this species yet.'}</div>
+        <div className="flex flex-col items-center gap-2 rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-4 py-6 text-center text-sm leading-relaxed text-slate-500">
+          <p>{isZh ? '暫無圖鑑資料。' : 'No field guide data is available.'}</p>
+          {!isAuthLoading && profile?.role !== 'admin' && profile?.role !== 'curator' && (
+            <>
+              <p>{isZh ? '邀請你成為展策人，和我們一起編寫。' : 'Become a Curator and help us write this page together.'}</p>
+              <button
+                type="button"
+                onClick={() => requireAuth(() => setIsCuratorApplicationOpen(true), '申請策展人')}
+                className="inline-flex min-h-9 items-center gap-1.5 rounded-xl border border-emerald-100 bg-emerald-50 px-3 py-2 text-xs font-bold text-emerald-700 transition-colors hover:bg-emerald-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-1"
+              >
+                <Send className="size-3.5" />
+                {isZh ? '申請策展人' : 'Apply to become a Curator'}
+              </button>
+            </>
+          )}
+        </div>
       ) : (
         <div className="space-y-4">
           <div className="overflow-hidden">
@@ -1525,6 +1544,11 @@ export default function SpeciesAnatomyCard({ tableName, speciesTaxaId, refreshKe
           )}
         </div>
       )}
+      <CuratorApplicationModal
+        isOpen={isCuratorApplicationOpen}
+        onClose={() => setIsCuratorApplicationOpen(false)}
+        profile={profile}
+      />
     </section>
   );
 }

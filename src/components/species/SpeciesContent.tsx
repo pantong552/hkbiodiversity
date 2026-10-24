@@ -5,8 +5,9 @@ import Image from 'next/image';
 import { Species } from '@/types/species';
 import { PlantSpecies } from '@/types/plants';
 import { useLanguage } from '@/context/LanguageContext';
-import { Bookmark, Map, ExternalLink, Leaf, Loader2 } from 'lucide-react';
+import { Bookmark, Map, ExternalLink, Leaf, Loader2, Send } from 'lucide-react';
 import { createClient } from '@/utils/supabase/client';
+import { useAuth } from '@/context/AuthContext';
 import TaxonomyDisplay from './TaxonomyDisplay';
 import ConservationStatus from './ConservationStatus';
 import CommentSection from '../comments/CommentSection';
@@ -25,6 +26,7 @@ import HkbihSpeciesCard from './HkbihSpeciesCard';
 import { useRouter } from 'next/navigation';
 import { useSpeciesPanel } from '@/context/SpeciesPanelContext';
 import { useTaxonomy } from '@/context/TaxonomyContext';
+import CuratorApplicationModal from '@/components/profile/CuratorApplicationModal';
 
 
 
@@ -211,6 +213,8 @@ const SpeciesHeroBackground = ({ photos, defaultImage, isLoading }: { photos: In
 export default function SpeciesContent({ species, showBreadcrumb = true, refreshTrigger = 0, anatomyCard }: SpeciesContentProps) {
   const shouldReduceMotion = useReducedMotion();
   const { language } = useLanguage();
+  const { profile, isLoading: isAuthLoading, requireAuth } = useAuth();
+  const [isCuratorApplicationOpen, setIsCuratorApplicationOpen] = React.useState(false);
   const { getTaxonomyChi } = useTaxonomy();
   const { isLightboxOpen, setPendingTaxonomyFilter, toggleExpand } = useSpeciesPanel();
   const router = useRouter();
@@ -534,9 +538,22 @@ export default function SpeciesContent({ species, showBreadcrumb = true, refresh
                           ))}
                         </div>
                       ) : (
-                        <p className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-4 py-6 text-center text-sm text-slate-500">
-                          {language === 'zh' ? '暫無本地詳細資料。' : 'No local details are available.'}
-                        </p>
+                        <div className="flex flex-col items-center gap-2 rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-4 py-6 text-center text-sm leading-relaxed text-slate-500">
+                          <p>{language === 'zh' ? '暫無詳細資料。' : 'No details are available.'}</p>
+                          {!isAuthLoading && profile?.role !== 'admin' && profile?.role !== 'curator' && (
+                            <>
+                              <p>{language === 'zh' ? '邀請你成為展策人，和我們一起編寫。' : 'Become a Curator and help us write this page together.'}</p>
+                              <button
+                                type="button"
+                                onClick={() => requireAuth(() => setIsCuratorApplicationOpen(true), '申請策展人')}
+                                className="inline-flex min-h-9 items-center gap-1.5 rounded-xl border border-emerald-100 bg-emerald-50 px-3 py-2 text-xs font-bold text-emerald-700 transition-colors hover:bg-emerald-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-1"
+                              >
+                                <Send className="size-3.5" />
+                                {language === 'zh' ? '申請策展人' : 'Apply to become a Curator'}
+                              </button>
+                            </>
+                          )}
+                        </div>
                       )}
                     </motion.div>
                   ) : isFauna ? (
@@ -561,6 +578,12 @@ export default function SpeciesContent({ species, showBreadcrumb = true, refresh
                 </AnimatePresence>
               </section>
             )}
+
+            <CuratorApplicationModal
+              isOpen={isCuratorApplicationOpen}
+              onClose={() => setIsCuratorApplicationOpen(false)}
+              profile={profile}
+            />
 
             {/* Distribution */}
             <section className="space-y-6">
