@@ -38,6 +38,7 @@ interface EnrichedLightboxProps {
   taxaId?: string;
   onDeletePhoto?: (photoId: string | number) => Promise<void>;
   footerContent?: React.ReactNode;
+  hideInfoFooter?: boolean;
 }
 
 export default function EnrichedLightbox({
@@ -49,7 +50,8 @@ export default function EnrichedLightbox({
   commonName,
   scientificName,
   onDeletePhoto,
-  footerContent
+  footerContent,
+  hideInfoFooter = false
 }: EnrichedLightboxProps) {
   const { profile } = useAuth();
   const { language } = useLanguage();
@@ -456,17 +458,17 @@ export default function EnrichedLightbox({
           )}
         </div>
 
-        {/* 底部資訊欄 */}
-        <motion.div 
-          animate={{ y: showUI ? 0 : 100, opacity: showUI ? 1 : 0 }}
-          className="absolute bottom-0 left-0 right-0 z-[120] p-6 md:p-8 pointer-events-none"
-        >
-          {footerContent ? (
-            <div className="mx-auto flex max-w-4xl justify-center">
-              <div className="pointer-events-auto">{footerContent}</div>
-            </div>
-          ) : (
-          <div className="max-w-4xl mx-auto flex flex-col items-center gap-4">
+        {!hideInfoFooter && (
+          <motion.div
+            animate={{ y: showUI ? 0 : 100, opacity: showUI ? 1 : 0 }}
+            className="absolute bottom-0 left-0 right-0 z-[120] p-6 md:p-8 pointer-events-none"
+          >
+            {footerContent ? (
+              <div className="mx-auto flex max-w-4xl justify-center">
+                <div className="pointer-events-auto">{footerContent}</div>
+              </div>
+            ) : (
+              <div className="max-w-4xl mx-auto flex flex-col items-center gap-4">
              <div className="flex flex-col items-center gap-1.5 p-5 bg-black/40 backdrop-blur-2xl rounded-[2rem] border border-white/10 pointer-events-auto shadow-2xl">
                 <h3 className="text-white text-lg md:text-xl font-black tracking-tight flex items-center gap-2">
                   <span className="inline-flex items-baseline gap-1">
@@ -508,10 +510,10 @@ export default function EnrichedLightbox({
                   )}
                 </div>
              </div>
-           </div>
-          )}
-
-        </motion.div>
+               </div>
+             )}
+           </motion.div>
+        )}
 
         {/* 底部縮圖進度條 (可選，這裡用簡單的小點表示) */}
         <div className="absolute bottom-4 left-0 right-0 flex justify-center gap-1.5 z-[130] pointer-events-none">

@@ -23,6 +23,7 @@ import SimilarSpeciesExplorer from './SimilarSpeciesExplorer';
 import BirdSoundCard from './BirdSoundCard';
 import SpeciesContributionCard from './SpeciesContributionCard';
 import HkbihSpeciesCard from './HkbihSpeciesCard';
+import HerbariumSpeciesCard from './HerbariumSpeciesCard';
 import { useRouter } from 'next/navigation';
 import { useSpeciesPanel } from '@/context/SpeciesPanelContext';
 import { useTaxonomy } from '@/context/TaxonomyContext';
@@ -36,7 +37,7 @@ interface SpeciesContentProps {
   refreshTrigger?: number;
   anatomyCard?: React.ReactNode;
 }
-type SpeciesWithPlantTaxonomy = Species & Partial<Pick<PlantSpecies, 'family_eng' | 'family_chi' | 'genus_eng' | 'genus_chi'>>;
+type SpeciesWithPlantTaxonomy = Species & Partial<Pick<PlantSpecies, 'family_eng' | 'family_chi' | 'genus_eng' | 'genus_chi' | 'oid'>>;
 type SpeciesReference = { code: string; zh: string | null; en: string | null; url: string | null };
 
 const SpeciesHeroBackground = ({ photos, defaultImage, isLoading }: { photos: InatGalleryPhoto[], defaultImage: string, isLoading: boolean }) => {
@@ -322,11 +323,17 @@ export default function SpeciesContent({ species, showBreadcrumb = true, refresh
     }
   ].filter(section => Boolean(section.content?.trim()));
   const detailContentKey = `${species.id ?? species.taxa_id ?? species.scientific_name}`;
-  const defaultDetailTab = detailSections.length > 0 ? 'supabase' : 'hkbih';
+  const hasHerbariumRecord = isPlant && Number.isInteger(plant.oid) && Number(plant.oid) > 0;
+  const hasDetailSourceTabs = isFauna || hasHerbariumRecord;
+  const defaultDetailTab = detailSections.length > 0
+    ? 'supabase'
+    : isFauna
+      ? 'hkbih'
+      : 'herbarium';
   const detailTabsId = React.useId();
   const [detailTabSelection, setDetailTabSelection] = React.useState<{
     contentKey: string;
-    tab: 'supabase' | 'hkbih';
+    tab: 'supabase' | 'hkbih' | 'herbarium';
   }>({ contentKey: detailContentKey, tab: defaultDetailTab });
   const activeDetailTab = detailTabSelection.contentKey === detailContentKey
     ? detailTabSelection.tab
@@ -445,7 +452,7 @@ export default function SpeciesContent({ species, showBreadcrumb = true, refresh
             {anatomyCard}
 
 
-            {(detailSections.length > 0 || isFauna) && (
+            {(detailSections.length > 0 || hasDetailSourceTabs) && (
               <section className="rounded-[2rem] sm:rounded-[2.5rem] border border-slate-100 bg-white p-6 shadow-sm sm:p-8">
                 <div className="mb-5 flex flex-wrap items-center justify-between gap-3 sm:mb-6">
                   <div className="flex min-w-0 items-center gap-3">
@@ -456,7 +463,7 @@ export default function SpeciesContent({ species, showBreadcrumb = true, refresh
                       {language === 'zh' ? '詳細資料' : 'Species Details'}
                     </h2>
                   </div>
-                  {isFauna && (
+                  {hasDetailSourceTabs && (
                     <div
                       className="flex shrink-0 items-center gap-0.5 rounded-full border border-slate-200/80 bg-slate-100/80 p-0.5 shadow-inner"
                       role="tablist"
@@ -485,29 +492,50 @@ export default function SpeciesContent({ species, showBreadcrumb = true, refresh
                         />
                         <span className="hidden sm:inline">HKBC</span>
                       </button>
-                      <button
-                        id={`${detailTabsId}-hkbih-tab`}
-                        type="button"
-                        role="tab"
-                        aria-label="HKBIH"
-                        aria-selected={activeDetailTab === 'hkbih'}
-                        aria-controls={`${detailTabsId}-hkbih-panel`}
-                        onClick={() => setDetailTabSelection({ contentKey: detailContentKey, tab: 'hkbih' })}
-                        className={`flex min-h-9 items-center justify-center gap-1.5 rounded-full px-2.5 py-1.5 text-xs font-bold transition-all duration-200 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-1 motion-reduce:transition-none sm:gap-2 ${
-                          activeDetailTab === 'hkbih'
-                            ? 'bg-white text-emerald-800 shadow-sm ring-1 ring-emerald-200/80'
-                            : 'text-slate-500 hover:-translate-y-px hover:bg-white hover:text-emerald-700 hover:shadow-sm active:translate-y-0'
-                        }`}
-                      >
-                        <Image
-                          src="/images/partners/hkbih.webp"
-                          alt=""
-                          width={20}
-                          height={20}
-                          className="h-4 w-4 shrink-0 object-contain"
-                        />
-                        <span className="hidden sm:inline">HKBIH</span>
-                      </button>
+                      {isFauna && (
+                        <button
+                          id={`${detailTabsId}-hkbih-tab`}
+                          type="button"
+                          role="tab"
+                          aria-label="HKBIH"
+                          aria-selected={activeDetailTab === 'hkbih'}
+                          aria-controls={`${detailTabsId}-hkbih-panel`}
+                          onClick={() => setDetailTabSelection({ contentKey: detailContentKey, tab: 'hkbih' })}
+                          className={`flex min-h-9 items-center justify-center gap-1.5 rounded-full px-2.5 py-1.5 text-xs font-bold transition-all duration-200 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-1 motion-reduce:transition-none sm:gap-2 ${
+                            activeDetailTab === 'hkbih'
+                              ? 'bg-white text-emerald-800 shadow-sm ring-1 ring-emerald-200/80'
+                              : 'text-slate-500 hover:-translate-y-px hover:bg-white hover:text-emerald-700 hover:shadow-sm active:translate-y-0'
+                          }`}
+                        >
+                          <Image
+                            src="/images/partners/hkbih.webp"
+                            alt=""
+                            width={20}
+                            height={20}
+                            className="h-4 w-4 shrink-0 object-contain"
+                          />
+                          <span className="hidden sm:inline">HKBIH</span>
+                        </button>
+                      )}
+                      {hasHerbariumRecord && (
+                        <button
+                          id={`${detailTabsId}-herbarium-tab`}
+                          type="button"
+                          role="tab"
+                          aria-label={language === 'zh' ? '香港植物標本室' : 'Hong Kong Herbarium'}
+                          aria-selected={activeDetailTab === 'herbarium'}
+                          aria-controls={`${detailTabsId}-herbarium-panel`}
+                          onClick={() => setDetailTabSelection({ contentKey: detailContentKey, tab: 'herbarium' })}
+                          className={`flex min-h-9 items-center justify-center gap-1.5 rounded-full px-2.5 py-1.5 text-xs font-bold transition-all duration-200 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-1 motion-reduce:transition-none sm:gap-2 ${
+                            activeDetailTab === 'herbarium'
+                              ? 'bg-white text-emerald-800 shadow-sm ring-1 ring-emerald-200/80'
+                              : 'text-slate-500 hover:-translate-y-px hover:bg-white hover:text-emerald-700 hover:shadow-sm active:translate-y-0'
+                          }`}
+                        >
+                          <Leaf className="h-4 w-4 shrink-0" />
+                          <span className="hidden sm:inline">{language === 'zh' ? '香港植物標本室' : 'HK Herbarium'}</span>
+                        </button>
+                      )}
                     </div>
                   )}
                 </div>
@@ -516,8 +544,8 @@ export default function SpeciesContent({ species, showBreadcrumb = true, refresh
                     <motion.div
                       key="supabase-details"
                       id={`${detailTabsId}-supabase-panel`}
-                      role={isFauna ? 'tabpanel' : undefined}
-                      aria-labelledby={isFauna ? `${detailTabsId}-supabase-tab` : undefined}
+                      role={hasDetailSourceTabs ? 'tabpanel' : undefined}
+                      aria-labelledby={hasDetailSourceTabs ? `${detailTabsId}-supabase-tab` : undefined}
                       initial={shouldReduceMotion ? false : { opacity: 0, y: 8 }}
                       animate={{ opacity: 1, y: 0 }}
                       exit={{ opacity: 0, y: shouldReduceMotion ? 0 : -4 }}
@@ -573,6 +601,20 @@ export default function SpeciesContent({ species, showBreadcrumb = true, refresh
                         hkbihScientificName={species.hkbih_scientific_name}
                         chineseName={species.common_name_chi}
                       />
+                    </motion.div>
+                  ) : hasHerbariumRecord ? (
+                    <motion.div
+                      key="herbarium-details"
+                      id={`${detailTabsId}-herbarium-panel`}
+                      role="tabpanel"
+                      aria-labelledby={`${detailTabsId}-herbarium-tab`}
+                      initial={shouldReduceMotion ? false : { opacity: 0, y: 8 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 1, y: shouldReduceMotion ? 0 : -4 }}
+                      transition={{ duration: shouldReduceMotion ? 0.12 : 0.24, ease: 'easeOut' }}
+                      className="min-h-20"
+                    >
+                      <HerbariumSpeciesCard oid={Number(plant.oid)} language={language === 'zh' ? 'zh' : 'en'} />
                     </motion.div>
                   ) : null}
                 </AnimatePresence>

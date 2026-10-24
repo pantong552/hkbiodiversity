@@ -4,6 +4,10 @@ const nextConfig: NextConfig = {
   async rewrites() {
     return [
       {
+        source: '/herbarium-api/:path*',
+        destination: 'https://herbarium.gov.hk/plantdb/:path*',
+      },
+      {
         source: '/bgis-api/:path*',
         destination: 'https://bih.gov.hk/BGIS/API/:path*',
       },
