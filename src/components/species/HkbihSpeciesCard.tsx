@@ -213,7 +213,7 @@ export default function HkbihSpeciesCard({
                 {identityFields.length > 0 && (
                   <dl>
                     {identityFields.map(field => (
-                      <div key={field.key} className="grid grid-cols-[minmax(7rem,9rem)_minmax(0,1fr)] gap-3 py-2.5">
+                      <div key={field.key} className="grid grid-cols-[minmax(7rem,9rem)_minmax(0,1fr)] gap-3 py-1.5">
                         <dt className="text-sm font-bold text-slate-700">{field.title}</dt>
                         <dd className={`min-w-0 whitespace-pre-line text-sm leading-relaxed text-slate-600 ${'italic' in field && field.italic ? 'italic' : ''}`}>
                           {renderFormattedText(field.text)}

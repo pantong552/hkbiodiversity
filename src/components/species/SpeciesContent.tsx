@@ -307,6 +307,14 @@ export default function SpeciesContent({ species, showBreadcrumb = true, refresh
     {
       title: language === 'zh' ? '備註' : 'Remarks',
       content: remarks
+    },
+    {
+      title: language === 'zh' ? '香港分布' : 'HK Distribution',
+      content: hkDist
+    },
+    {
+      title: language === 'zh' ? '全球分布' : 'Global Distribution',
+      content: globalDist
     }
   ].filter(section => Boolean(section.content?.trim()));
   const detailContentKey = `${species.id ?? species.taxa_id ?? species.scientific_name}`;
@@ -583,17 +591,6 @@ export default function SpeciesContent({ species, showBreadcrumb = true, refresh
               {species.scientific_name && (
                 <GbifGlobalMap scientificName={species.scientific_name} />
               )}
-
-              <div className="grid md:grid-cols-2 gap-6">
-                <div className="rounded-[2rem] sm:rounded-[2.5rem] shadow-sm bg-white p-6 border border-slate-100">
-                  <h3 className="font-black text-slate-800 mb-2">{language === 'zh' ? '香港分布' : 'HK Distribution'}</h3>
-                  <p className="text-slate-600 text-sm">{hkDist || '-'}</p>
-                </div>
-                <div className="rounded-[2rem] sm:rounded-[2.5rem] shadow-sm bg-white p-6 border border-slate-100">
-                  <h3 className="font-black text-slate-800 mb-2">{language === 'zh' ? '全球分布' : 'Global Distribution'}</h3>
-                  <p className="text-slate-600 text-sm">{globalDist || '-'}</p>
-                </div>
-              </div>
 
             </section>
 
