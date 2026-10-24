@@ -491,14 +491,6 @@ export default function HerbariumSpeciesCard({ oid, language }: HerbariumSpecies
         )}
         {family && <p className="mt-1 text-sm text-slate-600">{family}</p>}
         <dl className="mt-4 space-y-2 border-t border-emerald-900/15 pt-4 text-sm">
-          {[
-            [isChinese ? '科編號' : 'Family number', species.family_no],
-          ].filter(([, value]) => Boolean(value)).map(([label, value]) => (
-            <div key={label} className="grid grid-cols-[minmax(0,6rem)_1fr] gap-3">
-              <dt className="font-medium text-slate-700">{label}</dt>
-              <dd className="text-slate-600">{value}</dd>
-            </div>
-          ))}
           {synonymHtml.length > 0 && (
             <div className="grid grid-cols-[minmax(0,6rem)_1fr] gap-3">
               <dt className="font-medium text-slate-700">{isChinese ? '異名' : 'Synonym'}</dt>
@@ -542,7 +534,7 @@ export default function HerbariumSpeciesCard({ oid, language }: HerbariumSpecies
       </StatusSection>
 
       {(flowerPeriod || fruitPeriod) && (
-        <StatusSection title={isChinese ? '花' : 'Flowering and fruiting'} icon={Flower2}>
+        <StatusSection title={isChinese ? '花果期' : 'Flowering and fruiting'} icon={Flower2}>
           {flowerPeriod && <StatusRow label={isChinese ? '花期' : 'Flowering period'} value={flowerPeriod} />}
           {fruitPeriod && <StatusRow label={isChinese ? '果期' : 'Fruiting period'} value={fruitPeriod} />}
         </StatusSection>

@@ -486,9 +486,9 @@ export default function SpeciesContent({ species, showBreadcrumb = true, refresh
                         <Image
                           src="/logo.svg"
                           alt=""
-                          width={18}
-                          height={18}
-                          className="h-4 w-4 shrink-0 object-contain"
+                          width={24}
+                          height={24}
+                          className="h-5 w-5 shrink-0 object-contain"
                         />
                         <span className="hidden sm:inline">HKBC</span>
                       </button>
@@ -510,9 +510,9 @@ export default function SpeciesContent({ species, showBreadcrumb = true, refresh
                           <Image
                             src="/images/partners/hkbih.webp"
                             alt=""
-                            width={20}
-                            height={20}
-                            className="h-4 w-4 shrink-0 object-contain"
+                            width={24}
+                            height={24}
+                            className="h-5 w-5 shrink-0 object-contain"
                           />
                           <span className="hidden sm:inline">HKBIH</span>
                         </button>
@@ -532,7 +532,13 @@ export default function SpeciesContent({ species, showBreadcrumb = true, refresh
                               : 'text-slate-500 hover:-translate-y-px hover:bg-white hover:text-emerald-700 hover:shadow-sm active:translate-y-0'
                           }`}
                         >
-                          <Leaf className="h-4 w-4 shrink-0" />
+                          <Image
+                            src="/images/partners/HKherbarium_logo.webp"
+                            alt=""
+                            width={24}
+                            height={24}
+                            className="h-5 w-5 shrink-0 object-contain"
+                          />
                           <span className="hidden sm:inline">{language === 'zh' ? '香港植物標本室' : 'HK Herbarium'}</span>
                         </button>
                       )}

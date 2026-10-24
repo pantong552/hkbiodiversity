@@ -176,6 +176,10 @@ const nextConfig: NextConfig = {
         search: '',
       },
       {
+        pathname: '/images/partners/HKherbarium_logo.webp',
+        search: '',
+      },
+      {
         pathname: '/api/image/transform',
         search: '',
       },
