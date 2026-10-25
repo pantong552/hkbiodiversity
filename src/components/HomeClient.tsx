@@ -357,6 +357,7 @@ export default function HomeClient() {
         if (displayMode === 'table') {
           Object.entries(tableFilters).forEach(([key, value]) => {
             if (value.length === 0) return;
+            if (key === 'native_status' && taxaType === 'flora') return;
             
             // Map table keys to actual DB columns - 統一使用英文欄位作為 Filter Key
             const dbKey = key === 'common_name' 

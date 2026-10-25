@@ -58,6 +58,10 @@ export default function SpeciesTable({
     { name: 'Exotic', display: language === 'zh' ? '外來' : 'Exotic', count: 0 },
     { name: 'Reintroduced', display: language === 'zh' ? '重新引入' : 'Reintroduced', count: 0 },
   ];
+  const nativeStatusOptions = (metadata.native_status || nativeOptions).map(option => ({
+    ...option,
+    display: formatNativeStatus(option.name, language),
+  }));
 
   const columns = useMemo(() => {
     if (isPlant) {
@@ -153,7 +157,7 @@ export default function SpeciesTable({
                     {col.key === 'native_status' ? (
                       <MultiSelectDropdown
                         label={t('table.native_status')}
-                        options={metadata.native_status || nativeOptions}
+                        options={nativeStatusOptions}
                         selectedValues={filters.native_status || []}
                         onChange={(vals) => handleSelectChange('native_status', vals)}
                         placeholder={language === 'zh' ? "全部" : "All"}
