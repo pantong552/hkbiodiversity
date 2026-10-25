@@ -24,14 +24,14 @@ export interface PlantSpecies {
   flowering_months: number[];
   fruiting_months: number[];
   description_eng: string;
-  locality_eng: string;
-  distribution_eng: string;
+  local_distribution_eng: string;
+  global_distribution_eng: string;
   habitat_eng: string;
   usage_eng: string;
   remark_eng: string;
   description_chi: string;
-  locality_chi: string;
-  distribution_chi: string;
+  local_distribution_chi: string;
+  global_distribution_chi: string;
   habitat_chi: string;
   usage_chi: string;
   remark_chi: string;
