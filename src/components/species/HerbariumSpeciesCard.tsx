@@ -3,7 +3,7 @@
 import Image from 'next/image';
 import React from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
-import { ChevronLeft, ChevronRight, Expand, Flower2, Info, Leaf, Loader2, ShieldCheck, Sprout } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Expand, ExternalLink, Flower2, Info, Leaf, Link as LinkIcon, Loader2, ShieldCheck, Sprout, X } from 'lucide-react';
 import type { InatGalleryPhoto } from '@/hooks/useInaturalistSpeciesPhotos';
 import EnrichedLightbox from '@/components/ui/EnrichedLightbox';
 
@@ -102,6 +102,8 @@ function sanitizeFloraHtml(html: string): string {
       if (attribute === 'style') {
         if (/url\s*\(|expression\s*\(|javascript\s*:/i.test(value)) {
           element.removeAttribute(name);
+        } else if (element.tagName.toLowerCase() === 'div' && element.id.startsWith('eng_para_')) {
+          (element as HTMLElement).style.marginBottom = '0';
         }
         return;
       }
@@ -190,18 +192,24 @@ function StatusSection({
 }) {
   return (
     <section>
-      <h3 className="flex items-center gap-2 border-b border-emerald-200 pb-1.5 text-sm font-bold text-emerald-800">
-        <Icon className="h-5 w-5 text-emerald-700/70" />
-        {title}
-      </h3>
-      <dl className="space-y-2 px-8 py-3 text-sm">{children}</dl>
+      <StatusHeading title={title} icon={Icon} />
+      <dl className="space-y-2 px-4 py-3 text-sm sm:px-6">{children}</dl>
     </section>
+  );
+}
+
+function StatusHeading({ title, icon: Icon }: { title: string; icon: typeof Leaf }) {
+  return (
+    <h3 className="flex items-center gap-2 border-b border-emerald-200 pb-1.5 text-sm font-bold text-emerald-800">
+      <Icon className="h-5 w-5 text-emerald-700/70" />
+      {title}
+    </h3>
   );
 }
 
 function StatusRow({ label, value }: { label: string; value: string }) {
   return (
-    <div className="grid grid-cols-[minmax(0,12rem)_1fr] gap-3">
+    <div className="grid grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)] gap-3">
       <dt className="font-medium text-slate-700">{label}</dt>
       <dd className="text-slate-600">{value}</dd>
     </div>
@@ -242,7 +250,6 @@ function HerbariumPhotoCarousel({
 
   return (
     <section>
-      <h3 className="mb-3 text-sm font-bold text-slate-700">{language === 'zh' ? '相片' : 'Photos'}</h3>
       <div className="relative overflow-hidden rounded-2xl bg-slate-950 shadow-lg">
         <button
           type="button"
@@ -347,6 +354,59 @@ function HerbariumPhotoCarousel({
   );
 }
 
+function HerbariumIllustration({
+  url,
+  alt,
+  commonName,
+  scientificName,
+}: {
+  url: string;
+  alt: string;
+  commonName: string;
+  scientificName: string;
+}) {
+  const [isOpen, setIsOpen] = React.useState(false);
+  const lightboxPhoto: InatGalleryPhoto = {
+    id: url,
+    url,
+    small_url: url,
+    medium_url: url,
+    large_url: url,
+    original_url: url,
+    attribution: '',
+    licenseCode: null,
+    nativePageUrl: null,
+    observationUrl: null,
+    observedOn: null,
+  };
+
+  return (
+    <>
+      <section>
+        <StatusHeading title={alt} icon={Leaf} />
+        <button
+          type="button"
+          onClick={() => setIsOpen(true)}
+          aria-label={alt}
+          className="relative mt-3 block aspect-[4/3] w-full max-w-2xl overflow-hidden rounded-2xl bg-slate-50"
+        >
+          <Image src={url} alt={alt} fill sizes="(max-width: 768px) 100vw, 672px" unoptimized className="object-contain" />
+        </button>
+      </section>
+      <EnrichedLightbox
+        isOpen={isOpen}
+        onClose={() => setIsOpen(false)}
+        photos={[lightboxPhoto]}
+        currentIndex={0}
+        onNavigate={() => undefined}
+        commonName={commonName}
+        scientificName={scientificName}
+        hideInfoFooter
+      />
+    </>
+  );
+}
+
 function imageUrl(path: string | undefined): string | null {
   if (!path?.startsWith('/plantdb/')) return null;
   return `${HERBARIUM_ORIGIN}${path}`;
@@ -367,6 +427,7 @@ export default function HerbariumSpeciesCard({ oid, language }: HerbariumSpecies
   const [floraLoading, setFloraLoading] = React.useState(() => !herbariumCache.get(oid)?.hasFlora);
   const [speciesError, setSpeciesError] = React.useState('');
   const [floraError, setFloraError] = React.useState('');
+  const [isCopyrightOpen, setIsCopyrightOpen] = React.useState(false);
 
   React.useEffect(() => {
     const controller = new AbortController();
@@ -476,6 +537,15 @@ export default function HerbariumSpeciesCard({ oid, language }: HerbariumSpecies
 
   return (
     <div className="space-y-6">
+      {photos.length > 0 && (
+        <HerbariumPhotoCarousel
+          photos={photos}
+          commonName={commonName ?? ''}
+          scientificName={scientificNames[0] ?? species.scientific_name ?? ''}
+          language={language}
+        />
+      )}
+
       {speciesError && <p role="alert" className="rounded-xl bg-amber-50 px-4 py-3 text-sm text-amber-800">{speciesError}</p>}
       <div className="rounded-[1.75rem] bg-[#f0f3e3] px-6 py-5 sm:px-8 sm:py-6">
         {commonName && (
@@ -519,74 +589,168 @@ export default function HerbariumSpeciesCard({ oid, language }: HerbariumSpecies
         </dl>
       </div>
 
-      <StatusSection title={isChinese ? '生態資料' : 'Ecology'} icon={Sprout}>
-        <StatusRow
-          label={isChinese ? '生態狀況' : 'Status'}
-          value={isRecorded(species.native) ? (isChinese ? '原生' : 'Native') : isRecorded(species.exotic) ? (isChinese ? '外來' : 'Exotic') : isRecorded(species.cultivated) ? (isChinese ? '栽培' : 'Cultivated') : (isChinese ? '未有記錄' : 'Not recorded')}
-        />
-        {displayValue(species.native) === 'Y' && isRecorded(species.naturalized) && (
-          <StatusRow label={isChinese ? '歸化' : 'Naturalized'} value={yes} />
-        )}
-      </StatusSection>
-
-      <StatusSection title={isChinese ? '保育狀況' : 'Conservation'} icon={ShieldCheck}>
-        {conservationRows.map(([label, value]) => <StatusRow key={label} label={label} value={value} />)}
-      </StatusSection>
-
-      {(flowerPeriod || fruitPeriod) && (
-        <StatusSection title={isChinese ? '花果期' : 'Flowering and fruiting'} icon={Flower2}>
-          {flowerPeriod && <StatusRow label={isChinese ? '花期' : 'Flowering period'} value={flowerPeriod} />}
-          {fruitPeriod && <StatusRow label={isChinese ? '果期' : 'Fruiting period'} value={fruitPeriod} />}
+      <div className="grid grid-cols-1 items-start gap-x-8 gap-y-5 md:grid-cols-2">
+        <StatusSection title={isChinese ? '生態資料' : 'Ecology'} icon={Sprout}>
+          <StatusRow
+            label={isChinese ? '生態狀況' : 'Status'}
+            value={isRecorded(species.native) ? (isChinese ? '原生' : 'Native') : isRecorded(species.exotic) ? (isChinese ? '外來' : 'Exotic') : isRecorded(species.cultivated) ? (isChinese ? '栽培' : 'Cultivated') : (isChinese ? '未有記錄' : 'Not recorded')}
+          />
+          {displayValue(species.native) === 'Y' && isRecorded(species.naturalized) && (
+            <StatusRow label={isChinese ? '歸化' : 'Naturalized'} value={yes} />
+          )}
         </StatusSection>
-      )}
 
-      <StatusSection title={isChinese ? '其他' : 'Other information'} icon={Info}>
-        <StatusRow
-          label={isChinese ? '模式標本採自香港' : 'Type specimen collected in Hong Kong'}
-          value={isRecorded(species.type_specimen_in_hk) ? yes : no}
-        />
-      </StatusSection>
+        <StatusSection title={isChinese ? '保育狀況' : 'Conservation'} icon={ShieldCheck}>
+          {conservationRows.map(([label, value]) => <StatusRow key={label} label={label} value={value} />)}
+        </StatusSection>
 
-      {(floraLoading || floraError || floraTitle || floraHtml) && (
-        <section>
-          {floraTitle && (
-            <h3 className="flex items-center gap-2 border-b border-emerald-200 pb-1.5 text-sm font-bold text-emerald-800">
-              <Leaf className="h-5 w-5 text-emerald-700/70" />
-              {floraTitle}
-            </h3>
+        {(flowerPeriod || fruitPeriod) && (
+          <StatusSection title={isChinese ? '花果期' : 'Flowering and fruiting'} icon={Flower2}>
+            {flowerPeriod && <StatusRow label={isChinese ? '花期' : 'Flowering period'} value={flowerPeriod} />}
+            {fruitPeriod && <StatusRow label={isChinese ? '果期' : 'Fruiting period'} value={fruitPeriod} />}
+          </StatusSection>
+        )}
+
+        <StatusSection title={isChinese ? '其他' : 'Other information'} icon={Info}>
+          <StatusRow
+            label={isChinese ? '模式標本採自香港' : 'Type specimen collected in Hong Kong'}
+            value={isRecorded(species.type_specimen_in_hk) ? yes : no}
+          />
+        </StatusSection>
+      </div>
+
+      {(floraLoading || floraError || floraTitle || floraHtml || illustrationUrl) && (
+        <div className="space-y-2">
+          {(floraLoading || floraError || floraTitle || floraHtml) && (
+            <section>
+              {floraTitle && (
+                <h3 className="flex items-center gap-2 border-b border-emerald-200 pb-1.5 text-sm font-bold text-emerald-800">
+                  <Leaf className="h-5 w-5 text-emerald-700/70" />
+                  {floraTitle}
+                </h3>
+              )}
+              {floraLoading ? (
+                <div className="px-8 py-2 text-sm text-slate-500">
+                  <Loader2 className="mr-2 inline h-4 w-4 animate-spin text-emerald-600" />
+                  {language === 'zh' ? '正在載入《香港植物誌》內容…' : 'Loading Flora of Hong Kong content…'}
+                </div>
+              ) : floraError ? (
+                <p role="alert" className="px-8 py-2 text-sm text-rose-700">{floraError}</p>
+              ) : floraHtml ? (
+                <div className="max-w-none px-8 pt-2 pb-0 text-sm leading-relaxed text-slate-700 [&_p:last-child]:!mb-0" dangerouslySetInnerHTML={{ __html: floraHtml }} />
+              ) : (
+                <p className="px-8 py-2 text-sm text-slate-500">{language === 'zh' ? '暫無《香港植物誌》內容。' : 'No Flora of Hong Kong content is available.'}</p>
+              )}
+            </section>
           )}
-          {floraLoading ? (
-            <div className="flex items-center gap-2 px-8 py-3 text-sm text-slate-500">
-              <Loader2 className="h-4 w-4 animate-spin text-emerald-600" />
-              {language === 'zh' ? '正在載入《香港植物誌》內容…' : 'Loading Flora of Hong Kong content…'}
-            </div>
-          ) : floraError ? (
-            <p role="alert" className="px-8 py-3 text-sm text-rose-700">{floraError}</p>
-          ) : floraHtml ? (
-            <div className="max-w-none px-8 py-3 text-sm leading-relaxed text-slate-700" dangerouslySetInnerHTML={{ __html: floraHtml }} />
-          ) : (
-            <p className="px-8 py-3 text-sm text-slate-500">{language === 'zh' ? '暫無《香港植物誌》內容。' : 'No Flora of Hong Kong content is available.'}</p>
+
+          {illustrationUrl && (
+            <HerbariumIllustration
+              url={illustrationUrl}
+              alt={language === 'zh' ? '插圖' : 'Illustration'}
+              commonName={commonName ?? ''}
+              scientificName={scientificNames[0] ?? species.scientific_name ?? ''}
+            />
           )}
-        </section>
+        </div>
       )}
 
-      {photos.length > 0 && (
-        <HerbariumPhotoCarousel
-          photos={photos}
-          commonName={commonName ?? ''}
-          scientificName={scientificNames[0] ?? species.scientific_name ?? ''}
-          language={language}
-        />
-      )}
+      <div className="-mt-4 flex justify-end gap-2">
+        <button
+          type="button"
+          onClick={() => setIsCopyrightOpen(true)}
+          title={isChinese ? '香港植物標本室版權告示' : 'Hong Kong Herbarium Copyright Notice'}
+          aria-label={isChinese ? '查看香港植物標本室版權告示' : 'View Hong Kong Herbarium copyright notice'}
+          className="rounded-full p-2 text-emerald-600 transition-colors hover:bg-emerald-50 hover:text-emerald-800"
+        >
+          <Info className="h-4 w-4" />
+        </button>
+        <a
+          href={`https://herbarium.gov.hk/${isChinese ? 'tc' : 'en'}/hk-plant-database/plant-detail/index.html?pType=species&oID=${encodeURIComponent(String(oid))}`}
+          target="_blank"
+          rel="noopener noreferrer"
+          title={isChinese ? '在香港植物標本室查看此物種' : 'View this species on Hong Kong Herbarium'}
+          aria-label={isChinese ? '在香港植物標本室查看此物種' : 'View this species on Hong Kong Herbarium'}
+          className="shrink-0 rounded-full p-2 text-emerald-700 transition-colors hover:bg-emerald-50 hover:text-emerald-900"
+        >
+          <ExternalLink className="h-5 w-5" />
+        </a>
+      </div>
 
-      {illustrationUrl && (
-        <section>
-          <h3 className="mb-3 text-sm font-bold text-slate-700">{language === 'zh' ? '插圖' : 'Illustration'}</h3>
-          <a href={illustrationUrl} target="_blank" rel="noopener noreferrer" className="relative block aspect-[4/3] max-w-2xl overflow-hidden rounded-2xl bg-slate-50">
-            <Image src={illustrationUrl} alt={language === 'zh' ? '植物插圖' : 'Botanical illustration'} fill sizes="(max-width: 768px) 100vw, 672px" unoptimized className="object-contain" />
-          </a>
-        </section>
-      )}
+      <AnimatePresence>
+        {isCopyrightOpen && (
+          <div
+            className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/60 p-4 backdrop-blur-md"
+            onMouseDown={event => {
+              if (event.target === event.currentTarget) setIsCopyrightOpen(false);
+            }}
+          >
+            <motion.div
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="herbarium-copyright-title"
+              initial={{ opacity: 0, scale: 0.95, y: 10 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 10 }}
+              className="relative flex max-h-[85vh] w-full max-w-2xl flex-col overflow-hidden rounded-3xl border border-slate-100 bg-white shadow-2xl"
+            >
+              <div className="flex items-center justify-between bg-gradient-to-r from-emerald-700 via-emerald-600 to-teal-700 p-5 text-white shadow-md">
+                <div className="flex items-center gap-3">
+                  <div className="rounded-2xl border border-white/20 bg-white/10 p-2.5 backdrop-blur-sm">
+                    <Info className="h-5 w-5 text-emerald-100" />
+                  </div>
+                  <h3 id="herbarium-copyright-title" className="text-base font-black tracking-tight md:text-lg">
+                    {isChinese ? '香港植物標本室版權告示' : 'Hong Kong Herbarium Copyright Notice'}
+                  </h3>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setIsCopyrightOpen(false)}
+                  aria-label={isChinese ? '關閉' : 'Close'}
+                  className="rounded-full p-2 text-white/90 transition-colors hover:bg-white/20 hover:text-white"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+
+              <div className="flex-1 space-y-4 overflow-y-auto p-6 text-sm leading-relaxed text-slate-700">
+                {isChinese ? (
+                  <>
+                    <p>本頁香港植物標本室資料的展示與使用方式，依照其「版權告示」處理，僅作非商業用途，並註明香港植物標本室及漁農自然護理署為資料來源。</p>
+                    <p>該告示亦指出，商業用途須事先取得漁農自然護理署書面授權，並說明香港植物標本室及漁農自然護理署對使用相關資訊所引致的損失不承擔責任。</p>
+                  </>
+                ) : (
+                  <>
+                    <p>The display and use of Hong Kong Herbarium data on this page follows its Copyright Notice: the data is used for non-commercial purposes, with the Hong Kong Herbarium and AFCD acknowledged as the source.</p>
+                    <p>The notice also states that commercial use requires prior written authorization from AFCD and that the Hong Kong Herbarium and AFCD accept no liability for losses arising from use of the information.</p>
+                  </>
+                )}
+              </div>
+
+              <div className="flex justify-end gap-2 border-t border-slate-100 bg-slate-50 p-4">
+                <a
+                  href={isChinese
+                    ? 'https://herbarium.gov.hk/tc/important-notices/index.html'
+                    : 'https://herbarium.gov.hk/en/important-notices/index.html'}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-600 px-4 py-2.5 text-xs font-bold text-white shadow-sm transition-colors hover:bg-emerald-700"
+                >
+                  <LinkIcon className="h-3.5 w-3.5" />
+                  {isChinese ? '開啟連結' : 'Visit Site'}
+                </a>
+                <button
+                  type="button"
+                  onClick={() => setIsCopyrightOpen(false)}
+                  className="rounded-xl bg-slate-800 px-6 py-2.5 text-xs font-bold text-white shadow-sm transition-colors hover:bg-slate-900"
+                >
+                  {isChinese ? '關閉' : 'Close'}
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
