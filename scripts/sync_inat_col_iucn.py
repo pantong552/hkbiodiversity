@@ -10,6 +10,7 @@ import os
 import re
 import sys
 import time
+from difflib import SequenceMatcher
 from datetime import datetime
 from pathlib import Path
 
@@ -129,11 +130,38 @@ def fetch_inat_taxon_id(scientific_name):
             "fields": "(id:!t,name:!t,matched_term:!t)",
         },
     )
-    for item in data.get("results", []):
-        target_name = item.get("name", "")
-        matched_name = item.get("matched_term", "")
-        if target_name.lower() == query_name.lower() or matched_name.lower() == query_name.lower():
+    results = data.get("results", [])
+    normalized_query = query_name.casefold()
+    for item in results:
+        target_name = item.get("name") or ""
+        matched_name = item.get("matched_term") or ""
+        if (
+            target_name.casefold() == normalized_query
+            or matched_name.casefold() == normalized_query
+        ):
             return item.get("id"), target_name
+
+    close_matches = []
+    for item in results:
+        matched_name = item.get("matched_term") or ""
+        if not matched_name:
+            continue
+        similarity = SequenceMatcher(
+            None, normalized_query, matched_name.casefold()
+        ).ratio()
+        if similarity >= 0.95:
+            close_matches.append((similarity, item))
+
+    if close_matches:
+        best_similarity = max(similarity for similarity, _ in close_matches)
+        best_matches = [
+            item for similarity, item in close_matches
+            if similarity == best_similarity
+        ]
+        if len(best_matches) == 1:
+            item = best_matches[0]
+            return item.get("id"), item.get("name")
+
     return None, None
 
 
@@ -318,8 +346,8 @@ def fetch_iucn_status(scientific_name):
 
 
 def process_species(row):
-    """Run the lookups in order: iNaturalist, then COL and IUCN."""
-    result = row.copy()
+    """Look up iNaturalist first, using COL's accepted name as a fallback."""
+    result = row.to_dict()
     original_name = str(row.get("scientific_name", "")).replace("\xa0", " ").strip()
     for column in COL_COLUMNS:
         result[column] = ""
@@ -348,8 +376,34 @@ def process_species(row):
             if taxon_id:
                 inat_name, inat_taxonomy = fetch_inat_taxonomy(taxon_id)
 
+        col_taxonomy = None
         if not taxon_id or not inat_name:
-            result["remark"] = "iNaturalist taxon not found; COL and IUCN lookups skipped"
+            try:
+                col_taxonomy = fetch_col_taxonomy(original_name)
+            except requests.RequestException as error:
+                result["remark"] = f"COL fallback request failed: {error}"
+                return result
+            except (ValueError, KeyError, TypeError) as error:
+                result["remark"] = f"COL fallback response could not be processed: {error}"
+                return result
+
+            col_name = col_taxonomy.get("scientific_name_col")
+            if col_name:
+                taxon_id, inat_name = fetch_inat_taxon_id(col_name)
+                inat_taxonomy = None
+                if taxon_id:
+                    inat_name, inat_taxonomy = fetch_inat_taxonomy(taxon_id)
+
+        if not taxon_id or not inat_name:
+            if col_taxonomy is not None:
+                result.update(col_taxonomy)
+                col_status = col_taxonomy.get("remark") or "COL accepted name not found"
+                result["remark"] = (
+                    "iNaturalist taxon not found after COL fallback; "
+                    f"{col_status}"
+                )
+            else:
+                result["remark"] = "iNaturalist taxon not found; COL fallback unavailable"
             return result
 
         result["species_id"] = taxon_id
@@ -362,11 +416,15 @@ def process_species(row):
                     result[f"{column_prefix}_chi"] = rank_data.get("chi")
 
         if clean_scientific_name(original_name).lower() != clean_scientific_name(inat_name).lower():
+            name_source = "COL" if col_taxonomy is not None else "iNaturalist"
             note_eng = (
                 f"Taxonomic Update: The scientific name has been revised from "
-                f"{original_name} to {inat_name} following iNaturalist."
+                f"{original_name} to {inat_name} following {name_source}."
             )
-            note_chi = f"分類更新：根據 iNaturalist 分類標準，學名已從 {original_name} 修訂為 {inat_name}。"
+            note_chi = (
+                f"分類更新：根據 {name_source} 分類標準，學名已從 "
+                f"{original_name} 修訂為 {inat_name}。"
+            )
             for column, note in [("remarks_eng", note_eng), ("remarks_chi", note_chi)]:
                 previous = result.get(column)
                 if pd.isna(previous) or not str(previous).strip():
@@ -374,12 +432,15 @@ def process_species(row):
                 elif note not in str(previous):
                     result[column] = f"{previous}\n{note}"
 
-        try:
-            result.update(fetch_col_taxonomy(inat_name))
-        except requests.RequestException as error:
-            result["remark"] = f"COL request failed: {error}"
-        except (ValueError, KeyError, TypeError) as error:
-            result["remark"] = f"COL response could not be processed: {error}"
+        if col_taxonomy is not None:
+            result.update(col_taxonomy)
+        else:
+            try:
+                result.update(fetch_col_taxonomy(inat_name))
+            except requests.RequestException as error:
+                result["remark"] = f"COL request failed: {error}"
+            except (ValueError, KeyError, TypeError) as error:
+                result["remark"] = f"COL response could not be processed: {error}"
 
         if IUCN_TOKEN:
             try:
@@ -425,12 +486,24 @@ def process_file(input_path, output_dir):
             dataframe[column] = None
 
     output_rows = []
-    for _, row in tqdm(dataframe.iterrows(), total=len(dataframe), desc=input_path.name, unit="sp"):
-        output_rows.append(process_species(row))
+    def save_output():
+        output = pd.DataFrame(output_rows, columns=dataframe.columns)
+        output["species_id"] = pd.to_numeric(
+            output["species_id"], errors="coerce"
+        ).astype("Int64")
+        output.to_csv(output_path, index=False, encoding="utf-8-sig")
 
-    output = pd.DataFrame(output_rows, columns=dataframe.columns)
-    output["species_id"] = pd.to_numeric(output["species_id"], errors="coerce").astype("Int64")
-    output.to_csv(output_path, index=False, encoding="utf-8-sig")
+    for index, (_, row) in enumerate(
+        tqdm(dataframe.iterrows(), total=len(dataframe), desc=input_path.name, unit="sp"),
+        start=1,
+    ):
+        output_rows.append(process_species(row))
+        if index % 10 == 0:
+            save_output()
+            tqdm.write(f"  已儲存 {index} 筆至: {output_path}")
+
+    if len(output_rows) % 10 or not output_rows:
+        save_output()
     tqdm.write(f"  完成！輸出至: {output_path}")
 
 
