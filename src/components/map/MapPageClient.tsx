@@ -74,7 +74,7 @@ function initializeContourDemSources() {
 }
 
 export default function MapPageClient() {
-  const { language } = useLanguage();
+  const { language, setLanguage } = useLanguage();
   const [currentStyleId, setCurrentStyleId] = useState('openmaptiles-topo');
   const [isBasemapPickerOpen, setIsBasemapPickerOpen] = useState(false);
   const [isTerrainPickerOpen, setIsTerrainPickerOpen] = useState(false);
@@ -132,7 +132,9 @@ export default function MapPageClient() {
       overzoom: 1,
     })
     : undefined;
-  const mapStyle: string | StyleSpecification = currentBasemap.styleUrl || {
+  const mapStyle: string | StyleSpecification = currentBasemap.styleUrl
+    ? `${currentBasemap.styleUrl}?language=${language}`
+    : {
     ...currentBasemap.style,
     glyphs: 'https://demotiles.maplibre.org/font/{fontstack}/{range}.pbf',
   };
@@ -262,10 +264,34 @@ export default function MapPageClient() {
             aria-label={language === 'zh' ? '選擇底圖' : 'Choose a basemap'}
             className="pointer-events-auto absolute right-full top-0 mr-3 w-[min(20rem,calc(100vw-6rem))] overflow-hidden rounded-3xl border border-white/70 bg-white/95 p-3 shadow-2xl backdrop-blur-xl"
           >
-            <div className="mb-2 px-2 py-1">
+            <div className="mb-2 flex items-center justify-between gap-2 px-2 py-1">
               <h2 className="text-sm font-black text-slate-900">
                 {language === 'zh' ? '選擇地圖底圖' : 'Choose a basemap'}
               </h2>
+              <div className="flex items-center rounded-full border border-slate-200 bg-slate-50 p-0.5">
+                <button
+                  type="button"
+                  aria-label="中文"
+                  aria-pressed={language === 'zh'}
+                  onClick={() => setLanguage('zh')}
+                  className={`rounded-full px-2 py-1 text-xs font-bold transition ${
+                    language === 'zh' ? 'bg-white text-emerald-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'
+                  }`}
+                >
+                  中
+                </button>
+                <button
+                  type="button"
+                  aria-label="English"
+                  aria-pressed={language === 'en'}
+                  onClick={() => setLanguage('en')}
+                  className={`rounded-full px-2 py-1 text-xs font-bold transition ${
+                    language === 'en' ? 'bg-white text-emerald-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'
+                  }`}
+                >
+                  英
+                </button>
+              </div>
             </div>
             <div className="custom-scrollbar grid max-h-[min(55vh,28rem)] grid-cols-2 gap-2 overflow-y-auto p-1">
               {BASEMAPS.map((basemap) => {
@@ -277,7 +303,6 @@ export default function MapPageClient() {
                     aria-pressed={isSelected}
                     onClick={() => {
                       setCurrentStyleId(basemap.id);
-                      setIsBasemapPickerOpen(false);
                     }}
                     className={`group overflow-hidden rounded-2xl border text-left transition ${
                       isSelected

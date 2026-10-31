@@ -9,8 +9,59 @@ function isRecord(value: unknown): value is JsonRecord {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
+function localizedName(language: 'zh' | 'en'): unknown[] {
+  return language === 'zh'
+    ? ['coalesce', ['get', 'name:zh-Hant'], ['get', 'name:zh'], ['get', 'name:en'], ['get', 'name']]
+    : ['coalesce', ['get', 'name:en'], ['get', 'name']];
+}
+
+function containsNameField(value: unknown): boolean {
+  if (typeof value === 'string') return /\{name(?::[^}]+)?\}/.test(value);
+  if (!Array.isArray(value)) {
+    return isRecord(value) && Object.values(value).some(containsNameField);
+  }
+  if (value[0] === 'get' && typeof value[1] === 'string' && value[1].startsWith('name')) return true;
+  return value.some(containsNameField);
+}
+
+function localizeTextField(value: unknown, language: 'zh' | 'en'): unknown {
+  if (typeof value === 'string') {
+    const parts = value.split(/(\{[^}]+\})/g).filter(Boolean).map((part) => {
+      if (/^\{name(?::[^}]+)?\}$/.test(part)) return localizedName(language);
+      const property = /^\{([^}]+)\}$/.exec(part)?.[1];
+      return property ? ['get', property] : part;
+    });
+    return parts.length === 1 ? parts[0] : ['concat', ...parts];
+  }
+
+  if (Array.isArray(value)) {
+    if (value[0] === 'coalesce' && containsNameField(value)) {
+      return localizedName(language);
+    }
+    if (value[0] === 'get' && typeof value[1] === 'string' && value[1].startsWith('name')) {
+      return localizedName(language);
+    }
+    return value.map((part) => localizeTextField(part, language));
+  }
+
+  if (isRecord(value) && Array.isArray(value.stops) && value.stops.every(
+    (stop) => Array.isArray(stop) && stop.length === 2 && typeof stop[0] === 'number',
+  )) {
+    const [first, ...rest] = value.stops as [number, unknown][];
+    return [
+      'step',
+      ['zoom'],
+      localizeTextField(first[1], language),
+      ...rest.flatMap(([zoom, label]) => [zoom, localizeTextField(label, language)]),
+    ];
+  }
+
+  return value;
+}
+
 export async function GET(request: Request) {
   try {
+    const language = new URL(request.url).searchParams.get('language') === 'zh' ? 'zh' : 'en';
     const response = await fetch('https://styles.gpx.studio/osm-topo.json', {
       next: { revalidate: 86400 },
     });
@@ -31,10 +82,21 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: 'Invalid OpenMapTiles OSM Topo style' }, { status: 502 });
     }
 
-    style.layers = style.layers.filter(
+    const layers = style.layers.filter(
       (layer) => !isRecord(layer)
         || !['contours_index_ft', 'contours_ft', 'contours_label_ft'].includes(String(layer.id)),
     );
+    style.layers = layers;
+    for (const layer of layers) {
+      if (
+        isRecord(layer)
+        && layer.source === 'openmaptiles'
+        && isRecord(layer.layout)
+        && containsNameField(layer.layout['text-field'])
+      ) {
+        layer.layout['text-field'] = localizeTextField(layer.layout['text-field'], language);
+      }
+    }
 
     const sources = style.sources;
     const origin = new URL(request.url).origin;
