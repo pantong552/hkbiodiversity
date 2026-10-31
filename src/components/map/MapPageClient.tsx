@@ -31,21 +31,45 @@ const CONTOUR_THRESHOLDS: Record<number, [number, number]> = {
 };
 const MAP_ICON_BUTTON_CLASS = 'pointer-events-auto flex h-11 w-11 items-center justify-center rounded-full border border-white/80 bg-white/95 text-slate-700 shadow-lg backdrop-blur transition hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500';
 
-type ContourDemSource = InstanceType<typeof mlcontour.DemSource>;
-let contourDemSource: ContourDemSource | null = null;
+const DEM_SOURCES = {
+  mapterhorn: {
+    name: { zh: 'Mapterhorn（全球地形）', en: 'Mapterhorn (Global)' },
+    url: 'https://tiles.mapterhorn.com/{z}/{x}/{y}.webp',
+    maxzoom: 12,
+    attribution: 'Elevation data © Mapterhorn',
+  },
+  awsTerrain: {
+    name: { zh: 'AWS Terrain Tiles（Mapzen）', en: 'AWS Terrain Tiles (Mapzen)' },
+    url: '/api/map/dem/aws/{z}/{x}/{y}.png',
+    maxzoom: 15,
+    attribution: '<a href="https://registry.opendata.aws/terrain-tiles/" target="_blank" rel="noopener">AWS Terrain Tiles (Mapzen)</a> | SRTM and GMTED2010 data courtesy of USGS | <a href="https://github.com/tilezen/joerd/blob/master/docs/attribution.md" target="_blank" rel="noopener">Data source attributions</a>',
+  },
+} as const;
+type DemSourceId = keyof typeof DEM_SOURCES;
 
-function getContourDemSource() {
-  if (!contourDemSource) {
-    contourDemSource = new mlcontour.DemSource({
-      url: 'https://tiles.mapterhorn.com/{z}/{x}/{y}.webp',
+type ContourDemSource = InstanceType<typeof mlcontour.DemSource>;
+const contourDemSources: Partial<Record<DemSourceId, ContourDemSource>> = {};
+
+function getContourDemSource(id: DemSourceId) {
+  if (!contourDemSources[id]) {
+    const config = DEM_SOURCES[id];
+    contourDemSources[id] = new mlcontour.DemSource({
+      id: `terrain-${id}`,
+      url: config.url.startsWith('/')
+        ? `${window.location.origin}${config.url}`
+        : config.url,
       encoding: 'terrarium',
-      maxzoom: 12,
+      maxzoom: config.maxzoom,
       worker: true,
       cacheSize: 100,
     });
-    contourDemSource.setupMaplibre({ addProtocol });
+    contourDemSources[id].setupMaplibre({ addProtocol });
   }
-  return contourDemSource;
+  return contourDemSources[id]!;
+}
+
+function initializeContourDemSources() {
+  (Object.keys(DEM_SOURCES) as DemSourceId[]).forEach(getContourDemSource);
 }
 
 export default function MapPageClient() {
@@ -55,13 +79,16 @@ export default function MapPageClient() {
   const [isTerrainPickerOpen, setIsTerrainPickerOpen] = useState(false);
   const [isHillshadeEnabled, setIsHillshadeEnabled] = useState(false);
   const [areContoursEnabled, setAreContoursEnabled] = useState(true);
+  const [demSourceId, setDemSourceId] = useState<DemSourceId>('mapterhorn');
   const [terrainReady, setTerrainReady] = useState(false);
 
   const currentBasemap = BASEMAPS.find((basemap) => basemap.id === currentStyleId) || BASEMAPS[0];
   const isTopoBasemap = currentStyleId === 'openmaptiles-topo';
+  const demSourceConfig = DEM_SOURCES[demSourceId];
+  const demSource = terrainReady ? getContourDemSource(demSourceId) : null;
   const showGeneratedContours = !isTopoBasemap && areContoursEnabled && terrainReady;
-  const contourTiles = showGeneratedContours
-    ? getContourDemSource().contourProtocolUrl({
+  const contourTiles = showGeneratedContours && demSource
+    ? demSource.contourProtocolUrl({
       multiplier: 1,
       thresholds: CONTOUR_THRESHOLDS,
       elevationKey: 'ele',
@@ -84,40 +111,42 @@ export default function MapPageClient() {
         minZoom={3}
         reuseMaps
         onLoad={() => {
-          getContourDemSource();
+          initializeContourDemSources();
           setTerrainReady(true);
         }}
       >
-        {isHillshadeEnabled && terrainReady && (
+        {isHillshadeEnabled && demSource && (
           <Source
-            id="terrain-dem"
+            key={`terrain-dem-${demSourceId}`}
+            id={`terrain-dem-${demSourceId}`}
             type="raster-dem"
-            tiles={[getContourDemSource().sharedDemProtocolUrl]}
+            tiles={[demSource.sharedDemProtocolUrl]}
             encoding="terrarium"
-            maxzoom={12}
+            maxzoom={demSourceConfig.maxzoom}
             tileSize={256}
-            attribution="Elevation data © Mapterhorn"
+            attribution={demSourceConfig.attribution}
           >
             <Layer
-              id="terrain-hillshade"
+              id={`terrain-hillshade-${demSourceId}`}
               type="hillshade"
-              source="terrain-dem"
+              source={`terrain-dem-${demSourceId}`}
               paint={{ 'hillshade-exaggeration': 0.25 }}
             />
           </Source>
         )}
         {contourTiles && (
           <Source
-            id="terrain-contours"
+            key={`terrain-contours-${demSourceId}`}
+            id={`terrain-contours-${demSourceId}`}
             type="vector"
             tiles={[contourTiles]}
             maxzoom={16}
-            attribution="Elevation data © Mapterhorn"
+            attribution={demSourceConfig.attribution}
           >
             <Layer
-              id="terrain-contour-lines"
+              id={`terrain-contour-lines-${demSourceId}`}
               type="line"
-              source="terrain-contours"
+              source={`terrain-contours-${demSourceId}`}
               source-layer="contours"
               paint={{
                 'line-color': 'rgb(126, 124, 121)',
@@ -127,9 +156,9 @@ export default function MapPageClient() {
               layout={{ 'line-join': 'round', 'line-cap': 'round' }}
             />
             <Layer
-              id="terrain-contour-index-lines"
+              id={`terrain-contour-index-lines-${demSourceId}`}
               type="line"
-              source="terrain-contours"
+              source={`terrain-contours-${demSourceId}`}
               source-layer="contours"
               filter={['==', ['%', ['get', 'ele'], 100], 0]}
               paint={{
@@ -140,9 +169,9 @@ export default function MapPageClient() {
               layout={{ 'line-join': 'round', 'line-cap': 'round' }}
             />
             <Layer
-              id="terrain-contour-labels"
+              id={`terrain-contour-labels-${demSourceId}`}
               type="symbol"
-              source="terrain-contours"
+              source={`terrain-contours-${demSourceId}`}
               source-layer="contours"
               filter={['>', ['get', 'level'], 0]}
               layout={{
@@ -260,6 +289,31 @@ export default function MapPageClient() {
                   {language === 'zh' ? '地形圖層' : 'Terrain layers'}
                 </h2>
                 <div className="space-y-2">
+                  <fieldset role="radiogroup" className="space-y-1 border-b border-slate-100 pb-3">
+                    <legend className="px-2 pb-1 text-xs font-bold uppercase tracking-wide text-slate-500">
+                      {language === 'zh' ? '高程資料來源' : 'Elevation data'}
+                    </legend>
+                    {(Object.keys(DEM_SOURCES) as DemSourceId[]).map((id) => (
+                      <button
+                        key={id}
+                        type="button"
+                        role="radio"
+                        aria-checked={demSourceId === id}
+                        onClick={() => setDemSourceId(id)}
+                        className="flex w-full items-center justify-between rounded-xl px-2 py-2 text-left text-sm font-semibold text-slate-700 hover:bg-slate-50"
+                      >
+                        <span>{DEM_SOURCES[id].name[language]}</span>
+                        <span className={`flex h-4 w-4 items-center justify-center rounded-full border ${
+                          demSourceId === id ? 'border-emerald-600' : 'border-slate-300'
+                        }`}>
+                          {demSourceId === id && <span className="h-2 w-2 rounded-full bg-emerald-600" />}
+                        </span>
+                      </button>
+                    ))}
+                    <p className="px-2 pt-1 text-xs text-slate-500">
+                      {language === 'zh' ? '高度及等高線標籤均使用公尺（m）' : 'Elevations and contour labels use meters (m)'}
+                    </p>
+                  </fieldset>
                   <button
                     type="button"
                     role="switch"
