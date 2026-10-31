@@ -2,7 +2,7 @@
 
 import Image from 'next/image';
 import { useState, useEffect, useRef, useSyncExternalStore } from 'react';
-import { Menu, X, User, LogOut, Settings, Globe, Camera } from 'lucide-react';
+import { ArrowLeft, Menu, X, User, LogOut, Settings, Globe, Camera } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { motion } from 'framer-motion';
@@ -52,6 +52,7 @@ export default function Header({ isHomePage: propIsHomePage }: HeaderProps = {})
   
   // 正規化路徑（移除結尾斜線或查詢參數，確保 Vercel 生產環境首頁正確辨識）
   const normalizedPath = (pathname || '/').replace(/\/$/, '') || '/';
+  const isMapPage = normalizedPath === '/map';
   const isHomePage = propIsHomePage !== undefined ? propIsHomePage : (normalizedPath === '/');
   const hasSpeciesOpen = openSpeciesIds.length > 0;
   // 關鍵修正：只有當面板「展開且有物種開啟」時，Header 才需要變白色。如果面板收合，首頁 Header 依然保持透明。
@@ -164,6 +165,7 @@ export default function Header({ isHomePage: propIsHomePage }: HeaderProps = {})
   const navLinks = [
     { name: t('nav.home'), href: '/', hasSubmenu: false, disabled: false },
     { name: t('nav.database'), href: '/database', hasSubmenu: false, disabled: false },
+    { name: language === 'zh' ? '地圖' : 'Map', href: '/map', hasSubmenu: false, disabled: false },
     // 以下頁面尚未建立，暫時停用以避免 404 prefetch 錯誤
     { name: t('nav.about'), href: '/about', hasSubmenu: true, disabled: false },
     { name: t('nav.blog'), href: '/journal', hasSubmenu: false, disabled: false },
@@ -171,13 +173,29 @@ export default function Header({ isHomePage: propIsHomePage }: HeaderProps = {})
   ];
 
   return (
-    <div className={`
+    <div
+      className={`
       fixed top-4 inset-x-0 z-[60] 
       px-6 md:px-8 lg:px-10 xl:px-16
       transition-all duration-500 cubic-bezier(0.16, 1, 0.3, 1)
-      ${(isVisible && !isGalleryOpen && !isUploadModalOpen && !isAccountOpen && !isEditModalOpen && !isLightboxOpen) ? 'translate-y-0 opacity-100' : '-translate-y-40 opacity-0 pointer-events-none'}
-    `}>
-      <nav className={`
+      ${isMapPage
+        ? 'pointer-events-none opacity-100'
+        : (isVisible && !isGalleryOpen && !isUploadModalOpen && !isAccountOpen && !isEditModalOpen && !isLightboxOpen)
+          ? 'translate-y-0 opacity-100'
+          : '-translate-y-40 opacity-0 pointer-events-none'}
+    `}
+    >
+      {isMapPage && (
+        <Link
+          href="/"
+          onClick={() => toggleExpand(false)}
+          aria-label={language === 'zh' ? '返回主頁' : 'Back to home'}
+          className="pointer-events-auto absolute right-6 top-0 z-[70] flex h-11 w-11 items-center justify-center rounded-full border border-white/80 bg-white/95 text-slate-700 shadow-lg backdrop-blur transition hover:bg-white md:right-8"
+        >
+          <ArrowLeft className="h-5 w-5" />
+        </Link>
+      )}
+      {!isMapPage && <nav className={`
         max-w-[1920px] mx-auto rounded-[2rem]
         ${isHeaderTransparent ? 'bg-transparent border-transparent shadow-none' : 'glass-header bg-white/90 backdrop-blur-xl border-slate-100 shadow-2xl shadow-slate-200/50'}
         ${isScrolled ? 'py-2 lg:py-3' : 'py-3 lg:py-5'}
@@ -272,7 +290,9 @@ export default function Header({ isHomePage: propIsHomePage }: HeaderProps = {})
                       toggleExpand(false);
                     }
                   }}
-                  className={`${language === 'en' ? 'text-xs xl:text-sm' : 'text-sm'} font-bold transition-colors duration-500 ${isHeaderTransparent ? 'text-white drop-shadow-sm hover:text-emerald-300' : 'text-slate-500 hover:text-emerald-600'}`}
+                  className={`${link.href === '/map'
+                    ? `inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 ${isHeaderTransparent ? 'border-white/25 bg-white/10 text-white hover:bg-white/20' : 'border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100'}`
+                    : `${language === 'en' ? 'text-xs xl:text-sm' : 'text-sm'} font-bold transition-colors duration-500 ${isHeaderTransparent ? 'text-white drop-shadow-sm hover:text-emerald-300' : 'text-slate-500 hover:text-emerald-600'}`}`}
                 >
                   {link.name}
                 </Link>
@@ -428,7 +448,7 @@ export default function Header({ isHomePage: propIsHomePage }: HeaderProps = {})
                         toggleExpand(false);
                       }
                     }}
-                    className="text-lg font-bold text-slate-700 hover:text-emerald-600 px-4 py-2 rounded-xl hover:bg-emerald-50 transition-all"
+                    className={`flex items-center gap-2 text-lg font-bold text-slate-700 hover:text-emerald-600 px-4 py-2 rounded-xl hover:bg-emerald-50 transition-all ${link.href === '/map' ? 'bg-emerald-50 text-emerald-700' : ''}`}
                   >
                     {link.name}
                   </Link>
@@ -482,7 +502,7 @@ export default function Header({ isHomePage: propIsHomePage }: HeaderProps = {})
           </div>
         </div>
       )}
-      </nav>
+      </nav>}
     </div>
   );
 }

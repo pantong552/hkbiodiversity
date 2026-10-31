@@ -46,6 +46,7 @@ species_rows_updated.csv
 hkbws_species_partial.csv
 hkbws_species.csv
 /database
+/maplibre-contour-main
 
 # Skill
 .codex
