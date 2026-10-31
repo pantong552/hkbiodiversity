@@ -21,6 +21,7 @@ const INITIAL_VIEW_STATE = {
   latitude: 22.34826,
   zoom: 11.99,
 };
+const DEFAULT_BASEMAP_ID = 'openmaptiles-topo';
 
 const CONTOUR_THRESHOLDS: Record<number, [number, number]> = {
   10: [100, 500],
@@ -73,9 +74,91 @@ function initializeContourDemSources() {
   (Object.keys(DEM_SOURCES) as DemSourceId[]).forEach(getContourDemSource);
 }
 
+function getBasemapStyle(
+  basemap: (typeof BASEMAPS)[number],
+  language: 'zh' | 'en',
+): string | StyleSpecification {
+  if (basemap.styleUrl) {
+    return `${basemap.styleUrl}?language=${language}`;
+  }
+  return {
+    ...basemap.style,
+    glyphs: 'https://demotiles.maplibre.org/font/{fontstack}/{range}.pbf',
+  };
+}
+
+function preserveTerrainLayers(
+  previousStyle: StyleSpecification | undefined,
+  nextStyle: StyleSpecification,
+  hideContours: boolean,
+): StyleSpecification {
+  if (!previousStyle) return nextStyle;
+
+  const terrainSources = Object.fromEntries(
+    Object.entries(previousStyle.sources).filter(([id]) => (
+      id.startsWith('terrain-dem-') || id.startsWith('terrain-contours-')
+    )),
+  );
+  const existingLayerIds = new Set(nextStyle.layers.map((layer) => layer.id));
+  const terrainLayers = previousStyle.layers
+    .filter((layer) => (
+      layer.id.startsWith('terrain-hillshade-')
+      || layer.id.startsWith('terrain-contour-')
+    ))
+    .filter((layer) => !existingLayerIds.has(layer.id))
+    .map((layer) => {
+      if (!layer.id.startsWith('terrain-contour-')) return layer;
+      return {
+        ...layer,
+        layout: {
+          ...layer.layout,
+          visibility: hideContours ? 'none' as const : 'visible' as const,
+        },
+      };
+    });
+
+  return {
+    ...nextStyle,
+    sources: { ...nextStyle.sources, ...terrainSources },
+    layers: [...nextStyle.layers, ...terrainLayers],
+  };
+}
+
+async function updateTopoLabelLanguage(
+  map: ReturnType<MapRef['getMap']>,
+  language: 'zh' | 'en',
+) {
+  const response = await fetch(`/api/map/osm-topo?language=${language}`);
+  if (!response.ok) {
+    throw new Error(`Unable to load localized OSM Topo labels: ${response.status}`);
+  }
+
+  const style: unknown = await response.json();
+  if (!isRecord(style) || !Array.isArray(style.layers)) {
+    throw new Error('Invalid localized OSM Topo style response');
+  }
+
+  for (const layer of style.layers) {
+    if (
+      isRecord(layer)
+      && typeof layer.id === 'string'
+      && layer.source === 'openmaptiles'
+      && isRecord(layer.layout)
+      && Object.hasOwn(layer.layout, 'text-field')
+      && map.getLayer(layer.id)
+    ) {
+      map.setLayoutProperty(layer.id, 'text-field', layer.layout['text-field']);
+    }
+  }
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
 export default function MapPageClient() {
   const { language, setLanguage } = useLanguage();
-  const [currentStyleId, setCurrentStyleId] = useState('openmaptiles-topo');
+  const [currentStyleId, setCurrentStyleId] = useState(DEFAULT_BASEMAP_ID);
   const [isBasemapPickerOpen, setIsBasemapPickerOpen] = useState(false);
   const [isTerrainPickerOpen, setIsTerrainPickerOpen] = useState(false);
   const [isHillshadeEnabled, setIsHillshadeEnabled] = useState(false);
@@ -85,6 +168,12 @@ export default function MapPageClient() {
   const [mapReady, setMapReady] = useState(false);
   const [isMobileViewport, setIsMobileViewport] = useState(false);
   const mapRef = useRef<MapRef>(null);
+  const [initialStyle] = useState(() => getBasemapStyle(
+    BASEMAPS.find((basemap) => basemap.id === DEFAULT_BASEMAP_ID) || BASEMAPS[0],
+    language,
+  ));
+  const appliedBasemapId = useRef(DEFAULT_BASEMAP_ID);
+  const appliedTopoLanguage = useRef(language);
 
   useEffect(() => {
     const mobileViewport = window.matchMedia('(max-width: 639px)');
@@ -121,8 +210,7 @@ export default function MapPageClient() {
   const isTopoBasemap = currentStyleId === 'openmaptiles-topo';
   const demSourceConfig = DEM_SOURCES[demSourceId];
   const demSource = terrainReady ? getContourDemSource(demSourceId) : null;
-  const showGeneratedContours = !isTopoBasemap && areContoursEnabled && terrainReady;
-  const contourTiles = showGeneratedContours && demSource
+  const contourTiles = areContoursEnabled && terrainReady && demSource
     ? demSource.contourProtocolUrl({
       multiplier: 1,
       thresholds: CONTOUR_THRESHOLDS,
@@ -132,19 +220,54 @@ export default function MapPageClient() {
       overzoom: 1,
     })
     : undefined;
-  const mapStyle: string | StyleSpecification = currentBasemap.styleUrl
-    ? `${currentBasemap.styleUrl}?language=${language}`
-    : {
-    ...currentBasemap.style,
-    glyphs: 'https://demotiles.maplibre.org/font/{fontstack}/{range}.pbf',
-  };
+
+  useEffect(() => {
+    const map = mapRef.current?.getMap();
+    if (!mapReady || !map) return;
+
+    if (appliedBasemapId.current !== currentStyleId) {
+      appliedBasemapId.current = currentStyleId;
+      appliedTopoLanguage.current = language;
+      map.setStyle(getBasemapStyle(currentBasemap, language), {
+        transformStyle: (previousStyle, nextStyle) => preserveTerrainLayers(
+          previousStyle,
+          nextStyle,
+          isTopoBasemap,
+        ),
+      });
+      return;
+    }
+
+    if (!isTopoBasemap || appliedTopoLanguage.current === language) return;
+
+    let active = true;
+    const updateLabels = async () => {
+      try {
+        await updateTopoLabelLanguage(map, language);
+        if (active) appliedTopoLanguage.current = language;
+      } catch (error) {
+        if (active) console.error('Failed to update OpenMapTiles OSM Topo label language:', error);
+      }
+    };
+
+    if (map.isStyleLoaded()) {
+      void updateLabels();
+    } else {
+      map.once('style.load', updateLabels);
+    }
+
+    return () => {
+      active = false;
+      map.off('style.load', updateLabels);
+    };
+  }, [currentBasemap, currentStyleId, isTopoBasemap, language, mapReady]);
 
   return (
     <div className="relative h-dvh w-full overflow-hidden bg-slate-100">
       <Map
         ref={mapRef}
         initialViewState={INITIAL_VIEW_STATE}
-        mapStyle={mapStyle}
+        mapStyle={initialStyle}
         attributionControl={false}
         maxZoom={18}
         minZoom={3}
@@ -197,7 +320,11 @@ export default function MapPageClient() {
                 'line-opacity': 0.3,
                 'line-width': 0.5,
               }}
-              layout={{ 'line-join': 'round', 'line-cap': 'round' }}
+              layout={{
+                'line-join': 'round',
+                'line-cap': 'round',
+                visibility: isTopoBasemap ? 'none' : 'visible',
+              }}
             />
             <Layer
               id={`terrain-contour-index-lines-${demSourceId}`}
@@ -210,7 +337,11 @@ export default function MapPageClient() {
                 'line-opacity': 0.1,
                 'line-width': 1,
               }}
-              layout={{ 'line-join': 'round', 'line-cap': 'round' }}
+              layout={{
+                'line-join': 'round',
+                'line-cap': 'round',
+                visibility: isTopoBasemap ? 'none' : 'visible',
+              }}
             />
             <Layer
               id={`terrain-contour-labels-${demSourceId}`}
@@ -228,6 +359,7 @@ export default function MapPageClient() {
                 'text-field': ['concat', ['to-string', ['get', 'ele']], 'm'],
                 'text-font': ['Noto Sans Bold'],
                 'text-padding': 0,
+                visibility: isTopoBasemap ? 'none' : 'visible',
               }}
               paint={{
                 'text-color': '#5c5c5c',
