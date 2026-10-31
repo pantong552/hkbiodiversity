@@ -1,14 +1,15 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import Map, {
+  type MapRef,
   FullscreenControl,
   Layer,
   NavigationControl,
   ScaleControl,
   Source,
 } from 'react-map-gl/maplibre';
-import { addProtocol, type StyleSpecification } from 'maplibre-gl';
+import { addProtocol, AttributionControl, type StyleSpecification } from 'maplibre-gl';
 import mlcontour from 'maplibre-contour';
 import { Check, Layers, Mountain } from 'lucide-react';
 import { useLanguage } from '@/context/LanguageContext';
@@ -33,13 +34,13 @@ const MAP_ICON_BUTTON_CLASS = 'pointer-events-auto flex h-11 w-11 items-center j
 
 const DEM_SOURCES = {
   mapterhorn: {
-    name: { zh: 'Mapterhorn（全球地形）', en: 'Mapterhorn (Global)' },
+    name: { zh: 'Mapterhorn', en: 'Mapterhorn' },
     url: 'https://tiles.mapterhorn.com/{z}/{x}/{y}.webp',
     maxzoom: 12,
     attribution: 'Elevation data © Mapterhorn',
   },
   awsTerrain: {
-    name: { zh: 'AWS Terrain Tiles（Mapzen）', en: 'AWS Terrain Tiles (Mapzen)' },
+    name: { zh: 'Mapzen', en: 'Mapzen' },
     url: '/api/map/dem/aws/{z}/{x}/{y}.png',
     maxzoom: 15,
     attribution: '<a href="https://registry.opendata.aws/terrain-tiles/" target="_blank" rel="noopener">AWS Terrain Tiles (Mapzen)</a> | SRTM and GMTED2010 data courtesy of USGS | <a href="https://github.com/tilezen/joerd/blob/master/docs/attribution.md" target="_blank" rel="noopener">Data source attributions</a>',
@@ -81,6 +82,40 @@ export default function MapPageClient() {
   const [areContoursEnabled, setAreContoursEnabled] = useState(true);
   const [demSourceId, setDemSourceId] = useState<DemSourceId>('mapterhorn');
   const [terrainReady, setTerrainReady] = useState(false);
+  const [mapReady, setMapReady] = useState(false);
+  const [isMobileViewport, setIsMobileViewport] = useState(false);
+  const mapRef = useRef<MapRef>(null);
+
+  useEffect(() => {
+    const mobileViewport = window.matchMedia('(max-width: 639px)');
+    const updateViewport = () => setIsMobileViewport(mobileViewport.matches);
+    updateViewport();
+    mobileViewport.addEventListener('change', updateViewport);
+    return () => mobileViewport.removeEventListener('change', updateViewport);
+  }, []);
+
+  useEffect(() => {
+    const map = mapRef.current?.getMap();
+    if (!mapReady || !map) return;
+
+    const attributionControl = new AttributionControl({ compact: isMobileViewport });
+    map.addControl(attributionControl, 'bottom-right');
+
+    const attribution = map.getContainer().querySelector('details.maplibregl-ctrl-attrib');
+    const bottomRightControls = map.getContainer().querySelector('.maplibregl-ctrl-bottom-right');
+    if (attribution && bottomRightControls) {
+      bottomRightControls.append(attribution);
+    }
+
+    if (isMobileViewport) {
+      attribution?.classList.remove('maplibregl-compact-show');
+      attribution?.removeAttribute('open');
+    }
+
+    return () => {
+      map.removeControl(attributionControl);
+    };
+  }, [isMobileViewport, mapReady]);
 
   const currentBasemap = BASEMAPS.find((basemap) => basemap.id === currentStyleId) || BASEMAPS[0];
   const isTopoBasemap = currentStyleId === 'openmaptiles-topo';
@@ -105,14 +140,21 @@ export default function MapPageClient() {
   return (
     <div className="relative h-dvh w-full overflow-hidden bg-slate-100">
       <Map
+        ref={mapRef}
         initialViewState={INITIAL_VIEW_STATE}
         mapStyle={mapStyle}
+        attributionControl={false}
         maxZoom={18}
         minZoom={3}
         reuseMaps
+        onClick={() => {
+          setIsBasemapPickerOpen(false);
+          setIsTerrainPickerOpen(false);
+        }}
         onLoad={() => {
           initializeContourDemSources();
           setTerrainReady(true);
+          setMapReady(true);
         }}
       >
         {isHillshadeEnabled && demSource && (
@@ -310,9 +352,6 @@ export default function MapPageClient() {
                         </span>
                       </button>
                     ))}
-                    <p className="px-2 pt-1 text-xs text-slate-500">
-                      {language === 'zh' ? '高度及等高線標籤均使用公尺（m）' : 'Elevations and contour labels use meters (m)'}
-                    </p>
                   </fieldset>
                   <button
                     type="button"
