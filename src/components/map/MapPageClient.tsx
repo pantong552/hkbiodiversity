@@ -21,6 +21,7 @@ import {
   type StyleSpecification,
 } from 'maplibre-gl';
 import mlcontour from 'maplibre-contour';
+import CustomDropdown from '@/components/ui/CustomDropdown';
 import { Check, Layers, Mountain, Route as RouteIcon, Download, Trash2 } from 'lucide-react';
 import { useLanguage } from '@/context/LanguageContext';
 import { BASEMAPS } from '@/constants/basemaps';
@@ -73,6 +74,38 @@ const DEM_SOURCES = {
 type DemSourceId = keyof typeof DEM_SOURCES;
 const LIBERTY_BUILDING_SOURCE_ID = 'liberty-buildings';
 type RoutePoint = [number, number];
+
+function closestRoutePoint(point: RoutePoint, route: RoutePoint[]): RoutePoint {
+  if (route.length === 0) return point;
+  const latitudeScale = Math.cos((point[1] * Math.PI) / 180);
+  if (route.length === 1) return route[0];
+  let closest = route[0];
+  let closestDistance = Number.POSITIVE_INFINITY;
+  for (let index = 0; index < route.length - 1; index++) {
+    const start = route[index];
+    const end = route[index + 1];
+    const startX = (start[0] - point[0]) * latitudeScale;
+    const startY = start[1] - point[1];
+    const segmentX = (end[0] - start[0]) * latitudeScale;
+    const segmentY = end[1] - start[1];
+    const segmentLengthSquared = segmentX * segmentX + segmentY * segmentY;
+    const fraction = segmentLengthSquared === 0
+      ? 0
+      : Math.max(0, Math.min(1, -(startX * segmentX + startY * segmentY) / segmentLengthSquared));
+    const candidate: RoutePoint = [
+      start[0] + (end[0] - start[0]) * fraction,
+      start[1] + (end[1] - start[1]) * fraction,
+    ];
+    const dx = (candidate[0] - point[0]) * latitudeScale;
+    const dy = candidate[1] - point[1];
+    const distance = dx * dx + dy * dy;
+    if (distance < closestDistance) {
+      closest = candidate;
+      closestDistance = distance;
+    }
+  }
+  return closest;
+}
 
 function downloadRouteGpx(points: RoutePoint[]) {
   const trackpoints = points.map(([lon, lat]) => `<trkpt lat="${lat}" lon="${lon}"></trkpt>`).join('');
@@ -469,6 +502,7 @@ export default function MapPageClient() {
   const [routeCoordinates, setRouteCoordinates] = useState<RoutePoint[]>([]);
   const [routeBusy, setRouteBusy] = useState(false);
   const [routeError, setRouteError] = useState<string | null>(null);
+  const [waypointMenu, setWaypointMenu] = useState<{ index: number; x: number; y: number } | null>(null);
   const routeRequestId = useRef(0);
   const routeMarkersRef = useRef<MapLibreMarker[]>([]);
   const mapRef = useRef<MapRef>(null);
@@ -537,15 +571,27 @@ export default function MapPageClient() {
     if (!mapReady || !map) return;
     routeMarkersRef.current.forEach((marker) => marker.remove());
     routeMarkersRef.current = routeAnchors.map((anchor, index) => {
+      const markerPosition = routeCoordinates.length > 1
+        ? closestRoutePoint(anchor, routeCoordinates)
+        : anchor;
       const element = document.createElement('div');
-      element.className = 'flex h-7 w-7 cursor-grab items-center justify-center rounded-full border-2 border-slate-900 bg-white text-xs font-black text-slate-900 shadow-md active:cursor-grabbing';
+      element.className = 'flex h-[22px] w-[22px] cursor-grab select-none items-center justify-center rounded-full border-[2.5px] border-white bg-blue-600 text-[10px] font-bold leading-none text-white shadow-[0_1px_5px_rgba(15,23,42,0.55)] ring-1 ring-blue-800/70 active:cursor-grabbing';
       element.textContent = String(index + 1);
       element.setAttribute('aria-label', `${language === 'zh' ? '途經點' : 'Waypoint'} ${index + 1}`);
+      element.addEventListener('contextmenu', (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        setWaypointMenu({ index, x: event.clientX, y: event.clientY });
+      });
+      element.addEventListener('click', (event) => event.stopPropagation());
+      element.addEventListener('mousedown', (event) => {
+        if (event.button === 2) event.stopPropagation();
+      });
       const marker = new MapLibreMarkerConstructor({
         element,
         draggable: true,
         anchor: 'center',
-      }).setLngLat(anchor).addTo(map);
+      }).setLngLat(markerPosition).addTo(map);
       marker.on('dragend', () => {
         const { lng, lat } = marker.getLngLat();
         setRouteAnchors((points) => points.map((point, pointIndex) => (
@@ -558,7 +604,7 @@ export default function MapPageClient() {
       routeMarkersRef.current.forEach((marker) => marker.remove());
       routeMarkersRef.current = [];
     };
-  }, [language, mapReady, routeAnchors]);
+  }, [language, mapReady, routeAnchors, routeCoordinates]);
 
   useEffect(() => {
     const mobileViewport = window.matchMedia('(max-width: 639px)');
@@ -798,6 +844,7 @@ export default function MapPageClient() {
         minZoom={3}
         reuseMaps
         onClick={(event) => {
+          setWaypointMenu(null);
           setIsBasemapPickerOpen(false);
           setIsTerrainPickerOpen(false);
           if (isRouting) {
@@ -938,6 +985,43 @@ export default function MapPageClient() {
         <FullscreenControl position="bottom-right" />
         <ScaleControl position="bottom-left" />
       </Map>
+
+      {waypointMenu && (() => {
+        const actions = [
+          {
+            id: 'delete',
+            label: language === 'zh' ? '刪除途經點' : 'Delete waypoint',
+            icon: <Trash2 className="h-4 w-4" />,
+            onSelect: () => setRouteAnchors((points) => points.filter((_, index) => index !== waypointMenu.index)),
+            destructive: true,
+          },
+        ];
+        return (
+          <div
+            role="menu"
+            aria-label={language === 'zh' ? '途經點選項' : 'Waypoint options'}
+            style={{ left: waypointMenu.x, top: waypointMenu.y }}
+            className="fixed z-[100] min-w-44 -translate-y-1 rounded-xl border border-slate-200/90 bg-white/95 p-1.5 shadow-xl shadow-slate-900/20 backdrop-blur-xl"
+            onClick={(event) => event.stopPropagation()}
+            onContextMenu={(event) => event.preventDefault()}
+          >
+            {actions.map((action) => (
+              <button
+                key={action.id}
+                type="button"
+                role="menuitem"
+                onClick={() => {
+                  action.onSelect();
+                  setWaypointMenu(null);
+                }}
+                className={`flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm font-semibold transition ${action.destructive ? 'text-red-600 hover:bg-red-50' : 'text-slate-700 hover:bg-slate-100'}`}
+              >
+                {action.icon}{action.label}
+              </button>
+            ))}
+          </div>
+        );
+      })()}
 
       {locationError && (
         <div
@@ -1183,7 +1267,17 @@ export default function MapPageClient() {
               <span>{language === 'zh' ? '啟用路線規劃' : 'Enable routing'}</span><span className={`relative h-5 w-9 rounded-full transition ${isRouting ? 'bg-emerald-600' : 'bg-slate-300'}`}><span className={`absolute top-0.5 h-4 w-4 rounded-full bg-white transition ${isRouting ? 'left-[18px]' : 'left-0.5'}`} /></span>
             </button>
             {isRouting && <>
-              <select aria-label={language === 'zh' ? '活動類型' : 'Activity'} value={routeProfile} onChange={(event) => setRouteProfile(event.target.value as 'foot' | 'bike')} className="mt-2 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800"><option value="foot">{language === 'zh' ? '步行／行山' : 'Walking / hiking'}</option><option value="bike">{language === 'zh' ? '單車' : 'Cycling'}</option></select>
+              <CustomDropdown
+                options={[
+                  { value: 'foot', label: language === 'zh' ? '步行／行山' : 'Walking / hiking' },
+                  { value: 'bike', label: language === 'zh' ? '單車' : 'Cycling' },
+                ]}
+                value={routeProfile}
+                onChange={(value) => setRouteProfile(value as 'foot' | 'bike')}
+                className="mt-2"
+                appearance="map"
+                ariaLabel={language === 'zh' ? '活動類型' : 'Activity'}
+              />
               <button type="button" role="switch" aria-checked={allowPrivateRoads} onClick={() => setAllowPrivateRoads((allowed) => !allowed)} className="mt-2 flex w-full items-center justify-between rounded-xl px-2 py-2 text-left text-sm font-semibold text-slate-700"><span>{language === 'zh' ? '允許私人道路' : 'Allow private roads'}</span><span className={`relative h-5 w-9 rounded-full transition ${allowPrivateRoads ? 'bg-emerald-600' : 'bg-slate-300'}`}><span className={`absolute top-0.5 h-4 w-4 rounded-full bg-white transition ${allowPrivateRoads ? 'left-[18px]' : 'left-0.5'}`} /></span></button>
               <p className="px-1 py-2 text-xs text-slate-600">{routeBusy ? (language === 'zh' ? '正在尋找路線…' : 'Finding route…') : (language === 'zh' ? `點擊地圖新增途經點（${routeAnchors.length}）` : `Click map to add waypoint (${routeAnchors.length})`)}</p>
               {routeError && <p role="alert" className="mb-2 rounded-lg bg-red-50 px-2 py-1.5 text-xs text-red-700">{language === 'zh' ? '尋路失敗：' : 'Routing failed: '}{routeError}</p>}
