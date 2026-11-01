@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, type PointerEvent } from 'react';
 import Map, {
   type MapRef,
   FullscreenControl,
@@ -154,13 +154,16 @@ function RouteElevationPanel({
   coordinates,
   anchors,
   language,
+  onHoverRoutePoint,
 }: {
   coordinates: number[][];
   anchors: RoutePoint[];
   language: 'zh' | 'en';
+  onHoverRoutePoint: (point: { coordinate: RoutePoint; distance: number; elevation: number } | null) => void;
 }) {
   const chartContainerRef = useRef<SVGSVGElement>(null);
   const [chartSize, setChartSize] = useState({ width: 0, height: 0 });
+  const [chartHover, setChartHover] = useState<{ x: number; y: number; distance: number; elevation: number } | null>(null);
   useEffect(() => {
     const element = chartContainerRef.current;
     if (!element) return;
@@ -210,6 +213,7 @@ function RouteElevationPanel({
 
     return {
       distance: cumulativeDistances.at(-1) ?? 0,
+      cumulativeDistances,
       ascent,
       descent,
       minElevation,
@@ -227,9 +231,39 @@ function RouteElevationPanel({
     ? { distance: '全長距離', ascent: '總爬升', descent: '總下降', elevation: '高度', distanceAxis: '距離' }
     : { distance: 'Distance', ascent: 'Total ascent', descent: 'Total descent', elevation: 'Elevation', distanceAxis: 'Distance' };
 
+  const handleChartPointerMove = (event: PointerEvent<SVGSVGElement>) => {
+    const bounds = event.currentTarget.getBoundingClientRect();
+    const fraction = Math.max(0, Math.min(1, (event.clientX - bounds.left) / bounds.width));
+    const targetDistance = fraction * stats.distance;
+    let segmentIndex = stats.cumulativeDistances.findIndex((distance, index) => (
+      index > 0 && distance >= targetDistance
+    ));
+    if (segmentIndex < 0) segmentIndex = coordinates.length - 1;
+    const startIndex = Math.max(0, segmentIndex - 1);
+    const startDistance = stats.cumulativeDistances[startIndex];
+    const endDistance = stats.cumulativeDistances[segmentIndex];
+    const segmentFraction = endDistance === startDistance
+      ? 0
+      : (targetDistance - startDistance) / (endDistance - startDistance);
+    const start = coordinates[startIndex];
+    const end = coordinates[segmentIndex];
+    const elevation = (start[2] ?? 0) + ((end[2] ?? 0) - (start[2] ?? 0)) * segmentFraction;
+    const elevationRange = Math.max(stats.maxElevation - stats.minElevation, 1);
+    const y = 88 - ((elevation - stats.minElevation) / elevationRange) * 70;
+    setChartHover({ x: fraction * 1000, y, distance: targetDistance, elevation });
+    onHoverRoutePoint({
+      coordinate: [
+        start[0] + (end[0] - start[0]) * segmentFraction,
+        start[1] + (end[1] - start[1]) * segmentFraction,
+      ],
+      distance: targetDistance,
+      elevation,
+    });
+  };
+
   return (
     <section aria-label={language === 'zh' ? '路線高度資料' : 'Route elevation profile'} className="absolute inset-x-0 bottom-0 z-20 border-t border-white/70 bg-white/95 shadow-[0_-12px_40px_rgba(15,23,42,0.16)] backdrop-blur-xl">
-      <div className="mx-auto grid max-w-screen-2xl grid-cols-1 gap-4 px-4 py-3 sm:grid-cols-[210px_minmax(0,1fr)] sm:items-center sm:gap-6 sm:px-6">
+      <div className="mx-auto grid max-w-screen-2xl grid-cols-1 gap-3 px-3 py-3 sm:grid-cols-[170px_minmax(0,1fr)] sm:items-center sm:gap-0 sm:px-3">
         <div className="grid grid-cols-3 gap-2 sm:grid-cols-1 sm:gap-3">
           <div className="sm:pb-1">
             <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-slate-500">{labels.distance}</p>
@@ -249,7 +283,7 @@ function RouteElevationPanel({
             <span>{labels.elevation} · {Math.round(stats.minElevation)}–{Math.round(stats.maxElevation)} m</span>
             <span>{labels.distanceAxis}</span>
           </div>
-          <svg ref={chartContainerRef} viewBox="0 0 1000 106" preserveAspectRatio="none" role="img" aria-label={language === 'zh' ? '高度對距離圖表，包含途經點位置' : 'Elevation by distance chart with waypoint positions'} className="h-20 w-full overflow-visible sm:h-24">
+          <svg ref={chartContainerRef} viewBox="0 0 1000 106" preserveAspectRatio="none" role="img" aria-label={language === 'zh' ? '高度對距離圖表，包含途經點位置' : 'Elevation by distance chart with waypoint positions'} className="h-20 w-full overflow-visible sm:h-24" onPointerMove={handleChartPointerMove} onPointerLeave={() => { setChartHover(null); onHoverRoutePoint(null); }}>
             <defs><linearGradient id="route-elevation-fill" x1="0" x2="0" y1="0" y2="1"><stop offset="0%" stopColor="#38bdf8" stopOpacity="0.34" /><stop offset="100%" stopColor="#38bdf8" stopOpacity="0.04" /></linearGradient></defs>
             {[30, 60, 94].map((y) => <line key={y} x1="0" x2="1000" y1={y} y2={y} stroke="#cbd5e1" strokeDasharray="3 5" strokeWidth="1" />)}
             <AnimatePresence initial={false} mode="sync">
@@ -271,6 +305,14 @@ function RouteElevationPanel({
                 </g>)}
               </motion.g>
             </AnimatePresence>
+            {chartHover && <g pointerEvents="none">
+              <g transform={`translate(${chartHover.x} 0) scale(${chartSize.width > 0 ? (chartSize.height / chartSize.width) * (1000 / 106) : 1} 1) translate(${-chartHover.x} 0)`}>
+                <line x1={chartHover.x} x2={chartHover.x} y1="12" y2="94" stroke="#f59e0b" strokeDasharray="3 3" strokeOpacity="0.8" vectorEffect="non-scaling-stroke" />
+                <circle cx={chartHover.x} cy={chartHover.y} r="5" fill="#fff" stroke="#f59e0b" strokeWidth="2.5" vectorEffect="non-scaling-stroke" />
+                <text x={chartHover.x} y={Math.max(10, chartHover.y - 8)} textAnchor="middle" fill="#b45309" fontSize="10" fontWeight="700">{Math.round(chartHover.elevation)} m</text>
+                <text x={chartHover.x} y="104" textAnchor={chartHover.x < 60 ? 'start' : chartHover.x > 940 ? 'end' : 'middle'} fill="#b45309" fontSize="10" fontWeight="700">{formatDistance(chartHover.distance)}</text>
+              </g>
+            </g>}
           </svg>
           <div className="relative h-4 text-[10px] font-medium text-slate-400">
             <span className="absolute left-0 top-0">0 km</span>
@@ -690,10 +732,12 @@ export default function MapPageClient() {
   const [routeBusy, setRouteBusy] = useState(false);
   const [routeError, setRouteError] = useState<string | null>(null);
   const [routeInsertPreview, setRouteInsertPreview] = useState<{ point: RoutePoint; index: number } | null>(null);
+  const [routeProfileHover, setRouteProfileHover] = useState<{ coordinate: RoutePoint; distance: number; elevation: number } | null>(null);
   const [waypointMenu, setWaypointMenu] = useState<{ index: number; x: number; y: number } | null>(null);
   const routeRequestId = useRef(0);
   const routedAnchorsRef = useRef<RoutePoint[]>([]);
   const routeMarkersRef = useRef<MapLibreMarker[]>([]);
+  const routeProfileHoverMarkerRef = useRef<MapLibreMarker | null>(null);
   const mapRef = useRef<MapRef>(null);
   const isStyleReadyRef = useRef(false);
   const [initialStyle] = useState(() => getBasemapStyle(
@@ -802,6 +846,37 @@ export default function MapPageClient() {
       routeMarkersRef.current = [];
     };
   }, [language, mapReady, routeAnchors, routeCoordinates]);
+
+  useEffect(() => {
+    const map = mapRef.current?.getMap();
+    if (
+      !mapReady
+      || !map
+      || !isRouting
+      || routeCoordinates.length < 2
+      || !routeProfileHover
+      || !Number.isFinite(routeProfileHover.coordinate[0])
+      || !Number.isFinite(routeProfileHover.coordinate[1])
+    ) {
+      routeProfileHoverMarkerRef.current?.remove();
+      routeProfileHoverMarkerRef.current = null;
+      return;
+    }
+    if (!routeProfileHoverMarkerRef.current) {
+      const element = document.createElement('div');
+      element.className = 'h-4 w-4 rounded-full border-[3px] border-white bg-amber-500 shadow-[0_1px_7px_rgba(15,23,42,0.55)] ring-2 ring-amber-600/70';
+      element.style.pointerEvents = 'none';
+      element.setAttribute('aria-label', language === 'zh' ? '圖表游標位置' : 'Chart cursor position');
+      routeProfileHoverMarkerRef.current = new MapLibreMarkerConstructor({
+        element,
+        anchor: 'center',
+      })
+        .setOpacity(1, 1)
+        .setLngLat(routeProfileHover.coordinate)
+        .addTo(map);
+    }
+    routeProfileHoverMarkerRef.current.setLngLat(routeProfileHover.coordinate);
+  }, [isRouting, language, mapReady, routeCoordinates.length, routeProfileHover]);
 
   useEffect(() => {
     const mobileViewport = window.matchMedia('(max-width: 639px)');
@@ -1235,6 +1310,7 @@ export default function MapPageClient() {
           coordinates={routeCoordinates}
           anchors={routedAnchors}
           language={language}
+          onHoverRoutePoint={setRouteProfileHover}
         />
       )}
 
