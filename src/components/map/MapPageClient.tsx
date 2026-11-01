@@ -437,6 +437,7 @@ export default function MapPageClient() {
   const { language, setLanguage } = useLanguage();
   const [currentStyleId, setCurrentStyleId] = useState(DEFAULT_BASEMAP_ID);
   const [isBasemapPickerOpen, setIsBasemapPickerOpen] = useState(false);
+  const [hasOpenedBasemapPicker, setHasOpenedBasemapPicker] = useState(false);
   const [isTerrainPickerOpen, setIsTerrainPickerOpen] = useState(false);
   const [isHillshadeEnabled, setIsHillshadeEnabled] = useState(false);
   const [is3DModeEnabled, setIs3DModeEnabled] = useState(false);
@@ -841,6 +842,7 @@ export default function MapPageClient() {
           aria-expanded={isBasemapPickerOpen}
           aria-controls="map-basemap-picker"
           onClick={() => {
+            setHasOpenedBasemapPicker(true);
             setIsBasemapPickerOpen((open) => !open);
             setIsTerrainPickerOpen(false);
           }}
@@ -849,11 +851,15 @@ export default function MapPageClient() {
           <Layers className="h-5 w-5 text-emerald-700" />
         </button>
 
-        {isBasemapPickerOpen && (
+        {hasOpenedBasemapPicker && (
           <section
             id="map-basemap-picker"
             aria-label={language === 'zh' ? '選擇底圖' : 'Choose a basemap'}
-            className="pointer-events-auto absolute right-full top-0 mr-3 w-[min(20rem,calc(100vw-6rem))] overflow-hidden rounded-3xl border border-white/70 bg-white/95 p-3 shadow-2xl backdrop-blur-xl"
+            aria-hidden={!isBasemapPickerOpen}
+            inert={!isBasemapPickerOpen}
+            className={`pointer-events-auto absolute right-full top-0 mr-3 w-[min(20rem,calc(100vw-6rem))] overflow-hidden rounded-3xl border border-white/70 bg-white/95 p-3 shadow-2xl backdrop-blur-xl ${
+              isBasemapPickerOpen ? '' : 'invisible pointer-events-none'
+            }`}
           >
             <div className="mb-2 flex items-center justify-between gap-2 px-2 py-1">
               <h2 className="text-sm font-black text-slate-900">
