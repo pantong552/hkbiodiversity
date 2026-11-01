@@ -1,5 +1,10 @@
 @import "tailwindcss";
 
+@keyframes route-loading {
+  0% { left: -40%; }
+  100% { left: 100%; }
+}
+
 :root {
   --background: #ffffff;
   --foreground: #171717;

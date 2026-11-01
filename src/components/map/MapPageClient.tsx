@@ -107,6 +107,22 @@ function closestRoutePoint(point: RoutePoint, route: RoutePoint[]): RoutePoint {
   return closest;
 }
 
+function closestRouteIndex(point: RoutePoint, route: RoutePoint[]): number {
+  let closestIndex = 0;
+  let closestDistance = Number.POSITIVE_INFINITY;
+  const latitudeScale = Math.cos((point[1] * Math.PI) / 180);
+  route.forEach((candidate, index) => {
+    const dx = (candidate[0] - point[0]) * latitudeScale;
+    const dy = candidate[1] - point[1];
+    const distance = dx * dx + dy * dy;
+    if (distance < closestDistance) {
+      closestDistance = distance;
+      closestIndex = index;
+    }
+  });
+  return closestIndex;
+}
+
 function downloadRouteGpx(points: RoutePoint[]) {
   const trackpoints = points.map(([lon, lat]) => `<trkpt lat="${lat}" lon="${lon}"></trkpt>`).join('');
   const xml = `<?xml version="1.0" encoding="UTF-8"?><gpx version="1.1" creator="HK Biodiversity" xmlns="http://www.topografix.com/GPX/1/1"><trk><name>HK Biodiversity route</name><trkseg>${trackpoints}</trkseg></trk></gpx>`;
@@ -502,8 +518,10 @@ export default function MapPageClient() {
   const [routeCoordinates, setRouteCoordinates] = useState<RoutePoint[]>([]);
   const [routeBusy, setRouteBusy] = useState(false);
   const [routeError, setRouteError] = useState<string | null>(null);
+  const [routeInsertPreview, setRouteInsertPreview] = useState<{ point: RoutePoint; index: number } | null>(null);
   const [waypointMenu, setWaypointMenu] = useState<{ index: number; x: number; y: number } | null>(null);
   const routeRequestId = useRef(0);
+  const routedAnchorsRef = useRef<RoutePoint[]>([]);
   const routeMarkersRef = useRef<MapLibreMarker[]>([]);
   const mapRef = useRef<MapRef>(null);
   const isStyleReadyRef = useRef(false);
@@ -519,6 +537,7 @@ export default function MapPageClient() {
     if (!isRouting || routeAnchors.length < 2) {
       queueMicrotask(() => {
         if (routeRequestId.current === requestId) {
+          routedAnchorsRef.current = [];
           setRouteCoordinates([]);
           setRouteBusy(false);
           setRouteError(null);
@@ -552,9 +571,13 @@ export default function MapPageClient() {
       const data = await response.json();
       const coordinates = data?.paths?.[0]?.points?.coordinates;
       if (!Array.isArray(coordinates)) throw new Error('No route found');
-      if (routeRequestId.current === requestId) setRouteCoordinates(coordinates);
+      if (routeRequestId.current === requestId) {
+        routedAnchorsRef.current = routeAnchors;
+        setRouteCoordinates(coordinates);
+      }
     }).catch((error: unknown) => {
       if (routeRequestId.current === requestId) {
+        routedAnchorsRef.current = [];
         setRouteCoordinates([]);
         setRouteError(error instanceof Error ? error.message : 'Unable to calculate route');
       }
@@ -571,7 +594,7 @@ export default function MapPageClient() {
     if (!mapReady || !map) return;
     routeMarkersRef.current.forEach((marker) => marker.remove());
     routeMarkersRef.current = routeAnchors.map((anchor, index) => {
-      const markerPosition = routeCoordinates.length > 1
+      const markerPosition = routeAnchors === routedAnchorsRef.current && routeCoordinates.length > 1
         ? closestRoutePoint(anchor, routeCoordinates)
         : anchor;
       const element = document.createElement('div');
@@ -591,7 +614,10 @@ export default function MapPageClient() {
         element,
         draggable: true,
         anchor: 'center',
-      }).setLngLat(markerPosition).addTo(map);
+      })
+        .setOpacity(1, 1)
+        .setLngLat(markerPosition)
+        .addTo(map);
       marker.on('dragend', () => {
         const { lng, lat } = marker.getLngLat();
         setRouteAnchors((points) => points.map((point, pointIndex) => (
@@ -835,6 +861,11 @@ export default function MapPageClient() {
 
   return (
     <div className="map-page relative h-dvh w-full overflow-hidden bg-slate-100">
+      {routeBusy && <div className="pointer-events-none fixed inset-x-0 top-0 z-[1000]" role="status" aria-label={language === 'zh' ? '正在計算路線' : 'Calculating route'}>
+        <div className="relative h-1 w-full overflow-hidden bg-slate-900/10 shadow-sm">
+          <div className="absolute inset-y-0 w-2/5 bg-gradient-to-r from-emerald-400 via-sky-500 to-blue-600 shadow-[0_0_12px_rgba(14,165,233,0.65)]" style={{ animation: 'route-loading 1.25s ease-in-out infinite' }} />
+        </div>
+      </div>}
       <Map
         ref={mapRef}
         initialViewState={INITIAL_VIEW_STATE}
@@ -843,14 +874,46 @@ export default function MapPageClient() {
         maxZoom={currentStyleId === 'landsd-vector' ? 18.9 : 18}
         minZoom={3}
         reuseMaps
+        interactiveLayerIds={routeCoordinates.length > 1 ? ['planned-route-line'] : []}
         onClick={(event) => {
           setWaypointMenu(null);
           setIsBasemapPickerOpen(false);
           setIsTerrainPickerOpen(false);
           if (isRouting) {
-            setRouteAnchors((points) => [...points, [event.lngLat.lng, event.lngLat.lat]]);
+            const clickedRoute = event.features?.some((feature) => feature.layer.id === 'planned-route-line');
+            if (clickedRoute && routeInsertPreview) {
+              setRouteAnchors((points) => [
+                ...points.slice(0, routeInsertPreview.index),
+                routeInsertPreview.point,
+                ...points.slice(routeInsertPreview.index),
+              ]);
+            } else {
+              setRouteAnchors((points) => [...points, [event.lngLat.lng, event.lngLat.lat]]);
+            }
+            setRouteInsertPreview(null);
           }
         }}
+        onMouseMove={(event) => {
+          const overRoute = event.features?.some((feature) => feature.layer.id === 'planned-route-line');
+          if (!isRouting || !overRoute || routeAnchors.length < 2 || routeCoordinates.length < 2) {
+            setRouteInsertPreview(null);
+            return;
+          }
+          const point: RoutePoint = closestRoutePoint([event.lngLat.lng, event.lngLat.lat], routeCoordinates);
+          const routeIndex = closestRouteIndex(point, routeCoordinates);
+          const anchorRouteIndices = routeAnchors.map((anchor) => closestRouteIndex(anchor, routeCoordinates));
+          let insertionIndex = routeAnchors.length;
+          for (let index = 0; index < anchorRouteIndices.length - 1; index++) {
+            const startIndex = Math.min(anchorRouteIndices[index], anchorRouteIndices[index + 1]);
+            const endIndex = Math.max(anchorRouteIndices[index], anchorRouteIndices[index + 1]);
+            if (routeIndex >= startIndex && routeIndex <= endIndex) {
+              insertionIndex = index + 1;
+              break;
+            }
+          }
+          setRouteInsertPreview({ point, index: insertionIndex });
+        }}
+        onMouseLeave={() => setRouteInsertPreview(null)}
         onLoad={() => {
           initializeContourDemSources();
           isStyleReadyRef.current = true;
@@ -870,6 +933,16 @@ export default function MapPageClient() {
             geometry: { type: 'LineString', coordinates: routeCoordinates },
           }}>
             <Layer id="planned-route-line" type="line" paint={{ 'line-color': '#2563eb', 'line-width': 5, 'line-opacity': 0.92 }} layout={{ 'line-cap': 'round', 'line-join': 'round' }} />
+          </Source>
+        )}
+        {routeInsertPreview && isRouting && (
+          <Source id="route-insert-preview" type="geojson" data={{
+            type: 'Feature',
+            properties: { label: '+' },
+            geometry: { type: 'Point', coordinates: routeInsertPreview.point },
+          }}>
+            <Layer id="route-insert-preview-circle" type="circle" paint={{ 'circle-radius': 9, 'circle-color': '#ffffff', 'circle-stroke-color': '#2563eb', 'circle-stroke-width': 2, 'circle-opacity': 0.95 }} />
+            <Layer id="route-insert-preview-label" type="symbol" layout={{ 'text-field': '+', 'text-size': 14, 'text-font': ['Open Sans Bold', 'Arial Unicode MS Bold'], 'text-allow-overlap': true }} paint={{ 'text-color': '#2563eb' }} />
           </Source>
         )}
         {isHillshadeEnabled && demSource && (
