@@ -15,6 +15,8 @@ import {
   AttributionControl,
   type Map as MapLibreMap,
   type Marker as MapLibreMarker,
+  type CalculateTileZoomFunction,
+  type Source as MapLibreSource,
   type StyleSpecification,
 } from 'maplibre-gl';
 import mlcontour from 'maplibre-contour';
@@ -72,6 +74,11 @@ const LIBERTY_BUILDING_SOURCE_ID = 'liberty-buildings';
 const LIBERTY_BUILDING_LAYER_ID = 'liberty-buildings-3d';
 const THREE_D_TERRAIN_SOURCE_ID = 'terrain-dem-3d';
 const THREE_D_TERRAIN_EXAGGERATION = 1.25;
+const originalTileZoomFunctions = new WeakMap<
+  MapLibreSource,
+  CalculateTileZoomFunction | undefined
+>();
+const fixedTileZoomFunction: CalculateTileZoomFunction = (requestedCenterZoom) => requestedCenterZoom;
 
 type ContourDemSource = InstanceType<typeof mlcontour.DemSource>;
 const contourDemSources: Partial<Record<DemSourceId, ContourDemSource>> = {};
@@ -98,22 +105,32 @@ function initializeContourDemSources() {
   (Object.keys(DEM_SOURCES) as DemSourceId[]).forEach(getContourDemSource);
 }
 
-function updateBasemapTileZoom(map: MapLibreMap, enabled: boolean) {
+function updateTileZoomForAllSources(map: MapLibreMap, enabled: boolean) {
   const { sources } = map.getStyle();
+  let sourcesUpdated = false;
   for (const sourceId of Object.keys(sources)) {
-    if (
-      sourceId.startsWith('terrain-')
-      || sourceId === THREE_D_TERRAIN_SOURCE_ID
-      || sourceId === LIBERTY_BUILDING_SOURCE_ID
-    ) continue;
-
     const mapSource = map.getSource(sourceId);
-    if (mapSource) {
-      mapSource.calculateTileZoom = enabled
-        ? (requestedCenterZoom) => requestedCenterZoom
-        : undefined;
+    if (!mapSource) continue;
+
+    if (enabled) {
+      if (!originalTileZoomFunctions.has(mapSource)) {
+        originalTileZoomFunctions.set(mapSource, mapSource.calculateTileZoom);
+      }
+      if (mapSource.calculateTileZoom !== fixedTileZoomFunction) {
+        mapSource.calculateTileZoom = fixedTileZoomFunction;
+        sourcesUpdated = true;
+      }
+    } else if (originalTileZoomFunctions.has(mapSource)) {
+      const originalFunction = originalTileZoomFunctions.get(mapSource);
+      if (mapSource.calculateTileZoom !== originalFunction) {
+        mapSource.calculateTileZoom = originalFunction;
+        sourcesUpdated = true;
+      }
+      originalTileZoomFunctions.delete(mapSource);
     }
   }
+
+  if (sourcesUpdated) map._update();
 }
 
 function getLocalizedStyleUrl(url: string, language: 'zh' | 'en') {
@@ -550,8 +567,8 @@ export default function MapPageClient() {
     const apply3DMode = (styleLoaded = false) => {
       if (!styleLoaded && !map.isStyleLoaded()) return;
 
-      if (styleLoaded === true) {
-        updateBasemapTileZoom(map, is3DModeEnabled);
+      if (map.isStyleLoaded()) {
+        updateTileZoomForAllSources(map, is3DModeEnabled);
       }
 
       if (is3DModeEnabled) {
@@ -641,11 +658,14 @@ export default function MapPageClient() {
     };
 
     const apply3DModeAfterStyleLoad = () => apply3DMode(true);
+    const apply3DModeAfterStyleData = () => apply3DMode();
     map.on('style.load', apply3DModeAfterStyleLoad);
+    map.on('styledata', apply3DModeAfterStyleData);
     apply3DMode(map.isStyleLoaded() === true);
 
     return () => {
       map.off('style.load', apply3DModeAfterStyleLoad);
+      map.off('styledata', apply3DModeAfterStyleData);
     };
   }, [currentStyleId, demSourceId, is3DModeEnabled, mapReady, terrainReady]);
 
