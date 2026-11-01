@@ -1424,7 +1424,7 @@ export default function MapPageClient() {
             />
           </Source>
         )}
-        <NavigationControl position="bottom-right" showCompass showZoom={false} />
+        <NavigationControl position="bottom-right" showCompass showZoom={false} visualizePitch />
         <LiveLocationControl
           language={language}
           onTrackingChange={setIsLocationTracking}
