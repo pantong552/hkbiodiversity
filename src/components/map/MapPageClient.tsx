@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState, type PointerEvent } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent } from 'react';
 import Map, {
   type MapRef,
   FullscreenControl,
@@ -23,7 +23,7 @@ import {
 import mlcontour from 'maplibre-contour';
 import { AnimatePresence, motion, useSpring, useTransform } from 'framer-motion';
 import CustomDropdown from '@/components/ui/CustomDropdown';
-import { Check, Layers, Mountain, Route as RouteIcon, Download, Trash2 } from 'lucide-react';
+import { Check, Layers, Mountain, Route as RouteIcon, Download, Trash2, Plus } from 'lucide-react';
 import { useLanguage } from '@/context/LanguageContext';
 import { BASEMAPS } from '@/constants/basemaps';
 import 'maplibre-gl/dist/maplibre-gl.css';
@@ -75,6 +75,23 @@ const DEM_SOURCES = {
 type DemSourceId = keyof typeof DEM_SOURCES;
 const LIBERTY_BUILDING_SOURCE_ID = 'liberty-buildings';
 type RoutePoint = [number, number];
+type PlannedRoute = {
+  id: string;
+  name: string;
+  enabled: boolean;
+  allowPrivateRoads: boolean;
+  profile: 'foot' | 'bike';
+  anchors: RoutePoint[];
+  routedAnchors: RoutePoint[];
+  coordinates: RoutePoint[];
+  busy: boolean;
+  error: string | null;
+};
+const INACTIVE_ROUTE_COLORS = ['#059669', '#7c3aed', '#ea580c', '#0891b2'];
+
+function getRouteColor(routeId: string, activeRouteId: string, index: number) {
+  return routeId === activeRouteId ? '#2563eb' : INACTIVE_ROUTE_COLORS[index % INACTIVE_ROUTE_COLORS.length];
+}
 
 function closestRoutePoint(point: RoutePoint, route: RoutePoint[]): RoutePoint {
   if (route.length === 0) return point;
@@ -150,17 +167,59 @@ function AnimatedMetric({
   return <motion.span className={className}>{display}</motion.span>;
 }
 
+function RouteTabs({
+  tabs,
+  activeRouteId,
+  language,
+  onSelect,
+  onAdd,
+  onRemove,
+}: {
+  tabs: { id: string; name: string; busy: boolean; color: string }[];
+  activeRouteId: string;
+  language: 'zh' | 'en';
+  onSelect: (id: string) => void;
+  onAdd: () => void;
+  onRemove?: (id: string) => void;
+
+}) {
+  return (
+    <div role="tablist" aria-label={language === 'zh' ? '路線' : 'Routes'} className="flex min-w-0 items-center gap-1.5 overflow-x-auto">
+      {tabs.map((tab) => <div key={tab.id} style={{ backgroundColor: activeRouteId === tab.id ? tab.color : `${tab.color}18`, color: activeRouteId === tab.id ? '#fff' : tab.color, borderColor: `${tab.color}55` }} className={`group inline-flex shrink-0 items-center rounded-lg border transition ${activeRouteId === tab.id ? 'shadow-sm' : 'hover:brightness-95'}`}>
+        <button type="button" role="tab" aria-selected={activeRouteId === tab.id} onClick={() => onSelect(tab.id)} className="inline-flex items-center gap-2 py-1.5 pl-3 pr-2 text-xs font-bold">
+          {tab.name}{tab.busy && <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-sky-300" />}
+        </button>
+        {onRemove && <button type="button" aria-label={language === 'zh' ? `移除${tab.name}` : `Remove ${tab.name}`} title={language === 'zh' ? `移除${tab.name}` : `Remove ${tab.name}`} onClick={() => onRemove(tab.id)} className={`mr-1 inline-flex h-5 w-5 items-center justify-center rounded-md bg-transparent transition hover:bg-transparent hover:text-red-600 ${activeRouteId === tab.id ? 'text-white' : 'text-slate-500'}`}>
+          <Trash2 className="h-3 w-3" />
+        </button>}
+      </div>)}
+      <button type="button" onClick={onAdd} aria-label={language === 'zh' ? '新增路線' : 'Add route'} title={language === 'zh' ? '新增路線' : 'Add route'} className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-slate-200 text-slate-500 transition hover:border-emerald-300 hover:bg-emerald-50 hover:text-emerald-700"><Plus className="h-4 w-4" /></button>
+    </div>
+  );
+}
+
 function RouteElevationPanel({
   coordinates,
   anchors,
   language,
+  tabs,
+  activeRouteId,
+  onSelectRoute,
+  onAddRoute,
+  onRemoveRoute,
   onHoverRoutePoint,
 }: {
   coordinates: number[][];
   anchors: RoutePoint[];
   language: 'zh' | 'en';
+  tabs: { id: string; name: string; busy: boolean; color: string }[];
+  activeRouteId: string;
+  onSelectRoute: (id: string) => void;
+  onAddRoute: () => void;
+  onRemoveRoute: (id: string) => void;
   onHoverRoutePoint: (point: { coordinate: RoutePoint; distance: number; elevation: number } | null) => void;
 }) {
+  const hasChart = coordinates.length > 1;
   const chartContainerRef = useRef<SVGSVGElement>(null);
   const [chartSize, setChartSize] = useState({ width: 0, height: 0 });
   const [chartHover, setChartHover] = useState<{ x: number; y: number; distance: number; elevation: number } | null>(null);
@@ -172,7 +231,7 @@ function RouteElevationPanel({
     });
     observer.observe(element);
     return () => observer.disconnect();
-  }, []);
+  }, [hasChart]);
 
   const stats = useMemo(() => {
     const cumulativeDistances = [0];
@@ -263,7 +322,10 @@ function RouteElevationPanel({
 
   return (
     <section aria-label={language === 'zh' ? '路線高度資料' : 'Route elevation profile'} className="absolute inset-x-0 bottom-0 z-20 border-t border-white/70 bg-white/95 shadow-[0_-12px_40px_rgba(15,23,42,0.16)] backdrop-blur-xl">
-      <div className="mx-auto grid max-w-screen-2xl grid-cols-1 gap-3 px-3 py-3 sm:grid-cols-[170px_minmax(0,1fr)] sm:items-center sm:gap-0 sm:px-3">
+      <div className="mx-auto max-w-screen-2xl px-3 pt-2 sm:px-3">
+        <div className="mb-2"><RouteTabs tabs={tabs} activeRouteId={activeRouteId} language={language} onSelect={onSelectRoute} onAdd={onAddRoute} onRemove={onRemoveRoute} /></div>
+      </div>
+      {coordinates.length > 1 ? <div className="mx-auto grid max-w-screen-2xl grid-cols-1 gap-3 px-3 pb-3 sm:grid-cols-[170px_minmax(0,1fr)] sm:items-center sm:gap-0 sm:px-3">
         <div className="grid grid-cols-3 gap-2 sm:grid-cols-1 sm:gap-3">
           <div className="sm:pb-1">
             <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-slate-500">{labels.distance}</p>
@@ -330,7 +392,7 @@ function RouteElevationPanel({
             <span className="absolute right-0 top-0">{formatDistance(stats.distance)}</span>
           </div>
         </div>
-      </div>
+      </div> : <p className="px-4 pb-3 text-xs font-medium text-slate-500">{language === 'zh' ? '啟用路線規劃後，在地圖上點擊以新增途經點。' : 'Enable routing, then click the map to add waypoints.'}</p>}
     </section>
   );
 }
@@ -722,20 +784,44 @@ export default function MapPageClient() {
   const [isMobileViewport, setIsMobileViewport] = useState(false);
   const [locationError, setLocationError] = useState<string | null>(null);
   const [isLocationTracking, setIsLocationTracking] = useState(false);
-  const [isRouting, setIsRouting] = useState(false);
   const [isRoutingPanelOpen, setIsRoutingPanelOpen] = useState(false);
-  const [allowPrivateRoads, setAllowPrivateRoads] = useState(false);
-  const [routeProfile, setRouteProfile] = useState<'foot' | 'bike'>('foot');
-  const [routeAnchors, setRouteAnchors] = useState<RoutePoint[]>([]);
-  const [routedAnchors, setRoutedAnchors] = useState<RoutePoint[]>([]);
-  const [routeCoordinates, setRouteCoordinates] = useState<RoutePoint[]>([]);
-  const [routeBusy, setRouteBusy] = useState(false);
-  const [routeError, setRouteError] = useState<string | null>(null);
+  const [routes, setRoutes] = useState<PlannedRoute[]>([{
+    id: 'route-1', name: 'Route 1', enabled: false, allowPrivateRoads: false,
+    profile: 'foot', anchors: [], routedAnchors: [], coordinates: [], busy: false, error: null,
+  }]);
+  const [activeRouteId, setActiveRouteId] = useState('route-1');
+  const activeRoute = routes.find((route) => route.id === activeRouteId) ?? routes[0];
+  const isRouting = activeRoute.enabled;
+  const allowPrivateRoads = activeRoute.allowPrivateRoads;
+  const routeProfile = activeRoute.profile;
+  const routeAnchors = activeRoute.anchors;
+  const routedAnchors = activeRoute.routedAnchors;
+  const routeCoordinates = activeRoute.coordinates;
+  const routeBusy = activeRoute.busy;
+  const routeError = activeRoute.error;
+  const updateActiveRoute = useCallback((update: (route: PlannedRoute) => PlannedRoute) => {
+    setRoutes((currentRoutes) => currentRoutes.map((route) => (
+      route.id === activeRouteId ? update(route) : route
+    )));
+  }, [activeRouteId]);
+  const setIsRouting = useCallback((value: boolean | ((current: boolean) => boolean)) => updateActiveRoute((route) => ({
+    ...route, enabled: typeof value === 'function' ? value(route.enabled) : value,
+  })), [updateActiveRoute]);
+  const setAllowPrivateRoads = useCallback((value: boolean | ((current: boolean) => boolean)) => updateActiveRoute((route) => ({
+    ...route, allowPrivateRoads: typeof value === 'function' ? value(route.allowPrivateRoads) : value,
+  })), [updateActiveRoute]);
+  const setRouteProfile = useCallback((profile: 'foot' | 'bike') => updateActiveRoute((route) => ({ ...route, profile })), [updateActiveRoute]);
+  const setRouteAnchors = useCallback((value: RoutePoint[] | ((current: RoutePoint[]) => RoutePoint[])) => updateActiveRoute((route) => ({
+    ...route, anchors: typeof value === 'function' ? value(route.anchors) : value,
+  })), [updateActiveRoute]);
+  const setRoutedAnchors = useCallback((routed: RoutePoint[]) => updateActiveRoute((route) => ({ ...route, routedAnchors: routed })), [updateActiveRoute]);
+  const setRouteCoordinates = useCallback((coordinates: RoutePoint[]) => updateActiveRoute((route) => ({ ...route, coordinates })), [updateActiveRoute]);
+  const setRouteBusy = useCallback((busy: boolean) => updateActiveRoute((route) => ({ ...route, busy })), [updateActiveRoute]);
+  const setRouteError = useCallback((error: string | null) => updateActiveRoute((route) => ({ ...route, error })), [updateActiveRoute]);
   const [routeInsertPreview, setRouteInsertPreview] = useState<{ point: RoutePoint; index: number } | null>(null);
   const [routeProfileHover, setRouteProfileHover] = useState<{ coordinate: RoutePoint; distance: number; elevation: number } | null>(null);
   const [waypointMenu, setWaypointMenu] = useState<{ index: number; x: number; y: number } | null>(null);
   const routeRequestId = useRef(0);
-  const routedAnchorsRef = useRef<RoutePoint[]>([]);
   const routeMarkersRef = useRef<MapLibreMarker[]>([]);
   const routeProfileHoverMarkerRef = useRef<MapLibreMarker | null>(null);
   const mapRef = useRef<MapRef>(null);
@@ -746,18 +832,68 @@ export default function MapPageClient() {
   ));
   const appliedBasemapId = useRef(DEFAULT_BASEMAP_ID);
   const appliedLocalizedBasemapLanguage = useRef(language);
+  const addRoute = () => {
+    const nextRouteNumber = routes.length + 1;
+    const newRoute: PlannedRoute = {
+      id: `route-${nextRouteNumber}`,
+      name: language === 'zh' ? `路線 ${nextRouteNumber}` : `Route ${nextRouteNumber}`,
+      enabled: true,
+      allowPrivateRoads: false,
+      profile: 'foot',
+      anchors: [],
+      routedAnchors: [],
+      coordinates: [],
+      busy: false,
+      error: null,
+    };
+    setRoutes((currentRoutes) => [...currentRoutes, newRoute]);
+    setActiveRouteId(newRoute.id);
+    setRouteInsertPreview(null);
+    setRouteProfileHover(null);
+  };
+  const removeRoute = (routeId: string) => {
+    if (routes.length === 1) {
+      setRoutes((currentRoutes) => currentRoutes.map((route) => route.id === routeId ? {
+        ...route,
+        enabled: false,
+        anchors: [],
+        routedAnchors: [],
+        coordinates: [],
+        busy: false,
+        error: null,
+      } : route));
+      setRouteInsertPreview(null);
+      setRouteProfileHover(null);
+      setWaypointMenu(null);
+      return;
+    }
+    const removedIndex = routes.findIndex((route) => route.id === routeId);
+    const remainingRoutes = routes.filter((route) => route.id !== routeId);
+    setRoutes(remainingRoutes);
+    if (activeRouteId === routeId) {
+      setActiveRouteId(remainingRoutes[Math.min(removedIndex, remainingRoutes.length - 1)].id);
+    }
+    setRouteInsertPreview(null);
+    setRouteProfileHover(null);
+    setWaypointMenu(null);
+  };
 
   useEffect(() => {
     const requestId = ++routeRequestId.current;
-    if (!isRouting || routeAnchors.length < 2) {
+    if (routeAnchors.length < 2) {
       queueMicrotask(() => {
         if (routeRequestId.current === requestId) {
-          routedAnchorsRef.current = [];
           setRoutedAnchors([]);
           setRouteCoordinates([]);
           setRouteBusy(false);
           setRouteError(null);
         }
+      });
+      return;
+    }
+    if (!isRouting) {
+      queueMicrotask(() => {
+        if (routeRequestId.current === requestId) setRouteBusy(false);
       });
       return;
     }
@@ -788,7 +924,6 @@ export default function MapPageClient() {
       const coordinates = data?.paths?.[0]?.points?.coordinates;
       if (!Array.isArray(coordinates)) throw new Error('No route found');
       if (routeRequestId.current === requestId) {
-        routedAnchorsRef.current = routeAnchors;
         setRoutedAnchors(routeAnchors);
         setRouteCoordinates(coordinates);
       }
@@ -802,14 +937,14 @@ export default function MapPageClient() {
     return () => {
       if (routeRequestId.current === activeRequestId) routeRequestId.current++;
     };
-  }, [allowPrivateRoads, isRouting, routeAnchors, routeProfile]);
+  }, [activeRouteId, allowPrivateRoads, isRouting, routeAnchors, routeProfile, setRouteBusy, setRouteCoordinates, setRouteError, setRoutedAnchors]);
 
   useEffect(() => {
     const map = mapRef.current?.getMap();
     if (!mapReady || !map) return;
     routeMarkersRef.current.forEach((marker) => marker.remove());
     routeMarkersRef.current = routeAnchors.map((anchor, index) => {
-      const markerPosition = routeAnchors === routedAnchorsRef.current && routeCoordinates.length > 1
+      const markerPosition = routeAnchors === routedAnchors && routeCoordinates.length > 1
         ? closestRoutePoint(anchor, routeCoordinates)
         : anchor;
       const element = document.createElement('div');
@@ -845,7 +980,7 @@ export default function MapPageClient() {
       routeMarkersRef.current.forEach((marker) => marker.remove());
       routeMarkersRef.current = [];
     };
-  }, [language, mapReady, routeAnchors, routeCoordinates]);
+  }, [activeRouteId, language, mapReady, routeAnchors, routeCoordinates, routedAnchors, setRouteAnchors]);
 
   useEffect(() => {
     const map = mapRef.current?.getMap();
@@ -1120,13 +1255,13 @@ export default function MapPageClient() {
         maxZoom={currentStyleId === 'landsd-vector' ? 18.9 : 18}
         minZoom={3}
         reuseMaps
-        interactiveLayerIds={routeCoordinates.length > 1 ? ['planned-route-line'] : []}
+        interactiveLayerIds={routeCoordinates.length > 1 ? [`planned-route-line-${activeRouteId}`] : []}
         onClick={(event) => {
           setWaypointMenu(null);
           setIsBasemapPickerOpen(false);
           setIsTerrainPickerOpen(false);
           if (isRouting) {
-            const clickedRoute = event.features?.some((feature) => feature.layer.id === 'planned-route-line');
+            const clickedRoute = event.features?.some((feature) => feature.layer.id === `planned-route-line-${activeRouteId}`);
             if (clickedRoute && routeInsertPreview) {
               setRouteAnchors((points) => [
                 ...points.slice(0, routeInsertPreview.index),
@@ -1140,7 +1275,7 @@ export default function MapPageClient() {
           }
         }}
         onMouseMove={(event) => {
-          const overRoute = event.features?.some((feature) => feature.layer.id === 'planned-route-line');
+          const overRoute = event.features?.some((feature) => feature.layer.id === `planned-route-line-${activeRouteId}`);
           if (!isRouting || !overRoute || routeAnchors.length < 2 || routeCoordinates.length < 2) {
             setRouteInsertPreview(null);
             return;
@@ -1172,15 +1307,24 @@ export default function MapPageClient() {
           setMapReady(true);
         }}
       >
-        {routeCoordinates.length > 0 && (
-          <Source id="planned-route" type="geojson" data={{
+        {routes.map((route, index) => route.coordinates.length > 1 && (
+          <Source key={route.id} id={`planned-route-${route.id}`} type="geojson" data={{
             type: 'Feature',
-            properties: {},
-            geometry: { type: 'LineString', coordinates: routeCoordinates },
+            properties: { routeId: route.id },
+            geometry: { type: 'LineString', coordinates: route.coordinates },
           }}>
-            <Layer id="planned-route-line" type="line" paint={{ 'line-color': '#2563eb', 'line-width': 5, 'line-opacity': 0.92 }} layout={{ 'line-cap': 'round', 'line-join': 'round' }} />
+            <Layer
+              id={`planned-route-line-${route.id}`}
+              type="line"
+              paint={{
+                'line-color': getRouteColor(route.id, activeRouteId, index),
+                'line-width': route.id === activeRouteId ? 5 : 3.5,
+                'line-opacity': route.id === activeRouteId ? 0.95 : 0.68,
+              }}
+              layout={{ 'line-cap': 'round', 'line-join': 'round' }}
+            />
           </Source>
-        )}
+        ))}
         {routeInsertPreview && isRouting && (
           <Source id="route-insert-preview" type="geojson" data={{
             type: 'Feature',
@@ -1305,11 +1449,28 @@ export default function MapPageClient() {
         <ScaleControl position="bottom-left" />
       </Map>
 
-      {isRouting && routeCoordinates.length > 1 && (
+      {(routes.length > 1 || routes.some((route) => route.coordinates.length > 1)) && (
         <RouteElevationPanel
           coordinates={routeCoordinates}
           anchors={routedAnchors}
           language={language}
+          tabs={routes.map((route) => ({
+            id: route.id,
+            name: language === 'zh'
+              ? route.name.replace(/^Route/, '路線')
+              : route.name.replace(/^路線/, 'Route'),
+            busy: route.busy,
+            color: getRouteColor(route.id, activeRouteId, routes.indexOf(route)),
+          }))}
+          activeRouteId={activeRouteId}
+          onSelectRoute={(id) => {
+            setActiveRouteId(id);
+            setRouteInsertPreview(null);
+            setRouteProfileHover(null);
+            setWaypointMenu(null);
+          }}
+          onAddRoute={addRoute}
+          onRemoveRoute={removeRoute}
           onHoverRoutePoint={setRouteProfileHover}
         />
       )}
@@ -1590,7 +1751,26 @@ export default function MapPageClient() {
             <RouteIcon className="h-5 w-5" />
           </button>
           {isRoutingPanelOpen && <section aria-label={language === 'zh' ? '路線規劃' : 'Routing'} className="pointer-events-auto absolute right-full top-0 mr-3 w-[min(20rem,calc(100vw-6rem))] rounded-2xl border border-white/70 bg-white/95 p-3 shadow-2xl backdrop-blur-xl">
-            <h2 className="mb-2 flex items-center gap-2 px-1 text-sm font-black text-slate-900"><RouteIcon className="h-4 w-4" />Routing</h2>
+            <h2 className="mb-2 flex items-center gap-2 px-1 text-sm font-black text-slate-900"><RouteIcon className="h-4 w-4" />{language === 'zh' ? '路線規劃' : 'Routing'}</h2>
+            <div className="mb-2"><RouteTabs
+              tabs={routes.map((route) => ({
+                id: route.id,
+                name: language === 'zh'
+                  ? route.name.replace(/^Route/, '路線')
+                  : route.name.replace(/^路線/, 'Route'),
+                busy: route.busy,
+                color: getRouteColor(route.id, activeRouteId, routes.indexOf(route)),
+              }))}
+              activeRouteId={activeRouteId}
+              language={language}
+              onSelect={(id) => {
+                setActiveRouteId(id);
+                setRouteInsertPreview(null);
+                setRouteProfileHover(null);
+                setWaypointMenu(null);
+              }}
+              onAdd={addRoute}
+            /></div>
             <button type="button" role="switch" aria-checked={isRouting} onClick={() => setIsRouting((active) => !active)} className="flex w-full items-center justify-between rounded-xl bg-slate-100 px-3 py-2 text-sm font-bold text-slate-800">
               <span>{language === 'zh' ? '啟用路線規劃' : 'Enable routing'}</span><span className={`relative h-5 w-9 rounded-full transition ${isRouting ? 'bg-emerald-600' : 'bg-slate-300'}`}><span className={`absolute top-0.5 h-4 w-4 rounded-full bg-white transition ${isRouting ? 'left-[18px]' : 'left-0.5'}`} /></span>
             </button>
