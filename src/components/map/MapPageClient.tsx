@@ -449,6 +449,7 @@ export default function MapPageClient() {
   const [locationError, setLocationError] = useState<string | null>(null);
   const [isLocationTracking, setIsLocationTracking] = useState(false);
   const mapRef = useRef<MapRef>(null);
+  const isStyleReadyRef = useRef(false);
   const [initialStyle] = useState(() => getBasemapStyle(
     BASEMAPS.find((basemap) => basemap.id === DEFAULT_BASEMAP_ID) || BASEMAPS[0],
     language,
@@ -508,9 +509,10 @@ export default function MapPageClient() {
     if (appliedBasemapId.current !== currentStyleId) {
       appliedBasemapId.current = currentStyleId;
       appliedLocalizedBasemapLanguage.current = language;
-      if (is3DModeEnabled && map.isStyleLoaded() && map.getTerrain()) {
+      if (is3DModeEnabled && isStyleReadyRef.current && map.getTerrain()) {
         map.setTerrain(null);
       }
+      isStyleReadyRef.current = false;
       map.setStyle(getBasemapStyle(currentBasemap, language), {
         diff: !is3DModeEnabled,
         transformStyle: (previousStyle, nextStyle) => preserveTerrainLayers(previousStyle, nextStyle),
@@ -523,9 +525,10 @@ export default function MapPageClient() {
       && appliedLocalizedBasemapLanguage.current !== language
     ) {
       appliedLocalizedBasemapLanguage.current = language;
-      if (is3DModeEnabled && map.isStyleLoaded() && map.getTerrain()) {
+      if (is3DModeEnabled && isStyleReadyRef.current && map.getTerrain()) {
         map.setTerrain(null);
       }
+      isStyleReadyRef.current = false;
       map.setStyle(getBasemapStyle(currentBasemap, language), {
         diff: !is3DModeEnabled,
         transformStyle: (previousStyle, nextStyle) => preserveTerrainLayers(previousStyle, nextStyle),
@@ -565,12 +568,10 @@ export default function MapPageClient() {
     if (!mapReady || !map || !terrainReady) return;
 
     const terrainDemSource = getContourDemSource(demSourceId);
-    const apply3DMode = (styleLoaded = false) => {
-      if (!styleLoaded && !map.isStyleLoaded()) return;
+    const apply3DMode = () => {
+      if (!isStyleReadyRef.current) return;
 
-      if (map.isStyleLoaded()) {
-        updateTileZoomForAllSources(map, is3DModeEnabled);
-      }
+      updateTileZoomForAllSources(map, is3DModeEnabled);
 
       if (is3DModeEnabled) {
         const terrainSource = map.getStyle().sources[THREE_D_TERRAIN_SOURCE_ID];
@@ -658,11 +659,14 @@ export default function MapPageClient() {
       }
     };
 
-    const apply3DModeAfterStyleLoad = () => apply3DMode(true);
+    const apply3DModeAfterStyleLoad = () => {
+      isStyleReadyRef.current = true;
+      apply3DMode();
+    };
     const apply3DModeAfterStyleData = () => apply3DMode();
     map.on('style.load', apply3DModeAfterStyleLoad);
     map.on('styledata', apply3DModeAfterStyleData);
-    apply3DMode(map.isStyleLoaded() === true);
+    apply3DMode();
 
     return () => {
       map.off('style.load', apply3DModeAfterStyleLoad);
@@ -696,6 +700,7 @@ export default function MapPageClient() {
         }}
         onLoad={() => {
           initializeContourDemSources();
+          isStyleReadyRef.current = true;
           if (!window.isSecureContext || !('geolocation' in navigator)) {
             setLocationError(language === 'zh'
               ? '即時定位需要 HTTPS 安全連線及可用的瀏覽器定位服務。'
