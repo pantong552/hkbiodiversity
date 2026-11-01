@@ -22,9 +22,6 @@ const MAP_SOURCES = {
   googleSatellite: 'https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}',
   googleHybrid: 'https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}',
   googleTerrain: 'https://mt1.google.com/vt/lyrs=p&x={x}&y={y}&z={z}',
-  hkImagery: 'https://mapapi.geodata.gov.hk/gs/api/v1.0.0/xyz/imagery/wgs84/{z}/{x}/{y}.png',
-  hkVector: 'https://mapapi.geodata.gov.hk/gs/api/v1.0.0/xyz/basemap/wgs84/{z}/{x}/{y}.png',
-  hkLabel: 'https://mapapi.geodata.gov.hk/gs/api/v1.0.0/xyz/label/hk/en/wgs84/{z}/{x}/{y}.png',
 };
 
 function createRasterStyle(
@@ -118,23 +115,19 @@ export const BASEMAPS: Basemap[] = [
   },
   {
     id: 'hk-vector',
-    name: { zh: '香港政府向量', en: 'HK Vector' },
+    name: { zh: 'LandsD 地形圖', en: 'LandsD Topo' },
     preview: `https://a.basemaps.cartocdn.com/light_all/13/6694/3574.png${CARTO_KEY_PARAM}`,
+    previewStyleUrl: '/api/map/landsd-vector?basemap=hk-vector',
     attributionText: '© Lands Department (HKSAR) | MapLibre',
-    style: createRasterStyle([
-      { id: 'hk-vector-base', tiles: [MAP_SOURCES.hkVector], attribution: '&copy; HKSAR' },
-      { id: 'hk-vector-label', tiles: [MAP_SOURCES.hkLabel], attribution: '' },
-    ]),
+    styleUrl: '/api/map/landsd-vector?basemap=hk-vector',
   },
   {
     id: 'hk-imagery',
-    name: { zh: '香港政府影像', en: 'HK Imagery' },
+    name: { zh: 'LandsD 影像圖', en: 'LandsD Imagery' },
     preview: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/13/3574/6694',
+    previewStyleUrl: '/api/map/landsd-vector?basemap=hk-imagery',
     attributionText: '© Lands Department (HKSAR) | MapLibre',
-    style: createRasterStyle([
-      { id: 'hk-imagery-base', tiles: [MAP_SOURCES.hkImagery], attribution: '&copy; HKSAR' },
-      { id: 'hk-imagery-label', tiles: [MAP_SOURCES.hkLabel], attribution: '' },
-    ]),
+    styleUrl: '/api/map/landsd-vector?basemap=hk-imagery',
   },
   {
     id: 'landsd-vector',

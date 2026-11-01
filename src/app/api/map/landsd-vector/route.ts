@@ -4,8 +4,23 @@ const LANDSD_API_ROOT = 'https://mapapi.hkmapservice.gov.hk/gs/api/v1.0.0/vt';
 const BASEMAP_STYLE_URL = `${LANDSD_API_ROOT}/basemap/wgs84/resources/styles/root.json`;
 const BASEMAP_TILE_URL = `${LANDSD_API_ROOT}/basemap/wgs84/tile/{z}/{y}/{x}.pbf`;
 const LANDSD_API_STYLE_ROOT = 'https://api.hkmapservice.gov.hk/ags/map';
+const RASTER_BASEMAPS = {
+  'hk-vector': {
+    sourceId: 'hk-vector-base',
+    tiles: 'https://mapapi.geodata.gov.hk/gs/api/v1.0.0/xyz/basemap/wgs84/{z}/{x}/{y}.png',
+  },
+  'hk-imagery': {
+    sourceId: 'hk-imagery-base',
+    tiles: 'https://mapapi.geodata.gov.hk/gs/api/v1.0.0/xyz/imagery/wgs84/{z}/{x}/{y}.png',
+  },
+} as const;
+type RasterBasemapId = keyof typeof RASTER_BASEMAPS;
 
 type JsonRecord = Record<string, unknown>;
+
+function isRasterBasemapId(value: string): value is RasterBasemapId {
+  return Object.hasOwn(RASTER_BASEMAPS, value);
+}
 
 type StyleDocument = JsonRecord & {
   sources: JsonRecord;
@@ -42,7 +57,13 @@ async function fetchStyle(url: string | URL): Promise<StyleDocument> {
 
 export async function GET(request: Request) {
   try {
-    const language = new URL(request.url).searchParams.get('language') === 'zh' ? 'tc' : 'en';
+    const requestUrl = new URL(request.url);
+    const language = requestUrl.searchParams.get('language') === 'zh' ? 'tc' : 'en';
+    const requestedBasemapId = requestUrl.searchParams.get('basemap');
+    if (requestedBasemapId !== null && !isRasterBasemapId(requestedBasemapId)) {
+      return NextResponse.json({ error: 'Invalid LandsD raster basemap' }, { status: 400 });
+    }
+
     const apiKey = process.env.HKMAPSERVICE_API_KEY;
     if (!apiKey) {
       throw new Error('HKMAPSERVICE_API_KEY is not configured');
@@ -52,7 +73,7 @@ export async function GET(request: Request) {
       `${LANDSD_API_STYLE_ROOT}/label-${language}/VT/Indexed/WGS84/resources/styles/root.json`,
     );
     labelStyleUrl.searchParams.set('key', apiKey);
-    const origin = new URL(request.url).origin;
+    const origin = requestUrl.origin;
     const labelTileUrl = new URL(
       `/api/map/landsd-vector/labels/${language}/{z}/{y}/{x}.pbf`,
       origin,
@@ -61,10 +82,33 @@ export async function GET(request: Request) {
       `/api/map/landsd-vector/fonts/${language}/{fontstack}/{range}.pbf`,
       origin,
     ).href.replace(/%7B|%7D/gi, (match) => (match.toLowerCase() === '%7b' ? '{' : '}'));
-    const [basemapStyle, labelStyle] = await Promise.all([
+    const [landsdVectorStyle, labelStyle] = await Promise.all([
       fetchStyle(BASEMAP_STYLE_URL),
       fetchStyle(labelStyleUrl),
     ]);
+    const rasterBasemap = requestedBasemapId
+      ? RASTER_BASEMAPS[requestedBasemapId]
+      : undefined;
+    const basemapStyle = rasterBasemap
+      ? {
+        ...landsdVectorStyle,
+        sources: {
+          [rasterBasemap.sourceId]: {
+            type: 'raster',
+            tiles: [rasterBasemap.tiles],
+            tileSize: 256,
+            attribution: '&copy; HKSAR',
+          },
+        },
+        layers: [{
+          id: rasterBasemap.sourceId,
+          type: 'raster',
+          source: rasterBasemap.sourceId,
+          minzoom: 0,
+          maxzoom: 20,
+        }],
+      }
+      : landsdVectorStyle;
 
     const sourceEntries = Object.entries(basemapStyle.sources);
     const labelSourceEntries = Object.entries(labelStyle.sources).map(([id, source]) => {
@@ -119,13 +163,14 @@ export async function GET(request: Request) {
         if (!isRecord(source)) {
           throw new Error(`LandsD basemap style has an invalid source: ${id}`);
         }
+        const sourceConfig = Object.fromEntries(
+          Object.entries(source).filter(([key]) => key !== 'url'),
+        );
         return [
           id,
-          {
-            ...Object.fromEntries(Object.entries(source).filter(([key]) => key !== 'url')),
-            tiles: [BASEMAP_TILE_URL],
-            maxzoom: 15,
-          },
+          sourceConfig.type === 'raster'
+            ? sourceConfig
+            : { ...sourceConfig, tiles: [BASEMAP_TILE_URL], maxzoom: 15 },
         ];
       }),
       ...labelSourceEntries,

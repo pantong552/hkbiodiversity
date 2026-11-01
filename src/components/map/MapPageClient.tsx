@@ -98,12 +98,35 @@ function initializeContourDemSources() {
   (Object.keys(DEM_SOURCES) as DemSourceId[]).forEach(getContourDemSource);
 }
 
+function updateBasemapTileZoom(map: MapLibreMap, enabled: boolean) {
+  const { sources } = map.getStyle();
+  for (const sourceId of Object.keys(sources)) {
+    if (
+      sourceId.startsWith('terrain-')
+      || sourceId === THREE_D_TERRAIN_SOURCE_ID
+      || sourceId === LIBERTY_BUILDING_SOURCE_ID
+    ) continue;
+
+    const mapSource = map.getSource(sourceId);
+    if (mapSource) {
+      mapSource.calculateTileZoom = enabled
+        ? (requestedCenterZoom) => requestedCenterZoom
+        : undefined;
+    }
+  }
+}
+
+function getLocalizedStyleUrl(url: string, language: 'zh' | 'en') {
+  const separator = url.includes('?') ? '&' : '?';
+  return `${url}${separator}language=${language}`;
+}
+
 function getBasemapStyle(
   basemap: (typeof BASEMAPS)[number],
   language: 'zh' | 'en',
 ): string | StyleSpecification {
   if (basemap.styleUrl) {
-    return `${basemap.styleUrl}?language=${language}`;
+    return getLocalizedStyleUrl(basemap.styleUrl, language);
   }
   if (!basemap.style) {
     throw new Error(`Basemap ${basemap.id} does not have a style`);
@@ -136,9 +159,16 @@ function preserveTerrainLayers(
     ))
     .filter((layer) => !existingLayerIds.has(layer.id));
   const layers = [...nextStyle.layers];
+  const firstLandsdLabelLayerIndex = layers.findIndex((layer) => (
+    'source' in layer
+    && typeof layer.source === 'string'
+    && layer.source.startsWith('landsd-label-')
+  ));
   const firstSymbolLayerIndex = layers.findIndex((layer) => layer.type === 'symbol');
   layers.splice(
-    firstSymbolLayerIndex === -1 ? layers.length : firstSymbolLayerIndex,
+    firstLandsdLabelLayerIndex !== -1
+      ? firstLandsdLabelLayerIndex
+      : firstSymbolLayerIndex === -1 ? layers.length : firstSymbolLayerIndex,
     0,
     ...terrainLayers,
   );
@@ -520,6 +550,10 @@ export default function MapPageClient() {
     const apply3DMode = (styleLoaded = false) => {
       if (!styleLoaded && !map.isStyleLoaded()) return;
 
+      if (styleLoaded === true) {
+        updateBasemapTileZoom(map, is3DModeEnabled);
+      }
+
       if (is3DModeEnabled) {
         const terrainSource = map.getStyle().sources[THREE_D_TERRAIN_SOURCE_ID];
         const terrainTileUrl = terrainSource && 'tiles' in terrainSource
@@ -608,12 +642,10 @@ export default function MapPageClient() {
 
     const apply3DModeAfterStyleLoad = () => apply3DMode(true);
     map.on('style.load', apply3DModeAfterStyleLoad);
-    map.on('styledata', apply3DMode);
-    apply3DMode();
+    apply3DMode(map.isStyleLoaded() === true);
 
     return () => {
       map.off('style.load', apply3DModeAfterStyleLoad);
-      map.off('styledata', apply3DMode);
     };
   }, [currentStyleId, demSourceId, is3DModeEnabled, mapReady, terrainReady]);
 
@@ -860,7 +892,7 @@ export default function MapPageClient() {
                             latitude: BASEMAP_PREVIEW_CENTER[1],
                             zoom: 11,
                           }}
-                          mapStyle={`${basemap.previewStyleUrl}?language=${language}`}
+                          mapStyle={getLocalizedStyleUrl(basemap.previewStyleUrl, language)}
                           attributionControl={false}
                           interactive={false}
                           style={{ width: '100%', height: '100%' }}
