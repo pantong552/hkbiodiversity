@@ -3,7 +3,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import Map, { Source, Layer, MapLayerMouseEvent } from 'react-map-gl/maplibre';
 import type { Feature, FeatureCollection, MultiPolygon, Point, Polygon } from 'geojson';
-import type { StyleSpecification } from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import * as turf from '@turf/turf';
 import { fetchAllInatObservations, InatObservation } from '@/utils/inaturalist';
@@ -1236,7 +1235,13 @@ export default function SpeciesMap({ taxonId, scientificName, hkbihScientificNam
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [showAttribution, isMobile]);
 
-  const currentStyle = BASEMAPS.find(m => m.id === currentStyleId)?.style || BASEMAPS[0].style;
+  const currentBasemap = BASEMAPS.find(m => m.id === currentStyleId) || BASEMAPS[0];
+  const currentStyle = currentBasemap.styleUrl
+    ? `${currentBasemap.styleUrl}?language=${language}`
+    : currentBasemap.style;
+  if (!currentStyle) {
+    throw new Error(`Basemap ${currentBasemap.id} does not have a style`);
+  }
   const threatenedInatCount = observations.filter(isInatThreatened).length;
   const obscuredInatCount = observations.filter(observation => !isInatThreatened(observation) && isInatObscured(observation)).length;
   const inaccurateInatCount = observations.filter(observation => !isInatThreatened(observation) && Number(observation.positional_accuracy) > 1000).length;
@@ -1887,7 +1892,7 @@ export default function SpeciesMap({ taxonId, scientificName, hkbihScientificNam
           latitude: 22.365,
           zoom: 10
         }}
-        mapStyle={currentStyle as StyleSpecification}
+        mapStyle={currentStyle}
         onClick={onMapClick}
         onMouseMove={onMouseMove}
         onMouseLeave={onMouseLeave}

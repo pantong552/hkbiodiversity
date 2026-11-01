@@ -14,6 +14,10 @@ pnpm dev
 bun dev
 ```
 
+## LandsD Vector Basemap
+
+Set the server-side `HKMAPSERVICE_API_KEY` environment variable in `.env.local` for local development and in the deployment environment. Keep the key out of client-side code and source control; LandsD label tiles and glyphs are fetched through server routes.
+
 You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
 
 This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.

@@ -105,6 +105,9 @@ function getBasemapStyle(
   if (basemap.styleUrl) {
     return `${basemap.styleUrl}?language=${language}`;
   }
+  if (!basemap.style) {
+    throw new Error(`Basemap ${basemap.id} does not have a style`);
+  }
   return {
     ...basemap.style,
     glyphs: 'https://demotiles.maplibre.org/font/{fontstack}/{range}.pbf',
@@ -403,7 +406,7 @@ export default function MapPageClient() {
     language,
   ));
   const appliedBasemapId = useRef(DEFAULT_BASEMAP_ID);
-  const appliedBrightLanguage = useRef(language);
+  const appliedLocalizedBasemapLanguage = useRef(language);
 
   useEffect(() => {
     const mobileViewport = window.matchMedia('(max-width: 639px)');
@@ -456,7 +459,7 @@ export default function MapPageClient() {
 
     if (appliedBasemapId.current !== currentStyleId) {
       appliedBasemapId.current = currentStyleId;
-      appliedBrightLanguage.current = language;
+      appliedLocalizedBasemapLanguage.current = language;
       if (is3DModeEnabled && map.isStyleLoaded() && map.getTerrain()) {
         map.setTerrain(null);
       }
@@ -467,13 +470,31 @@ export default function MapPageClient() {
       return;
     }
 
-    if (currentStyleId !== 'openmaptiles-bright' || appliedBrightLanguage.current === language) return;
+    if (
+      currentStyleId === 'landsd-vector'
+      && appliedLocalizedBasemapLanguage.current !== language
+    ) {
+      appliedLocalizedBasemapLanguage.current = language;
+      if (is3DModeEnabled && map.isStyleLoaded() && map.getTerrain()) {
+        map.setTerrain(null);
+      }
+      map.setStyle(getBasemapStyle(currentBasemap, language), {
+        diff: !is3DModeEnabled,
+        transformStyle: (previousStyle, nextStyle) => preserveTerrainLayers(previousStyle, nextStyle),
+      });
+      return;
+    }
+
+    if (
+      currentStyleId !== 'openmaptiles-bright'
+      || appliedLocalizedBasemapLanguage.current === language
+    ) return;
 
     let active = true;
     const updateLabels = async () => {
       try {
         await updateBrightLabelLanguage(map, language);
-        if (active) appliedBrightLanguage.current = language;
+        if (active) appliedLocalizedBasemapLanguage.current = language;
       } catch (error) {
         if (active) console.error('Failed to update OpenMapTiles OSM Bright label language:', error);
       }
@@ -613,7 +634,7 @@ export default function MapPageClient() {
         initialViewState={INITIAL_VIEW_STATE}
         mapStyle={initialStyle}
         attributionControl={false}
-        maxZoom={18}
+        maxZoom={currentStyleId === 'landsd-vector' ? 18.9 : 18}
         minZoom={3}
         reuseMaps
         onClick={() => {

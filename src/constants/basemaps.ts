@@ -6,7 +6,7 @@ type Basemap = {
   preview?: string;
   previewStyleUrl?: string;
   attributionText: string;
-  style: StyleSpecification;
+  style?: StyleSpecification;
   styleUrl?: string;
 };
 
@@ -135,5 +135,13 @@ export const BASEMAPS: Basemap[] = [
       { id: 'hk-imagery-base', tiles: [MAP_SOURCES.hkImagery], attribution: '&copy; HKSAR' },
       { id: 'hk-imagery-label', tiles: [MAP_SOURCES.hkLabel], attribution: '' },
     ]),
+  },
+  {
+    id: 'landsd-vector',
+    name: { zh: 'LandsD 向量', en: 'LandsD Vector' },
+    preview: `https://a.basemaps.cartocdn.com/light_all/13/6694/3574.png${CARTO_KEY_PARAM}`,
+    previewStyleUrl: '/api/map/landsd-vector',
+    attributionText: '© Lands Department (HKSAR) | MapLibre',
+    styleUrl: '/api/map/landsd-vector',
   },
 ];
