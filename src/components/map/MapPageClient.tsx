@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import Map, {
   type MapRef,
   FullscreenControl,
@@ -21,6 +21,7 @@ import {
   type StyleSpecification,
 } from 'maplibre-gl';
 import mlcontour from 'maplibre-contour';
+import { AnimatePresence, motion, useSpring, useTransform } from 'framer-motion';
 import CustomDropdown from '@/components/ui/CustomDropdown';
 import { Check, Layers, Mountain, Route as RouteIcon, Download, Trash2 } from 'lucide-react';
 import { useLanguage } from '@/context/LanguageContext';
@@ -121,6 +122,175 @@ function closestRouteIndex(point: RoutePoint, route: RoutePoint[]): number {
     }
   });
   return closestIndex;
+}
+
+function getSegmentDistanceMeters(start: RoutePoint, end: RoutePoint) {
+  const radians = Math.PI / 180;
+  const lat1 = start[1] * radians;
+  const lat2 = end[1] * radians;
+  const deltaLat = (end[1] - start[1]) * radians;
+  const deltaLon = (end[0] - start[0]) * radians;
+  const a = Math.sin(deltaLat / 2) ** 2
+    + Math.cos(lat1) * Math.cos(lat2) * Math.sin(deltaLon / 2) ** 2;
+  return 6371008.8 * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+function AnimatedMetric({
+  value,
+  format,
+  className,
+}: {
+  value: number;
+  format: (value: number) => string;
+  className: string;
+}) {
+  const spring = useSpring(value, { stiffness: 110, damping: 24, mass: 0.7 });
+  const display = useTransform(spring, format);
+  useEffect(() => spring.set(value), [spring, value]);
+  return <motion.span className={className}>{display}</motion.span>;
+}
+
+function RouteElevationPanel({
+  coordinates,
+  anchors,
+  language,
+}: {
+  coordinates: number[][];
+  anchors: RoutePoint[];
+  language: 'zh' | 'en';
+}) {
+  const chartContainerRef = useRef<SVGSVGElement>(null);
+  const [chartSize, setChartSize] = useState({ width: 0, height: 0 });
+  useEffect(() => {
+    const element = chartContainerRef.current;
+    if (!element) return;
+    const observer = new ResizeObserver(([entry]) => {
+      setChartSize({ width: entry.contentRect.width, height: entry.contentRect.height });
+    });
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, []);
+
+  const stats = useMemo(() => {
+    const cumulativeDistances = [0];
+    let ascent = 0;
+    let descent = 0;
+    for (let index = 1; index < coordinates.length; index++) {
+      const previous = coordinates[index - 1];
+      const current = coordinates[index];
+      cumulativeDistances.push(cumulativeDistances[index - 1] + getSegmentDistanceMeters(
+        [previous[0], previous[1]],
+        [current[0], current[1]],
+      ));
+      const elevationChange = (current[2] ?? 0) - (previous[2] ?? 0);
+      if (elevationChange > 0) ascent += elevationChange;
+      else descent -= elevationChange;
+    }
+
+    const elevations = coordinates.map((point) => point[2] ?? 0);
+    const { minElevation, maxElevation } = elevations.reduce(
+      (range, elevation) => ({
+        minElevation: Math.min(range.minElevation, elevation),
+        maxElevation: Math.max(range.maxElevation, elevation),
+      }),
+      { minElevation: Number.POSITIVE_INFINITY, maxElevation: Number.NEGATIVE_INFINITY },
+    );
+    const elevationRange = Math.max(maxElevation - minElevation, 1);
+    const chartWidth = 1000;
+    const points = coordinates.map((point, index) => ({
+      x: coordinates.length > 1 ? (cumulativeDistances[index] / Math.max(cumulativeDistances.at(-1) ?? 1, 1)) * chartWidth : 0,
+      y: 88 - ((point[2] ?? 0) - minElevation) / elevationRange * 70,
+    }));
+    const linePath = points.map((point, index) => `${index === 0 ? 'M' : 'L'} ${point.x.toFixed(2)} ${point.y.toFixed(2)}`).join(' ');
+    const areaPath = `${linePath} L ${chartWidth} 94 L 0 94 Z`;
+    const waypointMarks = anchors.map((anchor, index) => {
+      const routeIndex = closestRouteIndex(anchor, coordinates.map(([lon, lat]) => [lon, lat] as RoutePoint));
+      return { index, distance: cumulativeDistances[routeIndex], ...points[routeIndex] };
+    });
+
+    return {
+      distance: cumulativeDistances.at(-1) ?? 0,
+      ascent,
+      descent,
+      minElevation,
+      maxElevation,
+      linePath,
+      areaPath,
+      waypointMarks,
+    };
+  }, [anchors, coordinates]);
+
+  const formatDistance = (meters: number) => meters >= 1000
+    ? `${(meters / 1000).toFixed(2)} km`
+    : `${Math.round(meters)} m`;
+  const labels = language === 'zh'
+    ? { distance: '全長距離', ascent: '總爬升', descent: '總下降', elevation: '高度', distanceAxis: '距離' }
+    : { distance: 'Distance', ascent: 'Total ascent', descent: 'Total descent', elevation: 'Elevation', distanceAxis: 'Distance' };
+
+  return (
+    <section aria-label={language === 'zh' ? '路線高度資料' : 'Route elevation profile'} className="absolute inset-x-0 bottom-0 z-20 border-t border-white/70 bg-white/95 shadow-[0_-12px_40px_rgba(15,23,42,0.16)] backdrop-blur-xl">
+      <div className="mx-auto grid max-w-screen-2xl grid-cols-1 gap-4 px-4 py-3 sm:grid-cols-[210px_minmax(0,1fr)] sm:items-center sm:gap-6 sm:px-6">
+        <div className="grid grid-cols-3 gap-2 sm:grid-cols-1 sm:gap-3">
+          <div className="sm:pb-1">
+            <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-slate-500">{labels.distance}</p>
+            <AnimatedMetric value={stats.distance} format={formatDistance} className="mt-0.5 text-lg font-black tracking-tight text-slate-900" />
+          </div>
+          <div>
+            <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-slate-500">{labels.ascent}</p>
+            <p className="mt-0.5 text-sm font-bold text-emerald-700">↗ <AnimatedMetric value={stats.ascent} format={(value) => `${Math.round(value)} m`} className="inline-block" /></p>
+          </div>
+          <div>
+            <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-slate-500">{labels.descent}</p>
+            <p className="mt-0.5 text-sm font-bold text-sky-700">↘ <AnimatedMetric value={stats.descent} format={(value) => `${Math.round(value)} m`} className="inline-block" /></p>
+          </div>
+        </div>
+        <div className="min-w-0">
+          <div className="mb-1 flex items-center justify-between text-[10px] font-semibold text-slate-500">
+            <span>{labels.elevation} · {Math.round(stats.minElevation)}–{Math.round(stats.maxElevation)} m</span>
+            <span>{labels.distanceAxis}</span>
+          </div>
+          <svg ref={chartContainerRef} viewBox="0 0 1000 106" preserveAspectRatio="none" role="img" aria-label={language === 'zh' ? '高度對距離圖表，包含途經點位置' : 'Elevation by distance chart with waypoint positions'} className="h-20 w-full overflow-visible sm:h-24">
+            <defs><linearGradient id="route-elevation-fill" x1="0" x2="0" y1="0" y2="1"><stop offset="0%" stopColor="#38bdf8" stopOpacity="0.34" /><stop offset="100%" stopColor="#38bdf8" stopOpacity="0.04" /></linearGradient></defs>
+            {[30, 60, 94].map((y) => <line key={y} x1="0" x2="1000" y1={y} y2={y} stroke="#cbd5e1" strokeDasharray="3 5" strokeWidth="1" />)}
+            <AnimatePresence initial={false} mode="sync">
+              <motion.g
+                key={stats.linePath}
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.35, ease: 'easeInOut' }}
+              >
+                <path d={stats.areaPath} fill="url(#route-elevation-fill)" />
+                <path d={stats.linePath} fill="none" stroke="#0284c7" strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" vectorEffect="non-scaling-stroke" />
+                {stats.waypointMarks.map((mark) => <g key={mark.index}>
+                  <g transform={`translate(${mark.x} 0) scale(${chartSize.width > 0 ? (chartSize.height / chartSize.width) * (1000 / 106) : 1} 1) translate(${-mark.x} 0)`}>
+                    <line x1={mark.x} x2={mark.x} y1="12" y2="94" stroke="#64748b" strokeDasharray="3 4" strokeOpacity="0.65" vectorEffect="non-scaling-stroke" />
+                    <circle cx={mark.x} cy={mark.y} r="5" fill="#fff" stroke="#1d4ed8" strokeWidth="2" vectorEffect="non-scaling-stroke" />
+                    <text x={mark.x} y="10" textAnchor="middle" fill="#1e3a8a" fontSize="10" fontWeight="700">{mark.index + 1}</text>
+                  </g>
+                </g>)}
+              </motion.g>
+            </AnimatePresence>
+          </svg>
+          <div className="relative h-4 text-[10px] font-medium text-slate-400">
+            <span className="absolute left-0 top-0">0 km</span>
+            {stats.waypointMarks
+              .filter((mark) => mark.index > 0 && mark.index < anchors.length - 1)
+              .map((mark) => (
+                <span
+                  key={mark.index}
+                  className="absolute top-0 -translate-x-1/2 whitespace-nowrap"
+                  style={{ left: `${(mark.x / 1000) * 100}%` }}
+                >
+                  {formatDistance(mark.distance)}
+                </span>
+              ))}
+            <span className="absolute right-0 top-0">{formatDistance(stats.distance)}</span>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
 }
 
 function downloadRouteGpx(points: RoutePoint[]) {
@@ -515,6 +685,7 @@ export default function MapPageClient() {
   const [allowPrivateRoads, setAllowPrivateRoads] = useState(false);
   const [routeProfile, setRouteProfile] = useState<'foot' | 'bike'>('foot');
   const [routeAnchors, setRouteAnchors] = useState<RoutePoint[]>([]);
+  const [routedAnchors, setRoutedAnchors] = useState<RoutePoint[]>([]);
   const [routeCoordinates, setRouteCoordinates] = useState<RoutePoint[]>([]);
   const [routeBusy, setRouteBusy] = useState(false);
   const [routeError, setRouteError] = useState<string | null>(null);
@@ -538,6 +709,7 @@ export default function MapPageClient() {
       queueMicrotask(() => {
         if (routeRequestId.current === requestId) {
           routedAnchorsRef.current = [];
+          setRoutedAnchors([]);
           setRouteCoordinates([]);
           setRouteBusy(false);
           setRouteError(null);
@@ -573,12 +745,11 @@ export default function MapPageClient() {
       if (!Array.isArray(coordinates)) throw new Error('No route found');
       if (routeRequestId.current === requestId) {
         routedAnchorsRef.current = routeAnchors;
+        setRoutedAnchors(routeAnchors);
         setRouteCoordinates(coordinates);
       }
     }).catch((error: unknown) => {
       if (routeRequestId.current === requestId) {
-        routedAnchorsRef.current = [];
-        setRouteCoordinates([]);
         setRouteError(error instanceof Error ? error.message : 'Unable to calculate route');
       }
     }).finally(() => {
@@ -1058,6 +1229,14 @@ export default function MapPageClient() {
         <FullscreenControl position="bottom-right" />
         <ScaleControl position="bottom-left" />
       </Map>
+
+      {isRouting && routeCoordinates.length > 1 && (
+        <RouteElevationPanel
+          coordinates={routeCoordinates}
+          anchors={routedAnchors}
+          language={language}
+        />
+      )}
 
       {waypointMenu && (() => {
         const actions = [
