@@ -190,7 +190,7 @@ export default function Header({ isHomePage: propIsHomePage }: HeaderProps = {})
           href="/"
           onClick={() => toggleExpand(false)}
           aria-label={language === 'zh' ? '返回主頁' : 'Back to home'}
-          className="pointer-events-auto absolute right-6 top-0 z-[70] flex h-11 w-11 items-center justify-center rounded-full border border-white/80 bg-white/95 text-slate-700 shadow-lg backdrop-blur transition hover:bg-white md:right-8"
+          className="pointer-events-auto absolute right-2.5 top-0 z-[70] flex h-11 w-11 items-center justify-center rounded-full border border-white/80 bg-white/95 text-slate-700 shadow-lg backdrop-blur transition hover:bg-white"
         >
           <ArrowLeft className="h-5 w-5" />
         </Link>

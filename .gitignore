@@ -47,6 +47,7 @@ hkbws_species_partial.csv
 hkbws_species.csv
 /database
 /maplibre-contour-main
+/gpx.studio-main
 
 # Skill
 .codex

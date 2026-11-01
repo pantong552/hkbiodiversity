@@ -3,7 +3,8 @@ import type { StyleSpecification } from 'maplibre-gl';
 type Basemap = {
   id: string;
   name: { zh: string; en: string };
-  preview: string;
+  preview?: string;
+  previewStyleUrl?: string;
   attributionText: string;
   style: StyleSpecification;
   styleUrl?: string;
@@ -73,12 +74,12 @@ export const BASEMAPS: Basemap[] = [
     style: createRasterStyle([{ id: 'osm', tiles: [MAP_SOURCES.osm], attribution: '&copy; OSM' }]),
   },
   {
-    id: 'openmaptiles-topo',
-    name: { zh: 'OpenMapTiles OSM 地形', en: 'OpenMapTiles OSM Topo' },
-    preview: 'https://tile.openstreetmap.org/13/6694/3574.png',
-    attributionText: '© OpenMapTiles | © OpenStreetMap | © Mapterhorn',
-    style: createRasterStyle([{ id: 'openmaptiles-topo-preview', tiles: [MAP_SOURCES.osm], attribution: '&copy; OpenStreetMap' }]),
-    styleUrl: '/api/map/osm-topo',
+    id: 'openmaptiles-bright',
+    name: { zh: 'OpenMapTiles', en: 'OpenMapTiles' },
+    previewStyleUrl: '/api/map/osm-bright',
+    attributionText: '© OpenMapTiles | © OpenStreetMap | © MapTiler',
+    style: createRasterStyle([{ id: 'openmaptiles-bright-preview', tiles: [MAP_SOURCES.osm], attribution: '&copy; OpenStreetMap' }]),
+    styleUrl: '/api/map/osm-bright',
   },
   {
     id: 'esri-sat',

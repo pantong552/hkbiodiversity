@@ -1,7 +1,8 @@
 import { NextResponse } from 'next/server';
+import osmBrightStyle from '../../../../../public/map-styles/osm-bright/style.json';
 
 const GPX_TILEJSON_URL = 'https://tiles.gpx.studio';
-const TILE_SOURCE_IDS = new Set(['openmaptiles', 'hillshading', 'contours_m', 'contours_ft']);
+const TILE_SOURCE_IDS = new Set(['openmaptiles']);
 
 type JsonRecord = Record<string, unknown>;
 
@@ -26,7 +27,11 @@ function containsNameField(value: unknown): boolean {
 
 function localizeTextField(value: unknown, language: 'zh' | 'en'): unknown {
   if (typeof value === 'string') {
-    const parts = value.split(/(\{[^}]+\})/g).filter(Boolean).map((part) => {
+    const localizedValue = value.replace(
+      /(\{name(?::[^}]+)?\})(?:\s*\{name(?::[^}]+)?\})+/g,
+      '$1',
+    );
+    const parts = localizedValue.split(/(\{[^}]+\})/g).filter(Boolean).map((part) => {
       if (/^\{name(?::[^}]+)?\}$/.test(part)) return localizedName(language);
       const property = /^\{([^}]+)\}$/.exec(part)?.[1];
       return property ? ['get', property] : part;
@@ -62,15 +67,7 @@ function localizeTextField(value: unknown, language: 'zh' | 'en'): unknown {
 export async function GET(request: Request) {
   try {
     const language = new URL(request.url).searchParams.get('language') === 'zh' ? 'zh' : 'en';
-    const response = await fetch('https://styles.gpx.studio/osm-topo.json', {
-      next: { revalidate: 86400 },
-    });
-    if (!response.ok) {
-      console.error(`GPX Studio style request failed with status ${response.status}`);
-      return NextResponse.json({ error: 'Unable to load OpenMapTiles OSM Topo style' }, { status: 502 });
-    }
-
-    const style: unknown = await response.json();
+    const style: unknown = structuredClone(osmBrightStyle);
     if (
       !isRecord(style)
       || !isRecord(style.sources)
@@ -78,16 +75,17 @@ export async function GET(request: Request) {
       || typeof style.glyphs !== 'string'
       || typeof style.sprite !== 'string'
     ) {
-      console.error('GPX Studio returned an invalid OpenMapTiles OSM Topo style');
-      return NextResponse.json({ error: 'Invalid OpenMapTiles OSM Topo style' }, { status: 502 });
+      console.error('OpenMapTiles returned an invalid OSM Bright style');
+      return NextResponse.json({ error: 'Invalid OpenMapTiles OSM Bright style' }, { status: 502 });
     }
 
-    const layers = style.layers.filter(
-      (layer) => !isRecord(layer)
-        || !['contours_index_ft', 'contours_ft', 'contours_label_ft'].includes(String(layer.id)),
-    );
-    style.layers = layers;
-    for (const layer of layers) {
+    if (!isRecord(style.sources.openmaptiles)) {
+      throw new Error('OpenMapTiles OSM Bright style is missing its vector tile source');
+    }
+    style.sources.openmaptiles.url = `${GPX_TILEJSON_URL}/openmaptiles.json`;
+    const styleAttribution = '<a href="https://openmaptiles.org/styles/osm-bright/" target="_blank" rel="noopener">OSM Bright style</a> © MapTiler';
+
+    for (const layer of style.layers) {
       if (
         isRecord(layer)
         && layer.source === 'openmaptiles'
@@ -135,18 +133,21 @@ export async function GET(request: Request) {
         minzoom: tileJson.minzoom,
         maxzoom: tileJson.maxzoom,
         bounds: tileJson.bounds,
-        attribution: tileJson.attribution,
+        attribution: [
+          typeof tileJson.attribution === 'string' ? tileJson.attribution : '',
+          styleAttribution,
+        ].filter(Boolean).join(' | '),
       };
     }));
 
     style.glyphs = `${origin}/api/map/fonts/{fontstack}/{range}.pbf`;
-    style.sprite = `${origin}/api/map/sprites/osm/sprite`;
+    style.sprite = `${origin}/map-styles/osm-bright/sprite`;
 
     return NextResponse.json(style, {
       headers: { 'Cache-Control': 'public, s-maxage=86400, stale-while-revalidate=3600' },
     });
   } catch (error) {
-    console.error('Failed to prepare GPX Studio OpenMapTiles style:', error);
-    return NextResponse.json({ error: 'Unable to prepare OpenMapTiles OSM Topo style' }, { status: 502 });
+    console.error('Failed to prepare OpenMapTiles OSM Bright style:', error);
+    return NextResponse.json({ error: 'Unable to prepare OpenMapTiles OSM Bright style' }, { status: 502 });
   }
 }

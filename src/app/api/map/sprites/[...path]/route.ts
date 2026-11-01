@@ -1,16 +1,21 @@
 import { NextResponse } from 'next/server';
 
+const SPRITE_SOURCES: Record<string, string> = {
+  osm: 'https://sprites.gpx.studio/osm',
+};
+
 export async function GET(
   _request: Request,
   { params }: { params: Promise<{ path: string[] }> },
 ) {
   const { path } = await params;
-  if (path.length !== 2 || path[0] !== 'osm' || !/^sprite(?:@2x)?\.(?:json|png)$/.test(path[1])) {
+  const spriteSource = SPRITE_SOURCES[path[0]];
+  if (path.length !== 2 || !spriteSource || !/^sprite(?:@2x)?\.(?:json|png)$/.test(path[1])) {
     return new NextResponse('Invalid map sprite request', { status: 400 });
   }
 
   try {
-    const response = await fetch(`https://sprites.gpx.studio/${path[0]}/${path[1]}`, {
+    const response = await fetch(`${spriteSource}/${path[1]}`, {
       next: { revalidate: 86400 },
     });
     if (!response.ok) {
@@ -24,7 +29,7 @@ export async function GET(
       },
     });
   } catch (error) {
-    console.error('Failed to proxy GPX Studio map sprite:', error);
+    console.error(`Failed to proxy ${path[0]} map sprite:`, error);
     return new NextResponse('Unable to load map sprite', { status: 502 });
   }
 }

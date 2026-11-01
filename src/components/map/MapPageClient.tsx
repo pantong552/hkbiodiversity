@@ -21,7 +21,20 @@ const INITIAL_VIEW_STATE = {
   latitude: 22.34826,
   zoom: 11.99,
 };
-const DEFAULT_BASEMAP_ID = 'openmaptiles-topo';
+const DEFAULT_BASEMAP_ID = 'openmaptiles-bright';
+const BASEMAP_PREVIEW_TILE_ZOOM = 13;
+const BASEMAP_PREVIEW_TILE_X = 6694;
+const BASEMAP_PREVIEW_TILE_Y = 3574;
+const BASEMAP_PREVIEW_TILE_COUNT = 2 ** BASEMAP_PREVIEW_TILE_ZOOM;
+const BASEMAP_PREVIEW_CENTER: [number, number] = [
+  ((BASEMAP_PREVIEW_TILE_X + 0.5) / BASEMAP_PREVIEW_TILE_COUNT) * 360 - 180,
+  Math.atan(Math.sinh(Math.PI * (1 - 2 * (BASEMAP_PREVIEW_TILE_Y + 0.5) / BASEMAP_PREVIEW_TILE_COUNT)))
+    * 180 / Math.PI,
+];
+
+function getBasemapPreviewZoom(width: number) {
+  return Math.log2(width * BASEMAP_PREVIEW_TILE_COUNT / 512);
+}
 
 const CONTOUR_THRESHOLDS: Record<number, [number, number]> = {
   10: [100, 500],
@@ -90,7 +103,6 @@ function getBasemapStyle(
 function preserveTerrainLayers(
   previousStyle: StyleSpecification | undefined,
   nextStyle: StyleSpecification,
-  hideContours: boolean,
 ): StyleSpecification {
   if (!previousStyle) return nextStyle;
 
@@ -105,17 +117,7 @@ function preserveTerrainLayers(
       layer.id.startsWith('terrain-hillshade-')
       || layer.id.startsWith('terrain-contour-')
     ))
-    .filter((layer) => !existingLayerIds.has(layer.id))
-    .map((layer) => {
-      if (!layer.id.startsWith('terrain-contour-')) return layer;
-      return {
-        ...layer,
-        layout: {
-          ...layer.layout,
-          visibility: hideContours ? 'none' as const : 'visible' as const,
-        },
-      };
-    });
+    .filter((layer) => !existingLayerIds.has(layer.id));
 
   return {
     ...nextStyle,
@@ -124,18 +126,18 @@ function preserveTerrainLayers(
   };
 }
 
-async function updateTopoLabelLanguage(
+async function updateBrightLabelLanguage(
   map: ReturnType<MapRef['getMap']>,
   language: 'zh' | 'en',
 ) {
-  const response = await fetch(`/api/map/osm-topo?language=${language}`);
+  const response = await fetch(`/api/map/osm-bright?language=${language}`);
   if (!response.ok) {
-    throw new Error(`Unable to load localized OSM Topo labels: ${response.status}`);
+    throw new Error(`Unable to load localized OSM Bright labels: ${response.status}`);
   }
 
   const style: unknown = await response.json();
   if (!isRecord(style) || !Array.isArray(style.layers)) {
-    throw new Error('Invalid localized OSM Topo style response');
+    throw new Error('Invalid localized OSM Bright style response');
   }
 
   for (const layer of style.layers) {
@@ -173,7 +175,7 @@ export default function MapPageClient() {
     language,
   ));
   const appliedBasemapId = useRef(DEFAULT_BASEMAP_ID);
-  const appliedTopoLanguage = useRef(language);
+  const appliedBrightLanguage = useRef(language);
 
   useEffect(() => {
     const mobileViewport = window.matchMedia('(max-width: 639px)');
@@ -207,7 +209,6 @@ export default function MapPageClient() {
   }, [isMobileViewport, mapReady]);
 
   const currentBasemap = BASEMAPS.find((basemap) => basemap.id === currentStyleId) || BASEMAPS[0];
-  const isTopoBasemap = currentStyleId === 'openmaptiles-topo';
   const demSourceConfig = DEM_SOURCES[demSourceId];
   const demSource = terrainReady ? getContourDemSource(demSourceId) : null;
   const contourTiles = areContoursEnabled && terrainReady && demSource
@@ -227,26 +228,22 @@ export default function MapPageClient() {
 
     if (appliedBasemapId.current !== currentStyleId) {
       appliedBasemapId.current = currentStyleId;
-      appliedTopoLanguage.current = language;
+      appliedBrightLanguage.current = language;
       map.setStyle(getBasemapStyle(currentBasemap, language), {
-        transformStyle: (previousStyle, nextStyle) => preserveTerrainLayers(
-          previousStyle,
-          nextStyle,
-          isTopoBasemap,
-        ),
+        transformStyle: (previousStyle, nextStyle) => preserveTerrainLayers(previousStyle, nextStyle),
       });
       return;
     }
 
-    if (!isTopoBasemap || appliedTopoLanguage.current === language) return;
+    if (currentStyleId !== 'openmaptiles-bright' || appliedBrightLanguage.current === language) return;
 
     let active = true;
     const updateLabels = async () => {
       try {
-        await updateTopoLabelLanguage(map, language);
-        if (active) appliedTopoLanguage.current = language;
+        await updateBrightLabelLanguage(map, language);
+        if (active) appliedBrightLanguage.current = language;
       } catch (error) {
-        if (active) console.error('Failed to update OpenMapTiles OSM Topo label language:', error);
+        if (active) console.error('Failed to update OpenMapTiles OSM Bright label language:', error);
       }
     };
 
@@ -260,7 +257,7 @@ export default function MapPageClient() {
       active = false;
       map.off('style.load', updateLabels);
     };
-  }, [currentBasemap, currentStyleId, isTopoBasemap, language, mapReady]);
+  }, [currentBasemap, currentStyleId, language, mapReady]);
 
   return (
     <div className="relative h-dvh w-full overflow-hidden bg-slate-100">
@@ -323,7 +320,7 @@ export default function MapPageClient() {
               layout={{
                 'line-join': 'round',
                 'line-cap': 'round',
-                visibility: isTopoBasemap ? 'none' : 'visible',
+                visibility: 'visible',
               }}
             />
             <Layer
@@ -340,7 +337,7 @@ export default function MapPageClient() {
               layout={{
                 'line-join': 'round',
                 'line-cap': 'round',
-                visibility: isTopoBasemap ? 'none' : 'visible',
+                visibility: 'visible',
               }}
             />
             <Layer
@@ -359,7 +356,7 @@ export default function MapPageClient() {
                 'text-field': ['concat', ['to-string', ['get', 'ele']], 'm'],
                 'text-font': ['Noto Sans Bold'],
                 'text-padding': 0,
-                visibility: isTopoBasemap ? 'none' : 'visible',
+                visibility: 'visible',
               }}
               paint={{
                 'text-color': '#5c5c5c',
@@ -374,7 +371,7 @@ export default function MapPageClient() {
         <ScaleControl position="bottom-left" />
       </Map>
 
-      <div className="absolute right-6 top-16 z-20 flex flex-col gap-2 md:right-8">
+      <div className="absolute right-2.5 top-[4.25rem] z-20 flex flex-col gap-2">
         <div className="relative">
         <button
           type="button"
@@ -443,9 +440,33 @@ export default function MapPageClient() {
                     }`}
                   >
                     <div
-                      className="relative h-20 bg-cover bg-center"
-                      style={{ backgroundImage: `url("${basemap.preview}")` }}
+                      className="relative h-20 overflow-hidden bg-slate-100"
+                      style={basemap.preview ? { backgroundImage: `url("${basemap.preview}")`, backgroundSize: 'cover', backgroundPosition: 'center' } : undefined}
                     >
+                      {basemap.previewStyleUrl && (
+                        <Map
+                          initialViewState={{
+                            longitude: BASEMAP_PREVIEW_CENTER[0],
+                            latitude: BASEMAP_PREVIEW_CENTER[1],
+                            zoom: 11,
+                          }}
+                          mapStyle={`${basemap.previewStyleUrl}?language=${language}`}
+                          attributionControl={false}
+                          interactive={false}
+                          style={{ width: '100%', height: '100%' }}
+                          onLoad={(event) => {
+                            const map = event.target;
+                            map.jumpTo({
+                              center: BASEMAP_PREVIEW_CENTER,
+                              zoom: getBasemapPreviewZoom(map.getContainer().clientWidth),
+                            });
+                          }}
+                          onResize={(event) => {
+                            const map = event.target;
+                            map.setZoom(getBasemapPreviewZoom(map.getContainer().clientWidth));
+                          }}
+                        />
+                      )}
                       {isSelected && (
                         <span className="absolute right-2 top-2 flex h-6 w-6 items-center justify-center rounded-full bg-emerald-600 text-white shadow">
                           <Check className="h-4 w-4" />
@@ -525,29 +546,17 @@ export default function MapPageClient() {
                   <button
                     type="button"
                     role="switch"
-                    aria-checked={isTopoBasemap || areContoursEnabled}
+                    aria-checked={areContoursEnabled}
                     aria-label={language === 'zh' ? '等高線' : 'Contour lines'}
-                    disabled={isTopoBasemap}
                     onClick={() => setAreContoursEnabled((enabled) => !enabled)}
-                    className={`flex w-full items-center justify-between rounded-xl px-2 py-2 text-left text-sm font-semibold ${
-                      isTopoBasemap ? 'cursor-not-allowed text-slate-400' : 'text-slate-700 hover:bg-slate-50'
-                    }`}
+                    className="flex w-full items-center justify-between rounded-xl px-2 py-2 text-left text-sm font-semibold text-slate-700 hover:bg-slate-50"
                   >
                     <span>{language === 'zh' ? '等高線' : 'Contour lines'}</span>
-                    <span className={`relative h-5 w-9 rounded-full transition ${
-                      isTopoBasemap || areContoursEnabled ? 'bg-emerald-600' : 'bg-slate-300'
-                    }`}>
-                      <span className={`absolute top-0.5 h-4 w-4 rounded-full bg-white transition ${
-                        isTopoBasemap || areContoursEnabled ? 'left-[18px]' : 'left-0.5'
-                      }`} />
+                    <span className={`relative h-5 w-9 rounded-full transition ${areContoursEnabled ? 'bg-emerald-600' : 'bg-slate-300'}`}>
+                      <span className={`absolute top-0.5 h-4 w-4 rounded-full bg-white transition ${areContoursEnabled ? 'left-[18px]' : 'left-0.5'}`} />
                     </span>
                   </button>
                 </div>
-                {isTopoBasemap && (
-                  <p className="mt-2 px-2 text-xs leading-relaxed text-slate-500">
-                    {language === 'zh' ? '此底圖已內建等高線' : 'Contours are built into this basemap'}
-                  </p>
-                )}
               </section>
             )}
         </div>
