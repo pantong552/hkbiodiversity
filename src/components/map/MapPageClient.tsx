@@ -8,8 +8,15 @@ import Map, {
   NavigationControl,
   ScaleControl,
   Source,
+  useControl,
 } from 'react-map-gl/maplibre';
-import { addProtocol, AttributionControl, type StyleSpecification } from 'maplibre-gl';
+import {
+  addProtocol,
+  AttributionControl,
+  type Map as MapLibreMap,
+  type Marker as MapLibreMarker,
+  type StyleSpecification,
+} from 'maplibre-gl';
 import mlcontour from 'maplibre-contour';
 import { Check, Layers, Mountain } from 'lucide-react';
 import { useLanguage } from '@/context/LanguageContext';
@@ -172,6 +179,210 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
+type LiveLocationControlProps = {
+  language: 'zh' | 'en';
+  onTrackingChange: (isTracking: boolean) => void;
+  onError: (code: number) => void;
+  onLocationUpdate: () => void;
+};
+
+function LiveLocationControl({
+  language,
+  onTrackingChange,
+  onError,
+  onLocationUpdate,
+}: LiveLocationControlProps) {
+  const propsRef = useRef({ language, onTrackingChange, onError, onLocationUpdate });
+  const buttonRef = useRef<HTMLButtonElement | null>(null);
+
+  const control = useControl(({ mapLib }) => {
+    let map: MapLibreMap | null = null;
+    let watchId: number | null = null;
+    let isTracking = false;
+    let locationMarker: MapLibreMarker | null = null;
+    let accuracyMarker: MapLibreMarker | null = null;
+    let accuracyElement: HTMLDivElement | null = null;
+    let locationAccuracy = 0;
+    let button: HTMLButtonElement;
+
+    const updateAccuracyCircle = () => {
+      if (!map || !locationMarker || !accuracyElement || locationAccuracy <= 0) return;
+
+      const location = locationMarker.getLngLat();
+      const point = map.project(location);
+      const metersPerPixel = map.unproject([point.x + 100, point.y]).distanceTo(location) / 100;
+      if (metersPerPixel <= 0) return;
+
+      const diameter = (2 * locationAccuracy) / metersPerPixel;
+      accuracyElement.style.width = `${diameter}px`;
+      accuracyElement.style.height = `${diameter}px`;
+    };
+
+    const stopTracking = () => {
+      if (watchId !== null) {
+        navigator.geolocation.clearWatch(watchId);
+        watchId = null;
+      }
+      isTracking = false;
+      locationMarker?.remove();
+      accuracyMarker?.remove();
+      locationMarker = null;
+      accuracyMarker = null;
+      accuracyElement = null;
+      locationAccuracy = 0;
+      button?.classList.remove(
+        'maplibregl-ctrl-geolocate-active',
+        'maplibregl-ctrl-geolocate-waiting',
+      );
+      button?.setAttribute('aria-pressed', 'false');
+      if (button) updateButtonLabel(false);
+      propsRef.current.onTrackingChange(false);
+    };
+
+    const reportError = (error: GeolocationPositionError) => {
+      if (error.code === error.PERMISSION_DENIED) {
+        stopTracking();
+      }
+      propsRef.current.onError(error.code);
+    };
+
+    const updateButtonLabel = (tracking: boolean) => {
+      const currentLanguage = propsRef.current.language;
+      const isSupported = window.isSecureContext && 'geolocation' in navigator;
+      const label = !isSupported
+        ? (currentLanguage === 'zh' ? '定位服務不可用' : 'Location unavailable')
+        : tracking
+          ? (currentLanguage === 'zh' ? '停止即時定位' : 'Stop live location')
+          : (currentLanguage === 'zh' ? '實時定位' : 'Live location');
+      button.setAttribute('aria-label', label);
+      button.title = label;
+    };
+
+    const updateLocation = (position: GeolocationPosition) => {
+      if (!map || !isTracking) return;
+
+      const { longitude, latitude, accuracy } = position.coords;
+      const center: [number, number] = [longitude, latitude];
+      locationAccuracy = accuracy;
+      const isFirstLocation = !locationMarker;
+      if (isFirstLocation) {
+        const dot = document.createElement('div');
+        dot.className = 'maplibregl-user-location-dot';
+        locationMarker = new mapLib.Marker({ element: dot, anchor: 'center' })
+          .setLngLat(center)
+          .addTo(map);
+
+        accuracyElement = document.createElement('div');
+        accuracyElement.className = 'maplibregl-user-location-accuracy-circle';
+        accuracyMarker = new mapLib.Marker({ element: accuracyElement, anchor: 'center' })
+          .setLngLat(center)
+          .addTo(map);
+      } else {
+        locationMarker?.setLngLat(center);
+        accuracyMarker?.setLngLat(center);
+      }
+
+      updateAccuracyCircle();
+
+      map.easeTo({
+        center,
+        zoom: Math.max(map.getZoom(), Math.min(16, map.getMaxZoom())),
+        duration: isFirstLocation ? 800 : 500,
+      });
+      button.classList.remove('maplibregl-ctrl-geolocate-waiting');
+      propsRef.current.onLocationUpdate();
+    };
+
+    return {
+      onAdd(nextMap) {
+        map = nextMap;
+        map.on('zoom', updateAccuracyCircle);
+        map.on('move', updateAccuracyCircle);
+        map.on('rotate', updateAccuracyCircle);
+        map.on('pitch', updateAccuracyCircle);
+        map.getContainer()
+          .querySelectorAll<HTMLButtonElement>('.maplibregl-ctrl-geolocate')
+          .forEach((existingButton) => {
+            existingButton.closest('.maplibregl-ctrl-group')?.remove();
+          });
+        const container = document.createElement('div');
+        container.className = 'maplibregl-ctrl maplibregl-ctrl-group';
+        button = document.createElement('button');
+        buttonRef.current = button;
+        button.type = 'button';
+        button.className = 'maplibregl-ctrl-geolocate';
+        button.setAttribute('aria-pressed', 'false');
+        const icon = document.createElement('span');
+        icon.className = 'maplibregl-ctrl-icon';
+        icon.setAttribute('aria-hidden', 'true');
+        button.append(icon);
+        container.append(button);
+
+        const isSupported = window.isSecureContext && 'geolocation' in navigator;
+        updateButtonLabel(false);
+        button.disabled = !isSupported;
+        button.addEventListener('click', () => {
+          if (isTracking) {
+            stopTracking();
+            return;
+          }
+          if (!map || !isSupported) return;
+
+          isTracking = true;
+          button.classList.add(
+            'maplibregl-ctrl-geolocate-active',
+            'maplibregl-ctrl-geolocate-waiting',
+          );
+          button.setAttribute('aria-pressed', 'true');
+          updateButtonLabel(true);
+          propsRef.current.onTrackingChange(true);
+
+          navigator.geolocation.getCurrentPosition(
+            updateLocation,
+            (error) => {
+              if (error.code === error.PERMISSION_DENIED) reportError(error);
+            },
+            { enableHighAccuracy: false, maximumAge: 30000, timeout: 10000 },
+          );
+          watchId = navigator.geolocation.watchPosition(
+            updateLocation,
+            reportError,
+            { enableHighAccuracy: true, maximumAge: 0, timeout: 60000 },
+          );
+        });
+
+        return container;
+      },
+      onRemove() {
+        stopTracking();
+        map?.off('zoom', updateAccuracyCircle);
+        map?.off('move', updateAccuracyCircle);
+        map?.off('rotate', updateAccuracyCircle);
+        map?.off('pitch', updateAccuracyCircle);
+        buttonRef.current = null;
+        map = null;
+      },
+    };
+  }, { position: 'bottom-right' });
+
+  useEffect(() => {
+    propsRef.current = { language, onTrackingChange, onError, onLocationUpdate };
+    const button = buttonRef.current;
+    if (!button) return;
+    const isSupported = window.isSecureContext && 'geolocation' in navigator;
+    const isTracking = button.getAttribute('aria-pressed') === 'true';
+    const label = !isSupported
+      ? (language === 'zh' ? '定位服務不可用' : 'Location unavailable')
+      : isTracking
+        ? (language === 'zh' ? '停止即時定位' : 'Stop live location')
+        : (language === 'zh' ? '實時定位' : 'Live location');
+    button.setAttribute('aria-label', label);
+    button.title = label;
+  }, [control, language, onError, onLocationUpdate, onTrackingChange]);
+
+  return null;
+}
+
 export default function MapPageClient() {
   const { language, setLanguage } = useLanguage();
   const [currentStyleId, setCurrentStyleId] = useState(DEFAULT_BASEMAP_ID);
@@ -184,6 +395,8 @@ export default function MapPageClient() {
   const [terrainReady, setTerrainReady] = useState(false);
   const [mapReady, setMapReady] = useState(false);
   const [isMobileViewport, setIsMobileViewport] = useState(false);
+  const [locationError, setLocationError] = useState<string | null>(null);
+  const [isLocationTracking, setIsLocationTracking] = useState(false);
   const mapRef = useRef<MapRef>(null);
   const [initialStyle] = useState(() => getBasemapStyle(
     BASEMAPS.find((basemap) => basemap.id === DEFAULT_BASEMAP_ID) || BASEMAPS[0],
@@ -283,8 +496,8 @@ export default function MapPageClient() {
     if (!mapReady || !map || !terrainReady) return;
 
     const terrainDemSource = getContourDemSource(demSourceId);
-    const apply3DMode = () => {
-      if (!map.isStyleLoaded()) return;
+    const apply3DMode = (styleLoaded = false) => {
+      if (!styleLoaded && !map.isStyleLoaded()) return;
 
       if (is3DModeEnabled) {
         const terrainSource = map.getStyle().sources[THREE_D_TERRAIN_SOURCE_ID];
@@ -372,12 +585,13 @@ export default function MapPageClient() {
       }
     };
 
-    map.on('style.load', apply3DMode);
+    const apply3DModeAfterStyleLoad = () => apply3DMode(true);
+    map.on('style.load', apply3DModeAfterStyleLoad);
     map.on('styledata', apply3DMode);
     apply3DMode();
 
     return () => {
-      map.off('style.load', apply3DMode);
+      map.off('style.load', apply3DModeAfterStyleLoad);
       map.off('styledata', apply3DMode);
     };
   }, [currentStyleId, demSourceId, is3DModeEnabled, mapReady, terrainReady]);
@@ -408,6 +622,11 @@ export default function MapPageClient() {
         }}
         onLoad={() => {
           initializeContourDemSources();
+          if (!window.isSecureContext || !('geolocation' in navigator)) {
+            setLocationError(language === 'zh'
+              ? '即時定位需要 HTTPS 安全連線及可用的瀏覽器定位服務。'
+              : 'Live location requires a secure HTTPS connection and browser location services.');
+          }
           setTerrainReady(true);
           setMapReady(true);
         }}
@@ -501,10 +720,45 @@ export default function MapPageClient() {
             />
           </Source>
         )}
-        <NavigationControl position="bottom-right" showCompass={false} />
+        <NavigationControl position="bottom-right" showCompass showZoom={false} />
+        <LiveLocationControl
+          language={language}
+          onTrackingChange={setIsLocationTracking}
+          onError={(code) => {
+            setLocationError(
+              code === 1
+                ? (language === 'zh'
+                  ? '定位權限被拒絕，請在瀏覽器設定中允許此網站使用位置。'
+                  : 'Location access was denied. Allow location access in your browser settings.')
+                : code === 2
+                  ? (language === 'zh'
+                    ? '目前無法取得位置，請確認裝置的定位服務已開啟。'
+                    : 'Your location is unavailable. Check that location services are enabled.')
+                  : (language === 'zh'
+                    ? '定位逾時，正在繼續嘗試取得高精度位置。'
+                    : 'Location timed out. Continuing to look for a high-accuracy fix.'),
+            );
+          }}
+          onLocationUpdate={() => setLocationError(null)}
+        />
         <FullscreenControl position="bottom-right" />
         <ScaleControl position="bottom-left" />
       </Map>
+
+      {locationError && (
+        <div
+          role="status"
+          aria-live="polite"
+          className="pointer-events-none absolute left-1/2 top-4 z-30 -translate-x-1/2 rounded-xl border border-slate-200/80 bg-white/95 px-4 py-2.5 text-center text-sm font-medium text-slate-700 shadow-lg backdrop-blur"
+        >
+          {locationError}
+        </div>
+      )}
+      {isLocationTracking && (
+        <span className="sr-only" aria-live="polite">
+          {language === 'zh' ? '正在持續追蹤位置' : 'Live location tracking is active'}
+        </span>
+      )}
 
       <div className="absolute right-2.5 top-[4.25rem] z-20 flex flex-col gap-2">
         <div className="relative">

@@ -57,6 +57,25 @@
   color: #64748b;
 }
 
+.map-page .maplibregl-user-location-dot,
+.map-page .maplibregl-user-location-dot:before {
+  background-color: #2563eb;
+}
+
+.map-page .maplibregl-user-location-dot:before {
+  box-shadow: 0 0 18px rgb(37 99 235 / 60%);
+}
+
+.map-page .maplibregl-user-location-dot:after {
+  box-shadow: 0 0 8px rgb(37 99 235 / 45%);
+}
+
+.map-page .maplibregl-user-location-accuracy-circle {
+  background-color: rgb(37 99 235 / 16%);
+  border: 1px solid rgb(37 99 235 / 40%);
+  box-shadow: 0 0 28px rgb(37 99 235 / 24%);
+}
+
 body {
   background-color: #f8fafc;
   background-image: radial-gradient(circle at top right, #f0fdf4 0%, #f8fafc 100%);
