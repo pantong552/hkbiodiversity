@@ -61,6 +61,10 @@ const DEM_SOURCES = {
   },
 } as const;
 type DemSourceId = keyof typeof DEM_SOURCES;
+const LIBERTY_BUILDING_SOURCE_ID = 'liberty-buildings';
+const LIBERTY_BUILDING_LAYER_ID = 'liberty-buildings-3d';
+const THREE_D_TERRAIN_SOURCE_ID = 'terrain-dem-3d';
+const THREE_D_TERRAIN_EXAGGERATION = 1.25;
 
 type ContourDemSource = InstanceType<typeof mlcontour.DemSource>;
 const contourDemSources: Partial<Record<DemSourceId, ContourDemSource>> = {};
@@ -108,7 +112,9 @@ function preserveTerrainLayers(
 
   const terrainSources = Object.fromEntries(
     Object.entries(previousStyle.sources).filter(([id]) => (
-      id.startsWith('terrain-dem-') || id.startsWith('terrain-contours-')
+      id.startsWith('terrain-dem-')
+      || id.startsWith('terrain-contours-')
+      || id === LIBERTY_BUILDING_SOURCE_ID
     )),
   );
   const existingLayerIds = new Set(nextStyle.layers.map((layer) => layer.id));
@@ -116,13 +122,21 @@ function preserveTerrainLayers(
     .filter((layer) => (
       layer.id.startsWith('terrain-hillshade-')
       || layer.id.startsWith('terrain-contour-')
+      || layer.id === LIBERTY_BUILDING_LAYER_ID
     ))
     .filter((layer) => !existingLayerIds.has(layer.id));
+  const layers = [...nextStyle.layers];
+  const firstSymbolLayerIndex = layers.findIndex((layer) => layer.type === 'symbol');
+  layers.splice(
+    firstSymbolLayerIndex === -1 ? layers.length : firstSymbolLayerIndex,
+    0,
+    ...terrainLayers,
+  );
 
   return {
     ...nextStyle,
     sources: { ...nextStyle.sources, ...terrainSources },
-    layers: [...nextStyle.layers, ...terrainLayers],
+    layers,
   };
 }
 
@@ -164,6 +178,7 @@ export default function MapPageClient() {
   const [isBasemapPickerOpen, setIsBasemapPickerOpen] = useState(false);
   const [isTerrainPickerOpen, setIsTerrainPickerOpen] = useState(false);
   const [isHillshadeEnabled, setIsHillshadeEnabled] = useState(false);
+  const [is3DModeEnabled, setIs3DModeEnabled] = useState(false);
   const [areContoursEnabled, setAreContoursEnabled] = useState(true);
   const [demSourceId, setDemSourceId] = useState<DemSourceId>('mapterhorn');
   const [terrainReady, setTerrainReady] = useState(false);
@@ -229,7 +244,11 @@ export default function MapPageClient() {
     if (appliedBasemapId.current !== currentStyleId) {
       appliedBasemapId.current = currentStyleId;
       appliedBrightLanguage.current = language;
+      if (is3DModeEnabled && map.isStyleLoaded() && map.getTerrain()) {
+        map.setTerrain(null);
+      }
       map.setStyle(getBasemapStyle(currentBasemap, language), {
+        diff: !is3DModeEnabled,
         transformStyle: (previousStyle, nextStyle) => preserveTerrainLayers(previousStyle, nextStyle),
       });
       return;
@@ -257,10 +276,124 @@ export default function MapPageClient() {
       active = false;
       map.off('style.load', updateLabels);
     };
-  }, [currentBasemap, currentStyleId, language, mapReady]);
+  }, [currentBasemap, currentStyleId, is3DModeEnabled, language, mapReady]);
+
+  useEffect(() => {
+    const map = mapRef.current?.getMap();
+    if (!mapReady || !map || !terrainReady) return;
+
+    const terrainDemSource = getContourDemSource(demSourceId);
+    const apply3DMode = () => {
+      if (!map.isStyleLoaded()) return;
+
+      if (is3DModeEnabled) {
+        const terrainSource = map.getStyle().sources[THREE_D_TERRAIN_SOURCE_ID];
+        const terrainTileUrl = terrainSource && 'tiles' in terrainSource
+          ? terrainSource.tiles?.[0]
+          : undefined;
+        if (
+          map.getSource(THREE_D_TERRAIN_SOURCE_ID)
+          && terrainTileUrl !== terrainDemSource.sharedDemProtocolUrl
+        ) {
+          if (map.getTerrain()?.source === THREE_D_TERRAIN_SOURCE_ID) {
+            map.setTerrain(null);
+          }
+          map.removeSource(THREE_D_TERRAIN_SOURCE_ID);
+        }
+        if (!map.getSource(THREE_D_TERRAIN_SOURCE_ID)) {
+          map.addSource(THREE_D_TERRAIN_SOURCE_ID, {
+            type: 'raster-dem',
+            tiles: [terrainDemSource.sharedDemProtocolUrl],
+            encoding: 'terrarium',
+            maxzoom: DEM_SOURCES[demSourceId].maxzoom,
+            tileSize: 256,
+            attribution: DEM_SOURCES[demSourceId].attribution,
+          });
+        }
+
+        if (!map.getSource(LIBERTY_BUILDING_SOURCE_ID)) {
+          map.addSource(LIBERTY_BUILDING_SOURCE_ID, {
+            type: 'vector',
+            url: 'https://tiles.openfreemap.org/planet',
+            attribution: '<a href="https://openfreemap.org" target="_blank" rel="noopener">OpenFreeMap</a> | <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">© OpenStreetMap contributors</a>',
+          });
+        }
+
+        if (!map.getLayer(LIBERTY_BUILDING_LAYER_ID)) {
+          const firstSymbolLayerId = map.getStyle().layers.find(
+            (layer) => layer.type === 'symbol',
+          )?.id;
+          map.addLayer({
+            id: LIBERTY_BUILDING_LAYER_ID,
+            type: 'fill-extrusion',
+            source: LIBERTY_BUILDING_SOURCE_ID,
+            'source-layer': 'building',
+            minzoom: 13,
+            paint: {
+              'fill-extrusion-color': '#a7a7a5',
+              'fill-extrusion-height': [
+                'to-number',
+                ['get', 'render_height'],
+                ['to-number', ['get', 'height'], 0],
+              ],
+              'fill-extrusion-base': [
+                'to-number',
+                ['get', 'render_min_height'],
+                ['to-number', ['get', 'min_height'], 0],
+              ],
+              'fill-extrusion-opacity': 0.85,
+              'fill-extrusion-vertical-gradient': true,
+            },
+          }, firstSymbolLayerId);
+        }
+      }
+
+      const desiredVisibility = is3DModeEnabled ? 'visible' : 'none';
+      if (
+        map.getLayer(LIBERTY_BUILDING_LAYER_ID)
+        && map.getLayoutProperty(LIBERTY_BUILDING_LAYER_ID, 'visibility') !== desiredVisibility
+      ) {
+        map.setLayoutProperty(LIBERTY_BUILDING_LAYER_ID, 'visibility', desiredVisibility);
+      }
+
+      if (is3DModeEnabled && map.getSource(THREE_D_TERRAIN_SOURCE_ID)) {
+        const terrain = map.getTerrain();
+        if (
+          terrain?.source !== THREE_D_TERRAIN_SOURCE_ID
+          || terrain.exaggeration !== THREE_D_TERRAIN_EXAGGERATION
+        ) {
+          map.setTerrain({
+            source: THREE_D_TERRAIN_SOURCE_ID,
+            exaggeration: THREE_D_TERRAIN_EXAGGERATION,
+          });
+        }
+      } else if (!is3DModeEnabled && map.getTerrain()) {
+        map.setTerrain(null);
+      }
+    };
+
+    map.on('style.load', apply3DMode);
+    map.on('styledata', apply3DMode);
+    apply3DMode();
+
+    return () => {
+      map.off('style.load', apply3DMode);
+      map.off('styledata', apply3DMode);
+    };
+  }, [currentStyleId, demSourceId, is3DModeEnabled, mapReady, terrainReady]);
+
+  useEffect(() => {
+    const map = mapRef.current?.getMap();
+    if (!mapReady || !map) return;
+    map.easeTo({
+      pitch: is3DModeEnabled ? 55 : 0,
+      zoom: is3DModeEnabled ? Math.max(map.getZoom(), 13) : map.getZoom(),
+      duration: 650,
+    });
+  }, [is3DModeEnabled, mapReady]);
 
   return (
-    <div className="relative h-dvh w-full overflow-hidden bg-slate-100">
+    <div className="map-page relative h-dvh w-full overflow-hidden bg-slate-100">
       <Map
         ref={mapRef}
         initialViewState={INITIAL_VIEW_STATE}
@@ -290,12 +423,14 @@ export default function MapPageClient() {
             tileSize={256}
             attribution={demSourceConfig.attribution}
           >
-            <Layer
-              id={`terrain-hillshade-${demSourceId}`}
-              type="hillshade"
-              source={`terrain-dem-${demSourceId}`}
-              paint={{ 'hillshade-exaggeration': 0.25 }}
-            />
+            {isHillshadeEnabled && (
+              <Layer
+                id={`terrain-hillshade-${demSourceId}`}
+                type="hillshade"
+                source={`terrain-dem-${demSourceId}`}
+                paint={{ 'hillshade-exaggeration': 0.25 }}
+              />
+            )}
           </Source>
         )}
         {contourTiles && (
@@ -560,6 +695,31 @@ export default function MapPageClient() {
               </section>
             )}
         </div>
+
+        <button
+          type="button"
+          aria-label={language === 'zh'
+            ? (is3DModeEnabled ? '退出 3D 模式' : '進入 3D 模式')
+            : (is3DModeEnabled ? 'Exit 3D mode' : 'Enter 3D mode')}
+          aria-pressed={is3DModeEnabled}
+          title={language === 'zh'
+            ? (is3DModeEnabled ? '退出 3D 模式' : '進入 3D 模式')
+            : (is3DModeEnabled ? 'Exit 3D mode' : 'Enter 3D mode')}
+          onClick={() => {
+            setIs3DModeEnabled((enabled) => {
+              if (!enabled) setIsHillshadeEnabled(true);
+              return !enabled;
+            });
+            setIsTerrainPickerOpen(false);
+          }}
+          className={`${MAP_ICON_BUTTON_CLASS} ${
+            is3DModeEnabled
+              ? '!border-emerald-600 !bg-emerald-600 !text-white hover:!bg-emerald-700'
+              : ''
+          }`}
+        >
+          <span className="text-sm font-black tracking-tight">3D</span>
+        </button>
       </div>
 
     </div>

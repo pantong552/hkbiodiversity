@@ -52,6 +52,11 @@
   @apply sticky top-4 z-50 rounded-[2rem] border border-slate-200/60 transition-all duration-300;
 }
 
+.map-page .maplibregl-ctrl-attrib,
+.map-page .maplibregl-ctrl-attrib a {
+  color: #64748b;
+}
+
 body {
   background-color: #f8fafc;
   background-image: radial-gradient(circle at top right, #f0fdf4 0%, #f8fafc 100%);
