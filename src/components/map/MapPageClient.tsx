@@ -14,13 +14,14 @@ import {
   addProtocol,
   AttributionControl,
   type Map as MapLibreMap,
+  Marker as MapLibreMarkerConstructor,
   type Marker as MapLibreMarker,
   type CalculateTileZoomFunction,
   type Source as MapLibreSource,
   type StyleSpecification,
 } from 'maplibre-gl';
 import mlcontour from 'maplibre-contour';
-import { Check, Layers, Mountain } from 'lucide-react';
+import { Check, Layers, Mountain, Route as RouteIcon, Download, Trash2 } from 'lucide-react';
 import { useLanguage } from '@/context/LanguageContext';
 import { BASEMAPS } from '@/constants/basemaps';
 import 'maplibre-gl/dist/maplibre-gl.css';
@@ -71,6 +72,18 @@ const DEM_SOURCES = {
 } as const;
 type DemSourceId = keyof typeof DEM_SOURCES;
 const LIBERTY_BUILDING_SOURCE_ID = 'liberty-buildings';
+type RoutePoint = [number, number];
+
+function downloadRouteGpx(points: RoutePoint[]) {
+  const trackpoints = points.map(([lon, lat]) => `<trkpt lat="${lat}" lon="${lon}"></trkpt>`).join('');
+  const xml = `<?xml version="1.0" encoding="UTF-8"?><gpx version="1.1" creator="HK Biodiversity" xmlns="http://www.topografix.com/GPX/1/1"><trk><name>HK Biodiversity route</name><trkseg>${trackpoints}</trkseg></trk></gpx>`;
+  const url = URL.createObjectURL(new Blob([xml], { type: 'application/gpx+xml' }));
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = 'route.gpx';
+  link.click();
+  URL.revokeObjectURL(url);
+}
 const LIBERTY_BUILDING_LAYER_ID = 'liberty-buildings-3d';
 const THREE_D_TERRAIN_SOURCE_ID = 'terrain-dem-3d';
 const THREE_D_TERRAIN_EXAGGERATION = 1.25;
@@ -448,6 +461,16 @@ export default function MapPageClient() {
   const [isMobileViewport, setIsMobileViewport] = useState(false);
   const [locationError, setLocationError] = useState<string | null>(null);
   const [isLocationTracking, setIsLocationTracking] = useState(false);
+  const [isRouting, setIsRouting] = useState(false);
+  const [isRoutingPanelOpen, setIsRoutingPanelOpen] = useState(false);
+  const [allowPrivateRoads, setAllowPrivateRoads] = useState(false);
+  const [routeProfile, setRouteProfile] = useState<'foot' | 'bike'>('foot');
+  const [routeAnchors, setRouteAnchors] = useState<RoutePoint[]>([]);
+  const [routeCoordinates, setRouteCoordinates] = useState<RoutePoint[]>([]);
+  const [routeBusy, setRouteBusy] = useState(false);
+  const [routeError, setRouteError] = useState<string | null>(null);
+  const routeRequestId = useRef(0);
+  const routeMarkersRef = useRef<MapLibreMarker[]>([]);
   const mapRef = useRef<MapRef>(null);
   const isStyleReadyRef = useRef(false);
   const [initialStyle] = useState(() => getBasemapStyle(
@@ -456,6 +479,86 @@ export default function MapPageClient() {
   ));
   const appliedBasemapId = useRef(DEFAULT_BASEMAP_ID);
   const appliedLocalizedBasemapLanguage = useRef(language);
+
+  useEffect(() => {
+    const requestId = ++routeRequestId.current;
+    if (!isRouting || routeAnchors.length < 2) {
+      queueMicrotask(() => {
+        if (routeRequestId.current === requestId) {
+          setRouteCoordinates([]);
+          setRouteBusy(false);
+          setRouteError(null);
+        }
+      });
+      return;
+    }
+    const activeRequestId = routeRequestId.current;
+    queueMicrotask(() => {
+      if (routeRequestId.current === activeRequestId) {
+        setRouteBusy(true);
+        setRouteError(null);
+      }
+    });
+    fetch('/api/map/route', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        points: routeAnchors,
+        profile: routeProfile,
+        elevation: true,
+        points_encoded: false,
+        details: ['road_class', 'surface', 'hike_rating', 'mtb_rating'],
+        allowPrivateRoads,
+      }),
+    }).then(async (response) => {
+      if (!response.ok) {
+        const message = await response.text();
+        throw new Error(message || `Route service error (${response.status})`);
+      }
+      const data = await response.json();
+      const coordinates = data?.paths?.[0]?.points?.coordinates;
+      if (!Array.isArray(coordinates)) throw new Error('No route found');
+      if (routeRequestId.current === requestId) setRouteCoordinates(coordinates);
+    }).catch((error: unknown) => {
+      if (routeRequestId.current === requestId) {
+        setRouteCoordinates([]);
+        setRouteError(error instanceof Error ? error.message : 'Unable to calculate route');
+      }
+    }).finally(() => {
+      if (routeRequestId.current === requestId) setRouteBusy(false);
+    });
+    return () => {
+      if (routeRequestId.current === activeRequestId) routeRequestId.current++;
+    };
+  }, [allowPrivateRoads, isRouting, routeAnchors, routeProfile]);
+
+  useEffect(() => {
+    const map = mapRef.current?.getMap();
+    if (!mapReady || !map) return;
+    routeMarkersRef.current.forEach((marker) => marker.remove());
+    routeMarkersRef.current = routeAnchors.map((anchor, index) => {
+      const element = document.createElement('div');
+      element.className = 'flex h-7 w-7 cursor-grab items-center justify-center rounded-full border-2 border-slate-900 bg-white text-xs font-black text-slate-900 shadow-md active:cursor-grabbing';
+      element.textContent = String(index + 1);
+      element.setAttribute('aria-label', `${language === 'zh' ? '途經點' : 'Waypoint'} ${index + 1}`);
+      const marker = new MapLibreMarkerConstructor({
+        element,
+        draggable: true,
+        anchor: 'center',
+      }).setLngLat(anchor).addTo(map);
+      marker.on('dragend', () => {
+        const { lng, lat } = marker.getLngLat();
+        setRouteAnchors((points) => points.map((point, pointIndex) => (
+          pointIndex === index ? [lng, lat] : point
+        )));
+      });
+      return marker;
+    });
+    return () => {
+      routeMarkersRef.current.forEach((marker) => marker.remove());
+      routeMarkersRef.current = [];
+    };
+  }, [language, mapReady, routeAnchors]);
 
   useEffect(() => {
     const mobileViewport = window.matchMedia('(max-width: 639px)');
@@ -694,9 +797,12 @@ export default function MapPageClient() {
         maxZoom={currentStyleId === 'landsd-vector' ? 18.9 : 18}
         minZoom={3}
         reuseMaps
-        onClick={() => {
+        onClick={(event) => {
           setIsBasemapPickerOpen(false);
           setIsTerrainPickerOpen(false);
+          if (isRouting) {
+            setRouteAnchors((points) => [...points, [event.lngLat.lng, event.lngLat.lat]]);
+          }
         }}
         onLoad={() => {
           initializeContourDemSources();
@@ -710,6 +816,15 @@ export default function MapPageClient() {
           setMapReady(true);
         }}
       >
+        {routeCoordinates.length > 0 && (
+          <Source id="planned-route" type="geojson" data={{
+            type: 'Feature',
+            properties: {},
+            geometry: { type: 'LineString', coordinates: routeCoordinates },
+          }}>
+            <Layer id="planned-route-line" type="line" paint={{ 'line-color': '#2563eb', 'line-width': 5, 'line-opacity': 0.92 }} layout={{ 'line-cap': 'round', 'line-join': 'round' }} />
+          </Source>
+        )}
         {isHillshadeEnabled && demSource && (
           <Source
             key={`terrain-dem-${demSourceId}`}
@@ -1058,6 +1173,24 @@ export default function MapPageClient() {
         >
           <span className="text-sm font-black tracking-tight">3D</span>
         </button>
+        <div className="relative">
+          <button type="button" aria-label={language === 'zh' ? '路線規劃' : 'Routing'} aria-expanded={isRoutingPanelOpen} onClick={() => { setIsRoutingPanelOpen((open) => !open); setIsBasemapPickerOpen(false); setIsTerrainPickerOpen(false); }} className={`${MAP_ICON_BUTTON_CLASS} ${isRouting ? '!border-emerald-600 !bg-emerald-600 !text-white hover:!bg-emerald-700' : ''}`}>
+            <RouteIcon className="h-5 w-5" />
+          </button>
+          {isRoutingPanelOpen && <section aria-label={language === 'zh' ? '路線規劃' : 'Routing'} className="pointer-events-auto absolute right-full top-0 mr-3 w-[min(20rem,calc(100vw-6rem))] rounded-2xl border border-white/70 bg-white/95 p-3 shadow-2xl backdrop-blur-xl">
+            <h2 className="mb-2 flex items-center gap-2 px-1 text-sm font-black text-slate-900"><RouteIcon className="h-4 w-4" />Routing</h2>
+            <button type="button" role="switch" aria-checked={isRouting} onClick={() => setIsRouting((active) => !active)} className="flex w-full items-center justify-between rounded-xl bg-slate-100 px-3 py-2 text-sm font-bold text-slate-800">
+              <span>{language === 'zh' ? '啟用路線規劃' : 'Enable routing'}</span><span className={`relative h-5 w-9 rounded-full transition ${isRouting ? 'bg-emerald-600' : 'bg-slate-300'}`}><span className={`absolute top-0.5 h-4 w-4 rounded-full bg-white transition ${isRouting ? 'left-[18px]' : 'left-0.5'}`} /></span>
+            </button>
+            {isRouting && <>
+              <select aria-label={language === 'zh' ? '活動類型' : 'Activity'} value={routeProfile} onChange={(event) => setRouteProfile(event.target.value as 'foot' | 'bike')} className="mt-2 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800"><option value="foot">{language === 'zh' ? '步行／行山' : 'Walking / hiking'}</option><option value="bike">{language === 'zh' ? '單車' : 'Cycling'}</option></select>
+              <button type="button" role="switch" aria-checked={allowPrivateRoads} onClick={() => setAllowPrivateRoads((allowed) => !allowed)} className="mt-2 flex w-full items-center justify-between rounded-xl px-2 py-2 text-left text-sm font-semibold text-slate-700"><span>{language === 'zh' ? '允許私人道路' : 'Allow private roads'}</span><span className={`relative h-5 w-9 rounded-full transition ${allowPrivateRoads ? 'bg-emerald-600' : 'bg-slate-300'}`}><span className={`absolute top-0.5 h-4 w-4 rounded-full bg-white transition ${allowPrivateRoads ? 'left-[18px]' : 'left-0.5'}`} /></span></button>
+              <p className="px-1 py-2 text-xs text-slate-600">{routeBusy ? (language === 'zh' ? '正在尋找路線…' : 'Finding route…') : (language === 'zh' ? `點擊地圖新增途經點（${routeAnchors.length}）` : `Click map to add waypoint (${routeAnchors.length})`)}</p>
+              {routeError && <p role="alert" className="mb-2 rounded-lg bg-red-50 px-2 py-1.5 text-xs text-red-700">{language === 'zh' ? '尋路失敗：' : 'Routing failed: '}{routeError}</p>}
+              <div className="flex gap-2"><button type="button" disabled={!routeCoordinates.length} onClick={() => downloadRouteGpx(routeCoordinates)} className="flex flex-1 items-center justify-center gap-1 rounded-lg bg-slate-800 px-2 py-2 text-xs font-bold text-white disabled:opacity-40"><Download className="h-3.5 w-3.5" />GPX</button><button type="button" disabled={!routeAnchors.length} onClick={() => { setRouteAnchors([]); setRouteCoordinates([]); }} className="flex flex-1 items-center justify-center gap-1 rounded-lg border border-slate-200 px-2 py-2 text-xs font-bold text-slate-700 disabled:opacity-40"><Trash2 className="h-3.5 w-3.5" />{language === 'zh' ? '清除' : 'Clear'}</button></div>
+            </>}
+          </section>}
+        </div>
       </div>
 
     </div>
