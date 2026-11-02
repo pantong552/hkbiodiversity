@@ -409,7 +409,14 @@ function RouteElevationPanel({
               </div>
             </div>
             <div className="min-w-0 flex-1">
-              <svg ref={chartContainerRef} viewBox="0 0 1000 100" preserveAspectRatio="none" role="img" aria-label={language === 'zh' ? '海拔對距離圖表，包含途經點位置' : 'Altitude by distance chart with waypoint positions'} className="h-24 w-full overflow-visible sm:h-32" onPointerMove={handleChartPointerMove} onPointerLeave={() => { setChartHover(null); onHoverRoutePoint(null); }}>
+              <svg ref={chartContainerRef} viewBox="0 0 1000 100" preserveAspectRatio="none" role="img" aria-label={language === 'zh' ? '海拔對距離圖表，包含途經點位置' : 'Altitude by distance chart with waypoint positions'} className="h-24 w-full touch-none select-none overflow-visible sm:h-32" onPointerDown={(event) => {
+                event.currentTarget.setPointerCapture(event.pointerId);
+                handleChartPointerMove(event);
+              }} onPointerMove={handleChartPointerMove} onPointerUp={(event) => {
+                if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+                  event.currentTarget.releasePointerCapture(event.pointerId);
+                }
+              }} onPointerCancel={() => { setChartHover(null); onHoverRoutePoint(null); }} onPointerLeave={() => { setChartHover(null); onHoverRoutePoint(null); }}>
                 <defs><linearGradient id="route-elevation-fill" x1="0" x2="0" y1="0" y2="1"><stop offset="0%" stopColor="#38bdf8" stopOpacity="0.34" /><stop offset="100%" stopColor="#38bdf8" stopOpacity="0.04" /></linearGradient></defs>
                 {[18, 53, 88].map((y) => <line key={y} x1="0" x2="1000" y1={y} y2={y} stroke="#cbd5e1" strokeDasharray="3 5" strokeWidth="1" />)}
                 <AnimatePresence initial={false} mode="sync">
