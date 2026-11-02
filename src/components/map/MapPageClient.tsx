@@ -152,6 +152,22 @@ function getSegmentDistanceMeters(start: RoutePoint, end: RoutePoint) {
   return 6371008.8 * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
+function interpolateRouteElevation(coordinates: number[][], segmentEndIndex: number, fraction: number) {
+  const previous = coordinates[Math.max(0, segmentEndIndex - 2)][2] ?? 0;
+  const start = coordinates[segmentEndIndex - 1][2] ?? 0;
+  const end = coordinates[segmentEndIndex][2] ?? 0;
+  const next = coordinates[Math.min(coordinates.length - 1, segmentEndIndex + 1)][2] ?? 0;
+  const fractionSquared = fraction * fraction;
+  const fractionCubed = fractionSquared * fraction;
+  const elevation = 0.5 * (
+    2 * start
+    + (-previous + end) * fraction
+    + (2 * previous - 5 * start + 4 * end - next) * fractionSquared
+    + (-previous + 3 * start - 3 * end + next) * fractionCubed
+  );
+  return Math.max(Math.min(start, end), Math.min(Math.max(start, end), elevation));
+}
+
 function AnimatedMetric({
   value,
   format,
@@ -208,6 +224,8 @@ function RouteElevationPanel({
   onAddRoute,
   onRemoveRoute,
   onHoverRoutePoint,
+  mapRef,
+  mapReady,
 }: {
   coordinates: number[][];
   anchors: RoutePoint[];
@@ -218,9 +236,12 @@ function RouteElevationPanel({
   onAddRoute: () => void;
   onRemoveRoute: (id: string) => void;
   onHoverRoutePoint: (point: { coordinate: RoutePoint; distance: number; elevation: number } | null) => void;
+  mapRef: { current: MapRef | null };
+  mapReady: boolean;
 }) {
   const hasChart = coordinates.length > 1;
   const chartContainerRef = useRef<SVGSVGElement>(null);
+  const panelRef = useRef<HTMLElement>(null);
   const [chartSize, setChartSize] = useState({ width: 0, height: 0 });
   const [chartHover, setChartHover] = useState<{ x: number; y: number; distance: number; elevation: number } | null>(null);
   useEffect(() => {
@@ -232,6 +253,30 @@ function RouteElevationPanel({
     observer.observe(element);
     return () => observer.disconnect();
   }, [hasChart]);
+  useEffect(() => {
+    if (!mapReady) return;
+    const panel = panelRef.current;
+    const map = mapRef.current?.getMap();
+    if (!panel || !map) return;
+
+    const controls = map.getContainer().querySelectorAll<HTMLElement>(
+      '.maplibregl-ctrl-bottom-left, .maplibregl-ctrl-bottom-right',
+    );
+    const updateControlPosition = () => {
+      const offset = `${panel.getBoundingClientRect().height}px`;
+      controls.forEach((control) => {
+        control.style.bottom = offset;
+      });
+    };
+
+    updateControlPosition();
+    const observer = new ResizeObserver(updateControlPosition);
+    observer.observe(panel);
+    return () => {
+      observer.disconnect();
+      controls.forEach((control) => control.style.removeProperty('bottom'));
+    };
+  }, [mapReady, mapRef]);
 
   const stats = useMemo(() => {
     const cumulativeDistances = [0];
@@ -259,9 +304,20 @@ function RouteElevationPanel({
     );
     const elevationRange = Math.max(maxElevation - minElevation, 1);
     const chartWidth = 1000;
-    const points = coordinates.map((point, index) => ({
-      x: coordinates.length > 1 ? (cumulativeDistances[index] / Math.max(cumulativeDistances.at(-1) ?? 1, 1)) * chartWidth : 0,
-      y: 88 - ((point[2] ?? 0) - minElevation) / elevationRange * 70,
+    const chartSamples = coordinates.flatMap((point, index) => {
+      if (index === 0) return [{ distance: cumulativeDistances[index], elevation: point[2] ?? 0 }];
+      const segmentDistance = cumulativeDistances[index] - cumulativeDistances[index - 1];
+      return Array.from({ length: 4 }, (_, sampleIndex) => {
+        const fraction = (sampleIndex + 1) / 4;
+        return {
+          distance: cumulativeDistances[index - 1] + segmentDistance * fraction,
+          elevation: interpolateRouteElevation(coordinates, index, fraction),
+        };
+      });
+    });
+    const points = chartSamples.map((sample) => ({
+      x: (sample.distance / Math.max(cumulativeDistances.at(-1) ?? 1, 1)) * chartWidth,
+      y: 88 - ((sample.elevation - minElevation) / elevationRange) * 70,
     }));
     const linePath = points.map((point, index) => `${index === 0 ? 'M' : 'L'} ${point.x.toFixed(2)} ${point.y.toFixed(2)}`).join(' ');
     const areaPath = `${linePath} L ${chartWidth} 94 L 0 94 Z`;
@@ -287,8 +343,8 @@ function RouteElevationPanel({
     ? `${(meters / 1000).toFixed(2)} km`
     : `${Math.round(meters)} m`;
   const labels = language === 'zh'
-    ? { distance: '全長距離', ascent: '總爬升', descent: '總下降', elevation: '高度', distanceAxis: '距離' }
-    : { distance: 'Distance', ascent: 'Total ascent', descent: 'Total descent', elevation: 'Elevation', distanceAxis: 'Distance' };
+    ? { distance: '全長距離', ascent: '總爬升', descent: '總下降' }
+    : { distance: 'Distance', ascent: 'Total ascent', descent: 'Total descent' };
 
   const handleChartPointerMove = (event: PointerEvent<SVGSVGElement>) => {
     const bounds = event.currentTarget.getBoundingClientRect();
@@ -306,7 +362,7 @@ function RouteElevationPanel({
       : (targetDistance - startDistance) / (endDistance - startDistance);
     const start = coordinates[startIndex];
     const end = coordinates[segmentIndex];
-    const elevation = (start[2] ?? 0) + ((end[2] ?? 0) - (start[2] ?? 0)) * segmentFraction;
+    const elevation = interpolateRouteElevation(coordinates, segmentIndex, segmentFraction);
     const elevationRange = Math.max(stats.maxElevation - stats.minElevation, 1);
     const y = 88 - ((elevation - stats.minElevation) / elevationRange) * 70;
     setChartHover({ x: fraction * 1000, y, distance: targetDistance, elevation });
@@ -321,12 +377,12 @@ function RouteElevationPanel({
   };
 
   return (
-    <section aria-label={language === 'zh' ? '路線高度資料' : 'Route elevation profile'} className="absolute inset-x-0 bottom-0 z-20 border-t border-white/70 bg-white/95 shadow-[0_-12px_40px_rgba(15,23,42,0.16)] backdrop-blur-xl">
+    <section ref={panelRef} aria-label={language === 'zh' ? '路線高度資料' : 'Route elevation profile'} className="absolute inset-x-0 bottom-0 z-20 border-t border-white/70 bg-white/95 shadow-[0_-12px_40px_rgba(15,23,42,0.16)] backdrop-blur-xl">
       <div className="mx-auto max-w-screen-2xl px-3 pt-2 sm:px-3">
         <div className="mb-2"><RouteTabs tabs={tabs} activeRouteId={activeRouteId} language={language} onSelect={onSelectRoute} onAdd={onAddRoute} onRemove={onRemoveRoute} /></div>
       </div>
-      {coordinates.length > 1 ? <div className="mx-auto grid max-w-screen-2xl grid-cols-1 gap-3 px-3 pb-3 sm:grid-cols-[170px_minmax(0,1fr)] sm:items-center sm:gap-0 sm:px-3">
-        <div className="grid grid-cols-3 gap-2 sm:grid-cols-1 sm:gap-3">
+      {coordinates.length > 1 ? <div className="mx-auto grid max-w-screen-2xl grid-cols-1 gap-3 px-3 pb-3 sm:grid-cols-[170px_minmax(0,1fr)] sm:items-center sm:gap-0 sm:px-3 sm:pb-2">
+        <div className="grid grid-cols-3 gap-2 sm:grid-cols-1 sm:gap-2">
           <div className="sm:pb-1">
             <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-slate-500">{labels.distance}</p>
             <AnimatedMetric value={stats.distance} format={formatDistance} className="mt-0.5 text-lg font-black tracking-tight text-slate-900" />
@@ -341,55 +397,65 @@ function RouteElevationPanel({
           </div>
         </div>
         <div className="min-w-0">
-          <div className="mb-1 flex items-center justify-between text-[10px] font-semibold text-slate-500">
-            <span>{labels.elevation} · {Math.round(stats.minElevation)}–{Math.round(stats.maxElevation)} m</span>
-            <span>{labels.distanceAxis}</span>
-          </div>
-          <svg ref={chartContainerRef} viewBox="0 0 1000 106" preserveAspectRatio="none" role="img" aria-label={language === 'zh' ? '高度對距離圖表，包含途經點位置' : 'Elevation by distance chart with waypoint positions'} className="h-20 w-full overflow-visible sm:h-24" onPointerMove={handleChartPointerMove} onPointerLeave={() => { setChartHover(null); onHoverRoutePoint(null); }}>
-            <defs><linearGradient id="route-elevation-fill" x1="0" x2="0" y1="0" y2="1"><stop offset="0%" stopColor="#38bdf8" stopOpacity="0.34" /><stop offset="100%" stopColor="#38bdf8" stopOpacity="0.04" /></linearGradient></defs>
-            {[30, 60, 94].map((y) => <line key={y} x1="0" x2="1000" y1={y} y2={y} stroke="#cbd5e1" strokeDasharray="3 5" strokeWidth="1" />)}
-            <AnimatePresence initial={false} mode="sync">
-              <motion.g
-                key={stats.linePath}
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                transition={{ duration: 0.35, ease: 'easeInOut' }}
-              >
-                <path d={stats.areaPath} fill="url(#route-elevation-fill)" />
-                <path d={stats.linePath} fill="none" stroke="#0284c7" strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" vectorEffect="non-scaling-stroke" />
-                {stats.waypointMarks.map((mark) => <g key={mark.index}>
-                  <g transform={`translate(${mark.x} 0) scale(${chartSize.width > 0 ? (chartSize.height / chartSize.width) * (1000 / 106) : 1} 1) translate(${-mark.x} 0)`}>
-                    <line x1={mark.x} x2={mark.x} y1="12" y2="94" stroke="#64748b" strokeDasharray="3 4" strokeOpacity="0.65" vectorEffect="non-scaling-stroke" />
-                    <circle cx={mark.x} cy={mark.y} r="5" fill="#fff" stroke="#1d4ed8" strokeWidth="2" vectorEffect="non-scaling-stroke" />
-                    <text x={mark.x} y="10" textAnchor="middle" fill="#1e3a8a" fontSize="10" fontWeight="700">{mark.index + 1}</text>
+          <div className="flex items-stretch">
+            <div aria-hidden="true" className="relative mr-1 h-24 w-9 shrink-0 sm:h-32">
+              <span className="absolute left-0 top-1/2 -translate-y-1/2 whitespace-nowrap text-[9px] font-semibold text-slate-500 [writing-mode:vertical-rl] rotate-180">
+                {language === 'zh' ? '海拔（米）' : 'Altitude (m)'}
+              </span>
+              <div className="absolute inset-y-0 left-3 right-0 text-right text-[9px] leading-none text-slate-500">
+                <span className="absolute right-0 top-[17%] -translate-y-1/2">{Math.round(stats.maxElevation)}</span>
+                <span className="absolute right-0 top-1/2 -translate-y-1/2">{Math.round((stats.minElevation + stats.maxElevation) / 2)}</span>
+                <span className="absolute right-0 top-[83%] -translate-y-1/2">{Math.round(stats.minElevation)}</span>
+              </div>
+            </div>
+            <div className="min-w-0 flex-1">
+              <svg ref={chartContainerRef} viewBox="0 0 1000 100" preserveAspectRatio="none" role="img" aria-label={language === 'zh' ? '海拔對距離圖表，包含途經點位置' : 'Altitude by distance chart with waypoint positions'} className="h-24 w-full overflow-visible sm:h-32" onPointerMove={handleChartPointerMove} onPointerLeave={() => { setChartHover(null); onHoverRoutePoint(null); }}>
+                <defs><linearGradient id="route-elevation-fill" x1="0" x2="0" y1="0" y2="1"><stop offset="0%" stopColor="#38bdf8" stopOpacity="0.34" /><stop offset="100%" stopColor="#38bdf8" stopOpacity="0.04" /></linearGradient></defs>
+                {[18, 53, 88].map((y) => <line key={y} x1="0" x2="1000" y1={y} y2={y} stroke="#cbd5e1" strokeDasharray="3 5" strokeWidth="1" />)}
+                <AnimatePresence initial={false} mode="sync">
+                  <motion.g
+                    key={stats.linePath}
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    transition={{ duration: 0.35, ease: 'easeInOut' }}
+                  >
+                    <path d={stats.areaPath} fill="url(#route-elevation-fill)" />
+                    <path d={stats.linePath} fill="none" stroke="#0284c7" strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" vectorEffect="non-scaling-stroke" />
+                    {stats.waypointMarks.map((mark) => <g key={mark.index}>
+                      <g transform={`translate(${mark.x} 0) scale(${chartSize.width > 0 ? (chartSize.height / chartSize.width) * (1000 / 100) : 1} 1) translate(${-mark.x} 0)`}>
+                        <line x1={mark.x} x2={mark.x} y1="12" y2="94" stroke="#64748b" strokeDasharray="3 4" strokeOpacity="0.65" vectorEffect="non-scaling-stroke" />
+                        <circle cx={mark.x} cy={mark.y} r="5" fill="#fff" stroke="#1d4ed8" strokeWidth="2" vectorEffect="non-scaling-stroke" />
+                        <text x={mark.x} y="10" textAnchor="middle" fill="#1e3a8a" fontSize="10" fontWeight="700">{mark.index + 1}</text>
+                      </g>
+                    </g>)}
+                  </motion.g>
+                </AnimatePresence>
+                {chartHover && <g pointerEvents="none">
+                  <g transform={`translate(${chartHover.x} 0) scale(${chartSize.width > 0 ? (chartSize.height / chartSize.width) * (1000 / 100) : 1} 1) translate(${-chartHover.x} 0)`}>
+                    <line x1={chartHover.x} x2={chartHover.x} y1="12" y2="94" stroke="#f59e0b" strokeDasharray="3 3" strokeOpacity="0.8" vectorEffect="non-scaling-stroke" />
+                    <circle cx={chartHover.x} cy={chartHover.y} r="5" fill="#fff" stroke="#f59e0b" strokeWidth="2.5" vectorEffect="non-scaling-stroke" />
+                    <text x={chartHover.x} y={Math.max(10, chartHover.y - 8)} textAnchor="middle" fill="#b45309" fontSize="10" fontWeight="700">{Math.round(chartHover.elevation)} m</text>
+                    <text x={chartHover.x} y="104" textAnchor={chartHover.x < 60 ? 'start' : chartHover.x > 940 ? 'end' : 'middle'} fill="#b45309" fontSize="10" fontWeight="700">{formatDistance(chartHover.distance)}</text>
                   </g>
-                </g>)}
-              </motion.g>
-            </AnimatePresence>
-            {chartHover && <g pointerEvents="none">
-              <g transform={`translate(${chartHover.x} 0) scale(${chartSize.width > 0 ? (chartSize.height / chartSize.width) * (1000 / 106) : 1} 1) translate(${-chartHover.x} 0)`}>
-                <line x1={chartHover.x} x2={chartHover.x} y1="12" y2="94" stroke="#f59e0b" strokeDasharray="3 3" strokeOpacity="0.8" vectorEffect="non-scaling-stroke" />
-                <circle cx={chartHover.x} cy={chartHover.y} r="5" fill="#fff" stroke="#f59e0b" strokeWidth="2.5" vectorEffect="non-scaling-stroke" />
-                <text x={chartHover.x} y={Math.max(10, chartHover.y - 8)} textAnchor="middle" fill="#b45309" fontSize="10" fontWeight="700">{Math.round(chartHover.elevation)} m</text>
-                <text x={chartHover.x} y="104" textAnchor={chartHover.x < 60 ? 'start' : chartHover.x > 940 ? 'end' : 'middle'} fill="#b45309" fontSize="10" fontWeight="700">{formatDistance(chartHover.distance)}</text>
-              </g>
-            </g>}
-          </svg>
-          <div className="relative h-4 text-[10px] font-medium text-slate-400">
-            <span className="absolute left-0 top-0">0 km</span>
-            {stats.waypointMarks
-              .filter((mark) => mark.index > 0 && mark.index < anchors.length - 1)
-              .map((mark) => (
-                <span
-                  key={mark.index}
-                  className="absolute top-0 -translate-x-1/2 whitespace-nowrap"
-                  style={{ left: `${(mark.x / 1000) * 100}%` }}
-                >
-                  {formatDistance(mark.distance)}
-                </span>
-              ))}
-            <span className="absolute right-0 top-0">{formatDistance(stats.distance)}</span>
+                </g>}
+              </svg>
+              <div className="relative h-3 text-[10px] font-medium text-slate-400">
+                <span className="absolute left-0 top-0">0 km</span>
+                {stats.waypointMarks
+                  .filter((mark) => mark.index > 0 && mark.index < anchors.length - 1)
+                  .map((mark) => (
+                    <span
+                      key={mark.index}
+                      className="absolute top-0 -translate-x-1/2 whitespace-nowrap"
+                      style={{ left: `${(mark.x / 1000) * 100}%` }}
+                    >
+                      {formatDistance(mark.distance)}
+                    </span>
+                  ))}
+                <span className="absolute right-0 top-0">{formatDistance(stats.distance)}</span>
+              </div>
+            </div>
           </div>
         </div>
       </div> : <p className="px-4 pb-3 text-xs font-medium text-slate-500">{language === 'zh' ? '啟用路線規劃後，在地圖上點擊以新增途經點。' : 'Enable routing, then click the map to add waypoints.'}</p>}
@@ -1472,6 +1538,8 @@ export default function MapPageClient() {
           onAddRoute={addRoute}
           onRemoveRoute={removeRoute}
           onHoverRoutePoint={setRouteProfileHover}
+          mapRef={mapRef}
+          mapReady={mapReady}
         />
       )}
 
