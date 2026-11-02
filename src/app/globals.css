@@ -105,7 +105,6 @@
 
 .map-page .maplibregl-user-location-direction path {
   fill: rgb(37 99 235 / 24%);
-  filter: blur(7px);
 }
 
 .map-page .maplibregl-user-location-accuracy-circle {
