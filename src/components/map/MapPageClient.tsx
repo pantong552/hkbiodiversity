@@ -363,7 +363,7 @@ function RouteElevationPanel({
     const areaPath = `${linePath} L ${chartWidth} 94 L 0 94 Z`;
     const waypointMarks = anchors.map((anchor, index) => {
       const routeIndex = closestRouteIndex(anchor, coordinates.map(([lon, lat]) => [lon, lat] as RoutePoint));
-      return { index, distance: cumulativeDistances[routeIndex], ...points[routeIndex] };
+      return { index, distance: cumulativeDistances[routeIndex], ...points[routeIndex * 4] };
     });
 
     return {
