@@ -33,6 +33,39 @@ const INITIAL_VIEW_STATE = {
   latitude: 22.34826,
   zoom: 11.99,
 };
+const ROUTE_DIRECTION_IMAGE_ID = 'route-direction-arrow';
+
+function ensureRouteDirectionImage(map: MapLibreMap) {
+  if (map.hasImage(ROUTE_DIRECTION_IMAGE_ID)) return;
+
+  const canvas = document.createElement('canvas');
+  canvas.width = 32;
+  canvas.height = 24;
+  const context = canvas.getContext('2d');
+  if (!context) throw new Error('Unable to create route direction arrow image');
+
+  context.beginPath();
+  context.moveTo(11, 10);
+  context.lineTo(19, 10);
+  context.lineTo(19, 5);
+  context.lineTo(30, 12);
+  context.lineTo(19, 19);
+  context.lineTo(19, 14);
+  context.lineTo(11, 14);
+  context.closePath();
+  context.lineJoin = 'round';
+  context.strokeStyle = 'rgba(15, 23, 42, 0.65)';
+  context.lineWidth = 2;
+  context.stroke();
+  context.fillStyle = '#ffffff';
+  context.fill();
+
+  map.addImage(
+    ROUTE_DIRECTION_IMAGE_ID,
+    context.getImageData(0, 0, canvas.width, canvas.height),
+    { pixelRatio: 2 },
+  );
+}
 const DEFAULT_BASEMAP_ID = 'openmaptiles-bright';
 const BASEMAP_PREVIEW_TILE_ZOOM = 13;
 const BASEMAP_PREVIEW_TILE_X = 6694;
@@ -395,7 +428,7 @@ function RouteElevationPanel({
       aria-label={language === 'zh' ? '路線高度資料' : 'Route elevation profile'}
       className="absolute inset-x-0 bottom-0 z-20 rounded-t-2xl border-t border-white/70 bg-white shadow-[0_-12px_40px_rgba(15,23,42,0.16)]"
     >
-      <div className={`mx-auto max-w-screen-2xl px-3 pt-1 sm:px-3 ${isCollapsed ? 'pb-2' : ''}`}>
+      <div className={`mx-auto max-w-screen-2xl px-3 pb-2 pt-0.5 sm:px-3 sm:pb-0 sm:pt-1 ${isCollapsed ? 'sm:pb-2' : ''}`}>
         <div className="flex flex-col items-center sm:flex-row sm:gap-2">
           <button
             type="button"
@@ -456,7 +489,7 @@ function RouteElevationPanel({
               {isCollapsed ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
             </span>
           </button>
-          <div className="order-2 mt-1 min-w-0 w-full sm:order-1 sm:mt-0 sm:flex-1">
+          <div className="order-2 mt-0.5 min-w-0 w-full sm:order-1 sm:mt-0 sm:flex-1">
             <RouteTabs tabs={tabs} activeRouteId={activeRouteId} language={language} onSelect={onSelectRoute} onAdd={onAddRoute} onRemove={onRemoveRoute} />
           </div>
         </div>
@@ -475,11 +508,11 @@ function RouteElevationPanel({
         }}
       >
       <div ref={panelContentRef} className="min-h-0 overflow-hidden">
-      {coordinates.length > 1 ? <div className="mx-auto grid max-w-screen-2xl grid-cols-1 gap-3 px-3 pb-3 sm:grid-cols-[170px_minmax(0,1fr)] sm:items-center sm:gap-0 sm:px-3 sm:pb-2">
+      {coordinates.length > 1 ? <div className="mx-auto grid max-w-screen-2xl grid-cols-1 gap-3 px-3 pb-3 sm:grid-cols-[112px_minmax(0,1fr)] sm:items-center sm:gap-0 sm:px-3 sm:pb-2">
         <div className="grid grid-cols-3 gap-2 sm:grid-cols-1 sm:gap-2">
-          <div className="sm:pb-1">
+          <div>
             <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-slate-500">{labels.distance}</p>
-            <AnimatedMetric value={stats.distance} format={formatDistance} className="mt-0.5 text-lg font-black tracking-tight text-slate-900" />
+            <AnimatedMetric value={stats.distance} format={formatDistance} className="mt-0.5 text-sm font-bold text-slate-900" />
           </div>
           <div>
             <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-slate-500">{labels.ascent}</p>
@@ -493,7 +526,7 @@ function RouteElevationPanel({
         <div className="min-w-0">
           <div className="flex items-stretch">
             <div aria-hidden="true" className="relative mr-1 h-24 w-9 shrink-0 sm:h-32">
-              <span className="absolute left-0 top-1/2 -translate-y-1/2 whitespace-nowrap text-[9px] font-semibold text-slate-500 [writing-mode:vertical-rl] rotate-180">
+              <span className={`absolute left-0 top-1/2 -translate-y-1/2 whitespace-nowrap text-[9px] font-semibold text-slate-500 [writing-mode:vertical-rl] ${language === 'zh' ? '' : 'rotate-180'}`}>
                 {language === 'zh' ? '海拔（米）' : 'Altitude (m)'}
               </span>
               <div className="absolute inset-y-0 left-3 right-0 text-right text-[9px] leading-none text-slate-500">
@@ -950,6 +983,7 @@ export default function MapPageClient() {
   const [demSourceId, setDemSourceId] = useState<DemSourceId>('mapterhorn');
   const [terrainReady, setTerrainReady] = useState(false);
   const [mapReady, setMapReady] = useState(false);
+  const [routeDirectionImageStyleId, setRouteDirectionImageStyleId] = useState<string | null>(null);
   const [isMobileViewport, setIsMobileViewport] = useState(false);
   const [locationError, setLocationError] = useState<string | null>(null);
   const [isLocationTracking, setIsLocationTracking] = useState(false);
@@ -1409,6 +1443,20 @@ export default function MapPageClient() {
     });
   }, [is3DModeEnabled, mapReady]);
 
+  useEffect(() => {
+    const map = mapRef.current?.getMap();
+    if (!mapReady || !map) return;
+
+    const onStyleLoad = () => {
+      ensureRouteDirectionImage(map);
+      setRouteDirectionImageStyleId(currentStyleId);
+    };
+    map.on('style.load', onStyleLoad);
+    return () => {
+      map.off('style.load', onStyleLoad);
+    };
+  }, [currentStyleId, mapReady]);
+
   return (
     <div className="map-page relative h-dvh w-full overflow-hidden bg-slate-100">
       {routeBusy && <div className="pointer-events-none fixed inset-x-0 top-0 z-[1000]" role="status" aria-label={language === 'zh' ? '正在計算路線' : 'Calculating route'}>
@@ -1466,6 +1514,11 @@ export default function MapPageClient() {
         onMouseLeave={() => setRouteInsertPreview(null)}
         onLoad={() => {
           initializeContourDemSources();
+          const map = mapRef.current?.getMap();
+          if (map) {
+            ensureRouteDirectionImage(map);
+            setRouteDirectionImageStyleId(currentStyleId);
+          }
           isStyleReadyRef.current = true;
           if (!window.isSecureContext || !('geolocation' in navigator)) {
             setLocationError(language === 'zh'
@@ -1487,11 +1540,25 @@ export default function MapPageClient() {
               type="line"
               paint={{
                 'line-color': getRouteColor(route.id, activeRouteId, index),
-                'line-width': route.id === activeRouteId ? 5 : 3.5,
+                'line-width': route.id === activeRouteId ? 6 : 4.5,
                 'line-opacity': route.id === activeRouteId ? 0.95 : 0.68,
               }}
               layout={{ 'line-cap': 'round', 'line-join': 'round' }}
             />
+            {routeDirectionImageStyleId === currentStyleId && <Layer
+              id={`planned-route-arrows-${route.id}`}
+              type="symbol"
+              layout={{
+                'symbol-placement': 'line',
+                'symbol-spacing': 120,
+                'icon-image': ROUTE_DIRECTION_IMAGE_ID,
+                'icon-size': 0.75,
+                'icon-rotation-alignment': 'map',
+                'icon-keep-upright': false,
+                'icon-allow-overlap': true,
+                'icon-ignore-placement': true,
+              }}
+            />}
           </Source>
         ))}
         {routeInsertPreview && isRouting && (
