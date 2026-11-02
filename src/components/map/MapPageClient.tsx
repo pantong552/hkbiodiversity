@@ -801,6 +801,7 @@ function LiveLocationControl({
     let watchId: number | null = null;
     let isTracking = false;
     let locationMarker: MapLibreMarker | null = null;
+    let directionMarker: MapLibreMarker | null = null;
     let accuracyMarker: MapLibreMarker | null = null;
     let accuracyElement: HTMLDivElement | null = null;
     let orientationListener: ((event: DeviceOrientationEvent) => void) | null = null;
@@ -832,7 +833,7 @@ function LiveLocationControl({
       if (typeof heading !== 'number' || !Number.isFinite(heading)) return;
 
       const normalizedHeading = ((heading % 360) + 360) % 360;
-      locationMarker.setRotation(normalizedHeading);
+      directionMarker?.setRotation(normalizedHeading);
       const roundedHeading = Math.round(normalizedHeading) % 360;
       if (lastReportedHeading !== roundedHeading) {
         lastReportedHeading = roundedHeading;
@@ -898,8 +899,10 @@ function LiveLocationControl({
       isTracking = false;
       stopOrientationTracking();
       locationMarker?.remove();
+      directionMarker?.remove();
       accuracyMarker?.remove();
       locationMarker = null;
+      directionMarker = null;
       accuracyMarker = null;
       accuracyElement = null;
       locationAccuracy = 0;
@@ -942,32 +945,47 @@ function LiveLocationControl({
       if (isFirstLocation) {
         const dot = document.createElement('div');
         dot.className = 'maplibregl-user-location-dot';
-        if (propsRef.current.isMobileViewport) {
-          const direction = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-          direction.setAttribute('viewBox', '0 0 64 64');
-          direction.setAttribute('aria-hidden', 'true');
-          direction.classList.add('maplibregl-user-location-direction');
-          const fieldOfView = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-          fieldOfView.setAttribute('d', 'M32 32 16 4 A32 32 0 0 1 48 4 Z');
-          direction.append(fieldOfView);
-          dot.append(direction);
-          dot.style.zIndex = '2';
-        }
+        dot.style.zIndex = '3';
         locationMarker = new mapLib.Marker({
           element: dot,
           anchor: 'center',
-          rotationAlignment: 'map',
+          pitchAlignment: 'viewport',
         })
           .setLngLat(center)
           .addTo(map);
 
         accuracyElement = document.createElement('div');
         accuracyElement.className = 'maplibregl-user-location-accuracy-circle';
-        accuracyMarker = new mapLib.Marker({ element: accuracyElement, anchor: 'center' })
+        accuracyElement.style.zIndex = '1';
+        accuracyMarker = new mapLib.Marker({
+          element: accuracyElement,
+          anchor: 'center',
+          pitchAlignment: 'map',
+        })
           .setLngLat(center)
           .addTo(map);
+
+        if (propsRef.current.isMobileViewport) {
+          const direction = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+          direction.setAttribute('viewBox', '0 0 96 96');
+          direction.setAttribute('aria-hidden', 'true');
+          direction.classList.add('maplibregl-user-location-direction');
+          direction.style.zIndex = '2';
+          const fieldOfView = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+          fieldOfView.setAttribute('d', 'M48 48 4 25 A57 57 0 0 1 92 25 Z');
+          direction.append(fieldOfView);
+          directionMarker = new mapLib.Marker({
+            element: direction,
+            anchor: 'center',
+            rotationAlignment: 'map',
+            pitchAlignment: 'map',
+          })
+            .setLngLat(center)
+            .addTo(map);
+        }
       } else {
         locationMarker?.setLngLat(center);
+        directionMarker?.setLngLat(center);
         accuracyMarker?.setLngLat(center);
       }
 

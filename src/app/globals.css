@@ -91,19 +91,15 @@
 }
 
 .map-page .maplibregl-user-location-direction {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  width: 64px;
-  height: 64px;
+  width: 88px;
+  height: 88px;
   overflow: visible;
   pointer-events: none;
-  transform: translate(-50%, -50%);
-  z-index: 1;
 }
 
 .map-page .maplibregl-user-location-direction path {
   fill: rgb(37 99 235 / 24%);
+  filter: blur(7px);
 }
 
 .map-page .maplibregl-user-location-accuracy-circle {
