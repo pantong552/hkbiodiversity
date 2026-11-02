@@ -769,6 +769,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 type LiveLocationControlProps = {
   language: 'zh' | 'en';
+  isMobileViewport: boolean;
   onTrackingChange: (isTracking: boolean) => void;
   onError: (code: number) => void;
   onLocationUpdate: () => void;
@@ -776,11 +777,12 @@ type LiveLocationControlProps = {
 
 function LiveLocationControl({
   language,
+  isMobileViewport,
   onTrackingChange,
   onError,
   onLocationUpdate,
 }: LiveLocationControlProps) {
-  const propsRef = useRef({ language, onTrackingChange, onError, onLocationUpdate });
+  const propsRef = useRef({ language, isMobileViewport, onTrackingChange, onError, onLocationUpdate });
   const buttonRef = useRef<HTMLButtonElement | null>(null);
 
   const control = useControl(({ mapLib }) => {
@@ -790,8 +792,57 @@ function LiveLocationControl({
     let locationMarker: MapLibreMarker | null = null;
     let accuracyMarker: MapLibreMarker | null = null;
     let accuracyElement: HTMLDivElement | null = null;
+    let orientationListener: ((event: DeviceOrientationEvent) => void) | null = null;
     let locationAccuracy = 0;
     let button: HTMLButtonElement;
+
+    const stopOrientationTracking = () => {
+      if (!orientationListener) return;
+      window.removeEventListener('deviceorientation', orientationListener);
+      orientationListener = null;
+    };
+
+    const startOrientationTracking = () => {
+      if (!propsRef.current.isMobileViewport || orientationListener || typeof DeviceOrientationEvent === 'undefined') {
+        return;
+      }
+
+      orientationListener = (event) => {
+        if (!isTracking || !locationMarker) return;
+
+        const compassEvent = event as DeviceOrientationEvent & { webkitCompassHeading?: number };
+        let heading = compassEvent.webkitCompassHeading;
+        if (typeof heading !== 'number' && event.absolute && typeof event.alpha === 'number') {
+          heading = 360 - event.alpha + (screen.orientation?.angle ?? 0);
+        }
+        if (typeof heading !== 'number' || !Number.isFinite(heading)) return;
+
+        locationMarker.setRotation((heading + 360) % 360);
+      };
+      window.addEventListener('deviceorientation', orientationListener, { passive: true });
+    };
+
+    const requestOrientationPermission = () => {
+      if (!propsRef.current.isMobileViewport || typeof DeviceOrientationEvent === 'undefined') return;
+
+      const orientationEvent = DeviceOrientationEvent as typeof DeviceOrientationEvent & {
+        requestPermission?: () => Promise<'granted' | 'denied'>;
+      };
+      if (!orientationEvent.requestPermission) {
+        startOrientationTracking();
+        return;
+      }
+
+      try {
+        void orientationEvent.requestPermission().then((permission) => {
+          if (permission === 'granted' && isTracking) startOrientationTracking();
+        }).catch((error: unknown) => {
+          console.warn('Unable to access device orientation.', error);
+        });
+      } catch (error: unknown) {
+        console.warn('Unable to access device orientation.', error);
+      }
+    };
 
     const updateAccuracyCircle = () => {
       if (!map || !locationMarker || !accuracyElement || locationAccuracy <= 0) return;
@@ -812,6 +863,7 @@ function LiveLocationControl({
         watchId = null;
       }
       isTracking = false;
+      stopOrientationTracking();
       locationMarker?.remove();
       accuracyMarker?.remove();
       locationMarker = null;
@@ -856,7 +908,21 @@ function LiveLocationControl({
       if (isFirstLocation) {
         const dot = document.createElement('div');
         dot.className = 'maplibregl-user-location-dot';
-        locationMarker = new mapLib.Marker({ element: dot, anchor: 'center' })
+        if (propsRef.current.isMobileViewport) {
+          const direction = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+          direction.setAttribute('viewBox', '0 0 32 32');
+          direction.setAttribute('aria-hidden', 'true');
+          direction.classList.add('maplibregl-user-location-direction');
+          const arrow = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+          arrow.setAttribute('d', 'M16 1 28 27 16 21 4 27Z');
+          direction.append(arrow);
+          dot.append(direction);
+        }
+        locationMarker = new mapLib.Marker({
+          element: dot,
+          anchor: 'center',
+          rotationAlignment: 'map',
+        })
           .setLngLat(center)
           .addTo(map);
 
@@ -924,6 +990,7 @@ function LiveLocationControl({
           button.setAttribute('aria-pressed', 'true');
           updateButtonLabel(true);
           propsRef.current.onTrackingChange(true);
+          requestOrientationPermission();
 
           navigator.geolocation.getCurrentPosition(
             updateLocation,
@@ -954,7 +1021,7 @@ function LiveLocationControl({
   }, { position: 'bottom-right' });
 
   useEffect(() => {
-    propsRef.current = { language, onTrackingChange, onError, onLocationUpdate };
+    propsRef.current = { language, isMobileViewport, onTrackingChange, onError, onLocationUpdate };
     const button = buttonRef.current;
     if (!button) return;
     const isSupported = window.isSecureContext && 'geolocation' in navigator;
@@ -966,7 +1033,7 @@ function LiveLocationControl({
         : (language === 'zh' ? '實時定位' : 'Live location');
     button.setAttribute('aria-label', label);
     button.title = label;
-  }, [control, language, onError, onLocationUpdate, onTrackingChange]);
+  }, [control, isMobileViewport, language, onError, onLocationUpdate, onTrackingChange]);
 
   return null;
 }
@@ -1663,6 +1730,7 @@ export default function MapPageClient() {
         <NavigationControl position="bottom-right" showCompass showZoom={false} visualizePitch />
         <LiveLocationControl
           language={language}
+          isMobileViewport={isMobileViewport}
           onTrackingChange={setIsLocationTracking}
           onError={(code) => {
             setLocationError(
