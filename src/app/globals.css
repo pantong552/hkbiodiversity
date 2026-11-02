@@ -90,11 +90,17 @@
   box-shadow: 0 0 8px rgb(37 99 235 / 45%);
 }
 
-.map-page .maplibregl-user-location-direction {
+.map-page .maplibregl-user-location-direction-marker {
   width: 88px;
   height: 88px;
-  overflow: visible;
   pointer-events: none;
+}
+
+.map-page .maplibregl-user-location-direction {
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
 }
 
 .map-page .maplibregl-user-location-direction path {

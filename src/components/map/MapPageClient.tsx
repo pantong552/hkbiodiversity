@@ -966,16 +966,19 @@ function LiveLocationControl({
           .addTo(map);
 
         if (propsRef.current.isMobileViewport) {
+          const directionMarkerElement = document.createElement('div');
+          directionMarkerElement.className = 'maplibregl-user-location-direction-marker';
+          directionMarkerElement.style.zIndex = '2';
           const direction = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
           direction.setAttribute('viewBox', '0 0 96 96');
           direction.setAttribute('aria-hidden', 'true');
           direction.classList.add('maplibregl-user-location-direction');
-          direction.style.zIndex = '2';
           const fieldOfView = document.createElementNS('http://www.w3.org/2000/svg', 'path');
           fieldOfView.setAttribute('d', 'M48 48 4 25 A57 57 0 0 1 92 25 Z');
           direction.append(fieldOfView);
+          directionMarkerElement.append(direction);
           directionMarker = new mapLib.Marker({
-            element: direction,
+            element: directionMarkerElement,
             anchor: 'center',
             rotationAlignment: 'map',
             pitchAlignment: 'map',
