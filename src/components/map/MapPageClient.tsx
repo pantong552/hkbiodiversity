@@ -23,7 +23,7 @@ import {
 import mlcontour from 'maplibre-contour';
 import { AnimatePresence, motion, useSpring, useTransform } from 'framer-motion';
 import CustomDropdown from '@/components/ui/CustomDropdown';
-import { Check, Layers, Mountain, Route as RouteIcon, Download, Trash2, Plus } from 'lucide-react';
+import { Check, ChevronDown, ChevronUp, Layers, Mountain, Route as RouteIcon, Download, Trash2, Plus } from 'lucide-react';
 import { useLanguage } from '@/context/LanguageContext';
 import { BASEMAPS } from '@/constants/basemaps';
 import 'maplibre-gl/dist/maplibre-gl.css';
@@ -242,8 +242,15 @@ function RouteElevationPanel({
   const hasChart = coordinates.length > 1;
   const chartContainerRef = useRef<SVGSVGElement>(null);
   const panelRef = useRef<HTMLElement>(null);
+  const panelContentRef = useRef<HTMLDivElement>(null);
   const [chartSize, setChartSize] = useState({ width: 0, height: 0 });
   const [chartHover, setChartHover] = useState<{ x: number; y: number; distance: number; elevation: number } | null>(null);
+  const [isCollapsed, setIsCollapsed] = useState(false);
+  const handlePointerStartRef = useRef<{ y: number; contentHeight: number; startHeight: number } | null>(null);
+  const suppressHandleClickRef = useRef(false);
+  const [handleDragHeight, setHandleDragHeight] = useState<number | null>(null);
+  const [panelContentHeight, setPanelContentHeight] = useState(0);
+  const [isDraggingHandle, setIsDraggingHandle] = useState(false);
   useEffect(() => {
     const element = chartContainerRef.current;
     if (!element) return;
@@ -375,12 +382,99 @@ function RouteElevationPanel({
       elevation,
     });
   };
+  const setPanelCollapsed = (collapsed: boolean) => {
+    setPanelContentHeight(panelContentRef.current?.scrollHeight ?? panelContentHeight);
+    setIsCollapsed(collapsed);
+    setChartHover(null);
+    onHoverRoutePoint(null);
+  };
 
   return (
-    <section ref={panelRef} aria-label={language === 'zh' ? '路線高度資料' : 'Route elevation profile'} className="absolute inset-x-0 bottom-0 z-20 border-t border-white/70 bg-white/95 shadow-[0_-12px_40px_rgba(15,23,42,0.16)] backdrop-blur-xl">
-      <div className="mx-auto max-w-screen-2xl px-3 pt-2 sm:px-3">
-        <div className="mb-2"><RouteTabs tabs={tabs} activeRouteId={activeRouteId} language={language} onSelect={onSelectRoute} onAdd={onAddRoute} onRemove={onRemoveRoute} /></div>
+    <section
+      ref={panelRef}
+      aria-label={language === 'zh' ? '路線高度資料' : 'Route elevation profile'}
+      className="absolute inset-x-0 bottom-0 z-20 rounded-t-2xl border-t border-white/70 bg-white shadow-[0_-12px_40px_rgba(15,23,42,0.16)]"
+    >
+      <div className={`mx-auto max-w-screen-2xl px-3 pt-1 sm:px-3 ${isCollapsed ? 'pb-2' : ''}`}>
+        <div className="flex flex-col items-center sm:flex-row sm:gap-2">
+          <button
+            type="button"
+            aria-label={language === 'zh'
+              ? (isCollapsed ? '展開路線高度圖' : '收合路線高度圖')
+              : (isCollapsed ? 'Expand route elevation profile' : 'Collapse route elevation profile')}
+            aria-expanded={!isCollapsed}
+            title={language === 'zh'
+              ? (isCollapsed ? '展開高度圖' : '收合高度圖')
+              : (isCollapsed ? 'Expand elevation profile' : 'Collapse elevation profile')}
+            className="order-1 flex h-3 w-full touch-none select-none items-center justify-center sm:order-2 sm:h-7 sm:w-9 sm:shrink-0 sm:rounded-lg sm:text-slate-500 sm:hover:bg-slate-100 sm:hover:text-slate-800"
+            onPointerDown={(event) => {
+              if (event.pointerType === 'touch') {
+                const contentHeight = panelContentRef.current?.scrollHeight ?? 0;
+                const startHeight = isCollapsed ? 0 : contentHeight;
+                handlePointerStartRef.current = { y: event.clientY, contentHeight, startHeight };
+                setPanelContentHeight(contentHeight);
+                setHandleDragHeight(startHeight);
+                setIsDraggingHandle(true);
+                event.currentTarget.setPointerCapture(event.pointerId);
+              }
+            }}
+            onPointerMove={(event) => {
+              const start = handlePointerStartRef.current;
+              if (!start || event.pointerType !== 'touch') return;
+              const deltaY = event.clientY - start.y;
+              const nextHeight = start.startHeight - deltaY;
+              setHandleDragHeight(Math.max(0, Math.min(start.contentHeight, nextHeight)));
+            }}
+            onPointerUp={(event) => {
+              const start = handlePointerStartRef.current;
+              handlePointerStartRef.current = null;
+              setIsDraggingHandle(false);
+              if (!start || event.pointerType !== 'touch') return;
+              const deltaY = event.clientY - start.y;
+              if (Math.abs(deltaY) >= 5) {
+                const nextHeight = Math.max(0, Math.min(start.contentHeight, start.startHeight - deltaY));
+                setPanelCollapsed(nextHeight < start.contentHeight / 2);
+                suppressHandleClickRef.current = true;
+              }
+              setHandleDragHeight(null);
+            }}
+            onPointerCancel={() => {
+              handlePointerStartRef.current = null;
+              setIsDraggingHandle(false);
+              setHandleDragHeight(null);
+            }}
+            onClick={() => {
+              if (suppressHandleClickRef.current) {
+                suppressHandleClickRef.current = false;
+                return;
+              }
+              setPanelCollapsed(!isCollapsed);
+            }}
+          >
+            <span className="h-1 w-10 rounded-full bg-slate-300 sm:hidden" />
+            <span className="hidden sm:inline-flex">
+              {isCollapsed ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+            </span>
+          </button>
+          <div className="order-2 mt-1 min-w-0 w-full sm:order-1 sm:mt-0 sm:flex-1">
+            <RouteTabs tabs={tabs} activeRouteId={activeRouteId} language={language} onSelect={onSelectRoute} onAdd={onAddRoute} onRemove={onRemoveRoute} />
+          </div>
+        </div>
       </div>
+      <div
+        className="grid transition-[grid-template-rows] duration-300 ease-in-out"
+        style={{
+          gridTemplateRows: handleDragHeight !== null
+            ? `${handleDragHeight}px`
+            : isCollapsed
+              ? '0px'
+              : panelContentHeight > 0
+                ? `${panelContentHeight}px`
+                : '1fr',
+          transitionDuration: isDraggingHandle ? '0ms' : undefined,
+        }}
+      >
+      <div ref={panelContentRef} className="min-h-0 overflow-hidden">
       {coordinates.length > 1 ? <div className="mx-auto grid max-w-screen-2xl grid-cols-1 gap-3 px-3 pb-3 sm:grid-cols-[170px_minmax(0,1fr)] sm:items-center sm:gap-0 sm:px-3 sm:pb-2">
         <div className="grid grid-cols-3 gap-2 sm:grid-cols-1 sm:gap-2">
           <div className="sm:pb-1">
@@ -466,6 +560,8 @@ function RouteElevationPanel({
           </div>
         </div>
       </div> : <p className="px-4 pb-3 text-xs font-medium text-slate-500">{language === 'zh' ? '啟用路線規劃後，在地圖上點擊以新增途經點。' : 'Enable routing, then click the map to add waypoints.'}</p>}
+      </div>
+      </div>
     </section>
   );
 }
