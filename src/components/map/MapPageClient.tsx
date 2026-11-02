@@ -802,6 +802,7 @@ function LiveLocationControl({
     let isTracking = false;
     let locationMarker: MapLibreMarker | null = null;
     let directionMarker: MapLibreMarker | null = null;
+    let directionMarkerElement: HTMLDivElement | null = null;
     let accuracyMarker: MapLibreMarker | null = null;
     let accuracyElement: HTMLDivElement | null = null;
     let orientationListener: ((event: DeviceOrientationEvent) => void) | null = null;
@@ -889,6 +890,11 @@ function LiveLocationControl({
       const diameter = (2 * locationAccuracy) / metersPerPixel;
       accuracyElement.style.width = `${diameter}px`;
       accuracyElement.style.height = `${diameter}px`;
+      if (directionMarkerElement) {
+        const outerDiameter = diameter + 2;
+        directionMarkerElement.style.width = `${outerDiameter}px`;
+        directionMarkerElement.style.height = `${outerDiameter}px`;
+      }
     };
 
     const stopTracking = () => {
@@ -903,6 +909,7 @@ function LiveLocationControl({
       accuracyMarker?.remove();
       locationMarker = null;
       directionMarker = null;
+      directionMarkerElement = null;
       accuracyMarker = null;
       accuracyElement = null;
       locationAccuracy = 0;
@@ -966,7 +973,7 @@ function LiveLocationControl({
           .addTo(map);
 
         if (propsRef.current.isMobileViewport) {
-          const directionMarkerElement = document.createElement('div');
+          directionMarkerElement = document.createElement('div');
           directionMarkerElement.className = 'maplibregl-user-location-direction-marker';
           directionMarkerElement.style.zIndex = '2';
           const direction = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
@@ -974,7 +981,7 @@ function LiveLocationControl({
           direction.setAttribute('aria-hidden', 'true');
           direction.classList.add('maplibregl-user-location-direction');
           const fieldOfView = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-          fieldOfView.setAttribute('d', 'M48 48 4 25 A57 57 0 0 1 92 25 Z');
+          fieldOfView.setAttribute('d', 'M48 48 33.6 2.2 A48 48 0 0 1 62.4 2.2 Z');
           direction.append(fieldOfView);
           directionMarkerElement.append(direction);
           directionMarker = new mapLib.Marker({
