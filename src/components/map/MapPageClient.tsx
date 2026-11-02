@@ -259,6 +259,7 @@ function RouteElevationPanel({
   onHoverRoutePoint,
   mapRef,
   mapReady,
+  isMobileViewport,
 }: {
   coordinates: number[][];
   anchors: RoutePoint[];
@@ -271,6 +272,7 @@ function RouteElevationPanel({
   onHoverRoutePoint: (point: { coordinate: RoutePoint; distance: number; elevation: number } | null) => void;
   mapRef: { current: MapRef | null };
   mapReady: boolean;
+  isMobileViewport: boolean;
 }) {
   const hasChart = coordinates.length > 1;
   const chartContainerRef = useRef<SVGSVGElement>(null);
@@ -426,7 +428,7 @@ function RouteElevationPanel({
     <section
       ref={panelRef}
       aria-label={language === 'zh' ? '路線高度資料' : 'Route elevation profile'}
-      className="absolute inset-x-0 bottom-0 z-20 rounded-t-2xl border-t border-white/70 bg-white shadow-[0_-12px_40px_rgba(15,23,42,0.16)]"
+      className={`absolute inset-x-0 ${isMobileViewport ? 'bottom-14' : 'bottom-0'} z-20 rounded-t-2xl border-t border-white/70 bg-white shadow-[0_-12px_40px_rgba(15,23,42,0.16)]`}
     >
       <div className={`mx-auto max-w-screen-2xl px-3 pb-2 pt-0.5 sm:px-3 sm:pb-0 sm:pt-1 ${isCollapsed ? 'sm:pb-2' : ''}`}>
         <div className="flex flex-col items-center sm:flex-row sm:gap-2">
@@ -772,7 +774,8 @@ type LiveLocationControlProps = {
   isMobileViewport: boolean;
   onTrackingChange: (isTracking: boolean) => void;
   onError: (code: number) => void;
-  onLocationUpdate: () => void;
+  onLocationUpdate: (longitude: number, latitude: number) => void;
+  onHeadingUpdate: (heading: number | null) => void;
 };
 
 function LiveLocationControl({
@@ -781,8 +784,16 @@ function LiveLocationControl({
   onTrackingChange,
   onError,
   onLocationUpdate,
+  onHeadingUpdate,
 }: LiveLocationControlProps) {
-  const propsRef = useRef({ language, isMobileViewport, onTrackingChange, onError, onLocationUpdate });
+  const propsRef = useRef({
+    language,
+    isMobileViewport,
+    onTrackingChange,
+    onError,
+    onLocationUpdate,
+    onHeadingUpdate,
+  });
   const buttonRef = useRef<HTMLButtonElement | null>(null);
 
   const control = useControl(({ mapLib }) => {
@@ -793,13 +804,40 @@ function LiveLocationControl({
     let accuracyMarker: MapLibreMarker | null = null;
     let accuracyElement: HTMLDivElement | null = null;
     let orientationListener: ((event: DeviceOrientationEvent) => void) | null = null;
+    let absoluteOrientationListener: ((event: DeviceOrientationEvent) => void) | null = null;
+    let lastReportedHeading: number | null = null;
     let locationAccuracy = 0;
     let button: HTMLButtonElement;
 
     const stopOrientationTracking = () => {
-      if (!orientationListener) return;
-      window.removeEventListener('deviceorientation', orientationListener);
-      orientationListener = null;
+      if (orientationListener) {
+        window.removeEventListener('deviceorientation', orientationListener);
+        orientationListener = null;
+      }
+      if (absoluteOrientationListener) {
+        window.removeEventListener('deviceorientationabsolute', absoluteOrientationListener as EventListener);
+        absoluteOrientationListener = null;
+      }
+      lastReportedHeading = null;
+    };
+
+    const updateOrientation = (event: DeviceOrientationEvent, isAbsoluteEvent = false) => {
+      if (!isTracking || !locationMarker) return;
+
+      const compassEvent = event as DeviceOrientationEvent & { webkitCompassHeading?: number };
+      let heading = compassEvent.webkitCompassHeading;
+      if (typeof heading !== 'number' && (event.absolute || isAbsoluteEvent) && typeof event.alpha === 'number') {
+        heading = 360 - event.alpha + (screen.orientation?.angle ?? 0);
+      }
+      if (typeof heading !== 'number' || !Number.isFinite(heading)) return;
+
+      const normalizedHeading = ((heading % 360) + 360) % 360;
+      locationMarker.setRotation(normalizedHeading);
+      const roundedHeading = Math.round(normalizedHeading) % 360;
+      if (lastReportedHeading !== roundedHeading) {
+        lastReportedHeading = roundedHeading;
+        propsRef.current.onHeadingUpdate(roundedHeading);
+      }
     };
 
     const startOrientationTracking = () => {
@@ -807,19 +845,14 @@ function LiveLocationControl({
         return;
       }
 
-      orientationListener = (event) => {
-        if (!isTracking || !locationMarker) return;
-
-        const compassEvent = event as DeviceOrientationEvent & { webkitCompassHeading?: number };
-        let heading = compassEvent.webkitCompassHeading;
-        if (typeof heading !== 'number' && event.absolute && typeof event.alpha === 'number') {
-          heading = 360 - event.alpha + (screen.orientation?.angle ?? 0);
-        }
-        if (typeof heading !== 'number' || !Number.isFinite(heading)) return;
-
-        locationMarker.setRotation((heading + 360) % 360);
-      };
+      orientationListener = (event) => updateOrientation(event);
+      absoluteOrientationListener = (event) => updateOrientation(event, true);
       window.addEventListener('deviceorientation', orientationListener, { passive: true });
+      window.addEventListener(
+        'deviceorientationabsolute',
+        absoluteOrientationListener as EventListener,
+        { passive: true },
+      );
     };
 
     const requestOrientationPermission = () => {
@@ -877,6 +910,7 @@ function LiveLocationControl({
       button?.setAttribute('aria-pressed', 'false');
       if (button) updateButtonLabel(false);
       propsRef.current.onTrackingChange(false);
+      propsRef.current.onHeadingUpdate(null);
     };
 
     const reportError = (error: GeolocationPositionError) => {
@@ -910,13 +944,14 @@ function LiveLocationControl({
         dot.className = 'maplibregl-user-location-dot';
         if (propsRef.current.isMobileViewport) {
           const direction = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-          direction.setAttribute('viewBox', '0 0 32 32');
+          direction.setAttribute('viewBox', '0 0 64 64');
           direction.setAttribute('aria-hidden', 'true');
           direction.classList.add('maplibregl-user-location-direction');
-          const arrow = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-          arrow.setAttribute('d', 'M16 1 28 27 16 21 4 27Z');
-          direction.append(arrow);
+          const fieldOfView = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+          fieldOfView.setAttribute('d', 'M32 32 16 4 A32 32 0 0 1 48 4 Z');
+          direction.append(fieldOfView);
           dot.append(direction);
+          dot.style.zIndex = '2';
         }
         locationMarker = new mapLib.Marker({
           element: dot,
@@ -944,7 +979,7 @@ function LiveLocationControl({
         duration: isFirstLocation ? 800 : 500,
       });
       button.classList.remove('maplibregl-ctrl-geolocate-waiting');
-      propsRef.current.onLocationUpdate();
+      propsRef.current.onLocationUpdate(longitude, latitude);
     };
 
     return {
@@ -1021,7 +1056,14 @@ function LiveLocationControl({
   }, { position: 'bottom-right' });
 
   useEffect(() => {
-    propsRef.current = { language, isMobileViewport, onTrackingChange, onError, onLocationUpdate };
+    propsRef.current = {
+      language,
+      isMobileViewport,
+      onTrackingChange,
+      onError,
+      onLocationUpdate,
+      onHeadingUpdate,
+    };
     const button = buttonRef.current;
     if (!button) return;
     const isSupported = window.isSecureContext && 'geolocation' in navigator;
@@ -1033,7 +1075,7 @@ function LiveLocationControl({
         : (language === 'zh' ? '實時定位' : 'Live location');
     button.setAttribute('aria-label', label);
     button.title = label;
-  }, [control, isMobileViewport, language, onError, onLocationUpdate, onTrackingChange]);
+  }, [control, isMobileViewport, language, onError, onHeadingUpdate, onLocationUpdate, onTrackingChange]);
 
   return null;
 }
@@ -1054,6 +1096,11 @@ export default function MapPageClient() {
   const [isMobileViewport, setIsMobileViewport] = useState(false);
   const [locationError, setLocationError] = useState<string | null>(null);
   const [isLocationTracking, setIsLocationTracking] = useState(false);
+  const [liveLocationCoordinates, setLiveLocationCoordinates] = useState<{
+    longitude: number;
+    latitude: number;
+  } | null>(null);
+  const [deviceHeading, setDeviceHeading] = useState<number | null>(null);
   const [isRoutingPanelOpen, setIsRoutingPanelOpen] = useState(false);
   const [routes, setRoutes] = useState<PlannedRoute[]>([{
     id: 'route-1', name: 'Route 1', enabled: false, allowPrivateRoads: false,
@@ -1525,12 +1572,13 @@ export default function MapPageClient() {
   }, [currentStyleId, mapReady]);
 
   return (
-    <div className="map-page relative h-dvh w-full overflow-hidden bg-slate-100">
+    <div className="map-page relative flex h-dvh w-full flex-col overflow-hidden bg-slate-100">
       {routeBusy && <div className="pointer-events-none fixed inset-x-0 top-0 z-[1000]" role="status" aria-label={language === 'zh' ? '正在計算路線' : 'Calculating route'}>
         <div className="relative h-1 w-full overflow-hidden bg-slate-900/10 shadow-sm">
           <div className="absolute inset-y-0 w-2/5 bg-gradient-to-r from-emerald-400 via-sky-500 to-blue-600 shadow-[0_0_12px_rgba(14,165,233,0.65)]" style={{ animation: 'route-loading 1.25s ease-in-out infinite' }} />
         </div>
       </div>}
+      <div className="relative min-h-0 flex-1">
       <Map
         ref={mapRef}
         initialViewState={INITIAL_VIEW_STATE}
@@ -1731,7 +1779,11 @@ export default function MapPageClient() {
         <LiveLocationControl
           language={language}
           isMobileViewport={isMobileViewport}
-          onTrackingChange={setIsLocationTracking}
+          onTrackingChange={(isTracking) => {
+            setIsLocationTracking(isTracking);
+            setLiveLocationCoordinates(null);
+            setDeviceHeading(null);
+          }}
           onError={(code) => {
             setLocationError(
               code === 1
@@ -1747,11 +1799,34 @@ export default function MapPageClient() {
                     : 'Location timed out. Continuing to look for a high-accuracy fix.'),
             );
           }}
-          onLocationUpdate={() => setLocationError(null)}
+          onLocationUpdate={(longitude, latitude) => {
+            setLiveLocationCoordinates({ longitude, latitude });
+            setLocationError(null);
+          }}
+          onHeadingUpdate={setDeviceHeading}
         />
         <FullscreenControl position="bottom-right" />
         <ScaleControl position="bottom-left" />
       </Map>
+      </div>
+      {isMobileViewport && (
+        <div className="z-30 grid h-14 shrink-0 grid-cols-2 items-center gap-2 border-t border-slate-200 bg-white/95 px-3 text-xs shadow-[0_-2px_8px_rgba(15,23,42,0.08)]">
+          <div className="min-w-0">
+            <p className="font-semibold text-slate-500">{language === 'zh' ? '定位座標' : 'Coordinates'}</p>
+            <p className="truncate font-mono text-slate-800">
+              {liveLocationCoordinates
+                ? `${liveLocationCoordinates.latitude.toFixed(6)}, ${liveLocationCoordinates.longitude.toFixed(6)}`
+                : '--'}
+            </p>
+          </div>
+          <div className="min-w-0 text-right">
+            <p className="font-semibold text-slate-500">{language === 'zh' ? '裝置角度' : 'Device heading'}</p>
+            <p className="font-mono text-slate-800">
+              {deviceHeading === null ? '--' : `${deviceHeading}°`}
+            </p>
+          </div>
+        </div>
+      )}
 
       {(routes.length > 1 || routes.some((route) => route.coordinates.length > 1)) && (
         <RouteElevationPanel
@@ -1778,6 +1853,7 @@ export default function MapPageClient() {
           onHoverRoutePoint={setRouteProfileHover}
           mapRef={mapRef}
           mapReady={mapReady}
+          isMobileViewport={isMobileViewport}
         />
       )}
 

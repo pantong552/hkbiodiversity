@@ -94,8 +94,8 @@
   position: absolute;
   top: 50%;
   left: 50%;
-  width: 32px;
-  height: 32px;
+  width: 64px;
+  height: 64px;
   overflow: visible;
   pointer-events: none;
   transform: translate(-50%, -50%);
@@ -103,10 +103,7 @@
 }
 
 .map-page .maplibregl-user-location-direction path {
-  fill: #2563eb;
-  stroke: #fff;
-  stroke-linejoin: round;
-  stroke-width: 2px;
+  fill: rgb(37 99 235 / 24%);
 }
 
 .map-page .maplibregl-user-location-accuracy-circle {
