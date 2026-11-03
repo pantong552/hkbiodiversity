@@ -800,6 +800,7 @@ function LiveLocationControl({
     let map: MapLibreMap | null = null;
     let watchId: number | null = null;
     let isTracking = false;
+    let shouldFollowLocation = false;
     let locationMarker: MapLibreMarker | null = null;
     let directionMarker: MapLibreMarker | null = null;
     let accuracyMarker: MapLibreMarker | null = null;
@@ -810,6 +811,12 @@ function LiveLocationControl({
     let lastReportedHeading: number | null = null;
     let locationAccuracy = 0;
     let button: HTMLButtonElement;
+
+    const stopFollowingLocationOnUserInteraction = (event: { originalEvent: Event | undefined }) => {
+      if (isTracking && event.originalEvent) {
+        shouldFollowLocation = false;
+      }
+    };
 
     const setMarkerLocation = (center: [number, number]) => {
       locationMarker?.setLngLat(center);
@@ -934,6 +941,7 @@ function LiveLocationControl({
         watchId = null;
       }
       isTracking = false;
+      shouldFollowLocation = false;
       if (locationAnimationFrame !== null) {
         cancelAnimationFrame(locationAnimationFrame);
         locationAnimationFrame = null;
@@ -1054,11 +1062,13 @@ function LiveLocationControl({
 
       if (isFirstLocation) updateAccuracyCircle();
 
-      map.easeTo({
-        center,
-        zoom: Math.max(map.getZoom(), Math.min(16, map.getMaxZoom())),
-        duration: isFirstLocation ? 800 : 500,
-      });
+      if (shouldFollowLocation) {
+        map.easeTo({
+          center,
+          zoom: Math.max(map.getZoom(), Math.min(16, map.getMaxZoom())),
+          duration: isFirstLocation ? 800 : 500,
+        });
+      }
       button.classList.remove('maplibregl-ctrl-geolocate-waiting');
       propsRef.current.onLocationUpdate(longitude, latitude);
     };
@@ -1070,6 +1080,9 @@ function LiveLocationControl({
         map.on('move', updateAccuracyCircle);
         map.on('rotate', updateAccuracyCircle);
         map.on('pitch', updateAccuracyCircle);
+        map.on('dragstart', stopFollowingLocationOnUserInteraction);
+        map.on('zoomstart', stopFollowingLocationOnUserInteraction);
+        map.on('boxzoomstart', stopFollowingLocationOnUserInteraction);
         map.getContainer()
           .querySelectorAll<HTMLButtonElement>('.maplibregl-ctrl-geolocate')
           .forEach((existingButton) => {
@@ -1099,6 +1112,7 @@ function LiveLocationControl({
           if (!map || !isSupported) return;
 
           isTracking = true;
+          shouldFollowLocation = true;
           button.classList.add(
             'maplibregl-ctrl-geolocate-active',
             'maplibregl-ctrl-geolocate-waiting',
@@ -1130,6 +1144,9 @@ function LiveLocationControl({
         map?.off('move', updateAccuracyCircle);
         map?.off('rotate', updateAccuracyCircle);
         map?.off('pitch', updateAccuracyCircle);
+        map?.off('dragstart', stopFollowingLocationOnUserInteraction);
+        map?.off('zoomstart', stopFollowingLocationOnUserInteraction);
+        map?.off('boxzoomstart', stopFollowingLocationOnUserInteraction);
         buttonRef.current = null;
         map = null;
       },
