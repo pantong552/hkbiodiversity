@@ -233,7 +233,7 @@ function RouteTabs({
 
 }) {
   return (
-    <div role="tablist" aria-label={language === 'zh' ? '路線' : 'Routes'} className="flex min-w-0 items-center gap-1.5 overflow-x-auto">
+    <div role="tablist" aria-label={language === 'zh' ? '路線' : 'Routes'} className="flex min-w-0 items-center gap-1.5 overflow-x-auto overscroll-y-none touch-pan-x">
       {tabs.map((tab) => <div key={tab.id} style={{ backgroundColor: activeRouteId === tab.id ? tab.color : `${tab.color}18`, color: activeRouteId === tab.id ? '#fff' : tab.color, borderColor: `${tab.color}55` }} className={`group inline-flex shrink-0 items-center rounded-lg border transition ${activeRouteId === tab.id ? 'shadow-sm' : 'hover:brightness-95'}`}>
         <button type="button" role="tab" aria-selected={activeRouteId === tab.id} onClick={() => onSelect(tab.id)} className="inline-flex items-center gap-2 py-1.5 pl-3 pr-2 text-xs font-bold">
           {tab.name}{tab.busy && <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-sky-300" />}
