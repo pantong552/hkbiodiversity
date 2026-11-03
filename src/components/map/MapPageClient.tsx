@@ -23,7 +23,7 @@ import {
 import mlcontour from 'maplibre-contour';
 import { AnimatePresence, motion, useSpring, useTransform } from 'framer-motion';
 import CustomDropdown from '@/components/ui/CustomDropdown';
-import { Check, ChevronDown, ChevronUp, Layers, Mountain, Route as RouteIcon, Download, Trash2, Plus } from 'lucide-react';
+import { Check, ChevronDown, ChevronLeft, ChevronUp, Layers, LoaderCircle, MapPin, Mountain, Plus, Route as RouteIcon, Search, Download, Trash2, X } from 'lucide-react';
 import { useLanguage } from '@/context/LanguageContext';
 import { BASEMAPS } from '@/constants/basemaps';
 import 'maplibre-gl/dist/maplibre-gl.css';
@@ -108,6 +108,15 @@ const DEM_SOURCES = {
 type DemSourceId = keyof typeof DEM_SOURCES;
 const LIBERTY_BUILDING_SOURCE_ID = 'liberty-buildings';
 type RoutePoint = [number, number];
+type LocationSearchResult = {
+  id: string;
+  name: string;
+  address: string;
+  coordinates: RoutePoint;
+};
+type WaypointMenuState =
+  | { type: 'waypoint'; index: number; x: number; y: number }
+  | { type: 'location'; id: string; x: number; y: number };
 type PlannedRoute = {
   id: string;
   name: string;
@@ -121,6 +130,82 @@ type PlannedRoute = {
   error: string | null;
 };
 const INACTIVE_ROUTE_COLORS = ['#059669', '#7c3aed', '#ea580c', '#0891b2'];
+const HONG_KONG_SEARCH_BOUNDS = {
+  west: 113.75,
+  south: 22.15,
+  east: 114.52,
+  north: 22.58,
+};
+
+function getStringProperty(properties: Record<string, unknown>, key: string) {
+  const value = properties[key];
+  return typeof value === 'string' && value.trim() ? value.trim() : null;
+}
+
+function isHongKongLabel(value: string | null) {
+  return value !== null && (value.includes('Hong Kong') || value.includes('香港'));
+}
+
+function parseLocationSearchResults(data: unknown): LocationSearchResult[] {
+  if (!isRecord(data) || !Array.isArray(data.features)) {
+    throw new Error('Invalid location search response');
+  }
+
+  const results: LocationSearchResult[] = [];
+  const seenIds = new Set<string>();
+
+  data.features.forEach((feature) => {
+    if (!isRecord(feature) || !isRecord(feature.geometry) || !Array.isArray(feature.geometry.coordinates)) return;
+    if (!isRecord(feature.properties)) return;
+
+    const [longitude, latitude] = feature.geometry.coordinates;
+    if (
+      typeof longitude !== 'number'
+      || typeof latitude !== 'number'
+      || longitude < HONG_KONG_SEARCH_BOUNDS.west
+      || longitude > HONG_KONG_SEARCH_BOUNDS.east
+      || latitude < HONG_KONG_SEARCH_BOUNDS.south
+      || latitude > HONG_KONG_SEARCH_BOUNDS.north
+    ) return;
+
+    const properties = feature.properties;
+    const countryCode = getStringProperty(properties, 'countrycode')?.toUpperCase();
+    const country = getStringProperty(properties, 'country');
+    const city = getStringProperty(properties, 'city');
+    const state = getStringProperty(properties, 'state');
+    const isHongKong = countryCode === 'HK'
+      || isHongKongLabel(country)
+      || isHongKongLabel(city)
+      || isHongKongLabel(state);
+    if (!isHongKong) return;
+
+    const name = getStringProperty(properties, 'name')
+      ?? getStringProperty(properties, 'street')
+      ?? getStringProperty(properties, 'locality');
+    if (!name) return;
+
+    const address = [
+      getStringProperty(properties, 'street'),
+      getStringProperty(properties, 'district'),
+      getStringProperty(properties, 'city'),
+      getStringProperty(properties, 'county'),
+      getStringProperty(properties, 'state'),
+      country === 'China' ? null : country,
+    ].filter((part, index, parts): part is string => Boolean(part) && part !== name && parts.indexOf(part) === index)
+      .join(' · ');
+    const osmType = getStringProperty(properties, 'osm_type') ?? 'location';
+    const osmId = properties.osm_id;
+    const id = osmId !== undefined && osmId !== null
+      ? `${osmType}-${String(osmId)}`
+      : `${name}-${longitude}-${latitude}`;
+    if (seenIds.has(id)) return;
+    seenIds.add(id);
+
+    results.push({ id, name, address, coordinates: [longitude, latitude] });
+  });
+
+  return results;
+}
 
 function getRouteColor(routeId: string, activeRouteId: string, index: number) {
   return routeId === activeRouteId ? '#2563eb' : INACTIVE_ROUTE_COLORS[index % INACTIVE_ROUTE_COLORS.length];
@@ -1195,6 +1280,13 @@ export default function MapPageClient() {
   const [routeDirectionImageStyleId, setRouteDirectionImageStyleId] = useState<string | null>(null);
   const [isMobileViewport, setIsMobileViewport] = useState(false);
   const [locationError, setLocationError] = useState<string | null>(null);
+  const [locationSearchQuery, setLocationSearchQuery] = useState('');
+  const [isLocationSearchExpanded, setIsLocationSearchExpanded] = useState(false);
+  const [locationSuggestions, setLocationSuggestions] = useState<LocationSearchResult[]>([]);
+  const [selectedLocationResults, setSelectedLocationResults] = useState<LocationSearchResult[]>([]);
+  const [isLocationSearchLoading, setIsLocationSearchLoading] = useState(false);
+  const [locationSearchError, setLocationSearchError] = useState<string | null>(null);
+  const [areLocationSuggestionsOpen, setAreLocationSuggestionsOpen] = useState(false);
   const [isLocationTracking, setIsLocationTracking] = useState(false);
   const [liveLocationCoordinates, setLiveLocationCoordinates] = useState<{
     longitude: number;
@@ -1237,11 +1329,13 @@ export default function MapPageClient() {
   const setRouteError = useCallback((error: string | null) => updateActiveRoute((route) => ({ ...route, error })), [updateActiveRoute]);
   const [routeInsertPreview, setRouteInsertPreview] = useState<{ point: RoutePoint; index: number } | null>(null);
   const [routeProfileHover, setRouteProfileHover] = useState<{ coordinate: RoutePoint; distance: number; elevation: number } | null>(null);
-  const [waypointMenu, setWaypointMenu] = useState<{ index: number; x: number; y: number } | null>(null);
+  const [waypointMenu, setWaypointMenu] = useState<WaypointMenuState | null>(null);
   const routeRequestId = useRef(0);
   const routeMarkersRef = useRef<MapLibreMarker[]>([]);
+  const locationMarkersRef = useRef<MapLibreMarker[]>([]);
   const routeProfileHoverMarkerRef = useRef<MapLibreMarker | null>(null);
   const mapRef = useRef<MapRef>(null);
+  const locationSearchInputRef = useRef<HTMLInputElement>(null);
   const isStyleReadyRef = useRef(false);
   const [initialStyle] = useState(() => getBasemapStyle(
     BASEMAPS.find((basemap) => basemap.id === DEFAULT_BASEMAP_ID) || BASEMAPS[0],
@@ -1249,6 +1343,85 @@ export default function MapPageClient() {
   ));
   const appliedBasemapId = useRef(DEFAULT_BASEMAP_ID);
   const appliedLocalizedBasemapLanguage = useRef(language);
+
+  useEffect(() => {
+    if (isLocationSearchExpanded) locationSearchInputRef.current?.focus();
+  }, [isLocationSearchExpanded]);
+
+  useEffect(() => {
+    const query = locationSearchQuery.trim();
+    if (query.length < 2) return;
+
+    const controller = new AbortController();
+    const bounds = HONG_KONG_SEARCH_BOUNDS;
+    const withoutHongKongPrefix = query.replace(/^(?:香港|Hong Kong)\s*/i, '').trim();
+    const geocoderQuery = withoutHongKongPrefix.length >= 2 ? withoutHongKongPrefix : query;
+    const params = new URLSearchParams({
+      q: geocoderQuery,
+      limit: '8',
+      lang: language === 'zh' ? 'default' : 'en',
+      bbox: `${bounds.west},${bounds.south},${bounds.east},${bounds.north}`,
+    });
+
+    const timeoutId = window.setTimeout(() => {
+      setLocationSuggestions([]);
+      setIsLocationSearchLoading(true);
+      setLocationSearchError(null);
+      fetch(`https://photon.komoot.io/api/?${params.toString()}`, { signal: controller.signal })
+        .then(async (response) => {
+          if (!response.ok) {
+            throw new Error(`Location search failed (${response.status})`);
+          }
+          return parseLocationSearchResults(await response.json());
+        })
+        .then((results) => setLocationSuggestions(results))
+        .catch((error: unknown) => {
+          if (controller.signal.aborted) return;
+          setLocationSearchError(error instanceof Error
+            ? error.message
+            : (language === 'zh' ? '搜尋地點時發生錯誤。' : 'Unable to search locations.'));
+        })
+        .finally(() => {
+          if (!controller.signal.aborted) setIsLocationSearchLoading(false);
+        });
+    }, 350);
+
+    return () => {
+      window.clearTimeout(timeoutId);
+      controller.abort();
+    };
+  }, [language, locationSearchQuery]);
+
+  useEffect(() => {
+    const map = mapRef.current?.getMap();
+    if (!mapReady || !map || selectedLocationResults.length === 0) return;
+
+    locationMarkersRef.current = selectedLocationResults.map((location) => {
+      const marker = new MapLibreMarkerConstructor({ color: '#dc2626', scale: 1.1 })
+        .setLngLat(location.coordinates)
+        .addTo(map);
+      const markerElement = marker.getElement();
+      markerElement.setAttribute('aria-label', location.name);
+      markerElement.setAttribute('title', location.name);
+      markerElement.addEventListener('contextmenu', (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        setWaypointMenu({
+          type: 'location',
+          id: location.id,
+          x: event.clientX,
+          y: event.clientY,
+        });
+      });
+      return marker;
+    });
+
+    return () => {
+      locationMarkersRef.current.forEach((marker) => marker.remove());
+      locationMarkersRef.current = [];
+    };
+  }, [mapReady, selectedLocationResults]);
+
   const addRoute = () => {
     const nextRouteNumber = routes.length + 1;
     const newRoute: PlannedRoute = {
@@ -1371,7 +1544,7 @@ export default function MapPageClient() {
       element.addEventListener('contextmenu', (event) => {
         event.preventDefault();
         event.stopPropagation();
-        setWaypointMenu({ index, x: event.clientX, y: event.clientY });
+        setWaypointMenu({ type: 'waypoint', index, x: event.clientX, y: event.clientY });
       });
       element.addEventListener('click', (event) => event.stopPropagation());
       element.addEventListener('mousedown', (event) => {
@@ -1908,6 +2081,144 @@ export default function MapPageClient() {
         <FullscreenControl position="bottom-right" />
         <ScaleControl position="bottom-left" />
       </Map>
+      <div className={`pointer-events-auto absolute left-3 top-3 z-30 overflow-hidden rounded-lg transition-[width] duration-300 ease-in-out ${isLocationSearchExpanded ? 'w-[min(24rem,calc(100vw-5.5rem))]' : 'w-11'}`}>
+        <div className={`flex h-11 w-full items-center border border-slate-200 bg-white px-2 text-slate-800 shadow-lg shadow-slate-900/15 ${isLocationSearchExpanded ? 'gap-3' : ''}`}>
+          <button
+            type="button"
+            aria-label={language === 'zh' ? '搜尋地點' : 'Search location'}
+            title={language === 'zh' ? '搜尋地點' : 'Search location'}
+            onClick={() => setIsLocationSearchExpanded(true)}
+            className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-slate-600 transition hover:bg-slate-100 hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500"
+          >
+            <Search className="h-5 w-5" aria-hidden="true" />
+          </button>
+          <AnimatePresence initial={false}>
+            {isLocationSearchExpanded && (
+              <motion.div
+                key="location-search-input"
+                initial={{ width: 0, opacity: 0 }}
+                animate={{ width: 'auto', opacity: 1 }}
+                exit={{ width: 0, opacity: 0 }}
+                transition={{ width: { duration: 0.28, ease: 'easeInOut' }, opacity: { duration: 0.18 } }}
+                className="flex min-w-0 flex-1 items-center gap-2 overflow-hidden whitespace-nowrap"
+              >
+              <input
+                ref={locationSearchInputRef}
+                type="text"
+                role="combobox"
+                aria-label={language === 'zh' ? '搜尋香港地點' : 'Search location in Hong Kong'}
+                aria-autocomplete="list"
+                aria-expanded={areLocationSuggestionsOpen && locationSearchQuery.trim().length >= 2}
+                aria-controls="map-location-suggestions"
+                aria-busy={isLocationSearchLoading}
+                autoComplete="off"
+                spellCheck={false}
+                value={locationSearchQuery}
+                placeholder={language === 'zh' ? '搜尋地點' : 'Search location'}
+                className="min-w-0 flex-1 bg-transparent text-sm font-medium text-slate-800 outline-none placeholder:text-slate-500"
+                onFocus={() => {
+                  if (locationSearchQuery.trim().length >= 2) setAreLocationSuggestionsOpen(true);
+                }}
+                onChange={(event) => {
+                  const query = event.target.value;
+                  setLocationSearchQuery(query);
+                  setLocationSuggestions([]);
+                  setSelectedLocationResults([]);
+                  setWaypointMenu(null);
+                  setIsLocationSearchLoading(query.trim().length >= 2);
+                  setLocationSearchError(null);
+                  setAreLocationSuggestionsOpen(true);
+                }}
+                onKeyDown={(event) => {
+                  if (event.key === 'Escape') setAreLocationSuggestionsOpen(false);
+                }}
+              />
+              {isLocationSearchLoading && (
+                <LoaderCircle className="h-4 w-4 shrink-0 animate-spin text-slate-500" aria-label={language === 'zh' ? '搜尋中' : 'Searching'} />
+              )}
+              {locationSearchQuery && (
+                <button
+                  type="button"
+                  aria-label={language === 'zh' ? '清除搜尋' : 'Clear search'}
+                  onClick={() => {
+                    setLocationSearchQuery('');
+                    setLocationSuggestions([]);
+                    setSelectedLocationResults([]);
+                    setWaypointMenu(null);
+                    setIsLocationSearchLoading(false);
+                    setLocationSearchError(null);
+                    setAreLocationSuggestionsOpen(false);
+                  }}
+                  className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-slate-500 transition hover:bg-slate-100 hover:text-slate-800"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              )}
+              <button
+                type="button"
+                aria-label={language === 'zh' ? '收合搜尋' : 'Collapse search'}
+                title={language === 'zh' ? '收合搜尋' : 'Collapse search'}
+                onClick={() => {
+                  setIsLocationSearchExpanded(false);
+                  setAreLocationSuggestionsOpen(false);
+                }}
+                className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-slate-500 transition hover:bg-slate-100 hover:text-slate-800"
+              >
+                <ChevronLeft className="h-4 w-4" />
+              </button>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
+        {isLocationSearchExpanded && areLocationSuggestionsOpen && locationSearchQuery.trim().length >= 2 && (
+          <div
+            id="map-location-suggestions"
+            role="listbox"
+            aria-label={language === 'zh' ? '地點搜尋結果' : 'Location search results'}
+            className="mt-1 max-h-[min(20rem,60vh)] overflow-y-auto rounded-lg border border-slate-200 bg-white text-slate-800 shadow-lg shadow-slate-900/15"
+          >
+            {isLocationSearchLoading ? (
+              <p role="status" className="px-4 py-3 text-sm text-slate-500">
+                {language === 'zh' ? '正在搜尋地點…' : 'Searching locations…'}
+              </p>
+            ) : locationSearchError ? (
+              <p role="alert" className="px-4 py-3 text-sm text-red-600">
+                {language === 'zh' ? '搜尋地點失敗，請稍後再試。' : 'Location search failed. Please try again.'}
+              </p>
+            ) : locationSuggestions.length === 0 ? (
+              <p className="px-4 py-3 text-sm text-slate-500">
+                {language === 'zh' ? '找不到香港地點' : 'No locations found in Hong Kong'}
+              </p>
+            ) : (
+              locationSuggestions.map((location) => (
+                <button
+                  key={location.id}
+                  type="button"
+                  role="option"
+                  aria-selected={false}
+                  onClick={() => {
+                    setSelectedLocationResults([location]);
+                    setWaypointMenu(null);
+                    setAreLocationSuggestionsOpen(false);
+
+                    const map = mapRef.current?.getMap();
+                    map?.flyTo({ center: location.coordinates, zoom: 15, duration: 900 });
+                  }}
+                  className="flex w-full items-center gap-3 border-t border-slate-100 px-3 py-2.5 text-left transition first:border-t-0 hover:bg-slate-50 focus-visible:bg-slate-50 focus-visible:outline-none"
+                >
+                  <MapPin className="h-7 w-7 shrink-0 fill-slate-500 text-slate-500" aria-hidden="true" />
+                  <span className="min-w-0">
+                    <span className="block truncate text-sm font-bold">{location.name}</span>
+                    {location.address && (
+                      <span className="block truncate text-sm text-slate-500">{location.address}</span>
+                    )}
+                  </span>
+                </button>
+              ))
+            )}
+          </div>
+        )}
+      </div>
       </div>
       <AnimatePresence initial={false}>
         {isMobileViewport && isLocationTracking && (
@@ -1970,19 +2281,30 @@ export default function MapPageClient() {
       )}
 
       {waypointMenu && (() => {
+        const isLocationMarker = waypointMenu.type === 'location';
         const actions = [
           {
             id: 'delete',
-            label: language === 'zh' ? '刪除途經點' : 'Delete waypoint',
+            label: language === 'zh'
+              ? (isLocationMarker ? '刪除地點標記' : '刪除途經點')
+              : (isLocationMarker ? 'Delete location marker' : 'Delete waypoint'),
             icon: <Trash2 className="h-4 w-4" />,
-            onSelect: () => setRouteAnchors((points) => points.filter((_, index) => index !== waypointMenu.index)),
+            onSelect: () => {
+              if (waypointMenu.type === 'location') {
+                setSelectedLocationResults((locations) => locations.filter((location) => location.id !== waypointMenu.id));
+              } else {
+                setRouteAnchors((points) => points.filter((_, index) => index !== waypointMenu.index));
+              }
+            },
             destructive: true,
           },
         ];
         return (
           <div
             role="menu"
-            aria-label={language === 'zh' ? '途經點選項' : 'Waypoint options'}
+            aria-label={language === 'zh'
+              ? (isLocationMarker ? '地點標記選項' : '途經點選項')
+              : (isLocationMarker ? 'Location marker options' : 'Waypoint options')}
             style={{ left: waypointMenu.x, top: waypointMenu.y }}
             className="fixed z-[100] min-w-44 -translate-y-1 rounded-xl border border-slate-200/90 bg-white/95 p-1.5 shadow-xl shadow-slate-900/20 backdrop-blur-xl"
             onClick={(event) => event.stopPropagation()}
