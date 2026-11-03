@@ -260,6 +260,7 @@ function RouteElevationPanel({
   mapRef,
   mapReady,
   isMobileViewport,
+  isLocationTracking,
 }: {
   coordinates: number[][];
   anchors: RoutePoint[];
@@ -273,6 +274,7 @@ function RouteElevationPanel({
   mapRef: { current: MapRef | null };
   mapReady: boolean;
   isMobileViewport: boolean;
+  isLocationTracking: boolean;
 }) {
   const hasChart = coordinates.length > 1;
   const chartContainerRef = useRef<SVGSVGElement>(null);
@@ -428,7 +430,7 @@ function RouteElevationPanel({
     <section
       ref={panelRef}
       aria-label={language === 'zh' ? '路線高度資料' : 'Route elevation profile'}
-      className={`absolute inset-x-0 ${isMobileViewport ? 'bottom-14' : 'bottom-0'} z-20 rounded-t-2xl border-t border-white/70 bg-white shadow-[0_-12px_40px_rgba(15,23,42,0.16)]`}
+      className={`absolute inset-x-0 ${isMobileViewport && isLocationTracking ? 'bottom-14' : 'bottom-0'} z-20 rounded-t-2xl border-t border-white/70 bg-white shadow-[0_-12px_40px_rgba(15,23,42,0.16)] transition-[bottom] duration-300 ease-in-out ${isMobileViewport ? 'touch-pan-x overscroll-y-contain' : ''}`}
     >
       <div className={`mx-auto max-w-screen-2xl px-3 pb-2 pt-0.5 sm:px-3 sm:pb-0 sm:pt-1 ${isCollapsed ? 'sm:pb-2' : ''}`}>
         <div className="flex flex-col items-center sm:flex-row sm:gap-2">
@@ -1907,24 +1909,35 @@ export default function MapPageClient() {
         <ScaleControl position="bottom-left" />
       </Map>
       </div>
-      {isMobileViewport && (
-        <div className="z-30 grid h-14 shrink-0 grid-cols-2 items-center gap-2 border-t border-slate-200 bg-white/95 px-3 text-xs shadow-[0_-2px_8px_rgba(15,23,42,0.08)]">
-          <div className="min-w-0">
-            <p className="font-semibold text-slate-500">{language === 'zh' ? '定位座標' : 'Coordinates'}</p>
-            <p className="truncate font-mono text-slate-800">
-              {liveLocationCoordinates
-                ? `${liveLocationCoordinates.latitude.toFixed(6)}, ${liveLocationCoordinates.longitude.toFixed(6)}`
-                : '--'}
-            </p>
-          </div>
-          <div className="min-w-0 text-right">
-            <p className="font-semibold text-slate-500">{language === 'zh' ? '裝置角度' : 'Device heading'}</p>
-            <p className="font-mono text-slate-800">
-              {deviceHeading === null ? '--' : `${deviceHeading}°`}
-            </p>
-          </div>
-        </div>
-      )}
+      <AnimatePresence initial={false}>
+        {isMobileViewport && isLocationTracking && (
+          <motion.div
+            key="live-location-status"
+            initial={{ height: 0, opacity: 0, y: 16 }}
+            animate={{ height: 56, opacity: 1, y: 0 }}
+            exit={{ height: 0, opacity: 0, y: 16 }}
+            transition={{ duration: 0.25, ease: 'easeInOut' }}
+            className="z-30 shrink-0 overflow-hidden"
+          >
+            <div className="grid h-14 grid-cols-2 items-center gap-2 border-t border-slate-200 bg-white/95 px-3 text-xs shadow-[0_-2px_8px_rgba(15,23,42,0.08)]">
+              <div className="min-w-0">
+                <p className="font-semibold text-slate-500">{language === 'zh' ? '定位座標' : 'Coordinates'}</p>
+                <p className="truncate font-mono text-slate-800">
+                  {liveLocationCoordinates
+                    ? `${liveLocationCoordinates.latitude.toFixed(6)}, ${liveLocationCoordinates.longitude.toFixed(6)}`
+                    : '--'}
+                </p>
+              </div>
+              <div className="min-w-0 text-right">
+                <p className="font-semibold text-slate-500">{language === 'zh' ? '裝置角度' : 'Device heading'}</p>
+                <p className="font-mono text-slate-800">
+                  {deviceHeading === null ? '--' : `${deviceHeading}°`}
+                </p>
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {(routes.length > 1 || routes.some((route) => route.coordinates.length > 1)) && (
         <RouteElevationPanel
@@ -1952,6 +1965,7 @@ export default function MapPageClient() {
           mapRef={mapRef}
           mapReady={mapReady}
           isMobileViewport={isMobileViewport}
+          isLocationTracking={isLocationTracking}
         />
       )}
 
