@@ -802,14 +802,50 @@ function LiveLocationControl({
     let isTracking = false;
     let locationMarker: MapLibreMarker | null = null;
     let directionMarker: MapLibreMarker | null = null;
-    let directionMarkerElement: HTMLDivElement | null = null;
     let accuracyMarker: MapLibreMarker | null = null;
     let accuracyElement: HTMLDivElement | null = null;
+    let locationAnimationFrame: number | null = null;
     let orientationListener: ((event: DeviceOrientationEvent) => void) | null = null;
     let absoluteOrientationListener: ((event: DeviceOrientationEvent) => void) | null = null;
     let lastReportedHeading: number | null = null;
     let locationAccuracy = 0;
     let button: HTMLButtonElement;
+
+    const setMarkerLocation = (center: [number, number]) => {
+      locationMarker?.setLngLat(center);
+      directionMarker?.setLngLat(center);
+      accuracyMarker?.setLngLat(center);
+      updateAccuracyCircle();
+    };
+
+    const animateMarkerLocation = (center: [number, number]) => {
+      if (!locationMarker) return;
+      if (locationAnimationFrame !== null) {
+        cancelAnimationFrame(locationAnimationFrame);
+      }
+
+      const start = locationMarker.getLngLat();
+      const startLongitude = start.lng;
+      const longitudeDelta = ((center[0] - startLongitude + 540) % 360) - 180;
+      const startLatitude = start.lat;
+      const startedAt = performance.now();
+      const duration = 500;
+      const animate = (now: number) => {
+        const progress = Math.min(1, (now - startedAt) / duration);
+        const easedProgress = 1 - (1 - progress) ** 3;
+        setMarkerLocation([
+          startLongitude + longitudeDelta * easedProgress,
+          startLatitude + (center[1] - startLatitude) * easedProgress,
+        ]);
+        if (progress < 1) {
+          locationAnimationFrame = requestAnimationFrame(animate);
+        } else {
+          locationAnimationFrame = null;
+        }
+      };
+
+      locationAnimationFrame = requestAnimationFrame(animate);
+    };
 
     const stopOrientationTracking = () => {
       if (orientationListener) {
@@ -890,11 +926,6 @@ function LiveLocationControl({
       const diameter = (2 * locationAccuracy) / metersPerPixel;
       accuracyElement.style.width = `${diameter}px`;
       accuracyElement.style.height = `${diameter}px`;
-      if (directionMarkerElement) {
-        const outerDiameter = diameter + 2;
-        directionMarkerElement.style.width = `${outerDiameter}px`;
-        directionMarkerElement.style.height = `${outerDiameter}px`;
-      }
     };
 
     const stopTracking = () => {
@@ -903,13 +934,16 @@ function LiveLocationControl({
         watchId = null;
       }
       isTracking = false;
+      if (locationAnimationFrame !== null) {
+        cancelAnimationFrame(locationAnimationFrame);
+        locationAnimationFrame = null;
+      }
       stopOrientationTracking();
       locationMarker?.remove();
       directionMarker?.remove();
       accuracyMarker?.remove();
       locationMarker = null;
       directionMarker = null;
-      directionMarkerElement = null;
       accuracyMarker = null;
       accuracyElement = null;
       locationAccuracy = 0;
@@ -973,15 +1007,36 @@ function LiveLocationControl({
           .addTo(map);
 
         if (propsRef.current.isMobileViewport) {
-          directionMarkerElement = document.createElement('div');
+          const directionMarkerElement = document.createElement('div');
           directionMarkerElement.className = 'maplibregl-user-location-direction-marker';
           directionMarkerElement.style.zIndex = '2';
           const direction = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
           direction.setAttribute('viewBox', '0 0 96 96');
           direction.setAttribute('aria-hidden', 'true');
           direction.classList.add('maplibregl-user-location-direction');
+          const definitions = document.createElementNS('http://www.w3.org/2000/svg', 'defs');
+          const gradient = document.createElementNS('http://www.w3.org/2000/svg', 'radialGradient');
+          gradient.setAttribute('id', 'maplibregl-user-location-direction-gradient');
+          gradient.setAttribute('gradientUnits', 'userSpaceOnUse');
+          gradient.setAttribute('cx', '48');
+          gradient.setAttribute('cy', '48');
+          gradient.setAttribute('r', '64');
+          [
+            { offset: '0%', opacity: '0.32' },
+            { offset: '55%', opacity: '0.16' },
+            { offset: '100%', opacity: '0' },
+          ].forEach(({ offset, opacity }) => {
+            const stop = document.createElementNS('http://www.w3.org/2000/svg', 'stop');
+            stop.setAttribute('offset', offset);
+            stop.setAttribute('stop-color', '#2563eb');
+            stop.setAttribute('stop-opacity', opacity);
+            gradient.append(stop);
+          });
+          definitions.append(gradient);
+          direction.append(definitions);
           const fieldOfView = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-          fieldOfView.setAttribute('d', 'M48 48 33.6 2.2 A48 48 0 0 1 62.4 2.2 Z');
+          fieldOfView.setAttribute('d', 'M48 48 4 25 A57 57 0 0 1 92 25 Z');
+          fieldOfView.setAttribute('fill', 'url(#maplibregl-user-location-direction-gradient)');
           direction.append(fieldOfView);
           directionMarkerElement.append(direction);
           directionMarker = new mapLib.Marker({
@@ -994,12 +1049,10 @@ function LiveLocationControl({
             .addTo(map);
         }
       } else {
-        locationMarker?.setLngLat(center);
-        directionMarker?.setLngLat(center);
-        accuracyMarker?.setLngLat(center);
+        animateMarkerLocation(center);
       }
 
-      updateAccuracyCircle();
+      if (isFirstLocation) updateAccuracyCircle();
 
       map.easeTo({
         center,
