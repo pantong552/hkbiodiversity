@@ -23,7 +23,8 @@ import {
 import mlcontour from 'maplibre-contour';
 import { AnimatePresence, motion, useSpring, useTransform } from 'framer-motion';
 import CustomDropdown from '@/components/ui/CustomDropdown';
-import { Check, ChevronDown, ChevronLeft, ChevronUp, Layers, LoaderCircle, Mountain, Plus, Route as RouteIcon, Search, Download, Trash2, X } from 'lucide-react';
+import useOfflineRouting from '@/hooks/useOfflineRouting';
+import { Check, ChevronDown, ChevronLeft, ChevronUp, Layers, LoaderCircle, Mountain, Plus, RefreshCw, Route as RouteIcon, Search, Download, Trash2, X } from 'lucide-react';
 import { useLanguage } from '@/context/LanguageContext';
 import { BASEMAPS } from '@/constants/basemaps';
 import 'maplibre-gl/dist/maplibre-gl.css';
@@ -128,6 +129,7 @@ type PlannedRoute = {
   coordinates: RoutePoint[];
   busy: boolean;
   error: string | null;
+  useOfflineRouting: boolean;
 };
 const INACTIVE_ROUTE_COLORS = ['#059669', '#7c3aed', '#ea580c', '#0891b2'];
 const HONG_KONG_SEARCH_BOUNDS = {
@@ -1275,6 +1277,8 @@ function LiveLocationControl({
 
 export default function MapPageClient() {
   const { language, setLanguage } = useLanguage();
+  const offlineRouting = useOfflineRouting();
+  const calculateOfflineRoute = offlineRouting.calculateRoute;
   const [currentStyleId, setCurrentStyleId] = useState(DEFAULT_BASEMAP_ID);
   const [isBasemapPickerOpen, setIsBasemapPickerOpen] = useState(false);
   const [hasOpenedBasemapPicker, setHasOpenedBasemapPicker] = useState(false);
@@ -1305,6 +1309,7 @@ export default function MapPageClient() {
   const [routes, setRoutes] = useState<PlannedRoute[]>([{
     id: 'route-1', name: 'Route 1', enabled: false, allowPrivateRoads: false,
     profile: 'foot', anchors: [], routedAnchors: [], coordinates: [], busy: false, error: null,
+    useOfflineRouting: false,
   }]);
   const [activeRouteId, setActiveRouteId] = useState('route-1');
   const activeRoute = routes.find((route) => route.id === activeRouteId) ?? routes[0];
@@ -1335,6 +1340,10 @@ export default function MapPageClient() {
   const setRouteCoordinates = useCallback((coordinates: RoutePoint[]) => updateActiveRoute((route) => ({ ...route, coordinates })), [updateActiveRoute]);
   const setRouteBusy = useCallback((busy: boolean) => updateActiveRoute((route) => ({ ...route, busy })), [updateActiveRoute]);
   const setRouteError = useCallback((error: string | null) => updateActiveRoute((route) => ({ ...route, error })), [updateActiveRoute]);
+  const setRouteOfflineMode = useCallback((enabled: boolean) => updateActiveRoute((route) => ({
+    ...route,
+    useOfflineRouting: enabled,
+  })), [updateActiveRoute]);
   const [routeInsertPreview, setRouteInsertPreview] = useState<{ point: RoutePoint; index: number } | null>(null);
   const [routeProfileHover, setRouteProfileHover] = useState<{ coordinate: RoutePoint; distance: number; elevation: number } | null>(null);
   const [waypointMenu, setWaypointMenu] = useState<WaypointMenuState | null>(null);
@@ -1473,6 +1482,7 @@ export default function MapPageClient() {
       enabled: true,
       allowPrivateRoads: false,
       profile: 'foot',
+      useOfflineRouting: false,
       anchors: [],
       routedAnchors: [],
       coordinates: [],
@@ -1537,25 +1547,31 @@ export default function MapPageClient() {
         setRouteError(null);
       }
     });
-    fetch('/api/map/route', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        points: routeAnchors,
-        profile: routeProfile,
-        elevation: true,
-        points_encoded: false,
-        details: ['road_class', 'surface', 'hike_rating', 'mtb_rating'],
-        allowPrivateRoads,
-      }),
-    }).then(async (response) => {
-      if (!response.ok) {
-        const message = await response.text();
-        throw new Error(message || `Route service error (${response.status})`);
-      }
-      const data = await response.json();
-      const coordinates = data?.paths?.[0]?.points?.coordinates;
-      if (!Array.isArray(coordinates)) throw new Error('No route found');
+    const routePromise = activeRoute.useOfflineRouting
+      ? calculateOfflineRoute(routeAnchors, routeProfile, allowPrivateRoads)
+      : fetch('/api/map/route', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          points: routeAnchors,
+          profile: routeProfile,
+          elevation: true,
+          points_encoded: false,
+          details: ['road_class', 'surface', 'hike_rating', 'mtb_rating'],
+          allowPrivateRoads,
+        }),
+      }).then(async (response) => {
+        if (!response.ok) {
+          const message = await response.text();
+          throw new Error(message || `Route service error (${response.status})`);
+        }
+        const data = await response.json();
+        const coordinates = data?.paths?.[0]?.points?.coordinates;
+        if (!Array.isArray(coordinates)) throw new Error('No route found');
+        return coordinates as RoutePoint[];
+      });
+
+    routePromise.then((coordinates) => {
       if (routeRequestId.current === requestId) {
         setRoutedAnchors(routeAnchors);
         setRouteCoordinates(coordinates);
@@ -1570,7 +1586,7 @@ export default function MapPageClient() {
     return () => {
       if (routeRequestId.current === activeRequestId) routeRequestId.current++;
     };
-  }, [activeRouteId, allowPrivateRoads, isRouting, routeAnchors, routeProfile, setRouteBusy, setRouteCoordinates, setRouteError, setRoutedAnchors]);
+  }, [activeRoute.useOfflineRouting, activeRouteId, allowPrivateRoads, calculateOfflineRoute, isRouting, routeAnchors, routeProfile, setRouteBusy, setRouteCoordinates, setRouteError, setRoutedAnchors]);
 
   useEffect(() => {
     const map = mapRef.current?.getMap();
@@ -2654,6 +2670,109 @@ export default function MapPageClient() {
                 ariaLabel={language === 'zh' ? '活動類型' : 'Activity'}
               />
               <button type="button" role="switch" aria-checked={allowPrivateRoads} onClick={() => setAllowPrivateRoads((allowed) => !allowed)} className="mt-2 flex w-full items-center justify-between rounded-xl px-2 py-2 text-left text-sm font-semibold text-slate-700"><span>{language === 'zh' ? '允許私人道路' : 'Allow private roads'}</span><span className={`relative h-5 w-9 rounded-full transition ${allowPrivateRoads ? 'bg-emerald-600' : 'bg-slate-300'}`}><span className={`absolute top-0.5 h-4 w-4 rounded-full bg-white transition ${allowPrivateRoads ? 'left-[18px]' : 'left-0.5'}`} /></span></button>
+              <button
+                type="button"
+                role="switch"
+                aria-checked={activeRoute.useOfflineRouting}
+                disabled={offlineRouting.isChecking || offlineRouting.isDownloading}
+                onClick={async () => {
+                  if (activeRoute.useOfflineRouting) {
+                    setRouteOfflineMode(false);
+                    return;
+                  }
+                  if (!offlineRouting.isAvailable && !(await offlineRouting.download())) return;
+                  setRouteOfflineMode(true);
+                }}
+                className={`mt-2 flex w-full items-center justify-between rounded-xl border px-3 py-2 text-left text-sm font-bold transition disabled:cursor-wait disabled:opacity-70 ${
+                  activeRoute.useOfflineRouting
+                    ? 'border-emerald-200 bg-emerald-50 text-emerald-800'
+                    : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
+                }`}
+              >
+                <span className="flex items-center gap-2">
+                  {offlineRouting.isDownloading
+                    ? <LoaderCircle className="h-4 w-4 animate-spin" />
+                    : activeRoute.useOfflineRouting
+                      ? <Check className="h-4 w-4" />
+                      : <Download className="h-4 w-4" />}
+                  {offlineRouting.isChecking
+                    ? (language === 'zh' ? '檢查離線路網…' : 'Checking offline network…')
+                    : offlineRouting.isDownloading
+                      ? (language === 'zh'
+                        ? (offlineRouting.isAvailable ? '更新香港離線路網…' : '下載香港離線路網…')
+                        : (offlineRouting.isAvailable ? 'Updating Hong Kong network…' : 'Downloading Hong Kong network…'))
+                      : activeRoute.useOfflineRouting
+                        ? (language === 'zh' ? '離線路線規劃已啟用' : 'Offline routing enabled')
+                        : offlineRouting.isAvailable
+                          ? (language === 'zh' ? '啟用離線路線規劃' : 'Enable offline routing')
+                          : (language === 'zh' ? '下載路網並啟用離線路線規劃' : 'Download network & enable offline routing')}
+                </span>
+                {!offlineRouting.isChecking && !offlineRouting.isDownloading && (
+                  <span className={`relative h-5 w-9 shrink-0 rounded-full transition ${
+                    activeRoute.useOfflineRouting ? 'bg-emerald-600' : 'bg-slate-300'
+                  }`}>
+                    <span className={`absolute top-0.5 h-4 w-4 rounded-full bg-white transition ${
+                      activeRoute.useOfflineRouting ? 'left-[18px]' : 'left-0.5'
+                    }`} />
+                  </span>
+                )}
+              </button>
+              {offlineRouting.isDownloading && (
+                <div className="mt-2 px-1" role="status" aria-live="polite">
+                  <div
+                    className="h-2 overflow-hidden rounded-full bg-slate-200"
+                    role="progressbar"
+                    aria-label={language === 'zh' ? '下載香港離線路網' : 'Downloading Hong Kong offline network'}
+                    aria-valuemin={0}
+                    aria-valuemax={100}
+                    aria-valuenow={offlineRouting.downloadProgress ?? undefined}
+                  >
+                    <div
+                      className={`h-full rounded-full bg-emerald-600 transition-[width] duration-300 ${
+                        offlineRouting.downloadProgress === null ? 'w-1/3 animate-pulse' : ''
+                      }`}
+                      style={offlineRouting.downloadProgress === null
+                        ? undefined
+                        : { width: `${offlineRouting.downloadProgress}%` }}
+                    />
+                  </div>
+                  <p className="mt-1 text-right text-[11px] font-semibold text-slate-600">
+                    {offlineRouting.downloadAttempt > 1
+                      ? (language === 'zh'
+                        ? `連線不穩，正在重試（${offlineRouting.downloadAttempt}/${offlineRouting.maxDownloadAttempts}）…`
+                        : `Connection interrupted; retrying (${offlineRouting.downloadAttempt}/${offlineRouting.maxDownloadAttempts})…`)
+                      : offlineRouting.downloadProgress !== null && offlineRouting.downloadProgress < 90
+                      ? `${offlineRouting.downloadProgress}%`
+                      : offlineRouting.downloadProgress !== null && offlineRouting.downloadProgress < 97
+                        ? (language === 'zh' ? '正在整理路網…' : 'Processing road network…')
+                        : offlineRouting.downloadProgress !== null
+                          ? (language === 'zh' ? '正在儲存到此裝置…' : 'Saving to this device…')
+                          : (language === 'zh' ? '下載中…' : 'Downloading…')}
+                  </p>
+                </div>
+              )}
+              {offlineRouting.isAvailable && (
+                <button
+                  type="button"
+                  disabled={offlineRouting.isDownloading || offlineRouting.isChecking}
+                  onClick={() => { void offlineRouting.download(); }}
+                  className="mt-2 flex w-full items-center justify-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-xs font-bold text-slate-700 transition hover:bg-slate-50 disabled:cursor-wait disabled:opacity-60"
+                >
+                  <RefreshCw className={`h-3.5 w-3.5 ${offlineRouting.isDownloading ? 'animate-spin' : ''}`} />
+                  {language === 'zh' ? '更新 OpenStreetMap 路網' : 'Update OpenStreetMap network'}
+                </button>
+              )}
+              <p className="px-1 pt-1 text-[11px] leading-4 text-slate-500">
+                {language === 'zh'
+                  ? '首次使用需下載香港 OpenStreetMap 路網並儲存於此裝置；離線路線與線上結果可能不同。'
+                  : 'First use downloads Hong Kong OpenStreetMap roads to this device. Offline routes may differ from online results.'}
+                {' '}<a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer" className="underline">© OpenStreetMap</a>
+              </p>
+              {offlineRouting.error && (
+                <p role="alert" className="mt-1 rounded-lg bg-red-50 px-2 py-1.5 text-xs text-red-700">
+                  {language === 'zh' ? '離線路線規劃失敗：' : 'Offline routing failed: '}{offlineRouting.error}
+                </p>
+              )}
               <p className="px-1 py-2 text-xs text-slate-600">{routeBusy ? (language === 'zh' ? '正在尋找路線…' : 'Finding route…') : (language === 'zh' ? `點擊地圖新增途經點（${routeAnchors.length}）` : `Click map to add waypoint (${routeAnchors.length})`)}</p>
               {routeError && <p role="alert" className="mb-2 rounded-lg bg-red-50 px-2 py-1.5 text-xs text-red-700">{language === 'zh' ? '尋路失敗：' : 'Routing failed: '}{routeError}</p>}
               <div className="flex gap-2"><button type="button" disabled={!routeCoordinates.length} onClick={() => downloadRouteGpx(routeCoordinates)} className="flex flex-1 items-center justify-center gap-1 rounded-lg bg-slate-800 px-2 py-2 text-xs font-bold text-white disabled:opacity-40"><Download className="h-3.5 w-3.5" />GPX</button><button type="button" disabled={!routeAnchors.length} onClick={() => { setRouteAnchors([]); setRouteCoordinates([]); }} className="flex flex-1 items-center justify-center gap-1 rounded-lg border border-slate-200 px-2 py-2 text-xs font-bold text-slate-700 disabled:opacity-40"><Trash2 className="h-3.5 w-3.5" />{language === 'zh' ? '清除' : 'Clear'}</button></div>

@@ -18,6 +18,12 @@ bun dev
 
 Set the server-side `HKMAPSERVICE_API_KEY` environment variable in `.env.local` for local development and in the deployment environment. Keep the key out of client-side code and source control; LandsD label tiles and glyphs are fetched through server routes.
 
+## Offline routing
+
+The map's routing panel can download Hong Kong's OpenStreetMap road network and keep it in the browser's IndexedDB. Once downloaded, walking and cycling routes are calculated locally in a Web Worker; enabling offline routing does not send route waypoints to the online GraphHopper service. The first download requires an internet connection and available browser storage. The panel can update the saved network, and transient download errors are retried automatically. Offline route results may differ from GraphHopper, and map tiles are not included in the routing dataset.
+
+OpenStreetMap data is provided by the Overpass API and is available under the [OpenStreetMap attribution requirements](https://www.openstreetmap.org/copyright).
+
 You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
 
 This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
