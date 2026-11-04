@@ -23,7 +23,7 @@ import {
 import mlcontour from 'maplibre-contour';
 import { AnimatePresence, motion, useSpring, useTransform } from 'framer-motion';
 import CustomDropdown from '@/components/ui/CustomDropdown';
-import { Check, ChevronDown, ChevronLeft, ChevronUp, Layers, LoaderCircle, MapPin, Mountain, Plus, Route as RouteIcon, Search, Download, Trash2, X } from 'lucide-react';
+import { Check, ChevronDown, ChevronLeft, ChevronUp, Layers, LoaderCircle, Mountain, Plus, Route as RouteIcon, Search, Download, Trash2, X } from 'lucide-react';
 import { useLanguage } from '@/context/LanguageContext';
 import { BASEMAPS } from '@/constants/basemaps';
 import 'maplibre-gl/dist/maplibre-gl.css';
@@ -860,6 +860,7 @@ type LiveLocationControlProps = {
   language: 'zh' | 'en';
   isMobileViewport: boolean;
   onTrackingChange: (isTracking: boolean) => void;
+  onSearchActionReady: (stopFollowing: (() => void) | null) => void;
   onError: (code: number) => void;
   onLocationUpdate: (longitude: number, latitude: number) => void;
   onHeadingUpdate: (heading: number | null) => void;
@@ -869,6 +870,7 @@ function LiveLocationControl({
   language,
   isMobileViewport,
   onTrackingChange,
+  onSearchActionReady,
   onError,
   onLocationUpdate,
   onHeadingUpdate,
@@ -877,6 +879,7 @@ function LiveLocationControl({
     language,
     isMobileViewport,
     onTrackingChange,
+    onSearchActionReady,
     onError,
     onLocationUpdate,
     onHeadingUpdate,
@@ -1163,6 +1166,9 @@ function LiveLocationControl({
     return {
       onAdd(nextMap) {
         map = nextMap;
+        propsRef.current.onSearchActionReady(() => {
+          if (isTracking) shouldFollowLocation = false;
+        });
         map.on('zoom', updateAccuracyCircle);
         map.on('move', updateAccuracyCircle);
         map.on('rotate', updateAccuracyCircle);
@@ -1227,6 +1233,7 @@ function LiveLocationControl({
       },
       onRemove() {
         stopTracking();
+        propsRef.current.onSearchActionReady(null);
         map?.off('zoom', updateAccuracyCircle);
         map?.off('move', updateAccuracyCircle);
         map?.off('rotate', updateAccuracyCircle);
@@ -1245,6 +1252,7 @@ function LiveLocationControl({
       language,
       isMobileViewport,
       onTrackingChange,
+      onSearchActionReady,
       onError,
       onLocationUpdate,
       onHeadingUpdate,
@@ -1260,7 +1268,7 @@ function LiveLocationControl({
         : (language === 'zh' ? '實時定位' : 'Live location');
     button.setAttribute('aria-label', label);
     button.title = label;
-  }, [control, isMobileViewport, language, onError, onHeadingUpdate, onLocationUpdate, onTrackingChange]);
+  }, [control, isMobileViewport, language, onError, onHeadingUpdate, onLocationUpdate, onSearchActionReady, onTrackingChange]);
 
   return null;
 }
@@ -1333,6 +1341,7 @@ export default function MapPageClient() {
   const routeRequestId = useRef(0);
   const routeMarkersRef = useRef<MapLibreMarker[]>([]);
   const locationMarkersRef = useRef<MapLibreMarker[]>([]);
+  const stopFollowingLiveLocationRef = useRef<(() => void) | null>(null);
   const routeProfileHoverMarkerRef = useRef<MapLibreMarker | null>(null);
   const mapRef = useRef<MapRef>(null);
   const locationSearchInputRef = useRef<HTMLInputElement>(null);
@@ -1343,6 +1352,40 @@ export default function MapPageClient() {
   ));
   const appliedBasemapId = useRef(DEFAULT_BASEMAP_ID);
   const appliedLocalizedBasemapLanguage = useRef(language);
+  const registerStopFollowingLiveLocation = useCallback((stopFollowing: (() => void) | null) => {
+    stopFollowingLiveLocationRef.current = stopFollowing;
+  }, []);
+  const showLocationResults = useCallback((results: LocationSearchResult[]) => {
+    if (results.length === 0) return;
+
+    stopFollowingLiveLocationRef.current?.();
+    setSelectedLocationResults(results);
+    setWaypointMenu(null);
+    setAreLocationSuggestionsOpen(false);
+
+    const map = mapRef.current?.getMap();
+    if (!map) return;
+    if (results.length === 1) {
+      map.flyTo({ center: results[0].coordinates, zoom: 15, duration: 900 });
+      return;
+    }
+
+    const longitudes = results.map((result) => result.coordinates[0]);
+    const latitudes = results.map((result) => result.coordinates[1]);
+    const bounds: [[number, number], [number, number]] = [
+      [Math.min(...longitudes), Math.min(...latitudes)],
+      [Math.max(...longitudes), Math.max(...latitudes)],
+    ];
+    if (bounds[0][0] === bounds[1][0] && bounds[0][1] === bounds[1][1]) {
+      map.flyTo({ center: bounds[0], zoom: 15, duration: 900 });
+      return;
+    }
+    map.fitBounds(bounds, {
+      padding: { top: 100, bottom: 80, left: 50, right: 50 },
+      maxZoom: 14,
+      duration: 900,
+    });
+  }, []);
 
   useEffect(() => {
     if (isLocationSearchExpanded) locationSearchInputRef.current?.focus();
@@ -1354,11 +1397,11 @@ export default function MapPageClient() {
 
     const controller = new AbortController();
     const bounds = HONG_KONG_SEARCH_BOUNDS;
-    const withoutHongKongPrefix = query.replace(/^(?:香港|Hong Kong)\s*/i, '').trim();
+    const withoutHongKongPrefix = query.replace(/^(?:香港\s+|Hong Kong\s+)/i, '').trim();
     const geocoderQuery = withoutHongKongPrefix.length >= 2 ? withoutHongKongPrefix : query;
     const params = new URLSearchParams({
       q: geocoderQuery,
-      limit: '8',
+      limit: '20',
       lang: language === 'zh' ? 'default' : 'en',
       bbox: `${bounds.west},${bounds.south},${bounds.east},${bounds.north}`,
     });
@@ -2052,6 +2095,7 @@ export default function MapPageClient() {
         <LiveLocationControl
           language={language}
           isMobileViewport={isMobileViewport}
+          onSearchActionReady={registerStopFollowingLiveLocation}
           onTrackingChange={(isTracking) => {
             setIsLocationTracking(isTracking);
             setLiveLocationCoordinates(null);
@@ -2085,9 +2129,19 @@ export default function MapPageClient() {
         <div className={`flex h-11 w-full items-center border border-slate-200 bg-white px-2 text-slate-800 shadow-lg shadow-slate-900/15 ${isLocationSearchExpanded ? 'gap-3' : ''}`}>
           <button
             type="button"
-            aria-label={language === 'zh' ? '搜尋地點' : 'Search location'}
-            title={language === 'zh' ? '搜尋地點' : 'Search location'}
-            onClick={() => setIsLocationSearchExpanded(true)}
+            aria-label={isLocationSearchExpanded
+              ? (language === 'zh' ? '在地圖顯示所有搜尋結果' : 'Show all search results on map')
+              : (language === 'zh' ? '搜尋地點' : 'Search location')}
+            title={isLocationSearchExpanded
+              ? (language === 'zh' ? '在地圖顯示所有搜尋結果' : 'Show all search results on map')
+              : (language === 'zh' ? '搜尋地點' : 'Search location')}
+            onClick={() => {
+              if (isLocationSearchExpanded) {
+                showLocationResults(locationSuggestions);
+              } else {
+                setIsLocationSearchExpanded(true);
+              }
+            }}
             className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-slate-600 transition hover:bg-slate-100 hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500"
           >
             <Search className="h-5 w-5" aria-hidden="true" />
@@ -2130,7 +2184,12 @@ export default function MapPageClient() {
                   setAreLocationSuggestionsOpen(true);
                 }}
                 onKeyDown={(event) => {
-                  if (event.key === 'Escape') setAreLocationSuggestionsOpen(false);
+                  if (event.key === 'Enter') {
+                    event.preventDefault();
+                    showLocationResults(locationSuggestions);
+                  } else if (event.key === 'Escape') {
+                    setAreLocationSuggestionsOpen(false);
+                  }
                 }}
               />
               {isLocationSearchLoading && (
@@ -2196,17 +2255,9 @@ export default function MapPageClient() {
                   type="button"
                   role="option"
                   aria-selected={false}
-                  onClick={() => {
-                    setSelectedLocationResults([location]);
-                    setWaypointMenu(null);
-                    setAreLocationSuggestionsOpen(false);
-
-                    const map = mapRef.current?.getMap();
-                    map?.flyTo({ center: location.coordinates, zoom: 15, duration: 900 });
-                  }}
-                  className="flex w-full items-center gap-3 border-t border-slate-100 px-3 py-2.5 text-left transition first:border-t-0 hover:bg-slate-50 focus-visible:bg-slate-50 focus-visible:outline-none"
+                  onClick={() => showLocationResults([location])}
+                  className="flex w-full items-center border-t border-slate-100 px-4 py-2.5 text-left transition first:border-t-0 hover:bg-slate-50 focus-visible:bg-slate-50 focus-visible:outline-none"
                 >
-                  <MapPin className="h-7 w-7 shrink-0 fill-slate-500 text-slate-500" aria-hidden="true" />
                   <span className="min-w-0">
                     <span className="block truncate text-sm font-bold">{location.name}</span>
                     {location.address && (
