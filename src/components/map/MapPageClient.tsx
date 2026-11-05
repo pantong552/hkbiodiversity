@@ -2758,7 +2758,7 @@ export default function MapPageClient() {
                       : offlineRouting.downloadProgress !== null && offlineRouting.downloadProgress < 90
                       ? `${offlineRouting.downloadProgress}%`
                       : offlineRouting.downloadProgress !== null && offlineRouting.downloadProgress < 95
-                        ? (language === 'zh' ? '正在下載高程資料…' : 'Downloading elevation data…')
+                        ? (language === 'zh' ? '正在解碼路網及高程…' : 'Decoding roads and elevation…')
                         : offlineRouting.downloadProgress !== null && offlineRouting.downloadProgress < 97
                         ? (language === 'zh' ? '正在整理路網…' : 'Processing road network…')
                         : offlineRouting.downloadProgress !== null

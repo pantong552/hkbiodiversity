@@ -2,11 +2,11 @@ export type OfflineRoutingPackage = {
   id: string;
   version: number;
   downloadedAt: number;
-  nodes: [number, number, number][];
+  nodes: [number, number, number, number][];
   ways: { nodes: number[]; tags: Record<string, string> }[];
 };
 
-const HEADER_SIZE = 48;
+const HEADER_SIZE = 52;
 const WAY_SIZE = 10;
 
 function isStringRecord(value: unknown): value is Record<string, string> {
@@ -43,15 +43,17 @@ export async function decodeNetworkPackage(
   const referenceCount = view.getUint32(16, true);
   const tagCount = view.getUint32(20, true);
   const coordinateSize = view.getUint32(24, true);
-  const waySize = view.getUint32(28, true);
-  const referenceSize = view.getUint32(32, true);
-  const tagSize = view.getUint32(36, true);
-  const downloadedAt = Number(view.getBigUint64(40, true));
-  const totalSize = headerSize + coordinateSize + waySize + referenceSize + tagSize;
+  const elevationSize = view.getUint32(28, true);
+  const waySize = view.getUint32(32, true);
+  const referenceSize = view.getUint32(36, true);
+  const tagSize = view.getUint32(40, true);
+  const downloadedAt = Number(view.getBigUint64(44, true));
+  const totalSize = headerSize + coordinateSize + elevationSize + waySize + referenceSize + tagSize;
   if (
     magic !== 'HKRT'
-    || formatVersion !== 1
+    || formatVersion !== 2
     || headerSize !== HEADER_SIZE
+    || elevationSize !== nodeCount * 2
     || waySize !== wayCount * WAY_SIZE
     || totalSize !== packageBytes.byteLength
     || !nodeCount
@@ -76,7 +78,7 @@ export async function decodeNetworkPackage(
     return value % 2 === 0 ? value / 2 : -(value + 1) / 2;
   };
 
-  const nodes: OfflineRoutingPackage['nodes'] = new Array(nodeCount);
+  const coordinates: [number, number][] = new Array(nodeCount);
   const coordinateEnd = headerSize + coordinateSize;
   const coordinateCursor = { offset: headerSize };
   let longitude = 0;
@@ -91,13 +93,20 @@ export async function decodeNetworkPackage(
     ) {
       throw new Error('Offline road network package contains invalid coordinates');
     }
-    nodes[index] = [index, longitude / 10_000_000, latitude / 10_000_000];
+    coordinates[index] = [longitude / 10_000_000, latitude / 10_000_000];
   }
   if (coordinateCursor.offset !== coordinateEnd) {
     throw new Error('Offline road network package coordinate data is invalid');
   }
 
-  const waysStart = coordinateEnd;
+  const elevationsStart = coordinateEnd;
+  const waysStart = elevationsStart + elevationSize;
+  const nodes: OfflineRoutingPackage['nodes'] = coordinates.map(([longitude, latitude], index) => [
+    index,
+    longitude,
+    latitude,
+    view.getInt16(elevationsStart + index * 2, true) / 10,
+  ]);
   const referencesStart = waysStart + waySize;
   const referencesEnd = referencesStart + referenceSize;
   const tagsStart = referencesEnd;

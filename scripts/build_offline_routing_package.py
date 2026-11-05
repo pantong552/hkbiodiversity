@@ -10,7 +10,7 @@ import urllib.request
 
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
-OUTPUT = ROOT / "public" / "offline-routing" / "hong-kong-v1.bin"
+OUTPUT = ROOT / ".next" / "offline-routing" / "hong-kong-v1.bin"
 BOUNDS = (22.15, 113.75, 22.58, 114.52)
 TAGS = {
     "highway",

@@ -3,7 +3,7 @@ import { decodeNetworkPackage } from './offlineRoutingPackage';
 type RoutePoint = [number, number];
 type RouteCoordinate = [number, number, number];
 type RouteProfile = 'foot' | 'bike';
-type StoredNode = [number, number, number];
+type StoredNode = [number, number, number, number];
 type StoredWay = { nodes: number[]; tags: Record<string, string> };
 type StoredNetwork = {
   id: string;
@@ -24,7 +24,6 @@ type StoredNetworkPackage = {
   downloadedAt: number;
   blob: Blob;
 };
-type StoredElevationTile = { id: string; blob: Blob };
 type RequestMessage =
   | { id: number; type: 'check' }
   | { id: number; type: 'download'; forceNetwork?: boolean }
@@ -50,6 +49,7 @@ type ResponseMessage =
 type GraphEdge = { to: number; cost: number };
 type RoutingGraph = {
   coordinates: RoutePoint[];
+  elevations: Float32Array;
   edges: GraphEdge[][];
   incoming: Uint8Array;
   outgoing: Uint8Array;
@@ -58,18 +58,16 @@ type RoutingGraph = {
 const DATABASE_NAME = 'hkbiodiversity-offline-routing';
 const DATABASE_VERSION = 1;
 const NETWORK_ID = 'hong-kong-osm-roads';
-const NETWORK_VERSION = 3;
-const ELEVATION_ZOOM = 14;
-const ELEVATION_TILE_PREFIX = `elevation-${ELEVATION_ZOOM}-`;
-const HONG_KONG_BOUNDS = { west: 113.75, south: 22.15, east: 114.52, north: 22.58 };
-const NETWORK_PACKAGE_URL = '/offline-routing/hong-kong-v1.bin';
+const NETWORK_VERSION = 4;
+const ELEVATION_ZOOM = 15;
+const NETWORK_PACKAGE_URL = '/offline-routing/hong-kong-v2.bin';
 const MAX_SNAP_DISTANCE_METERS = 500;
 const MAX_DOWNLOAD_ATTEMPTS = 3;
 
 let cachedGraph: RoutingGraph | null = null;
 let cachedGraphKey: string | null = null;
 let cachedNetwork: StoredNetwork | null = null;
-const cachedElevationPixels = new Map<string, Uint8ClampedArray>();
+let cachedNetworkPackage: Blob | null = null;
 
 function openDatabase() {
   return new Promise<IDBDatabase>((resolve, reject) => {
@@ -100,11 +98,13 @@ async function readNetwork(): Promise<StoredNetwork | null> {
           && typeof result.downloadedAt === 'number'
           && result.blob instanceof Blob
         ) {
+          cachedNetworkPackage = result.blob;
           void result.blob.arrayBuffer()
             .then((buffer) => decodeNetworkPackage(new Uint8Array(buffer), NETWORK_ID, NETWORK_VERSION))
             .then(resolve, reject);
           return;
         }
+        cachedNetworkPackage = null;
         resolve((result as StoredNetwork | undefined) ?? null);
       };
       request.onerror = () => reject(request.error ?? new Error('Unable to read offline routing data'));
@@ -129,33 +129,8 @@ async function readNetworkMetadata(): Promise<StoredNetworkMetadata | null> {
   }
 }
 
-async function readElevationTiles(ids: string[]) {
-  const database = await openDatabase();
-  try {
-    return await new Promise<StoredElevationTile[]>((resolve, reject) => {
-      const request = database.transaction('networks', 'readonly')
-        .objectStore('networks')
-        .getAll(IDBKeyRange.bound(ELEVATION_TILE_PREFIX, `${ELEVATION_TILE_PREFIX}\uffff`));
-      request.onsuccess = () => {
-        const wantedIds = new Set(ids);
-        const tiles = (request.result as unknown[]).filter((value): value is StoredElevationTile => (
-          isRecord(value)
-          && typeof value.id === 'string'
-          && wantedIds.has(value.id)
-          && value.blob instanceof Blob
-        ));
-        resolve(tiles);
-      };
-      request.onerror = () => reject(request.error ?? new Error('Unable to read offline elevation data'));
-    });
-  } finally {
-    database.close();
-  }
-}
-
 async function writeNetwork(
   network: StoredNetwork,
-  elevationTiles: StoredElevationTile[],
   networkPackage?: Blob,
 ) {
   const database = await openDatabase();
@@ -163,12 +138,13 @@ async function writeNetwork(
     await new Promise<void>((resolve, reject) => {
       const transaction = database.transaction('networks', 'readwrite');
       const store = transaction.objectStore('networks');
-      store.put(networkPackage
+      const packageBlob = networkPackage ?? cachedNetworkPackage;
+      store.put(packageBlob
         ? {
           id: network.id,
           version: network.version,
           downloadedAt: network.downloadedAt,
-          blob: networkPackage,
+          blob: packageBlob,
         } satisfies StoredNetworkPackage
         : network);
       store.put({
@@ -177,7 +153,12 @@ async function writeNetwork(
         elevationZoom: ELEVATION_ZOOM,
         downloadedAt: network.downloadedAt,
       } satisfies StoredNetworkMetadata);
-      elevationTiles.forEach((tile) => store.put(tile));
+      const keysRequest = store.getAllKeys();
+      keysRequest.onsuccess = () => {
+        keysRequest.result.forEach((key) => {
+          if (typeof key === 'string' && key.startsWith('elevation-')) store.delete(key);
+        });
+      };
       transaction.oncomplete = () => resolve();
       transaction.onerror = () => reject(transaction.error ?? new Error('Unable to save offline routing data'));
       transaction.onabort = () => reject(transaction.error ?? new Error('Unable to save offline routing data'));
@@ -202,15 +183,14 @@ async function downloadNetwork(id: number, forceNetwork: boolean) {
     const downloaded = await fetchNetworkPackage(id, forceNetwork);
     network = downloaded.network;
     networkPackage = downloaded.blob;
+    cachedNetworkPackage = networkPackage;
   }
-  const elevationTiles = await downloadElevationTiles(id);
   post({ id, type: 'download-progress', progress: 95 });
   post({ id, type: 'download-progress', progress: 97 });
-  await writeNetwork(network, elevationTiles, networkPackage);
+  await writeNetwork(network, networkPackage);
   cachedNetwork = network;
   cachedGraph = null;
   cachedGraphKey = null;
-  cachedElevationPixels.clear();
   post({ id, type: 'downloaded', downloadedAt: network.downloadedAt });
 }
 
@@ -218,7 +198,7 @@ function isRetryableDownloadError(error: unknown) {
   if (error instanceof TypeError) return true;
   if (error instanceof DOMException && ['AbortError', 'TimeoutError'].includes(error.name)) return true;
   return error instanceof Error
-    && /^(OpenStreetMap|Elevation tile) download failed \((408|425|429|5\d\d)\)$/.test(error.message);
+    && /^OpenStreetMap download failed \((408|425|429|5\d\d)\)$/.test(error.message);
 }
 
 function wait(milliseconds: number) {
@@ -240,8 +220,8 @@ async function fetchNetworkPackage(id: number, forceNetwork: boolean) {
         signal: AbortSignal.timeout(120_000),
       });
       if (!response.ok) throw new Error(`OpenStreetMap download failed (${response.status})`);
-      const compressed = await readResponseBytes(response, id, 70);
-      post({ id, type: 'download-progress', progress: 70 });
+      const compressed = await readResponseBytes(response, id, 90);
+      post({ id, type: 'download-progress', progress: 92 });
       const network = await decodeNetworkPackage(compressed, NETWORK_ID, NETWORK_VERSION);
       const buffer = new ArrayBuffer(compressed.byteLength);
       new Uint8Array(buffer).set(compressed);
@@ -283,74 +263,6 @@ async function readResponseBytes(response: Response, id: number, progressEnd: nu
     offset += chunk.byteLength;
   });
   return bytes;
-}
-
-function getElevationTileCoordinates() {
-  const tileCount = 2 ** ELEVATION_ZOOM;
-  const toTileX = (longitude: number) => Math.floor(((longitude + 180) / 360) * tileCount);
-  const toTileY = (latitude: number) => {
-    const radians = (latitude * Math.PI) / 180;
-    return Math.floor(((1 - Math.asinh(Math.tan(radians)) / Math.PI) / 2) * tileCount);
-  };
-  const tiles: { x: number; y: number }[] = [];
-  for (let x = toTileX(HONG_KONG_BOUNDS.west); x <= toTileX(HONG_KONG_BOUNDS.east); x++) {
-    for (let y = toTileY(HONG_KONG_BOUNDS.north); y <= toTileY(HONG_KONG_BOUNDS.south); y++) {
-      tiles.push({ x, y });
-    }
-  }
-  return tiles;
-}
-
-async function downloadElevationTiles(id: number) {
-  const coordinates = getElevationTileCoordinates();
-  const tiles: StoredElevationTile[] = new Array(coordinates.length);
-  let nextIndex = 0;
-  let completed = 0;
-  const downloadNext = async () => {
-    while (true) {
-      const index = nextIndex++;
-      if (index >= coordinates.length) return;
-      const { x, y } = coordinates[index];
-      const response = await fetchElevationTile(x, y, id);
-      const blob = await response.blob();
-      if (blob.size === 0 || !blob.type.includes('image/png')) {
-        throw new Error(`Elevation tile ${x}/${y} returned invalid image data`);
-      }
-      tiles[index] = { id: `${ELEVATION_TILE_PREFIX}${x}-${y}`, blob };
-      completed++;
-      post({
-        id,
-        type: 'download-progress',
-        progress: 70 + Math.round((completed / coordinates.length) * 24),
-        attempt: 1,
-        maxAttempts: MAX_DOWNLOAD_ATTEMPTS,
-      });
-    }
-  };
-  await Promise.all(Array.from({ length: Math.min(4, coordinates.length) }, () => downloadNext()));
-  return tiles;
-}
-
-async function fetchElevationTile(x: number, y: number, id: number) {
-  const url = `/api/map/dem/aws/${ELEVATION_ZOOM}/${x}/${y}.png`;
-  for (let attempt = 1; attempt <= MAX_DOWNLOAD_ATTEMPTS; attempt++) {
-    try {
-      const response = await fetch(url, { signal: AbortSignal.timeout(30_000) });
-      if (!response.ok) throw new Error(`Elevation tile download failed (${response.status})`);
-      return response;
-    } catch (error) {
-      if (!isRetryableDownloadError(error) || attempt === MAX_DOWNLOAD_ATTEMPTS) throw error;
-      post({
-        id,
-        type: 'download-progress',
-        progress: null,
-        attempt: attempt + 1,
-        maxAttempts: MAX_DOWNLOAD_ATTEMPTS,
-      });
-      await wait(1000 * (2 ** (attempt - 1)));
-    }
-  }
-  throw new Error(`Elevation tile download failed for ${x}/${y}`);
 }
 
 function isRoutable(tags: Record<string, string>, profile: RouteProfile, allowPrivateRoads: boolean) {
@@ -429,10 +341,12 @@ function distanceMeters(start: RoutePoint, end: RoutePoint) {
 
 function buildGraph(network: StoredNetwork, profile: RouteProfile, allowPrivateRoads: boolean): RoutingGraph {
   const coordinates: RoutePoint[] = [];
+  const elevations = new Float32Array(network.nodes.length);
   const nodeIndexById = new Map<number, number>();
-  network.nodes.forEach(([id, longitude, latitude]) => {
+  network.nodes.forEach(([id, longitude, latitude, elevation]) => {
     nodeIndexById.set(id, coordinates.length);
     coordinates.push([longitude, latitude]);
+    elevations[coordinates.length - 1] = elevation;
   });
   const edges: GraphEdge[][] = coordinates.map(() => []);
   const incoming = new Uint8Array(coordinates.length);
@@ -462,7 +376,7 @@ function buildGraph(network: StoredNetwork, profile: RouteProfile, allowPrivateR
     }
   });
 
-  return { coordinates, edges, incoming, outgoing };
+  return { coordinates, elevations, edges, incoming, outgoing };
 }
 
 async function getGraph(profile: RouteProfile, allowPrivateRoads: boolean) {
@@ -584,7 +498,7 @@ function searchRoute(graph: RoutingGraph, start: number, destination: number, pr
     path.push(current);
   }
   path.reverse();
-  return path.map((index) => graph.coordinates[index]);
+  return path;
 }
 
 async function calculateRoute(
@@ -600,89 +514,21 @@ async function calculateRoute(
     index < points.length - 1,
     index > 0,
   ));
-  const coordinates: RoutePoint[] = [];
+  const coordinates: RouteCoordinate[] = [];
   for (let index = 1; index < snapped.length; index++) {
     const segment = searchRoute(graph, snapped[index - 1], snapped[index], profile);
-    if (index === 1) coordinates.push(points[index - 1]);
-    coordinates.push(...segment, points[index]);
-  }
-  return addElevations(coordinates);
-}
-
-function getElevationTilePosition([longitude, latitude]: RoutePoint) {
-  const tileCount = 2 ** ELEVATION_ZOOM;
-  const x = ((longitude + 180) / 360) * tileCount;
-  const radians = (latitude * Math.PI) / 180;
-  const y = ((1 - Math.asinh(Math.tan(radians)) / Math.PI) / 2) * tileCount;
-  const tileX = Math.floor(x);
-  const tileY = Math.floor(y);
-  return {
-    id: `${ELEVATION_TILE_PREFIX}${tileX}-${tileY}`,
-    pixelX: Math.min(255, (x - tileX) * 256),
-    pixelY: Math.min(255, (y - tileY) * 256),
-  };
-}
-
-function getPixelElevation(pixels: Uint8ClampedArray, x: number, y: number) {
-  const offset = (y * 256 + x) * 4;
-  return pixels[offset] * 256 + pixels[offset + 1] + pixels[offset + 2] / 256 - 32768;
-}
-
-function interpolatePixelElevation(pixels: Uint8ClampedArray, x: number, y: number) {
-  const x0 = Math.floor(x);
-  const y0 = Math.floor(y);
-  const x1 = Math.min(x0 + 1, 255);
-  const y1 = Math.min(y0 + 1, 255);
-  const fractionX = x - x0;
-  const fractionY = y - y0;
-  const top = getPixelElevation(pixels, x0, y0)
-    + (getPixelElevation(pixels, x1, y0) - getPixelElevation(pixels, x0, y0)) * fractionX;
-  const bottom = getPixelElevation(pixels, x0, y1)
-    + (getPixelElevation(pixels, x1, y1) - getPixelElevation(pixels, x0, y1)) * fractionX;
-  return top + (bottom - top) * fractionY;
-}
-
-async function decodeElevationTile(blob: Blob) {
-  if (typeof OffscreenCanvas === 'undefined' || typeof createImageBitmap === 'undefined') {
-    throw new Error('This browser cannot read offline elevation tiles');
-  }
-  const bitmap = await createImageBitmap(blob);
-  try {
-    const canvas = new OffscreenCanvas(bitmap.width, bitmap.height);
-    const context = canvas.getContext('2d', { willReadFrequently: true });
-    if (!context) throw new Error('Unable to read offline elevation tile');
-    context.drawImage(bitmap, 0, 0);
-    return context.getImageData(0, 0, bitmap.width, bitmap.height).data;
-  } finally {
-    bitmap.close();
-  }
-}
-
-async function addElevations(coordinates: RoutePoint[]): Promise<RouteCoordinate[]> {
-  const positions = coordinates.map(getElevationTilePosition);
-  const tileIds = [...new Set(positions.map((position) => position.id))];
-  const missingIds = tileIds.filter((id) => !cachedElevationPixels.has(id));
-  if (missingIds.length > 0) {
-    const tiles = await readElevationTiles(missingIds);
-    const tilesById = new Map(tiles.map((tile) => [tile.id, tile]));
-    const missingTileId = missingIds.find((id) => !tilesById.has(id));
-    if (missingTileId) {
-      throw new Error('Offline elevation data is missing. Update the Hong Kong road network while online.');
+    if (index === 1) {
+      const [longitude, latitude] = points[index - 1];
+      coordinates.push([longitude, latitude, graph.elevations[snapped[index - 1]]]);
     }
-    await Promise.all(missingIds.map(async (id) => {
-      const tile = tilesById.get(id);
-      if (!tile) return;
-      cachedElevationPixels.set(id, await decodeElevationTile(tile.blob));
-    }));
+    segment.forEach((nodeIndex) => {
+      const [longitude, latitude] = graph.coordinates[nodeIndex];
+      coordinates.push([longitude, latitude, graph.elevations[nodeIndex]]);
+    });
+    const [longitude, latitude] = points[index];
+    coordinates.push([longitude, latitude, graph.elevations[snapped[index]]]);
   }
-
-  return coordinates.map(([longitude, latitude], index) => {
-    const position = positions[index];
-    const pixels = cachedElevationPixels.get(position.id);
-    if (!pixels) throw new Error('Unable to read offline elevation data');
-    const elevation = interpolatePixelElevation(pixels, position.pixelX, position.pixelY);
-    return [longitude, latitude, elevation];
-  });
+  return coordinates;
 }
 
 function post(message: ResponseMessage) {
