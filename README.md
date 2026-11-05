@@ -20,9 +20,9 @@ Set the server-side `HKMAPSERVICE_API_KEY` environment variable in `.env.local` 
 
 ## Offline routing
 
-The map's routing panel can download Hong Kong's OpenStreetMap road network and AWS Terrain Tiles elevation data, then keep both in the browser's IndexedDB. Once downloaded, walking and cycling routes and their elevation profiles are calculated locally in a Web Worker; enabling offline routing does not send route waypoints to the online GraphHopper service. The first download requires an internet connection and available browser storage. The panel can update the saved network, and transient download errors are retried automatically. Offline route results may differ from GraphHopper, and map tiles are not included in the routing dataset.
+The map's routing panel downloads a prebuilt, compressed Hong Kong OpenStreetMap road-network package (currently about 7 MiB) and zoom-14 AWS Terrain Tiles elevation data, then keeps the compressed road package and elevation tiles in the browser's IndexedDB. The worker unpacks the road data locally when it needs to build its routing graph. Once downloaded, walking and cycling routes and their elevation profiles are calculated locally; enabling offline routing does not send route waypoints to the online GraphHopper service. The first download requires an internet connection and available browser storage. The panel can update the saved network, and transient download errors are retried automatically. Offline route results may differ from GraphHopper, and map tiles are not included in the routing dataset.
 
-OpenStreetMap data is provided by the Overpass API and is available under the [OpenStreetMap attribution requirements](https://www.openstreetmap.org/copyright).
+To refresh the OSM data, run `python scripts/build_offline_routing_package.py` and deploy the generated `public/offline-routing/hong-kong-v1.bin` file with the app. The generated package is distributed under the [Open Database License (ODbL)](https://www.openstreetmap.org/copyright); keep the OpenStreetMap attribution and license link with the routing feature.
 Elevation data is provided by [AWS Terrain Tiles](https://registry.opendata.aws/terrain-tiles/) using SRTM data.
 
 You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.

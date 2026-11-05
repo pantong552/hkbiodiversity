@@ -2771,7 +2771,7 @@ export default function MapPageClient() {
                 <button
                   type="button"
                   disabled={offlineRouting.isDownloading || offlineRouting.isChecking}
-                  onClick={() => { void offlineRouting.download(); }}
+                  onClick={() => { void offlineRouting.download(true); }}
                   className="mt-2 flex w-full items-center justify-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-xs font-bold text-slate-700 transition hover:bg-slate-50 disabled:cursor-wait disabled:opacity-60"
                 >
                   <RefreshCw className={`h-3.5 w-3.5 ${offlineRouting.isDownloading ? 'animate-spin' : ''}`} />

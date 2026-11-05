@@ -121,7 +121,7 @@ export default function useOfflineRouting() {
     worker.postMessage({ ...message, id });
   }), []);
 
-  const download = useCallback(async () => {
+  const download = useCallback(async (forceNetwork = false) => {
     if (downloadInFlightRef.current) return false;
     downloadInFlightRef.current = true;
     setError(null);
@@ -129,7 +129,7 @@ export default function useOfflineRouting() {
     setDownloadAttempt(1);
     setIsDownloading(true);
     try {
-      await request<void>({ type: 'download' });
+      await request<void>({ type: 'download', forceNetwork });
       return true;
     } catch (downloadError) {
       setIsDownloading(false);
