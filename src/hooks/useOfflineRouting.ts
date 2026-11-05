@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 export type OfflineRoutePoint = [number, number];
+export type OfflineRouteCoordinate = [number, number, number];
 type OfflineRouteProfile = 'foot' | 'bike';
 type WorkerResponse =
   | { id: number; type: 'status'; available: boolean; downloadedAt: number | null }
@@ -145,7 +146,7 @@ export default function useOfflineRouting() {
     points: OfflineRoutePoint[],
     profile: OfflineRouteProfile,
     allowPrivateRoads: boolean,
-  ) => request<OfflineRoutePoint[]>({
+  ) => request<OfflineRouteCoordinate[]>({
     type: 'route',
     points,
     profile,

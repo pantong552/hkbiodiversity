@@ -20,9 +20,10 @@ Set the server-side `HKMAPSERVICE_API_KEY` environment variable in `.env.local` 
 
 ## Offline routing
 
-The map's routing panel can download Hong Kong's OpenStreetMap road network and keep it in the browser's IndexedDB. Once downloaded, walking and cycling routes are calculated locally in a Web Worker; enabling offline routing does not send route waypoints to the online GraphHopper service. The first download requires an internet connection and available browser storage. The panel can update the saved network, and transient download errors are retried automatically. Offline route results may differ from GraphHopper, and map tiles are not included in the routing dataset.
+The map's routing panel can download Hong Kong's OpenStreetMap road network and AWS Terrain Tiles elevation data, then keep both in the browser's IndexedDB. Once downloaded, walking and cycling routes and their elevation profiles are calculated locally in a Web Worker; enabling offline routing does not send route waypoints to the online GraphHopper service. The first download requires an internet connection and available browser storage. The panel can update the saved network, and transient download errors are retried automatically. Offline route results may differ from GraphHopper, and map tiles are not included in the routing dataset.
 
 OpenStreetMap data is provided by the Overpass API and is available under the [OpenStreetMap attribution requirements](https://www.openstreetmap.org/copyright).
+Elevation data is provided by [AWS Terrain Tiles](https://registry.opendata.aws/terrain-tiles/) using SRTM data.
 
 You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
 

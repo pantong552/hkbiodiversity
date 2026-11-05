@@ -109,6 +109,7 @@ const DEM_SOURCES = {
 type DemSourceId = keyof typeof DEM_SOURCES;
 const LIBERTY_BUILDING_SOURCE_ID = 'liberty-buildings';
 type RoutePoint = [number, number];
+type RouteCoordinate = [number, number] | [number, number, number];
 type LocationSearchResult = {
   id: string;
   name: string;
@@ -126,7 +127,7 @@ type PlannedRoute = {
   profile: 'foot' | 'bike';
   anchors: RoutePoint[];
   routedAnchors: RoutePoint[];
-  coordinates: RoutePoint[];
+  coordinates: RouteCoordinate[];
   busy: boolean;
   error: string | null;
   useOfflineRouting: boolean;
@@ -213,11 +214,11 @@ function getRouteColor(routeId: string, activeRouteId: string, index: number) {
   return routeId === activeRouteId ? '#2563eb' : INACTIVE_ROUTE_COLORS[index % INACTIVE_ROUTE_COLORS.length];
 }
 
-function closestRoutePoint(point: RoutePoint, route: RoutePoint[]): RoutePoint {
+function closestRoutePoint(point: RoutePoint, route: RouteCoordinate[]): RoutePoint {
   if (route.length === 0) return point;
   const latitudeScale = Math.cos((point[1] * Math.PI) / 180);
-  if (route.length === 1) return route[0];
-  let closest = route[0];
+  if (route.length === 1) return [route[0][0], route[0][1]];
+  let closest: RoutePoint = [route[0][0], route[0][1]];
   let closestDistance = Number.POSITIVE_INFINITY;
   for (let index = 0; index < route.length - 1; index++) {
     const start = route[index];
@@ -245,7 +246,7 @@ function closestRoutePoint(point: RoutePoint, route: RoutePoint[]): RoutePoint {
   return closest;
 }
 
-function closestRouteIndex(point: RoutePoint, route: RoutePoint[]): number {
+function closestRouteIndex(point: RoutePoint, route: ReadonlyArray<ReadonlyArray<number>>): number {
   let closestIndex = 0;
   let closestDistance = Number.POSITIVE_INFINITY;
   const latitudeScale = Math.cos((point[1] * Math.PI) / 180);
@@ -453,7 +454,7 @@ function RouteElevationPanel({
     const linePath = points.map((point, index) => `${index === 0 ? 'M' : 'L'} ${point.x.toFixed(2)} ${point.y.toFixed(2)}`).join(' ');
     const areaPath = `${linePath} L ${chartWidth} 94 L 0 94 Z`;
     const waypointMarks = anchors.map((anchor, index) => {
-      const routeIndex = closestRouteIndex(anchor, coordinates.map(([lon, lat]) => [lon, lat] as RoutePoint));
+      const routeIndex = closestRouteIndex(anchor, coordinates);
       return { index, distance: cumulativeDistances[routeIndex], ...points[routeIndex * 4] };
     });
 
@@ -690,8 +691,10 @@ function RouteElevationPanel({
   );
 }
 
-function downloadRouteGpx(points: RoutePoint[]) {
-  const trackpoints = points.map(([lon, lat]) => `<trkpt lat="${lat}" lon="${lon}"></trkpt>`).join('');
+function downloadRouteGpx(points: RouteCoordinate[]) {
+  const trackpoints = points.map(([lon, lat, elevation]) => (
+    `<trkpt lat="${lat}" lon="${lon}">${elevation === undefined ? '' : `<ele>${elevation.toFixed(1)}</ele>`}</trkpt>`
+  )).join('');
   const xml = `<?xml version="1.0" encoding="UTF-8"?><gpx version="1.1" creator="HK Biodiversity" xmlns="http://www.topografix.com/GPX/1/1"><trk><name>HK Biodiversity route</name><trkseg>${trackpoints}</trkseg></trk></gpx>`;
   const url = URL.createObjectURL(new Blob([xml], { type: 'application/gpx+xml' }));
   const link = document.createElement('a');
@@ -1337,7 +1340,7 @@ export default function MapPageClient() {
     ...route, anchors: typeof value === 'function' ? value(route.anchors) : value,
   })), [updateActiveRoute]);
   const setRoutedAnchors = useCallback((routed: RoutePoint[]) => updateActiveRoute((route) => ({ ...route, routedAnchors: routed })), [updateActiveRoute]);
-  const setRouteCoordinates = useCallback((coordinates: RoutePoint[]) => updateActiveRoute((route) => ({ ...route, coordinates })), [updateActiveRoute]);
+  const setRouteCoordinates = useCallback((coordinates: RouteCoordinate[]) => updateActiveRoute((route) => ({ ...route, coordinates })), [updateActiveRoute]);
   const setRouteBusy = useCallback((busy: boolean) => updateActiveRoute((route) => ({ ...route, busy })), [updateActiveRoute]);
   const setRouteError = useCallback((error: string | null) => updateActiveRoute((route) => ({ ...route, error })), [updateActiveRoute]);
   const setRouteOfflineMode = useCallback((enabled: boolean) => updateActiveRoute((route) => ({
@@ -1568,7 +1571,7 @@ export default function MapPageClient() {
         const data = await response.json();
         const coordinates = data?.paths?.[0]?.points?.coordinates;
         if (!Array.isArray(coordinates)) throw new Error('No route found');
-        return coordinates as RoutePoint[];
+        return coordinates as RouteCoordinate[];
       });
 
     routePromise.then((coordinates) => {
@@ -1980,7 +1983,14 @@ export default function MapPageClient() {
           <Source key={route.id} id={`planned-route-${route.id}`} type="geojson" data={{
             type: 'Feature',
             properties: { routeId: route.id },
-            geometry: { type: 'LineString', coordinates: route.coordinates },
+            geometry: {
+              type: 'LineString',
+              coordinates: route.coordinates.map(([longitude, latitude, elevation]) => (
+                elevation === undefined
+                  ? [longitude, latitude]
+                  : [longitude, latitude, elevation]
+              )),
+            },
           }}>
             <Layer
               id={`planned-route-line-${route.id}`}
@@ -2319,7 +2329,11 @@ export default function MapPageClient() {
 
       {(routes.length > 1 || routes.some((route) => route.coordinates.length > 1)) && (
         <RouteElevationPanel
-          coordinates={routeCoordinates}
+          coordinates={routeCoordinates.map(([longitude, latitude, elevation]) => (
+            elevation === undefined
+              ? [longitude, latitude]
+              : [longitude, latitude, elevation]
+          ))}
           anchors={routedAnchors}
           language={language}
           tabs={routes.map((route) => ({
@@ -2743,7 +2757,9 @@ export default function MapPageClient() {
                         : `Connection interrupted; retrying (${offlineRouting.downloadAttempt}/${offlineRouting.maxDownloadAttempts})…`)
                       : offlineRouting.downloadProgress !== null && offlineRouting.downloadProgress < 90
                       ? `${offlineRouting.downloadProgress}%`
-                      : offlineRouting.downloadProgress !== null && offlineRouting.downloadProgress < 97
+                      : offlineRouting.downloadProgress !== null && offlineRouting.downloadProgress < 95
+                        ? (language === 'zh' ? '正在下載高程資料…' : 'Downloading elevation data…')
+                        : offlineRouting.downloadProgress !== null && offlineRouting.downloadProgress < 97
                         ? (language === 'zh' ? '正在整理路網…' : 'Processing road network…')
                         : offlineRouting.downloadProgress !== null
                           ? (language === 'zh' ? '正在儲存到此裝置…' : 'Saving to this device…')
@@ -2764,9 +2780,10 @@ export default function MapPageClient() {
               )}
               <p className="px-1 pt-1 text-[11px] leading-4 text-slate-500">
                 {language === 'zh'
-                  ? '首次使用需下載香港 OpenStreetMap 路網並儲存於此裝置；離線路線與線上結果可能不同。'
-                  : 'First use downloads Hong Kong OpenStreetMap roads to this device. Offline routes may differ from online results.'}
+                  ? '首次使用會下載香港 OpenStreetMap 路網及高程資料並儲存於此裝置；離線路線與線上結果可能不同。'
+                  : 'First use downloads Hong Kong OpenStreetMap roads and elevation data to this device. Offline routes may differ from online results.'}
                 {' '}<a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer" className="underline">© OpenStreetMap</a>
+                {' · '}<a href="https://registry.opendata.aws/terrain-tiles/" target="_blank" rel="noopener noreferrer" className="underline">AWS Terrain Tiles (Mapzen/SRTM)</a>
               </p>
               {offlineRouting.error && (
                 <p role="alert" className="mt-1 rounded-lg bg-red-50 px-2 py-1.5 text-xs text-red-700">

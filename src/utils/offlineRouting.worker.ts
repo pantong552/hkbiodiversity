@@ -1,4 +1,5 @@
 type RoutePoint = [number, number];
+type RouteCoordinate = [number, number, number];
 type RouteProfile = 'foot' | 'bike';
 type StoredNode = [number, number, number];
 type StoredWay = { nodes: number[]; tags: Record<string, string> };
@@ -14,6 +15,7 @@ type StoredNetworkMetadata = {
   version: number;
   downloadedAt: number;
 };
+type StoredElevationTile = { id: string; blob: Blob };
 type RequestMessage =
   | { id: number; type: 'check' }
   | { id: number; type: 'download' }
@@ -34,7 +36,7 @@ type ResponseMessage =
     maxAttempts?: number;
   }
   | { id: number; type: 'downloaded'; downloadedAt: number }
-  | { id: number; type: 'route'; coordinates: RoutePoint[] }
+  | { id: number; type: 'route'; coordinates: RouteCoordinate[] }
   | { id: number; type: 'error'; error: string };
 type GraphEdge = { to: number; cost: number };
 type RoutingGraph = {
@@ -47,7 +49,10 @@ type RoutingGraph = {
 const DATABASE_NAME = 'hkbiodiversity-offline-routing';
 const DATABASE_VERSION = 1;
 const NETWORK_ID = 'hong-kong-osm-roads';
-const NETWORK_VERSION = 1;
+const NETWORK_VERSION = 2;
+const ELEVATION_ZOOM = 12;
+const ELEVATION_TILE_PREFIX = `elevation-${ELEVATION_ZOOM}-`;
+const HONG_KONG_BOUNDS = { west: 113.75, south: 22.15, east: 114.52, north: 22.58 };
 const OVERPASS_URL = 'https://overpass-api.de/api/interpreter';
 const OSM_TAGS = [
   'highway',
@@ -72,6 +77,7 @@ const MAX_DOWNLOAD_ATTEMPTS = 3;
 let cachedGraph: RoutingGraph | null = null;
 let cachedGraphKey: string | null = null;
 let cachedNetwork: StoredNetwork | null = null;
+const cachedElevationPixels = new Map<string, Uint8ClampedArray>();
 
 function openDatabase() {
   return new Promise<IDBDatabase>((resolve, reject) => {
@@ -117,7 +123,31 @@ async function readNetworkMetadata(): Promise<StoredNetworkMetadata | null> {
   }
 }
 
-async function writeNetwork(network: StoredNetwork) {
+async function readElevationTiles(ids: string[]) {
+  const database = await openDatabase();
+  try {
+    return await new Promise<StoredElevationTile[]>((resolve, reject) => {
+      const request = database.transaction('networks', 'readonly')
+        .objectStore('networks')
+        .getAll(IDBKeyRange.bound(ELEVATION_TILE_PREFIX, `${ELEVATION_TILE_PREFIX}\uffff`));
+      request.onsuccess = () => {
+        const wantedIds = new Set(ids);
+        const tiles = (request.result as unknown[]).filter((value): value is StoredElevationTile => (
+          isRecord(value)
+          && typeof value.id === 'string'
+          && wantedIds.has(value.id)
+          && value.blob instanceof Blob
+        ));
+        resolve(tiles);
+      };
+      request.onerror = () => reject(request.error ?? new Error('Unable to read offline elevation data'));
+    });
+  } finally {
+    database.close();
+  }
+}
+
+async function writeNetwork(network: StoredNetwork, elevationTiles: StoredElevationTile[]) {
   const database = await openDatabase();
   try {
     await new Promise<void>((resolve, reject) => {
@@ -129,6 +159,7 @@ async function writeNetwork(network: StoredNetwork) {
         version: network.version,
         downloadedAt: network.downloadedAt,
       } satisfies StoredNetworkMetadata);
+      elevationTiles.forEach((tile) => store.put(tile));
       transaction.oncomplete = () => resolve();
       transaction.onerror = () => reject(transaction.error ?? new Error('Unable to save offline routing data'));
       transaction.onabort = () => reject(transaction.error ?? new Error('Unable to save offline routing data'));
@@ -235,19 +266,22 @@ async function downloadNetwork(id: number) {
     if (lastDownloadError) throw lastDownloadError;
     throw new Error('No Hong Kong road network was found using the administrative boundary or map-area query');
   }
-  post({ id, type: 'download-progress', progress: 90 });
+  const elevationTiles = await downloadElevationTiles(id);
+  post({ id, type: 'download-progress', progress: 95 });
   post({ id, type: 'download-progress', progress: 97 });
-  await writeNetwork(network);
+  await writeNetwork(network, elevationTiles);
   cachedNetwork = network;
   cachedGraph = null;
   cachedGraphKey = null;
+  cachedElevationPixels.clear();
   post({ id, type: 'downloaded', downloadedAt: network.downloadedAt });
 }
 
 function isRetryableDownloadError(error: unknown) {
   if (error instanceof TypeError) return true;
   if (error instanceof DOMException && ['AbortError', 'TimeoutError'].includes(error.name)) return true;
-  return error instanceof Error && /^OpenStreetMap download failed \((408|425|429|5\d\d)\)$/.test(error.message);
+  return error instanceof Error
+    && /^(OpenStreetMap|Elevation tile) download failed \((408|425|429|5\d\d)\)$/.test(error.message);
 }
 
 function wait(milliseconds: number) {
@@ -271,7 +305,7 @@ async function fetchNetworkQuery(query: string, id: number, queryIndex: number, 
         signal: AbortSignal.timeout(210_000),
       });
       if (!response.ok) throw new Error(`OpenStreetMap download failed (${response.status})`);
-      return await readResponseJson(response, id, queryIndex, queryCount);
+      return await readResponseJson(response, id, queryIndex, queryCount, 70);
     } catch (error) {
       if (!isRetryableDownloadError(error) || attempt === MAX_DOWNLOAD_ATTEMPTS) throw error;
       await wait(1000 * (2 ** (attempt - 1)));
@@ -280,13 +314,87 @@ async function fetchNetworkQuery(query: string, id: number, queryIndex: number, 
   throw new Error('OpenStreetMap download failed after retries');
 }
 
-async function readResponseJson(response: Response, id: number, queryIndex: number, queryCount: number) {
+function getElevationTileCoordinates() {
+  const tileCount = 2 ** ELEVATION_ZOOM;
+  const toTileX = (longitude: number) => Math.floor(((longitude + 180) / 360) * tileCount);
+  const toTileY = (latitude: number) => {
+    const radians = (latitude * Math.PI) / 180;
+    return Math.floor(((1 - Math.asinh(Math.tan(radians)) / Math.PI) / 2) * tileCount);
+  };
+  const tiles: { x: number; y: number }[] = [];
+  for (let x = toTileX(HONG_KONG_BOUNDS.west); x <= toTileX(HONG_KONG_BOUNDS.east); x++) {
+    for (let y = toTileY(HONG_KONG_BOUNDS.north); y <= toTileY(HONG_KONG_BOUNDS.south); y++) {
+      tiles.push({ x, y });
+    }
+  }
+  return tiles;
+}
+
+async function downloadElevationTiles(id: number) {
+  const coordinates = getElevationTileCoordinates();
+  const tiles: StoredElevationTile[] = new Array(coordinates.length);
+  let nextIndex = 0;
+  let completed = 0;
+  const downloadNext = async () => {
+    while (true) {
+      const index = nextIndex++;
+      if (index >= coordinates.length) return;
+      const { x, y } = coordinates[index];
+      const response = await fetchElevationTile(x, y, id);
+      const blob = await response.blob();
+      if (blob.size === 0 || !blob.type.includes('image/png')) {
+        throw new Error(`Elevation tile ${x}/${y} returned invalid image data`);
+      }
+      tiles[index] = { id: `${ELEVATION_TILE_PREFIX}${x}-${y}`, blob };
+      completed++;
+      post({
+        id,
+        type: 'download-progress',
+        progress: 70 + Math.round((completed / coordinates.length) * 24),
+        attempt: 1,
+        maxAttempts: MAX_DOWNLOAD_ATTEMPTS,
+      });
+    }
+  };
+  await Promise.all(Array.from({ length: Math.min(4, coordinates.length) }, () => downloadNext()));
+  return tiles;
+}
+
+async function fetchElevationTile(x: number, y: number, id: number) {
+  const url = `/api/map/dem/aws/${ELEVATION_ZOOM}/${x}/${y}.png`;
+  for (let attempt = 1; attempt <= MAX_DOWNLOAD_ATTEMPTS; attempt++) {
+    try {
+      const response = await fetch(url, { signal: AbortSignal.timeout(30_000) });
+      if (!response.ok) throw new Error(`Elevation tile download failed (${response.status})`);
+      return response;
+    } catch (error) {
+      if (!isRetryableDownloadError(error) || attempt === MAX_DOWNLOAD_ATTEMPTS) throw error;
+      post({
+        id,
+        type: 'download-progress',
+        progress: null,
+        attempt: attempt + 1,
+        maxAttempts: MAX_DOWNLOAD_ATTEMPTS,
+      });
+      await wait(1000 * (2 ** (attempt - 1)));
+    }
+  }
+  throw new Error(`Elevation tile download failed for ${x}/${y}`);
+}
+
+async function readResponseJson(
+  response: Response,
+  id: number,
+  queryIndex: number,
+  queryCount: number,
+  progressEnd: number,
+) {
   const totalBytes = Number(response.headers.get('content-length'));
   const total = Number.isFinite(totalBytes) && totalBytes > 0 ? totalBytes : null;
   const reader = response.body?.getReader();
   if (!reader) {
     const data: unknown = await response.json();
-    post({ id, type: 'download-progress', progress: Math.round(((queryIndex + 1) / queryCount) * 80) });
+    post({ id, type: 'download-progress', progress: Math.round(((queryIndex + 1) / queryCount) * progressEnd) });
     return data;
   }
 
@@ -300,7 +408,7 @@ async function readResponseJson(response: Response, id: number, queryIndex: numb
     const queryProgress = total ? Math.min(1, loaded / total) : null;
     const progress = queryProgress === null
       ? null
-      : Math.round(((queryIndex + queryProgress) / queryCount) * 80);
+      : Math.round(((queryIndex + queryProgress) / queryCount) * progressEnd);
     post({ id, type: 'download-progress', progress });
   }
 
@@ -566,7 +674,68 @@ async function calculateRoute(
     if (index === 1) coordinates.push(points[index - 1]);
     coordinates.push(...segment, points[index]);
   }
-  return coordinates;
+  return addElevations(coordinates);
+}
+
+function getElevationTilePosition([longitude, latitude]: RoutePoint) {
+  const tileCount = 2 ** ELEVATION_ZOOM;
+  const x = ((longitude + 180) / 360) * tileCount;
+  const radians = (latitude * Math.PI) / 180;
+  const y = ((1 - Math.asinh(Math.tan(radians)) / Math.PI) / 2) * tileCount;
+  const tileX = Math.floor(x);
+  const tileY = Math.floor(y);
+  return {
+    id: `${ELEVATION_TILE_PREFIX}${tileX}-${tileY}`,
+    pixelX: Math.min(255, Math.floor((x - tileX) * 256)),
+    pixelY: Math.min(255, Math.floor((y - tileY) * 256)),
+  };
+}
+
+async function decodeElevationTile(blob: Blob) {
+  if (typeof OffscreenCanvas === 'undefined' || typeof createImageBitmap === 'undefined') {
+    throw new Error('This browser cannot read offline elevation tiles');
+  }
+  const bitmap = await createImageBitmap(blob);
+  try {
+    const canvas = new OffscreenCanvas(bitmap.width, bitmap.height);
+    const context = canvas.getContext('2d', { willReadFrequently: true });
+    if (!context) throw new Error('Unable to read offline elevation tile');
+    context.drawImage(bitmap, 0, 0);
+    return context.getImageData(0, 0, bitmap.width, bitmap.height).data;
+  } finally {
+    bitmap.close();
+  }
+}
+
+async function addElevations(coordinates: RoutePoint[]): Promise<RouteCoordinate[]> {
+  const positions = coordinates.map(getElevationTilePosition);
+  const tileIds = [...new Set(positions.map((position) => position.id))];
+  const missingIds = tileIds.filter((id) => !cachedElevationPixels.has(id));
+  if (missingIds.length > 0) {
+    const tiles = await readElevationTiles(missingIds);
+    const tilesById = new Map(tiles.map((tile) => [tile.id, tile]));
+    const missingTileId = missingIds.find((id) => !tilesById.has(id));
+    if (missingTileId) {
+      throw new Error('Offline elevation data is missing. Update the Hong Kong road network while online.');
+    }
+    await Promise.all(missingIds.map(async (id) => {
+      const tile = tilesById.get(id);
+      if (!tile) return;
+      cachedElevationPixels.set(id, await decodeElevationTile(tile.blob));
+    }));
+  }
+
+  return coordinates.map(([longitude, latitude], index) => {
+    const position = positions[index];
+    const pixels = cachedElevationPixels.get(position.id);
+    if (!pixels) throw new Error('Unable to read offline elevation data');
+    const offset = (position.pixelY * 256 + position.pixelX) * 4;
+    const red = pixels[offset];
+    const green = pixels[offset + 1];
+    const blue = pixels[offset + 2];
+    const elevation = red * 256 + green + blue / 256 - 32768;
+    return [longitude, latitude, elevation];
+  });
 }
 
 function post(message: ResponseMessage) {
