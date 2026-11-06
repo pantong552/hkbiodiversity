@@ -284,6 +284,17 @@ function closestRouteIndex(point: RoutePoint, route: ReadonlyArray<ReadonlyArray
   return closestIndex;
 }
 
+function getRouteInsertionIndex(point: RoutePoint, anchors: RoutePoint[], coordinates: RouteCoordinate[]) {
+  const routeIndex = closestRouteIndex(point, coordinates);
+  const anchorRouteIndices = anchors.map((anchor) => closestRouteIndex(anchor, coordinates));
+  for (let index = 0; index < anchorRouteIndices.length - 1; index++) {
+    const startIndex = Math.min(anchorRouteIndices[index], anchorRouteIndices[index + 1]);
+    const endIndex = Math.max(anchorRouteIndices[index], anchorRouteIndices[index + 1]);
+    if (routeIndex >= startIndex && routeIndex <= endIndex) return index + 1;
+  }
+  return anchors.length;
+}
+
 function getSegmentDistanceMeters(start: RoutePoint, end: RoutePoint) {
   const radians = Math.PI / 180;
   const lat1 = start[1] * radians;
@@ -1376,6 +1387,9 @@ export default function MapPageClient() {
   const [waypointMenu, setWaypointMenu] = useState<WaypointMenuState | null>(null);
   const routeRequestId = useRef(0);
   const snappedRouteAnchorsRef = useRef<{ routeId: string; anchors: RoutePoint[] } | null>(null);
+  const ignoreNextRouteMapClickRef = useRef(false);
+  const ignoreNextRouteMapClickTimerRef = useRef<number | null>(null);
+  const suppressWaypointContextMenuRef = useRef<{ index: number; createdAt: number } | null>(null);
   const routeMarkersRef = useRef<MapLibreMarker[]>([]);
   const locationMarkersRef = useRef<MapLibreMarker[]>([]);
   const stopFollowingLiveLocationRef = useRef<(() => void) | null>(null);
@@ -1642,10 +1656,62 @@ export default function MapPageClient() {
       const element = document.createElement('div');
       element.className = 'flex h-[22px] w-[22px] cursor-grab select-none items-center justify-center rounded-full border-[2.5px] border-white bg-blue-600 text-[10px] font-bold leading-none text-white shadow-[0_1px_5px_rgba(15,23,42,0.55)] ring-1 ring-blue-800/70 active:cursor-grabbing';
       element.textContent = String(index + 1);
+      element.dataset.routeWaypointMarker = 'true';
       element.setAttribute('aria-label', `${language === 'zh' ? '途經點' : 'Waypoint'} ${index + 1}`);
+      let waypointLongPressTimer: number | null = null;
+      let waypointTouchStart: { x: number; y: number } | null = null;
+      const clearWaypointLongPress = () => {
+        if (waypointLongPressTimer !== null) window.clearTimeout(waypointLongPressTimer);
+        waypointLongPressTimer = null;
+        waypointTouchStart = null;
+      };
+      element.addEventListener('touchstart', (event) => {
+        if (!isMobileViewport || event.touches.length !== 1) return;
+        clearWaypointLongPress();
+        const touch = event.touches[0];
+        waypointTouchStart = { x: touch.clientX, y: touch.clientY };
+        waypointLongPressTimer = window.setTimeout(() => {
+          waypointLongPressTimer = null;
+          if (!waypointTouchStart) return;
+          ignoreNextRouteMapClickRef.current = true;
+          if (ignoreNextRouteMapClickTimerRef.current !== null) {
+            window.clearTimeout(ignoreNextRouteMapClickTimerRef.current);
+          }
+          ignoreNextRouteMapClickTimerRef.current = window.setTimeout(() => {
+            ignoreNextRouteMapClickRef.current = false;
+            ignoreNextRouteMapClickTimerRef.current = null;
+          }, 1200);
+          setWaypointMenu({
+            type: 'waypoint',
+            index,
+            x: waypointTouchStart.x,
+            y: waypointTouchStart.y,
+          });
+        }, 550);
+      });
+      element.addEventListener('touchmove', (event) => {
+        if (!waypointTouchStart || event.touches.length !== 1) {
+          clearWaypointLongPress();
+          return;
+        }
+        const touch = event.touches[0];
+        if (Math.hypot(touch.clientX - waypointTouchStart.x, touch.clientY - waypointTouchStart.y) > 12) {
+          clearWaypointLongPress();
+        }
+      });
+      element.addEventListener('touchend', clearWaypointLongPress);
+      element.addEventListener('touchcancel', clearWaypointLongPress);
       element.addEventListener('contextmenu', (event) => {
         event.preventDefault();
         event.stopPropagation();
+        const suppressedMenu = suppressWaypointContextMenuRef.current;
+        if (
+          suppressedMenu?.index === index
+          && Date.now() - suppressedMenu.createdAt < 1500
+        ) {
+          suppressWaypointContextMenuRef.current = null;
+          return;
+        }
         setWaypointMenu({ type: 'waypoint', index, x: event.clientX, y: event.clientY });
       });
       element.addEventListener('click', (event) => event.stopPropagation());
@@ -1693,7 +1759,7 @@ export default function MapPageClient() {
       routeMarkersRef.current.forEach((marker) => marker.remove());
       routeMarkersRef.current = [];
     };
-  }, [activeRoute.id, activeRoute.useOfflineRouting, language, mapReady, routeAnchors.length, setRouteAnchors]);
+  }, [activeRoute.id, activeRoute.useOfflineRouting, isMobileViewport, language, mapReady, routeAnchors.length, setRouteAnchors]);
 
   useEffect(() => {
     routeMarkersRef.current.forEach((marker, index) => {
@@ -1704,7 +1770,104 @@ export default function MapPageClient() {
         : anchor;
       marker.setLngLat(markerPosition);
     });
-  }, [routeAnchors, routeCoordinates, routedAnchors]);
+  }, [isMobileViewport, routeAnchors, routeCoordinates, routedAnchors]);
+
+  useEffect(() => {
+    const map = mapRef.current?.getMap();
+    const canvasContainer = map?.getCanvasContainer();
+    if (
+      !mapReady
+      || !map
+      || !canvasContainer
+      || !isMobileViewport
+      || !isRouting
+      || !activeRoute.useOfflineRouting
+      || routeAnchors.length < 2
+      || routeCoordinates.length < 2
+    ) return;
+
+    let longPressTimer: number | null = null;
+    let startPoint: { x: number; y: number } | null = null;
+    const clearLongPress = () => {
+      if (longPressTimer !== null) window.clearTimeout(longPressTimer);
+      longPressTimer = null;
+      startPoint = null;
+    };
+    const onTouchStart = (event: TouchEvent) => {
+      if (event.target instanceof Element && event.target.closest('[data-route-waypoint-marker="true"]')) return;
+      if (event.touches.length !== 1) {
+        clearLongPress();
+        return;
+      }
+      const touch = event.touches[0];
+      startPoint = { x: touch.clientX, y: touch.clientY };
+      longPressTimer = window.setTimeout(() => {
+        longPressTimer = null;
+        if (!startPoint) return;
+        const bounds = canvasContainer.getBoundingClientRect();
+        const mapPoint: [number, number] = [
+          startPoint.x - bounds.left,
+          startPoint.y - bounds.top,
+        ];
+        const routeLayerId = `planned-route-line-${activeRoute.id}`;
+        if (!map.queryRenderedFeatures(mapPoint, { layers: [routeLayerId] }).length) return;
+
+        const { lng, lat } = map.unproject(mapPoint);
+        const point = closestRoutePoint([lng, lat], routeCoordinates);
+        const insertionIndex = getRouteInsertionIndex(point, routeAnchors, routeCoordinates);
+        suppressWaypointContextMenuRef.current = { index: insertionIndex, createdAt: Date.now() };
+        ignoreNextRouteMapClickRef.current = true;
+        if (ignoreNextRouteMapClickTimerRef.current !== null) {
+          window.clearTimeout(ignoreNextRouteMapClickTimerRef.current);
+        }
+        ignoreNextRouteMapClickTimerRef.current = window.setTimeout(() => {
+          ignoreNextRouteMapClickRef.current = false;
+          ignoreNextRouteMapClickTimerRef.current = null;
+        }, 1200);
+        setRouteAnchors((points) => [
+          ...points.slice(0, insertionIndex),
+          point,
+          ...points.slice(insertionIndex),
+        ]);
+        setRouteInsertPreview(null);
+      }, 550);
+    };
+    const onTouchMove = (event: TouchEvent) => {
+      if (!startPoint || event.touches.length !== 1) {
+        clearLongPress();
+        return;
+      }
+      const touch = event.touches[0];
+      if (Math.hypot(touch.clientX - startPoint.x, touch.clientY - startPoint.y) > 12) {
+        clearLongPress();
+      }
+    };
+    const onTouchEnd = () => clearLongPress();
+    const onContextMenu = (event: MouseEvent) => {
+      const bounds = canvasContainer.getBoundingClientRect();
+      const mapPoint: [number, number] = [
+        event.clientX - bounds.left,
+        event.clientY - bounds.top,
+      ];
+      if (map.queryRenderedFeatures(mapPoint, { layers: [`planned-route-line-${activeRoute.id}`] }).length) {
+        event.preventDefault();
+      }
+    };
+
+    canvasContainer.addEventListener('touchstart', onTouchStart, { passive: true });
+    canvasContainer.addEventListener('touchmove', onTouchMove, { passive: true });
+    canvasContainer.addEventListener('touchend', onTouchEnd);
+    canvasContainer.addEventListener('touchcancel', onTouchEnd);
+    canvasContainer.addEventListener('contextmenu', onContextMenu);
+    return () => {
+      clearLongPress();
+      canvasContainer.removeEventListener('touchstart', onTouchStart);
+      canvasContainer.removeEventListener('touchmove', onTouchMove);
+      canvasContainer.removeEventListener('touchend', onTouchEnd);
+      canvasContainer.removeEventListener('touchcancel', onTouchEnd);
+      canvasContainer.removeEventListener('contextmenu', onContextMenu);
+    };
+  }, [activeRoute.id, activeRoute.useOfflineRouting, isMobileViewport, isRouting, mapReady, routeAnchors, routeCoordinates, setRouteAnchors]);
 
   useEffect(() => {
     const map = mapRef.current?.getMap();
@@ -2037,6 +2200,14 @@ export default function MapPageClient() {
         reuseMaps
         interactiveLayerIds={routeCoordinates.length > 1 ? [`planned-route-line-${activeRouteId}`] : []}
         onClick={(event) => {
+          if (ignoreNextRouteMapClickRef.current) {
+            ignoreNextRouteMapClickRef.current = false;
+            if (ignoreNextRouteMapClickTimerRef.current !== null) {
+              window.clearTimeout(ignoreNextRouteMapClickTimerRef.current);
+              ignoreNextRouteMapClickTimerRef.current = null;
+            }
+            return;
+          }
           setWaypointMenu(null);
           setIsBasemapPickerOpen(false);
           setIsTerrainPickerOpen(false);
@@ -2061,18 +2232,10 @@ export default function MapPageClient() {
             return;
           }
           const point: RoutePoint = closestRoutePoint([event.lngLat.lng, event.lngLat.lat], routeCoordinates);
-          const routeIndex = closestRouteIndex(point, routeCoordinates);
-          const anchorRouteIndices = routeAnchors.map((anchor) => closestRouteIndex(anchor, routeCoordinates));
-          let insertionIndex = routeAnchors.length;
-          for (let index = 0; index < anchorRouteIndices.length - 1; index++) {
-            const startIndex = Math.min(anchorRouteIndices[index], anchorRouteIndices[index + 1]);
-            const endIndex = Math.max(anchorRouteIndices[index], anchorRouteIndices[index + 1]);
-            if (routeIndex >= startIndex && routeIndex <= endIndex) {
-              insertionIndex = index + 1;
-              break;
-            }
-          }
-          setRouteInsertPreview({ point, index: insertionIndex });
+          setRouteInsertPreview({
+            point,
+            index: getRouteInsertionIndex(point, routeAnchors, routeCoordinates),
+          });
         }}
         onMouseLeave={() => setRouteInsertPreview(null)}
         onLoad={() => {
@@ -2131,7 +2294,7 @@ export default function MapPageClient() {
             />}
           </Source>
         ))}
-        {routeInsertPreview && isRouting && (
+        {routeInsertPreview && isRouting && !isMobileViewport && (
           <Source id="route-insert-preview" type="geojson" data={{
             type: 'Feature',
             properties: { label: '+' },
