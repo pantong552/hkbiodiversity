@@ -517,16 +517,10 @@ async function calculateRoute(
   const coordinates: RouteCoordinate[] = [];
   for (let index = 1; index < snapped.length; index++) {
     const segment = searchRoute(graph, snapped[index - 1], snapped[index], profile);
-    if (index === 1) {
-      const [longitude, latitude] = points[index - 1];
-      coordinates.push([longitude, latitude, graph.elevations[snapped[index - 1]]]);
-    }
     segment.forEach((nodeIndex) => {
       const [longitude, latitude] = graph.coordinates[nodeIndex];
       coordinates.push([longitude, latitude, graph.elevations[nodeIndex]]);
     });
-    const [longitude, latitude] = points[index];
-    coordinates.push([longitude, latitude, graph.elevations[snapped[index]]]);
   }
   return coordinates;
 }

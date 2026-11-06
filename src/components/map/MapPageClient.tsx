@@ -246,6 +246,14 @@ function closestRoutePoint(point: RoutePoint, route: RouteCoordinate[]): RoutePo
   return closest;
 }
 
+function haveSameRoutePoints(first: RoutePoint[], second: RoutePoint[]): boolean {
+  return first.length === second.length
+    && first.every((point, index) => {
+      const other = second[index];
+      return other !== undefined && point[0] === other[0] && point[1] === other[1];
+    });
+}
+
 function closestRouteIndex(point: RoutePoint, route: ReadonlyArray<ReadonlyArray<number>>): number {
   let closestIndex = 0;
   let closestDistance = Number.POSITIVE_INFINITY;
@@ -1351,6 +1359,7 @@ export default function MapPageClient() {
   const [routeProfileHover, setRouteProfileHover] = useState<{ coordinate: RoutePoint; distance: number; elevation: number } | null>(null);
   const [waypointMenu, setWaypointMenu] = useState<WaypointMenuState | null>(null);
   const routeRequestId = useRef(0);
+  const snappedRouteAnchorsRef = useRef<{ routeId: string; anchors: RoutePoint[] } | null>(null);
   const routeMarkersRef = useRef<MapLibreMarker[]>([]);
   const locationMarkersRef = useRef<MapLibreMarker[]>([]);
   const stopFollowingLiveLocationRef = useRef<(() => void) | null>(null);
@@ -1525,6 +1534,17 @@ export default function MapPageClient() {
   };
 
   useEffect(() => {
+    const snappedUpdate = snappedRouteAnchorsRef.current;
+    if (snappedUpdate) {
+      snappedRouteAnchorsRef.current = null;
+      if (
+        snappedUpdate.routeId === activeRouteId
+        && haveSameRoutePoints(routeAnchors, snappedUpdate.anchors)
+      ) {
+        return;
+      }
+    }
+
     const requestId = ++routeRequestId.current;
     if (routeAnchors.length < 2) {
       queueMicrotask(() => {
@@ -1576,8 +1596,13 @@ export default function MapPageClient() {
 
     routePromise.then((coordinates) => {
       if (routeRequestId.current === requestId) {
-        setRoutedAnchors(routeAnchors);
+        const snappedAnchors = routeAnchors.map((anchor) => closestRoutePoint(anchor, coordinates));
+        setRoutedAnchors(snappedAnchors);
         setRouteCoordinates(coordinates);
+        if (!haveSameRoutePoints(routeAnchors, snappedAnchors)) {
+          snappedRouteAnchorsRef.current = { routeId: activeRouteId, anchors: snappedAnchors };
+          setRouteAnchors(snappedAnchors);
+        }
       }
     }).catch((error: unknown) => {
       if (routeRequestId.current === requestId) {
@@ -1589,16 +1614,13 @@ export default function MapPageClient() {
     return () => {
       if (routeRequestId.current === activeRequestId) routeRequestId.current++;
     };
-  }, [activeRoute.useOfflineRouting, activeRouteId, allowPrivateRoads, calculateOfflineRoute, isRouting, routeAnchors, routeProfile, setRouteBusy, setRouteCoordinates, setRouteError, setRoutedAnchors]);
+  }, [activeRoute.useOfflineRouting, activeRouteId, allowPrivateRoads, calculateOfflineRoute, isRouting, routeAnchors, routeProfile, setRouteAnchors, setRouteBusy, setRouteCoordinates, setRouteError, setRoutedAnchors]);
 
   useEffect(() => {
     const map = mapRef.current?.getMap();
     if (!mapReady || !map) return;
     routeMarkersRef.current.forEach((marker) => marker.remove());
-    routeMarkersRef.current = routeAnchors.map((anchor, index) => {
-      const markerPosition = routeAnchors === routedAnchors && routeCoordinates.length > 1
-        ? closestRoutePoint(anchor, routeCoordinates)
-        : anchor;
+    routeMarkersRef.current = Array.from({ length: routeAnchors.length }, (_, index) => {
       const element = document.createElement('div');
       element.className = 'flex h-[22px] w-[22px] cursor-grab select-none items-center justify-center rounded-full border-[2.5px] border-white bg-blue-600 text-[10px] font-bold leading-none text-white shadow-[0_1px_5px_rgba(15,23,42,0.55)] ring-1 ring-blue-800/70 active:cursor-grabbing';
       element.textContent = String(index + 1);
@@ -1618,13 +1640,34 @@ export default function MapPageClient() {
         anchor: 'center',
       })
         .setOpacity(1, 1)
-        .setLngLat(markerPosition)
+        .setLngLat([0, 0])
         .addTo(map);
-      marker.on('dragend', () => {
+      let lastRouteUpdate = 0;
+      let pendingRouteUpdate: number | null = null;
+      const updateAnchor = () => {
         const { lng, lat } = marker.getLngLat();
         setRouteAnchors((points) => points.map((point, pointIndex) => (
           pointIndex === index ? [lng, lat] : point
         )));
+      };
+      marker.on('drag', () => {
+        if (!activeRoute.useOfflineRouting) return;
+        const now = Date.now();
+        if (now - lastRouteUpdate >= 200) {
+          lastRouteUpdate = now;
+          updateAnchor();
+        } else if (pendingRouteUpdate === null) {
+          pendingRouteUpdate = window.setTimeout(() => {
+            pendingRouteUpdate = null;
+            lastRouteUpdate = Date.now();
+            updateAnchor();
+          }, 200 - (now - lastRouteUpdate));
+        }
+      });
+      marker.on('dragend', () => {
+        if (pendingRouteUpdate !== null) window.clearTimeout(pendingRouteUpdate);
+        pendingRouteUpdate = null;
+        updateAnchor();
       });
       return marker;
     });
@@ -1632,7 +1675,18 @@ export default function MapPageClient() {
       routeMarkersRef.current.forEach((marker) => marker.remove());
       routeMarkersRef.current = [];
     };
-  }, [activeRouteId, language, mapReady, routeAnchors, routeCoordinates, routedAnchors, setRouteAnchors]);
+  }, [activeRoute.id, activeRoute.useOfflineRouting, language, mapReady, routeAnchors.length, setRouteAnchors]);
+
+  useEffect(() => {
+    routeMarkersRef.current.forEach((marker, index) => {
+      const anchor = routeAnchors[index];
+      if (!anchor) return;
+      const markerPosition = haveSameRoutePoints(routeAnchors, routedAnchors) && routeCoordinates.length > 1
+        ? closestRoutePoint(anchor, routeCoordinates)
+        : anchor;
+      marker.setLngLat(markerPosition);
+    });
+  }, [routeAnchors, routeCoordinates, routedAnchors]);
 
   useEffect(() => {
     const map = mapRef.current?.getMap();
