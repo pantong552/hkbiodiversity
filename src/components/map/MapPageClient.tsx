@@ -1967,6 +1967,7 @@ export default function MapPageClient() {
   }, [isMobileViewport, mapReady]);
 
   const currentBasemap = BASEMAPS.find((basemap) => basemap.id === currentStyleId) || BASEMAPS[0];
+  const isSatelliteBasemap = ['esri-sat', 'google-sat', 'google-hybrid', 'hk-imagery'].includes(currentStyleId);
   const demSourceConfig = DEM_SOURCES[demSourceId];
   const demSource = terrainReady ? getContourDemSource(demSourceId) : null;
   const contourTiles = areContoursEnabled && terrainReady && demSource
@@ -2380,8 +2381,8 @@ export default function MapPageClient() {
               source-layer="contours"
               filter={['all', ['!=', ['get', 'ele'], 0], ['!=', ['get', 'ele'], 10]]}
               paint={{
-                'line-color': 'rgb(126, 124, 121)',
-                'line-opacity': 0.3,
+                'line-color': isSatelliteBasemap ? '#ffffff' : 'rgb(126, 124, 121)',
+                'line-opacity': isSatelliteBasemap ? 0.7 : 0.3,
                 'line-width': 0.5,
               }}
               layout={{
@@ -2395,11 +2396,12 @@ export default function MapPageClient() {
               type="line"
               source={`terrain-contours-${demSourceId}`}
               source-layer="contours"
-              filter={['all', ['==', ['%', ['get', 'ele'], 100], 0], ['!=', ['get', 'ele'], 0], ['!=', ['get', 'ele'], 10]]}
+              minzoom={15}
+              filter={['all', ['==', ['%', ['get', 'ele'], 50], 0], ['!=', ['get', 'ele'], 0], ['!=', ['get', 'ele'], 10]]}
               paint={{
-                'line-color': 'rgb(124, 122, 121)',
-                'line-opacity': 0.1,
-                'line-width': 1,
+                'line-color': isSatelliteBasemap ? '#ffffff' : 'rgb(124, 122, 121)',
+                'line-opacity': isSatelliteBasemap ? 0.9 : 0.5,
+                'line-width': 1.5,
               }}
               layout={{
                 'line-join': 'round',
@@ -2426,8 +2428,8 @@ export default function MapPageClient() {
                 visibility: 'visible',
               }}
               paint={{
-                'text-color': '#5c5c5c',
-                'text-halo-color': 'rgba(255,255,255,0.85)',
+                'text-color': isSatelliteBasemap ? '#ffffff' : '#5c5c5c',
+                'text-halo-color': isSatelliteBasemap ? 'rgba(15,23,42,0.85)' : 'rgba(255,255,255,0.85)',
                 'text-halo-width': 1.25,
               }}
             />
