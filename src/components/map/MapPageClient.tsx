@@ -2200,6 +2200,7 @@ export default function MapPageClient() {
         reuseMaps
         interactiveLayerIds={routeCoordinates.length > 1 ? [`planned-route-line-${activeRouteId}`] : []}
         onClick={(event) => {
+          setIsRoutingPanelOpen(false);
           if (ignoreNextRouteMapClickRef.current) {
             ignoreNextRouteMapClickRef.current = false;
             if (ignoreNextRouteMapClickTimerRef.current !== null) {
@@ -2224,6 +2225,9 @@ export default function MapPageClient() {
             }
             setRouteInsertPreview(null);
           }
+        }}
+        onMoveStart={(event) => {
+          if (event.originalEvent) setIsRoutingPanelOpen(false);
         }}
         onMouseMove={(event) => {
           const overRoute = event.features?.some((feature) => feature.layer.id === `planned-route-line-${activeRouteId}`);
@@ -2713,17 +2717,23 @@ export default function MapPageClient() {
           }}
           className={MAP_ICON_BUTTON_CLASS}
         >
-          <Layers className="h-5 w-5 text-emerald-700" />
+          <Layers className="h-5 w-5 text-slate-700" />
         </button>
 
         {hasOpenedBasemapPicker && (
-          <section
+          <motion.section
             id="map-basemap-picker"
             aria-label={language === 'zh' ? '選擇底圖' : 'Choose a basemap'}
             aria-hidden={!isBasemapPickerOpen}
             inert={!isBasemapPickerOpen}
+            initial={{ opacity: 0, x: 12, scale: 0.96 }}
+            animate={isBasemapPickerOpen
+              ? { opacity: 1, x: 0, scale: 1 }
+              : { opacity: 0, x: 12, scale: 0.96 }}
+            transition={{ duration: 0.18, ease: 'easeOut' }}
+            style={{ transformOrigin: 'right center' }}
             className={`pointer-events-auto absolute right-full top-0 mr-3 w-[min(20rem,calc(100vw-6rem))] overflow-hidden rounded-3xl border border-white/70 bg-white/95 p-3 shadow-2xl backdrop-blur-xl ${
-              isBasemapPickerOpen ? '' : 'invisible pointer-events-none'
+              isBasemapPickerOpen ? '' : 'pointer-events-none'
             }`}
           >
             <div className="mb-2 flex items-center justify-between gap-2 px-2 py-1">
@@ -2813,7 +2823,7 @@ export default function MapPageClient() {
                 );
               })}
             </div>
-            </section>
+            </motion.section>
         )}
         </div>
 
@@ -2829,15 +2839,21 @@ export default function MapPageClient() {
               }}
               className={MAP_ICON_BUTTON_CLASS}
             >
-              <Mountain className="h-5 w-5 text-emerald-700" />
+              <Mountain className="h-5 w-5 text-slate-700" />
             </button>
 
-            {isTerrainPickerOpen && (
-              <section
-                id="map-terrain-picker"
-                aria-label={language === 'zh' ? '地形圖層設定' : 'Terrain layer settings'}
-                className="pointer-events-auto absolute right-full top-0 mr-3 w-[min(18rem,calc(100vw-6rem))] rounded-2xl border border-white/70 bg-white/95 p-4 shadow-2xl backdrop-blur-xl"
-              >
+            <AnimatePresence initial={false}>
+              {isTerrainPickerOpen && (
+                <motion.section
+                  id="map-terrain-picker"
+                  aria-label={language === 'zh' ? '地形圖層設定' : 'Terrain layer settings'}
+                  initial={{ opacity: 0, x: 12, scale: 0.96 }}
+                  animate={{ opacity: 1, x: 0, scale: 1 }}
+                  exit={{ opacity: 0, x: 12, scale: 0.96 }}
+                  transition={{ duration: 0.18, ease: 'easeOut' }}
+                  style={{ transformOrigin: 'right center' }}
+                  className="pointer-events-auto absolute right-full top-0 mr-3 w-[min(18rem,calc(100vw-6rem))] rounded-2xl border border-white/70 bg-white/95 p-4 shadow-2xl backdrop-blur-xl"
+                >
                 <h2 className="mb-3 text-sm font-black text-slate-900">
                   {language === 'zh' ? '地形圖層' : 'Terrain layers'}
                 </h2>
@@ -2890,8 +2906,9 @@ export default function MapPageClient() {
                     </span>
                   </button>
                 </div>
-              </section>
-            )}
+                </motion.section>
+              )}
+            </AnimatePresence>
         </div>
 
         <button
@@ -2922,7 +2939,16 @@ export default function MapPageClient() {
           <button type="button" aria-label={language === 'zh' ? '路線規劃' : 'Routing'} aria-expanded={isRoutingPanelOpen} onClick={() => { setIsRoutingPanelOpen((open) => !open); setIsBasemapPickerOpen(false); setIsTerrainPickerOpen(false); }} className={`${MAP_ICON_BUTTON_CLASS} ${isRouting ? '!border-emerald-600 !bg-emerald-600 !text-white hover:!bg-emerald-700' : ''}`}>
             <RouteIcon className="h-5 w-5" />
           </button>
-          {isRoutingPanelOpen && <section aria-label={language === 'zh' ? '路線規劃' : 'Routing'} className="pointer-events-auto absolute right-full top-0 mr-3 w-[min(20rem,calc(100vw-6rem))] rounded-2xl border border-white/70 bg-white/95 p-3 shadow-2xl backdrop-blur-xl">
+          <AnimatePresence initial={false}>
+            {isRoutingPanelOpen && <motion.section
+              aria-label={language === 'zh' ? '路線規劃' : 'Routing'}
+              initial={{ opacity: 0, x: 12, scale: 0.96 }}
+              animate={{ opacity: 1, x: 0, scale: 1 }}
+              exit={{ opacity: 0, x: 12, scale: 0.96 }}
+              transition={{ duration: 0.18, ease: 'easeOut' }}
+              style={{ transformOrigin: 'right center' }}
+              className="pointer-events-auto absolute right-full top-0 mr-3 w-[min(20rem,calc(100vw-6rem))] rounded-2xl border border-white/70 bg-white/95 p-3 shadow-2xl backdrop-blur-xl"
+            >
             <h2 className="mb-2 flex items-center gap-2 px-1 text-sm font-black text-slate-900"><RouteIcon className="h-4 w-4" />{language === 'zh' ? '路線規劃' : 'Routing'}</h2>
             <div className="mb-2"><RouteTabs
               tabs={routes.map((route) => ({
@@ -3105,7 +3131,8 @@ export default function MapPageClient() {
               {routeError && <p role="alert" className="mb-2 rounded-lg bg-red-50 px-2 py-1.5 text-xs text-red-700">{language === 'zh' ? '尋路失敗：' : 'Routing failed: '}{getRouteErrorMessage(routeError, language)}</p>}
               <div className="flex gap-2"><button type="button" disabled={!routeCoordinates.length} onClick={() => downloadRouteGpx(routeCoordinates)} className="flex flex-1 items-center justify-center gap-1 rounded-lg bg-slate-800 px-2 py-2 text-xs font-bold text-white disabled:opacity-40"><Download className="h-3.5 w-3.5" />GPX</button><button type="button" disabled={!routeAnchors.length} onClick={() => { setRouteAnchors([]); setRouteCoordinates([]); }} className="flex flex-1 items-center justify-center gap-1 rounded-lg border border-slate-200 px-2 py-2 text-xs font-bold text-slate-700 disabled:opacity-40"><Trash2 className="h-3.5 w-3.5" />{language === 'zh' ? '清除' : 'Clear'}</button></div>
             </>}
-          </section>}
+            </motion.section>}
+          </AnimatePresence>
         </div>
       </div>
 
