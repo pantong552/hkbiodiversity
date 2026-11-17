@@ -90,6 +90,19 @@
   box-shadow: 0 0 8px rgb(37 99 235 / 45%);
 }
 
+.map-page .maplibregl-user-location-dot.maplibregl-user-location-dot-stale,
+.map-page .maplibregl-user-location-dot.maplibregl-user-location-dot-stale:before {
+  background-color: #94a3b8;
+}
+
+.map-page .maplibregl-user-location-dot.maplibregl-user-location-dot-stale:before {
+  box-shadow: 0 0 18px rgb(148 163 184 / 60%);
+}
+
+.map-page .maplibregl-user-location-dot.maplibregl-user-location-dot-stale:after {
+  display: none;
+}
+
 .map-page .maplibregl-user-location-direction-marker {
   width: 88px;
   height: 88px;
@@ -107,7 +120,13 @@
   background-color: rgb(37 99 235 / 16%);
   border: 1px solid rgb(37 99 235 / 16%);
   box-shadow: 0 0 28px rgb(37 99 235 / 24%);
-  transition: width 300ms ease, height 300ms ease;
+  transition: width 300ms ease, height 300ms ease, background-color 300ms ease, border-color 300ms ease, box-shadow 300ms ease;
+}
+
+.map-page .maplibregl-user-location-accuracy-circle-stale {
+  background-color: rgb(148 163 184 / 16%);
+  border-color: rgb(148 163 184 / 16%);
+  box-shadow: 0 0 28px rgb(148 163 184 / 24%);
 }
 
 body {

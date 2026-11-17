@@ -1063,6 +1063,11 @@ function LiveLocationControl({
       accuracyElement.style.height = `${diameter}px`;
     };
 
+    const setLocationStale = (stale: boolean) => {
+      locationMarker?.getElement().classList.toggle('maplibregl-user-location-dot-stale', stale);
+      accuracyElement?.classList.toggle('maplibregl-user-location-accuracy-circle-stale', stale);
+    };
+
     const stopTracking = () => {
       if (watchId !== null) {
         navigator.geolocation.clearWatch(watchId);
@@ -1096,6 +1101,8 @@ function LiveLocationControl({
     const reportError = (error: GeolocationPositionError) => {
       if (error.code === error.PERMISSION_DENIED) {
         stopTracking();
+      } else {
+        setLocationStale(true);
       }
       propsRef.current.onError(error.code);
     };
@@ -1115,6 +1122,7 @@ function LiveLocationControl({
     const updateLocation = (position: GeolocationPosition) => {
       if (!map || !isTracking) return;
 
+      setLocationStale(false);
       const { longitude, latitude, accuracy } = position.coords;
       const center: [number, number] = [longitude, latitude];
       locationAccuracy = accuracy;
