@@ -290,9 +290,7 @@ export default function Header({ isHomePage: propIsHomePage }: HeaderProps = {})
                       toggleExpand(false);
                     }
                   }}
-                  className={`${link.href === '/map'
-                    ? `inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 ${isHeaderTransparent ? 'border-white/25 bg-white/10 text-white hover:bg-white/20' : 'border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100'}`
-                    : `${language === 'en' ? 'text-xs xl:text-sm' : 'text-sm'} font-bold transition-colors duration-500 ${isHeaderTransparent ? 'text-white drop-shadow-sm hover:text-emerald-300' : 'text-slate-500 hover:text-emerald-600'}`}`}
+                  className={`${language === 'en' ? 'text-xs xl:text-sm' : 'text-sm'} font-bold transition-colors duration-500 ${isHeaderTransparent ? 'text-white drop-shadow-sm hover:text-emerald-300' : 'text-slate-500 hover:text-emerald-600'}`}
                 >
                   {link.name}
                 </Link>
@@ -448,7 +446,7 @@ export default function Header({ isHomePage: propIsHomePage }: HeaderProps = {})
                         toggleExpand(false);
                       }
                     }}
-                    className={`flex items-center gap-2 text-lg font-bold text-slate-700 hover:text-emerald-600 px-4 py-2 rounded-xl hover:bg-emerald-50 transition-all ${link.href === '/map' ? 'bg-emerald-50 text-emerald-700' : ''}`}
+                    className="flex items-center gap-2 text-lg font-bold text-slate-700 hover:text-emerald-600 px-4 py-2 rounded-xl hover:bg-emerald-50 transition-all"
                   >
                     {link.name}
                   </Link>
