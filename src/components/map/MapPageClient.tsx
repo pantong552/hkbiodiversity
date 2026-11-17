@@ -2378,6 +2378,7 @@ export default function MapPageClient() {
               type="line"
               source={`terrain-contours-${demSourceId}`}
               source-layer="contours"
+              filter={['all', ['!=', ['get', 'ele'], 0], ['!=', ['get', 'ele'], 10]]}
               paint={{
                 'line-color': 'rgb(126, 124, 121)',
                 'line-opacity': 0.3,
@@ -2394,7 +2395,7 @@ export default function MapPageClient() {
               type="line"
               source={`terrain-contours-${demSourceId}`}
               source-layer="contours"
-              filter={['==', ['%', ['get', 'ele'], 100], 0]}
+              filter={['all', ['==', ['%', ['get', 'ele'], 100], 0], ['!=', ['get', 'ele'], 0], ['!=', ['get', 'ele'], 10]]}
               paint={{
                 'line-color': 'rgb(124, 122, 121)',
                 'line-opacity': 0.1,
@@ -2411,7 +2412,7 @@ export default function MapPageClient() {
               type="symbol"
               source={`terrain-contours-${demSourceId}`}
               source-layer="contours"
-              filter={['>', ['get', 'level'], 0]}
+              filter={['all', ['>', ['get', 'level'], 0], ['!=', ['get', 'ele'], 0], ['!=', ['get', 'ele'], 10]]}
               layout={{
                 'symbol-placement': 'line',
                 'text-anchor': 'center',
