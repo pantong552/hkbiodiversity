@@ -21,6 +21,7 @@ import {
   type StyleSpecification,
 } from 'maplibre-gl';
 import mlcontour from 'maplibre-contour';
+import proj4 from 'proj4';
 import { AnimatePresence, motion, useSpring, useTransform } from 'framer-motion';
 import CustomDropdown from '@/components/ui/CustomDropdown';
 import useOfflineRouting from '@/hooks/useOfflineRouting';
@@ -34,7 +35,31 @@ const INITIAL_VIEW_STATE = {
   latitude: 22.34826,
   zoom: 11.99,
 };
+// EPSG:2326 Hong Kong 1980 Grid System, including its WGS 84 datum shift.
+const WGS84_PROJECTION = '+proj=longlat +datum=WGS84 +no_defs +type=crs';
+const HK1980_PROJECTION = '+proj=tmerc +lat_0=22.3121333333333 +lon_0=114.178555555556 +k=1 +x_0=836694.05 +y_0=819069.8 +ellps=intl +towgs84=-162.619,-276.959,-161.764,-0.067753,2.243648,1.158828,-1.094246 +units=m +no_defs +type=crs';
 const ROUTE_DIRECTION_IMAGE_ID = 'route-direction-arrow';
+
+function projectToHk1980(longitude: number, latitude: number) {
+  const [easting, northing] = proj4(WGS84_PROJECTION, HK1980_PROJECTION, [longitude, latitude]);
+  return { easting, northing };
+}
+
+function formatLiveCoordinates(
+  coordinates: { longitude: number; latitude: number; accuracy: number } | null,
+  coordinateSystem: 'wgs84' | 'hk1980',
+) {
+  if (!coordinates) return '--';
+
+  let formattedCoordinates: string;
+  if (coordinateSystem === 'hk1980') {
+    const { easting, northing } = projectToHk1980(coordinates.longitude, coordinates.latitude);
+    formattedCoordinates = `E ${Math.round(easting).toLocaleString('en-US')}, N ${Math.round(northing).toLocaleString('en-US')}`;
+  } else {
+    formattedCoordinates = `${coordinates.latitude.toFixed(6)}, ${coordinates.longitude.toFixed(6)}`;
+  }
+  return formattedCoordinates;
+}
 
 function ensureRouteDirectionImage(map: MapLibreMap) {
   if (map.hasImage(ROUTE_DIRECTION_IMAGE_ID)) return;
@@ -900,7 +925,7 @@ type LiveLocationControlProps = {
   onTrackingChange: (isTracking: boolean) => void;
   onSearchActionReady: (stopFollowing: (() => void) | null) => void;
   onError: (code: number) => void;
-  onLocationUpdate: (longitude: number, latitude: number) => void;
+  onLocationUpdate: (longitude: number, latitude: number, accuracy: number) => void;
   onHeadingUpdate: (heading: number | null) => void;
 };
 
@@ -1206,7 +1231,7 @@ function LiveLocationControl({
         });
       }
       button.classList.remove('maplibregl-ctrl-geolocate-waiting');
-      propsRef.current.onLocationUpdate(longitude, latitude);
+      propsRef.current.onLocationUpdate(longitude, latitude, accuracy);
     };
 
     return {
@@ -1348,7 +1373,9 @@ export default function MapPageClient() {
   const [liveLocationCoordinates, setLiveLocationCoordinates] = useState<{
     longitude: number;
     latitude: number;
+    accuracy: number;
   } | null>(null);
+  const [coordinateSystem, setCoordinateSystem] = useState<'wgs84' | 'hk1980'>('wgs84');
   const [deviceHeading, setDeviceHeading] = useState<number | null>(null);
   const [isRoutingPanelOpen, setIsRoutingPanelOpen] = useState(false);
   const [isOfflineRoutingInfoOpen, setIsOfflineRoutingInfoOpen] = useState(false);
@@ -2430,8 +2457,8 @@ export default function MapPageClient() {
                     : 'Location timed out. Continuing to look for a high-accuracy fix.'),
             );
           }}
-          onLocationUpdate={(longitude, latitude) => {
-            setLiveLocationCoordinates({ longitude, latitude });
+          onLocationUpdate={(longitude, latitude, accuracy) => {
+            setLiveLocationCoordinates({ longitude, latitude, accuracy });
             setLocationError(null);
           }}
           onHeadingUpdate={setDeviceHeading}
@@ -2595,17 +2622,50 @@ export default function MapPageClient() {
             transition={{ duration: 0.25, ease: 'easeInOut' }}
             className="z-30 shrink-0 overflow-hidden"
           >
-            <div className="grid h-14 grid-cols-2 items-center gap-2 border-t border-slate-200 bg-white/95 px-3 text-xs shadow-[0_-2px_8px_rgba(15,23,42,0.08)]">
+            <div className="grid h-14 grid-cols-[minmax(0,1.7fr)_minmax(4.5rem,0.7fr)] items-center gap-2 border-t border-slate-200 bg-white/95 px-3 text-xs shadow-[0_-2px_8px_rgba(15,23,42,0.08)]">
               <div className="min-w-0">
-                <p className="font-semibold text-slate-500">{language === 'zh' ? '定位座標' : 'Coordinates'}</p>
-                <p className="truncate font-mono text-slate-800">
-                  {liveLocationCoordinates
-                    ? `${liveLocationCoordinates.latitude.toFixed(6)}, ${liveLocationCoordinates.longitude.toFixed(6)}`
-                    : '--'}
+                <div className="flex items-center gap-2">
+                  <p className="shrink-0 font-semibold text-slate-500">{language === 'zh' ? '定位座標' : 'Coordinates'}</p>
+                  <div
+                    role="group"
+                    aria-label={language === 'zh' ? '座標系統' : 'Coordinate system'}
+                    className="flex shrink-0 items-center rounded-md bg-slate-100 p-0.5"
+                  >
+                    <button
+                      type="button"
+                      aria-pressed={coordinateSystem === 'wgs84'}
+                      onClick={() => setCoordinateSystem('wgs84')}
+                      className={`rounded px-1.5 py-0.5 text-[9px] font-bold leading-none transition ${
+                        coordinateSystem === 'wgs84' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500'
+                      }`}
+                    >
+                      WGS84
+                    </button>
+                    <button
+                      type="button"
+                      aria-pressed={coordinateSystem === 'hk1980'}
+                      onClick={() => setCoordinateSystem('hk1980')}
+                      className={`rounded px-1.5 py-0.5 text-[9px] font-bold leading-none transition ${
+                        coordinateSystem === 'hk1980' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500'
+                      }`}
+                    >
+                      HK1980
+                    </button>
+                  </div>
+                </div>
+                <p className="flex min-w-0 items-center gap-1 font-mono text-[10px] leading-4 text-slate-800">
+                  <span className="min-w-0 truncate">
+                    {formatLiveCoordinates(liveLocationCoordinates, coordinateSystem)}
+                  </span>
+                  {liveLocationCoordinates && (
+                    <span className="shrink-0 whitespace-nowrap">
+                      (± {Math.round(liveLocationCoordinates.accuracy)}m)
+                    </span>
+                  )}
                 </p>
               </div>
               <div className="min-w-0 text-right">
-                <p className="font-semibold text-slate-500">{language === 'zh' ? '裝置角度' : 'Device heading'}</p>
+                <p className="font-semibold text-slate-500">{language === 'zh' ? '朝向' : 'Heading'}</p>
                 <p className="font-mono text-slate-800">
                   {deviceHeading === null ? '--' : `${deviceHeading}°`}
                 </p>
