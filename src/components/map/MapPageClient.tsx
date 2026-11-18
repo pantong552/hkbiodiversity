@@ -1852,11 +1852,13 @@ export default function MapPageClient() {
     let requestController: AbortController | null = null;
     let moveEndTimeout: number | null = null;
     let loadedRequest: { bbox: [number, number, number, number]; tier: number } | null = null;
+    let requestedTier: number | null = null;
     const updateGlaFeatures = async () => {
       const zoom = map.getZoom();
       if (zoom < GLA_LAYER_MIN_ZOOM) {
         requestController?.abort();
         requestController = null;
+        requestedTier = null;
         loadedRequest = null;
         setGlaData({ type: 'FeatureCollection', features: [] });
         setIsGlaLoading(false);
@@ -1874,6 +1876,10 @@ export default function MapPageClient() {
       const latitude = (bbox[1] + bbox[3]) / 2;
       const scale = 591657550.5 * Math.cos(latitude * Math.PI / 180) / 2 ** (zoom + 1);
       const tier = scale > 20000 ? 0 : scale > 4500 ? 1 : 2;
+      if (loadedRequest && loadedRequest.tier !== tier) {
+        loadedRequest = null;
+        setGlaData({ type: 'FeatureCollection', features: [] });
+      }
       const coversCurrentView = loadedRequest !== null
         && loadedRequest.tier === tier
         && bbox[0] >= loadedRequest.bbox[0]
@@ -1885,6 +1891,7 @@ export default function MapPageClient() {
       requestController?.abort();
       const controller = new AbortController();
       requestController = controller;
+      requestedTier = tier;
       const width = bbox[2] - bbox[0];
       const height = bbox[3] - bbox[1];
       const requestBbox: [number, number, number, number] = [
@@ -1923,8 +1930,40 @@ export default function MapPageClient() {
           setGlaLoadError(error instanceof Error ? error.message : 'Unable to load GLA data');
         }
       } finally {
-        if (requestController === controller) requestController = null;
+        if (requestController === controller) {
+          requestController = null;
+          requestedTier = null;
+        }
         if (active && !controller.signal.aborted) setIsGlaLoading(false);
+      }
+    };
+    const clearStaleGlaTier = () => {
+      const zoom = map.getZoom();
+      if (zoom < GLA_LAYER_MIN_ZOOM) {
+        if (loadedRequest || requestedTier !== null) {
+          requestController?.abort();
+          requestController = null;
+          requestedTier = null;
+          loadedRequest = null;
+          setGlaData({ type: 'FeatureCollection', features: [] });
+          setIsGlaLoading(false);
+        }
+        return;
+      }
+
+      const bounds = map.getBounds();
+      const latitude = (bounds.getSouth() + bounds.getNorth()) / 2;
+      const scale = 591657550.5 * Math.cos(latitude * Math.PI / 180) / 2 ** (zoom + 1);
+      const tier = scale > 20000 ? 0 : scale > 4500 ? 1 : 2;
+      if (loadedRequest && loadedRequest.tier !== tier) {
+        loadedRequest = null;
+        setGlaData({ type: 'FeatureCollection', features: [] });
+      }
+      if (requestedTier !== null && requestedTier !== tier) {
+        requestController?.abort();
+        requestController = null;
+        requestedTier = null;
+        setIsGlaLoading(false);
       }
     };
     const scheduleGlaUpdate = () => {
@@ -1935,10 +1974,12 @@ export default function MapPageClient() {
       }, 200);
     };
 
+    map.on('zoom', clearStaleGlaTier);
     map.on('moveend', scheduleGlaUpdate);
     void updateGlaFeatures();
     return () => {
       active = false;
+      map.off('zoom', clearStaleGlaTier);
       map.off('moveend', scheduleGlaUpdate);
       if (moveEndTimeout !== null) window.clearTimeout(moveEndTimeout);
       requestController?.abort();
@@ -2801,7 +2842,7 @@ export default function MapPageClient() {
               id="lot-boundaries"
               type="raster"
               minzoom={LOT_LAYER_MIN_ZOOM}
-              paint={{ 'raster-opacity': 0.9 }}
+              paint={{ 'raster-opacity': 0.9, 'raster-fade-duration': 0 }}
             />
           </Source>
         )}

@@ -1,5 +1,4 @@
 import { NextResponse } from 'next/server';
-import proj4 from 'proj4';
 
 export const runtime = 'nodejs';
 export const maxDuration = 60;
@@ -17,8 +16,6 @@ const HONG_KONG_BOUNDS = {
   north: 22.58,
 };
 const WEB_MERCATOR_LIMIT = 20037508.342789244;
-const WGS84_PROJECTION = '+proj=longlat +datum=WGS84 +no_defs +type=crs';
-const HK1980_PROJECTION = '+proj=tmerc +lat_0=22.3121333333333 +lon_0=114.178555555556 +k=1 +x_0=836694.05 +y_0=819069.8 +ellps=intl +towgs84=-162.619,-276.959,-161.764,-0.067753,2.243648,1.158828,-1.094246 +units=m +no_defs +type=crs';
 
 type JsonRecord = Record<string, unknown>;
 type Position = [number, number];
@@ -173,32 +170,7 @@ function toTileBounds(z: number, x: number, y: number) {
   const maxX = minX + tileSize;
   const maxY = WEB_MERCATOR_LIMIT - y * tileSize;
   const minY = maxY - tileSize;
-  const mercatorToWgs84 = ([easting, northing]: Position): Position => [
-    (easting / 6378137) * 180 / Math.PI,
-    (2 * Math.atan(Math.exp(northing / 6378137)) - Math.PI / 2) * 180 / Math.PI,
-  ];
-  const edgeSamples: Position[] = [
-    [minX, minY],
-    [minX, (minY + maxY) / 2],
-    [minX, maxY],
-    [(minX + maxX) / 2, minY],
-    [(minX + maxX) / 2, maxY],
-    [maxX, minY],
-    [maxX, (minY + maxY) / 2],
-    [maxX, maxY],
-  ];
-  const wgs84Samples: Position[] = edgeSamples.map(mercatorToWgs84);
-  const hk1980Coordinates = wgs84Samples.map((coordinates) => (
-    proj4(WGS84_PROJECTION, HK1980_PROJECTION, coordinates)
-  ));
-  const eastings = hk1980Coordinates.map(([easting]) => easting);
-  const northings = hk1980Coordinates.map(([, northing]) => northing);
-  return [
-    Math.min(...eastings),
-    Math.min(...northings),
-    Math.max(...eastings),
-    Math.max(...northings),
-  ].join(',');
+  return [minX, minY, maxX, maxY].join(',');
 }
 
 async function getLotTile(request: Request, url: URL) {
@@ -211,8 +183,8 @@ async function getLotTile(request: Request, url: URL) {
 
   const params = new URLSearchParams({
     bbox: toTileBounds(z, x, y),
-    bboxSR: '2326',
-    imageSR: '2326',
+    bboxSR: '3857',
+    imageSR: '3857',
     size: '256,256',
     dpi: '96',
     format: 'png32',
