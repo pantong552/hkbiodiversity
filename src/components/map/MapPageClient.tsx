@@ -27,7 +27,7 @@ import proj4 from 'proj4';
 import { AnimatePresence, motion, useSpring, useTransform } from 'framer-motion';
 import CustomDropdown from '@/components/ui/CustomDropdown';
 import useOfflineRouting from '@/hooks/useOfflineRouting';
-import { Check, ChevronDown, ChevronLeft, ChevronUp, Eye, EyeOff, Info, Layers, LoaderCircle, Mountain, Plus, RefreshCw, Route as RouteIcon, Search, Download, Trash2, X } from 'lucide-react';
+import { Check, ChevronDown, ChevronLeft, ChevronUp, Eye, EyeOff, Info, Layers, LoaderCircle, Map as MapIcon, Mountain, Plus, RefreshCw, Route as RouteIcon, Search, Download, Trash2, X } from 'lucide-react';
 import { useLanguage } from '@/context/LanguageContext';
 import { BASEMAPS } from '@/constants/basemaps';
 import { HABITAT_MIN_ZOOM, HABITAT_TYPES, type HabitatTypeId } from '@/constants/habitats';
@@ -1361,6 +1361,58 @@ function LiveLocationControl({
   return null;
 }
 
+type ThreeDModeControlProps = {
+  language: 'zh' | 'en';
+  isEnabled: boolean;
+  onToggle: () => void;
+};
+
+function ThreeDModeControl({ language, isEnabled, onToggle }: ThreeDModeControlProps) {
+  const propsRef = useRef({ language, isEnabled, onToggle });
+  const buttonRef = useRef<HTMLButtonElement | null>(null);
+
+  const control = useControl(() => ({
+    onAdd() {
+      const container = document.createElement('div');
+      container.className = 'maplibregl-ctrl maplibregl-ctrl-group';
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'maplibregl-ctrl-fullscreen';
+      button.setAttribute('aria-pressed', 'false');
+      button.textContent = '3D';
+      button.style.display = 'flex';
+      button.style.alignItems = 'center';
+      button.style.justifyContent = 'center';
+      button.style.fontSize = '10px';
+      button.style.fontWeight = '700';
+      button.addEventListener('click', () => propsRef.current.onToggle());
+      buttonRef.current = button;
+      container.append(button);
+      return container;
+    },
+    onRemove() {
+      buttonRef.current = null;
+    },
+  }), { position: 'bottom-right' });
+
+  useEffect(() => {
+    propsRef.current = { language, isEnabled, onToggle };
+    const button = buttonRef.current;
+    if (!button) return;
+
+    const label = language === 'zh'
+      ? (isEnabled ? '退出 3D 模式' : '進入 3D 模式')
+      : (isEnabled ? 'Exit 3D mode' : 'Enter 3D mode');
+    button.setAttribute('aria-label', label);
+    button.title = label;
+    button.setAttribute('aria-pressed', String(isEnabled));
+    button.style.backgroundColor = isEnabled ? '#059669' : '';
+    button.style.color = isEnabled ? '#ffffff' : '';
+  }, [control, isEnabled, language, onToggle]);
+
+  return null;
+}
+
 export default function MapPageClient() {
   const { language, setLanguage } = useLanguage();
   const offlineRouting = useOfflineRouting();
@@ -1369,6 +1421,7 @@ export default function MapPageClient() {
   const [isBasemapPickerOpen, setIsBasemapPickerOpen] = useState(false);
   const [hasOpenedBasemapPicker, setHasOpenedBasemapPicker] = useState(false);
   const [isTerrainPickerOpen, setIsTerrainPickerOpen] = useState(false);
+  const [isHabitatPickerOpen, setIsHabitatPickerOpen] = useState(false);
   const [isHillshadeEnabled, setIsHillshadeEnabled] = useState(false);
   const [is3DModeEnabled, setIs3DModeEnabled] = useState(false);
   const [areContoursEnabled, setAreContoursEnabled] = useState(true);
@@ -1759,6 +1812,23 @@ export default function MapPageClient() {
     document.addEventListener('pointermove', hideTooltipOverInterface);
     return () => document.removeEventListener('pointermove', hideTooltipOverInterface);
   }, [isHabitatTooltipVisible]);
+
+  useEffect(() => {
+    if (!mapReady) return;
+
+    const map = mapRef.current?.getMap();
+    if (!map) return;
+
+    const updateHabitatZoom = () => {
+      setIsHabitatZoomedIn(map.getZoom() >= HABITAT_MIN_ZOOM);
+    };
+
+    updateHabitatZoom();
+    map.on('zoomend', updateHabitatZoom);
+    return () => {
+      map.off('zoomend', updateHabitatZoom);
+    };
+  }, [mapReady]);
 
   useEffect(() => {
     const map = mapRef.current?.getMap();
@@ -2462,7 +2532,9 @@ export default function MapPageClient() {
           </div>
         </section>
       </div>}
-      {routeBusy && <div className="pointer-events-none fixed inset-x-0 top-0 z-[1000]" role="status" aria-label={language === 'zh' ? '正在計算路線' : 'Calculating route'}>
+      {(routeBusy || isHabitatLoading) && <div className="pointer-events-none fixed inset-x-0 top-0 z-[1000]" role="status" aria-label={language === 'zh'
+        ? (isHabitatLoading ? '正在載入棲地地圖' : '正在計算路線')
+        : (isHabitatLoading ? 'Loading habitat map' : 'Calculating route')}>
         <div className="relative h-1 w-full overflow-hidden bg-slate-900/10 shadow-sm">
           <div className="absolute inset-y-0 w-2/5 bg-gradient-to-r from-emerald-400 via-sky-500 to-blue-600 shadow-[0_0_12px_rgba(14,165,233,0.65)]" style={{ animation: 'route-loading 1.25s ease-in-out infinite' }} />
         </div>
@@ -2500,6 +2572,7 @@ export default function MapPageClient() {
           setWaypointMenu(null);
           setIsBasemapPickerOpen(false);
           setIsTerrainPickerOpen(false);
+          setIsHabitatPickerOpen(false);
           if (isRouting) {
             const clickedRoute = event.features?.some((feature) => feature.layer.id === `planned-route-line-${activeRouteId}`);
             if (clickedRoute && routeInsertPreview) {
@@ -2587,7 +2660,7 @@ export default function MapPageClient() {
                   ['zoom'],
                   HABITAT_MIN_ZOOM,
                   0.2,
-                  14,
+                  16,
                   0.38,
                   18,
                   0.5,
@@ -2794,6 +2867,18 @@ export default function MapPageClient() {
             setLocationError(null);
           }}
           onHeadingUpdate={setDeviceHeading}
+        />
+        <ThreeDModeControl
+          language={language}
+          isEnabled={is3DModeEnabled}
+          onToggle={() => {
+            setIs3DModeEnabled((enabled) => {
+              if (!enabled) setIsHillshadeEnabled(true);
+              return !enabled;
+            });
+            setIsTerrainPickerOpen(false);
+            setIsHabitatPickerOpen(false);
+          }}
         />
         <FullscreenControl position="bottom-right" />
         <ScaleControl position="bottom-left" />
@@ -3114,10 +3199,11 @@ export default function MapPageClient() {
             setHasOpenedBasemapPicker(true);
             setIsBasemapPickerOpen((open) => !open);
             setIsTerrainPickerOpen(false);
+            setIsHabitatPickerOpen(false);
           }}
           className={MAP_ICON_BUTTON_CLASS}
         >
-          <Layers className="h-5 w-5 text-slate-700" />
+          <MapIcon className="h-5 w-5 text-slate-700" />
         </button>
 
         {hasOpenedBasemapPicker && (
@@ -3230,12 +3316,13 @@ export default function MapPageClient() {
         <div className="relative">
             <button
               type="button"
-              aria-label={language === 'zh' ? '地圖圖層設定' : 'Map layer settings'}
+              aria-label={language === 'zh' ? '地形設定' : 'Terrain settings'}
               aria-expanded={isTerrainPickerOpen}
               aria-controls="map-layer-picker"
               onClick={() => {
                 setIsTerrainPickerOpen((open) => !open);
                 setIsBasemapPickerOpen(false);
+                setIsHabitatPickerOpen(false);
               }}
               className={MAP_ICON_BUTTON_CLASS}
             >
@@ -3246,7 +3333,7 @@ export default function MapPageClient() {
               {isTerrainPickerOpen && (
                 <motion.section
                   id="map-layer-picker"
-                  aria-label={language === 'zh' ? '地圖圖層設定' : 'Map layer settings'}
+                  aria-label={language === 'zh' ? '地形設定' : 'Terrain settings'}
                   initial={{ opacity: 0, x: 12, scale: 0.96 }}
                   animate={{ opacity: 1, x: 0, scale: 1 }}
                   exit={{ opacity: 0, x: 12, scale: 0.96 }}
@@ -3255,7 +3342,7 @@ export default function MapPageClient() {
                   className="pointer-events-auto absolute right-full top-0 mr-3 max-h-[85dvh] w-[min(18rem,calc(100vw-6rem))] overflow-y-auto rounded-2xl border border-white/70 bg-white/95 p-4 shadow-2xl backdrop-blur-xl"
                 >
                 <h2 className="mb-3 text-sm font-black text-slate-900">
-                  {language === 'zh' ? '地圖圖層' : 'Map layers'}
+                  {language === 'zh' ? '地形設定' : 'Terrain settings'}
                 </h2>
                 <div className="space-y-2">
                   <fieldset role="radiogroup" className="space-y-1 border-b border-slate-100 pb-3">
@@ -3305,19 +3392,66 @@ export default function MapPageClient() {
                       <span className={`absolute top-0.5 h-4 w-4 rounded-full bg-white transition ${areContoursEnabled ? 'left-[18px]' : 'left-0.5'}`} />
                     </span>
                   </button>
+                </div>
+                </motion.section>
+              )}
+            </AnimatePresence>
+        </div>
+
+        <div className="relative">
+          <button
+            type="button"
+            aria-label={language === 'zh' ? '地圖圖層' : 'Map Layer'}
+            title={language === 'zh' ? '地圖圖層' : 'Map Layer'}
+            aria-expanded={isHabitatPickerOpen}
+            aria-controls="map-habitat-picker"
+            onClick={() => {
+              setIsHabitatPickerOpen((open) => !open);
+              setIsBasemapPickerOpen(false);
+              setIsTerrainPickerOpen(false);
+            }}
+            className={`${MAP_ICON_BUTTON_CLASS} ${areHabitatsEnabled ? '!border-emerald-600 !bg-emerald-600 !text-white hover:!bg-emerald-700' : ''}`}
+          >
+            <Layers className={`h-5 w-5 ${areHabitatsEnabled ? 'text-white' : 'text-slate-700'}`} />
+          </button>
+
+          <AnimatePresence initial={false}>
+            {isHabitatPickerOpen && (
+              <motion.section
+                id="map-habitat-picker"
+                aria-label={language === 'zh' ? '地圖圖層' : 'Map Layer'}
+                initial={{ opacity: 0, x: 12, scale: 0.96 }}
+                animate={{ opacity: 1, x: 0, scale: 1 }}
+                exit={{ opacity: 0, x: 12, scale: 0.96 }}
+                transition={{ duration: 0.18, ease: 'easeOut' }}
+                style={{ transformOrigin: 'right center' }}
+                className="pointer-events-auto absolute right-full top-0 mr-3 max-h-[85dvh] w-[min(18rem,calc(100vw-6rem))] overflow-y-auto rounded-2xl border border-white/70 bg-white/95 p-4 shadow-2xl backdrop-blur-xl"
+              >
+                <h2 className="mb-3 text-sm font-black text-slate-900">
+                  {language === 'zh' ? '地圖圖層' : 'Map Layer'}
+                </h2>
+                <div className="space-y-2">
                   <button
                     type="button"
                     role="switch"
                     aria-checked={areHabitatsEnabled}
                     aria-label={language === 'zh' ? '陸地棲地圖' : 'Terrestrial habitat map'}
+                    disabled={!isHabitatZoomedIn && !areHabitatsEnabled}
                     onClick={() => setAreHabitatsEnabled((enabled) => !enabled)}
-                    className="flex w-full items-center justify-between rounded-xl px-2 py-2 text-left text-sm font-semibold text-slate-700 hover:bg-slate-50"
+                    className="flex w-full items-center justify-between rounded-xl px-2 py-2 text-left text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     <span>{language === 'zh' ? '陸地棲地圖' : 'Terrestrial habitat map'}</span>
                     <span className={`relative h-5 w-9 rounded-full transition ${areHabitatsEnabled ? 'bg-emerald-600' : 'bg-slate-300'}`}>
                       <span className={`absolute top-0.5 h-4 w-4 rounded-full bg-white transition ${areHabitatsEnabled ? 'left-[18px]' : 'left-0.5'}`} />
                     </span>
                   </button>
+                  {!isHabitatZoomedIn && (
+                    <p role="status" className="px-2 pt-1 text-xs text-slate-500">
+                      {language === 'zh'
+                        ? `請放大至 ${HABITAT_MIN_ZOOM} 級以啟用棲地地圖。`
+                        : `Zoom in to level ${HABITAT_MIN_ZOOM} to enable the habitat map.`}
+                    </p>
+                  )}
                   {areHabitatsEnabled && (
                     <div className="px-2 pt-1">
                       <h3 className="mb-1 text-[11px] font-bold uppercase tracking-wide text-slate-500">
@@ -3393,13 +3527,6 @@ export default function MapPageClient() {
                             : `Loading habitats in this view (${habitatProgressCount}/${habitatFetchSelection.size}): ${HABITAT_TYPES.find(({ id }) => id === loadingHabitatType)?.name.en ?? '…'}`}
                         </p>
                       )}
-                      {!isHabitatZoomedIn && (
-                        <p role="status" className="mt-2 text-xs text-slate-500">
-                          {language === 'zh'
-                            ? `請放大至 ${HABITAT_MIN_ZOOM} 級以查看棲地資料。`
-                            : `Zoom in to level ${HABITAT_MIN_ZOOM} to view habitat data.`}
-                        </p>
-                      )}
                       {hasHabitatError && (
                         <p role="alert" className="mt-2 text-xs text-red-700">
                           {language === 'zh'
@@ -3410,37 +3537,13 @@ export default function MapPageClient() {
                     </div>
                   )}
                 </div>
-                </motion.section>
-              )}
-            </AnimatePresence>
+              </motion.section>
+            )}
+          </AnimatePresence>
         </div>
 
-        <button
-          type="button"
-          aria-label={language === 'zh'
-            ? (is3DModeEnabled ? '退出 3D 模式' : '進入 3D 模式')
-            : (is3DModeEnabled ? 'Exit 3D mode' : 'Enter 3D mode')}
-          aria-pressed={is3DModeEnabled}
-          title={language === 'zh'
-            ? (is3DModeEnabled ? '退出 3D 模式' : '進入 3D 模式')
-            : (is3DModeEnabled ? 'Exit 3D mode' : 'Enter 3D mode')}
-          onClick={() => {
-            setIs3DModeEnabled((enabled) => {
-              if (!enabled) setIsHillshadeEnabled(true);
-              return !enabled;
-            });
-            setIsTerrainPickerOpen(false);
-          }}
-          className={`${MAP_ICON_BUTTON_CLASS} ${
-            is3DModeEnabled
-              ? '!border-emerald-600 !bg-emerald-600 !text-white hover:!bg-emerald-700'
-              : ''
-          }`}
-        >
-          <span className="text-sm font-black tracking-tight">3D</span>
-        </button>
         <div className="relative">
-          <button type="button" aria-label={language === 'zh' ? '路線規劃' : 'Routing'} aria-expanded={isRoutingPanelOpen} onClick={() => { setIsRoutingPanelOpen((open) => !open); setIsBasemapPickerOpen(false); setIsTerrainPickerOpen(false); }} className={`${MAP_ICON_BUTTON_CLASS} ${isRouting ? '!border-emerald-600 !bg-emerald-600 !text-white hover:!bg-emerald-700' : ''}`}>
+          <button type="button" aria-label={language === 'zh' ? '路線規劃' : 'Routing'} aria-expanded={isRoutingPanelOpen} onClick={() => { setIsRoutingPanelOpen((open) => !open); setIsBasemapPickerOpen(false); setIsTerrainPickerOpen(false); setIsHabitatPickerOpen(false); }} className={`${MAP_ICON_BUTTON_CLASS} ${isRouting ? '!border-emerald-600 !bg-emerald-600 !text-white hover:!bg-emerald-700' : ''}`}>
             <RouteIcon className="h-5 w-5" />
           </button>
           <AnimatePresence initial={false}>

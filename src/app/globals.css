@@ -63,9 +63,9 @@
 }
 
 .map-page .habitat-tooltip-popup .maplibregl-popup-content {
-  padding: 0;
-  background: transparent;
-  box-shadow: none;
+  padding: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
 }
 
 .map-page .habitat-tooltip-popup {
