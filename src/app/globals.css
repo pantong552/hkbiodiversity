@@ -62,6 +62,16 @@
   color: #64748b;
 }
 
+.map-page .habitat-tooltip-popup .maplibregl-popup-content {
+  padding: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.map-page .habitat-tooltip-popup .maplibregl-popup-tip {
+  display: none;
+}
+
 @media (max-width: 639px) {
   .map-page .maplibregl-ctrl-attrib,
   .map-page .maplibregl-ctrl-attrib * {

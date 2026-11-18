@@ -6,6 +6,7 @@ import Map, {
   FullscreenControl,
   Layer,
   NavigationControl,
+  Popup,
   ScaleControl,
   Source,
   useControl,
@@ -20,6 +21,7 @@ import {
   type Source as MapLibreSource,
   type StyleSpecification,
 } from 'maplibre-gl';
+import type { FeatureCollection } from 'geojson';
 import mlcontour from 'maplibre-contour';
 import proj4 from 'proj4';
 import { AnimatePresence, motion, useSpring, useTransform } from 'framer-motion';
@@ -28,6 +30,7 @@ import useOfflineRouting from '@/hooks/useOfflineRouting';
 import { Check, ChevronDown, ChevronLeft, ChevronUp, Info, Layers, LoaderCircle, Mountain, Plus, RefreshCw, Route as RouteIcon, Search, Download, Trash2, X } from 'lucide-react';
 import { useLanguage } from '@/context/LanguageContext';
 import { BASEMAPS } from '@/constants/basemaps';
+import { HABITAT_MIN_ZOOM, HABITAT_TYPES, type HabitatTypeId } from '@/constants/habitats';
 import 'maplibre-gl/dist/maplibre-gl.css';
 
 const INITIAL_VIEW_STATE = {
@@ -1355,6 +1358,20 @@ export default function MapPageClient() {
   const [isHillshadeEnabled, setIsHillshadeEnabled] = useState(false);
   const [is3DModeEnabled, setIs3DModeEnabled] = useState(false);
   const [areContoursEnabled, setAreContoursEnabled] = useState(true);
+  const [areHabitatsEnabled, setAreHabitatsEnabled] = useState(false);
+  const [habitatData, setHabitatData] = useState<
+    Partial<Record<HabitatTypeId, FeatureCollection>>
+  >({});
+  const [habitatHover, setHabitatHover] = useState<{
+    type: HabitatTypeId;
+    coordinates: RoutePoint;
+  } | null>(null);
+  const [isHabitatLoading, setIsHabitatLoading] = useState(false);
+  const [loadingHabitatType, setLoadingHabitatType] = useState<HabitatTypeId | null>(null);
+  const [hasHabitatError, setHasHabitatError] = useState(false);
+  const [isHabitatZoomedIn, setIsHabitatZoomedIn] = useState(
+    INITIAL_VIEW_STATE.zoom >= HABITAT_MIN_ZOOM,
+  );
   const [demSourceId, setDemSourceId] = useState<DemSourceId>('mapterhorn');
   const [terrainReady, setTerrainReady] = useState(false);
   const [mapReady, setMapReady] = useState(false);
@@ -1520,6 +1537,134 @@ export default function MapPageClient() {
       controller.abort();
     };
   }, [language, locationSearchQuery]);
+
+  useEffect(() => {
+    if (!areHabitatsEnabled) {
+      setHabitatData({});
+      setHabitatHover(null);
+      setIsHabitatLoading(false);
+      setLoadingHabitatType(null);
+      setHasHabitatError(false);
+      return;
+    }
+
+    const map = mapRef.current?.getMap();
+    if (!mapReady || !map) return;
+
+    let active = true;
+    let requestController: AbortController | null = null;
+    let moveEndTimeout: number | null = null;
+    const updateHabitatFeatures = async () => {
+      const zoom = map.getZoom();
+      const canLoad = zoom >= HABITAT_MIN_ZOOM;
+      setIsHabitatZoomedIn(canLoad);
+      requestController?.abort();
+
+      if (!canLoad) {
+        setHabitatData({});
+        setHabitatHover(null);
+        setIsHabitatLoading(false);
+        setLoadingHabitatType(null);
+        setHasHabitatError(false);
+        return;
+      }
+
+      const bounds = map.getBounds();
+      const controller = new AbortController();
+      requestController = controller;
+      setHabitatData({});
+      setHabitatHover(null);
+      setIsHabitatLoading(true);
+      setLoadingHabitatType(null);
+      setHasHabitatError(false);
+
+      const bbox = [
+        bounds.getWest(),
+        bounds.getSouth(),
+        bounds.getEast(),
+        bounds.getNorth(),
+      ];
+      const loadHabitats = async () => {
+        for (const [index, habitat] of HABITAT_TYPES.entries()) {
+          if (!active || controller.signal.aborted) return;
+          setLoadingHabitatType(habitat.id);
+          try {
+            let collection: FeatureCollection | null = null;
+            for (let attempt = 0; attempt < 3; attempt += 1) {
+              const response = await fetch('/api/map/habitats', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ type: habitat.id, bbox, zoom }),
+                signal: controller.signal,
+              });
+              if (
+                (response.status === 429 || response.status === 503)
+                && attempt < 2
+              ) {
+                const retryAfterSeconds = Number(response.headers.get('Retry-After'));
+                const retryDelay = Number.isFinite(retryAfterSeconds) && retryAfterSeconds > 0
+                  ? Math.min(retryAfterSeconds * 1000, 10000)
+                  : 1000 * (attempt + 1);
+                await new Promise((resolve) => window.setTimeout(resolve, retryDelay));
+                continue;
+              }
+              if (!response.ok) {
+                throw new Error(`Habitat data request failed for ${habitat.id} (${response.status})`);
+              }
+
+              const result = await response.json() as FeatureCollection | null;
+              if (
+                !result
+                || result.type !== 'FeatureCollection'
+                || !Array.isArray(result.features)
+              ) {
+                throw new Error(`Invalid GeoJSON returned for ${habitat.id}`);
+              }
+              collection = result;
+              break;
+            }
+            if (collection && active && !controller.signal.aborted) {
+              setHabitatData((current) => ({ ...current, [habitat.id]: collection }));
+            }
+          } catch (error) {
+            if (active && !controller.signal.aborted) {
+              console.error(`Failed to load ${habitat.id} habitat features:`, error);
+              setHasHabitatError(true);
+            }
+          }
+
+          if (index < HABITAT_TYPES.length - 1 && active && !controller.signal.aborted) {
+            await new Promise((resolve) => window.setTimeout(resolve, 600));
+          }
+        }
+      };
+
+      try {
+        await loadHabitats();
+      } finally {
+        if (active && !controller.signal.aborted) {
+          setIsHabitatLoading(false);
+          setLoadingHabitatType(null);
+        }
+      }
+    };
+    const scheduleHabitatUpdate = () => {
+      if (moveEndTimeout !== null) window.clearTimeout(moveEndTimeout);
+      moveEndTimeout = window.setTimeout(() => {
+        moveEndTimeout = null;
+        void updateHabitatFeatures();
+      }, 200);
+    };
+
+    map.on('moveend', scheduleHabitatUpdate);
+    void updateHabitatFeatures();
+    return () => {
+      active = false;
+      map.off('moveend', scheduleHabitatUpdate);
+      if (moveEndTimeout !== null) window.clearTimeout(moveEndTimeout);
+      requestController?.abort();
+    };
+  }, [areHabitatsEnabled, mapReady]);
 
   useEffect(() => {
     const map = mapRef.current?.getMap();
@@ -1968,6 +2113,9 @@ export default function MapPageClient() {
 
   const currentBasemap = BASEMAPS.find((basemap) => basemap.id === currentStyleId) || BASEMAPS[0];
   const isSatelliteBasemap = ['esri-sat', 'google-sat', 'google-hybrid', 'hk-imagery'].includes(currentStyleId);
+  const hoveredHabitat = habitatHover
+    ? HABITAT_TYPES.find(({ id }) => id === habitatHover.type)
+    : undefined;
   const demSourceConfig = DEM_SOURCES[demSourceId];
   const demSource = terrainReady ? getContourDemSource(demSourceId) : null;
   const contourTiles = areContoursEnabled && terrainReady && demSource
@@ -2234,7 +2382,14 @@ export default function MapPageClient() {
         maxZoom={currentStyleId === 'landsd-vector' ? 18.9 : 18}
         minZoom={3}
         reuseMaps
-        interactiveLayerIds={routeCoordinates.length > 1 ? [`planned-route-line-${activeRouteId}`] : []}
+        interactiveLayerIds={[
+          ...(routeCoordinates.length > 1 ? [`planned-route-line-${activeRouteId}`] : []),
+          ...(areHabitatsEnabled
+            ? HABITAT_TYPES
+              .filter(({ id }) => (habitatData[id]?.features.length ?? 0) > 0)
+              .map(({ id }) => `habitat-map-fills-${id}`)
+            : []),
+        ]}
         onClick={(event) => {
           setIsRoutingPanelOpen(false);
           if (ignoreNextRouteMapClickRef.current) {
@@ -2263,9 +2418,25 @@ export default function MapPageClient() {
           }
         }}
         onMoveStart={(event) => {
+          setHabitatHover(null);
           if (event.originalEvent) setIsRoutingPanelOpen(false);
         }}
         onMouseMove={(event) => {
+          const hoveredHabitatLayerId = event.features?.find(
+            (feature) => feature.layer.id.startsWith('habitat-map-fills-'),
+          )?.layer.id;
+          const hoveredHabitat = HABITAT_TYPES.find(
+            ({ id }) => hoveredHabitatLayerId === `habitat-map-fills-${id}`,
+          );
+          if (hoveredHabitat) {
+            setHabitatHover({
+              type: hoveredHabitat.id,
+              coordinates: [event.lngLat.lng, event.lngLat.lat],
+            });
+          } else {
+            setHabitatHover(null);
+          }
+
           const overRoute = event.features?.some((feature) => feature.layer.id === `planned-route-line-${activeRouteId}`);
           if (!isRouting || !overRoute || routeAnchors.length < 2 || routeCoordinates.length < 2) {
             setRouteInsertPreview(null);
@@ -2277,7 +2448,10 @@ export default function MapPageClient() {
             index: getRouteInsertionIndex(point, routeAnchors, routeCoordinates),
           });
         }}
-        onMouseLeave={() => setRouteInsertPreview(null)}
+        onMouseLeave={() => {
+          setRouteInsertPreview(null);
+          setHabitatHover(null);
+        }}
         onLoad={() => {
           initializeContourDemSources();
           const map = mapRef.current?.getMap();
@@ -2295,6 +2469,43 @@ export default function MapPageClient() {
           setMapReady(true);
         }}
       >
+        {areHabitatsEnabled && HABITAT_TYPES.map((habitat) => {
+          const collection = habitatData[habitat.id];
+          if (!collection || collection.features.length === 0) return null;
+          return (
+          <Source key={habitat.id} id={`habitat-map-${habitat.id}`} type="geojson" data={collection}>
+            <Layer
+              id={`habitat-map-fills-${habitat.id}`}
+              type="fill"
+              minzoom={HABITAT_MIN_ZOOM}
+              paint={{
+                'fill-color': habitat.color,
+                'fill-opacity': [
+                  'interpolate',
+                  ['linear'],
+                  ['zoom'],
+                  HABITAT_MIN_ZOOM,
+                  0.2,
+                  14,
+                  0.38,
+                  18,
+                  0.5,
+                ],
+              }}
+            />
+            <Layer
+              id={`habitat-map-outlines-${habitat.id}`}
+              type="line"
+              minzoom={HABITAT_MIN_ZOOM}
+              paint={{
+                'line-color': habitat.color,
+                'line-opacity': 0.85,
+                'line-width': ['interpolate', ['linear'], ['zoom'], HABITAT_MIN_ZOOM, 0.35, 16, 1],
+              }}
+            />
+          </Source>
+          );
+        })}
         {routes.map((route, index) => route.coordinates.length > 1 && (
           <Source key={route.id} id={`planned-route-${route.id}`} type="geojson" data={{
             type: 'Feature',
@@ -2396,12 +2607,11 @@ export default function MapPageClient() {
               type="line"
               source={`terrain-contours-${demSourceId}`}
               source-layer="contours"
-              minzoom={15}
               filter={['all', ['==', ['%', ['get', 'ele'], 50], 0], ['!=', ['get', 'ele'], 0], ['!=', ['get', 'ele'], 10]]}
               paint={{
-                'line-color': isSatelliteBasemap ? '#ffffff' : 'rgb(124, 122, 121)',
-                'line-opacity': isSatelliteBasemap ? 0.9 : 0.5,
-                'line-width': 1.5,
+                'line-color': isSatelliteBasemap ? '#52525b' : 'rgb(105, 103, 101)',
+                'line-opacity': isSatelliteBasemap ? 0.9 : 0.55,
+                'line-width': 0.5,
               }}
               layout={{
                 'line-join': 'round',
@@ -2434,6 +2644,24 @@ export default function MapPageClient() {
               }}
             />
           </Source>
+        )}
+        {habitatHover && hoveredHabitat && (
+          <Popup
+            className="habitat-tooltip-popup"
+            longitude={habitatHover.coordinates[0]}
+            latitude={habitatHover.coordinates[1]}
+            anchor="top-left"
+            offset={14}
+            closeButton={false}
+            closeOnClick={false}
+          >
+            <div
+              role="tooltip"
+              className="whitespace-nowrap rounded-xl border border-white/20 bg-slate-950/90 px-3 py-2 text-sm font-semibold text-white shadow-xl shadow-slate-950/25 ring-1 ring-slate-950/10 backdrop-blur-md"
+            >
+              {hoveredHabitat.name[language]}
+            </div>
+          </Popup>
         )}
         <NavigationControl position="bottom-right" showCompass showZoom={false} visualizePitch />
         <LiveLocationControl
@@ -2901,9 +3129,9 @@ export default function MapPageClient() {
         <div className="relative">
             <button
               type="button"
-              aria-label={language === 'zh' ? '地形圖層設定' : 'Terrain layer settings'}
+              aria-label={language === 'zh' ? '地圖圖層設定' : 'Map layer settings'}
               aria-expanded={isTerrainPickerOpen}
-              aria-controls="map-terrain-picker"
+              aria-controls="map-layer-picker"
               onClick={() => {
                 setIsTerrainPickerOpen((open) => !open);
                 setIsBasemapPickerOpen(false);
@@ -2916,17 +3144,17 @@ export default function MapPageClient() {
             <AnimatePresence initial={false}>
               {isTerrainPickerOpen && (
                 <motion.section
-                  id="map-terrain-picker"
-                  aria-label={language === 'zh' ? '地形圖層設定' : 'Terrain layer settings'}
+                  id="map-layer-picker"
+                  aria-label={language === 'zh' ? '地圖圖層設定' : 'Map layer settings'}
                   initial={{ opacity: 0, x: 12, scale: 0.96 }}
                   animate={{ opacity: 1, x: 0, scale: 1 }}
                   exit={{ opacity: 0, x: 12, scale: 0.96 }}
                   transition={{ duration: 0.18, ease: 'easeOut' }}
                   style={{ transformOrigin: 'right center' }}
-                  className="pointer-events-auto absolute right-full top-0 mr-3 w-[min(18rem,calc(100vw-6rem))] rounded-2xl border border-white/70 bg-white/95 p-4 shadow-2xl backdrop-blur-xl"
+                  className="pointer-events-auto absolute right-full top-0 mr-3 max-h-[85dvh] w-[min(18rem,calc(100vw-6rem))] overflow-y-auto rounded-2xl border border-white/70 bg-white/95 p-4 shadow-2xl backdrop-blur-xl"
                 >
                 <h2 className="mb-3 text-sm font-black text-slate-900">
-                  {language === 'zh' ? '地形圖層' : 'Terrain layers'}
+                  {language === 'zh' ? '地圖圖層' : 'Map layers'}
                 </h2>
                 <div className="space-y-2">
                   <fieldset role="radiogroup" className="space-y-1 border-b border-slate-100 pb-3">
@@ -2976,6 +3204,59 @@ export default function MapPageClient() {
                       <span className={`absolute top-0.5 h-4 w-4 rounded-full bg-white transition ${areContoursEnabled ? 'left-[18px]' : 'left-0.5'}`} />
                     </span>
                   </button>
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={areHabitatsEnabled}
+                    aria-label={language === 'zh' ? '陸地棲地圖' : 'Terrestrial habitat map'}
+                    onClick={() => setAreHabitatsEnabled((enabled) => !enabled)}
+                    className="flex w-full items-center justify-between rounded-xl px-2 py-2 text-left text-sm font-semibold text-slate-700 hover:bg-slate-50"
+                  >
+                    <span>{language === 'zh' ? '陸地棲地圖' : 'Terrestrial habitat map'}</span>
+                    <span className={`relative h-5 w-9 rounded-full transition ${areHabitatsEnabled ? 'bg-emerald-600' : 'bg-slate-300'}`}>
+                      <span className={`absolute top-0.5 h-4 w-4 rounded-full bg-white transition ${areHabitatsEnabled ? 'left-[18px]' : 'left-0.5'}`} />
+                    </span>
+                  </button>
+                  {areHabitatsEnabled && (
+                    <div className="px-2 pt-1">
+                      <h3 className="mb-1 text-[11px] font-bold uppercase tracking-wide text-slate-500">
+                        {language === 'zh' ? '棲地類型' : 'Habitat types'}
+                      </h3>
+                      <ul className="max-h-36 space-y-1 overflow-y-auto">
+                        {HABITAT_TYPES.map((habitat) => (
+                          <li key={habitat.id} className="flex items-center gap-2 text-xs text-slate-700">
+                            <span
+                              aria-hidden="true"
+                              className="h-3 w-3 shrink-0 rounded-sm"
+                              style={{ backgroundColor: habitat.color }}
+                            />
+                            <span>{habitat.name[language]}</span>
+                          </li>
+                        ))}
+                      </ul>
+                      {isHabitatLoading && (
+                        <p role="status" className="mt-2 text-xs text-slate-500">
+                          {language === 'zh'
+                            ? `正在載入目前範圍的棲地（${Object.keys(habitatData).length}/${HABITAT_TYPES.length}）：${HABITAT_TYPES.find(({ id }) => id === loadingHabitatType)?.name.zh ?? '…'}`
+                            : `Loading habitats in this view (${Object.keys(habitatData).length}/${HABITAT_TYPES.length}): ${HABITAT_TYPES.find(({ id }) => id === loadingHabitatType)?.name.en ?? '…'}`}
+                        </p>
+                      )}
+                      {!isHabitatZoomedIn && (
+                        <p role="status" className="mt-2 text-xs text-slate-500">
+                          {language === 'zh'
+                            ? `請放大至 ${HABITAT_MIN_ZOOM} 級以查看棲地資料。`
+                            : `Zoom in to level ${HABITAT_MIN_ZOOM} to view habitat data.`}
+                        </p>
+                      )}
+                      {hasHabitatError && (
+                        <p role="alert" className="mt-2 text-xs text-red-700">
+                          {language === 'zh'
+                            ? '棲地資料載入失敗，請移動地圖重試。'
+                            : 'Unable to load habitat data. Move the map to retry.'}
+                        </p>
+                      )}
+                    </div>
+                  )}
                 </div>
                 </motion.section>
               )}
