@@ -175,6 +175,8 @@ type PlannedRoute = {
   useOfflineRouting: boolean;
 };
 const INACTIVE_ROUTE_COLORS = ['#059669', '#7c3aed', '#ea580c', '#0891b2'];
+const LOT_LAYER_MIN_ZOOM = 15;
+const GLA_LAYER_MIN_ZOOM = 11;
 const HONG_KONG_SEARCH_BOUNDS = {
   west: 113.75,
   south: 22.15,
@@ -936,6 +938,18 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
+function isFeatureCollection(value: unknown): value is FeatureCollection {
+  return isRecord(value)
+    && value.type === 'FeatureCollection'
+    && Array.isArray(value.features)
+    && value.features.every((feature) => (
+      isRecord(feature)
+      && feature.type === 'Feature'
+      && isRecord(feature.geometry)
+      && isRecord(feature.properties)
+    ));
+}
+
 type LiveLocationControlProps = {
   language: 'zh' | 'en';
   isMobileViewport: boolean;
@@ -1426,6 +1440,15 @@ export default function MapPageClient() {
   const [is3DModeEnabled, setIs3DModeEnabled] = useState(false);
   const [areContoursEnabled, setAreContoursEnabled] = useState(true);
   const [areHabitatsEnabled, setAreHabitatsEnabled] = useState(false);
+  const [areLotsEnabled, setAreLotsEnabled] = useState(false);
+  const [areGlaEnabled, setAreGlaEnabled] = useState(false);
+  const [mapZoom, setMapZoom] = useState(INITIAL_VIEW_STATE.zoom);
+  const [glaData, setGlaData] = useState<FeatureCollection>({
+    type: 'FeatureCollection',
+    features: [],
+  });
+  const [isGlaLoading, setIsGlaLoading] = useState(false);
+  const [glaLoadError, setGlaLoadError] = useState<string | null>(null);
   const [habitatFetchSelection, setHabitatFetchSelection] = useState<Set<HabitatTypeId>>(
     () => new Set(HABITAT_TYPES.map(({ id }) => id)),
   );
@@ -1451,6 +1474,8 @@ export default function MapPageClient() {
   const [isHabitatZoomedIn, setIsHabitatZoomedIn] = useState(
     INITIAL_VIEW_STATE.zoom >= HABITAT_MIN_ZOOM,
   );
+  const isLotZoomedIn = mapZoom >= LOT_LAYER_MIN_ZOOM;
+  const isGlaZoomedIn = mapZoom >= GLA_LAYER_MIN_ZOOM;
   const [demSourceId, setDemSourceId] = useState<DemSourceId>('mapterhorn');
   const [terrainReady, setTerrainReady] = useState(false);
   const [mapReady, setMapReady] = useState(false);
@@ -1813,6 +1838,114 @@ export default function MapPageClient() {
   }, [areHabitatsEnabled, habitatFetchSelection, mapReady]);
 
   useEffect(() => {
+    if (!areGlaEnabled) {
+      setGlaData({ type: 'FeatureCollection', features: [] });
+      setIsGlaLoading(false);
+      setGlaLoadError(null);
+      return;
+    }
+
+    const map = mapRef.current?.getMap();
+    if (!mapReady || !map) return;
+
+    let active = true;
+    let requestController: AbortController | null = null;
+    let moveEndTimeout: number | null = null;
+    let loadedRequest: { bbox: [number, number, number, number]; tier: number } | null = null;
+    const updateGlaFeatures = async () => {
+      const zoom = map.getZoom();
+      if (zoom < GLA_LAYER_MIN_ZOOM) {
+        requestController?.abort();
+        requestController = null;
+        loadedRequest = null;
+        setGlaData({ type: 'FeatureCollection', features: [] });
+        setIsGlaLoading(false);
+        setGlaLoadError(null);
+        return;
+      }
+
+      const bounds = map.getBounds();
+      const bbox: [number, number, number, number] = [
+        bounds.getWest(),
+        bounds.getSouth(),
+        bounds.getEast(),
+        bounds.getNorth(),
+      ];
+      const latitude = (bbox[1] + bbox[3]) / 2;
+      const scale = 591657550.5 * Math.cos(latitude * Math.PI / 180) / 2 ** (zoom + 1);
+      const tier = scale > 20000 ? 0 : scale > 4500 ? 1 : 2;
+      const coversCurrentView = loadedRequest !== null
+        && loadedRequest.tier === tier
+        && bbox[0] >= loadedRequest.bbox[0]
+        && bbox[1] >= loadedRequest.bbox[1]
+        && bbox[2] <= loadedRequest.bbox[2]
+        && bbox[3] <= loadedRequest.bbox[3];
+      if (coversCurrentView) return;
+
+      requestController?.abort();
+      const controller = new AbortController();
+      requestController = controller;
+      const width = bbox[2] - bbox[0];
+      const height = bbox[3] - bbox[1];
+      const requestBbox: [number, number, number, number] = [
+        bbox[0] - width * 0.25,
+        bbox[1] - height * 0.25,
+        bbox[2] + width * 0.25,
+        bbox[3] + height * 0.25,
+      ];
+      setIsGlaLoading(true);
+      setGlaLoadError(null);
+
+      try {
+        const params = new URLSearchParams({
+          type: 'gla',
+          bbox: requestBbox.map((coordinate) => coordinate.toFixed(6)).join(','),
+          zoom: zoom.toFixed(2),
+        });
+        const response = await fetch(`/api/map/land-layers?${params}`, {
+          signal: controller.signal,
+        });
+        if (!response.ok) {
+          throw new Error(`GLA data request failed (${response.status})`);
+        }
+
+        const collection: unknown = await response.json();
+        if (!isFeatureCollection(collection)) {
+          throw new Error('Invalid GeoJSON returned for GLA');
+        }
+        if (active && !controller.signal.aborted) {
+          loadedRequest = { bbox: requestBbox, tier };
+          setGlaData(collection);
+        }
+      } catch (error) {
+        if (active && !controller.signal.aborted) {
+          console.error('Failed to load GLA features:', error);
+          setGlaLoadError(error instanceof Error ? error.message : 'Unable to load GLA data');
+        }
+      } finally {
+        if (requestController === controller) requestController = null;
+        if (active && !controller.signal.aborted) setIsGlaLoading(false);
+      }
+    };
+    const scheduleGlaUpdate = () => {
+      if (moveEndTimeout !== null) window.clearTimeout(moveEndTimeout);
+      moveEndTimeout = window.setTimeout(() => {
+        moveEndTimeout = null;
+        void updateGlaFeatures();
+      }, 200);
+    };
+
+    map.on('moveend', scheduleGlaUpdate);
+    void updateGlaFeatures();
+    return () => {
+      active = false;
+      map.off('moveend', scheduleGlaUpdate);
+      if (moveEndTimeout !== null) window.clearTimeout(moveEndTimeout);
+      requestController?.abort();
+    };
+  }, [areGlaEnabled, mapReady]);
+
+  useEffect(() => {
     if (!isHabitatTooltipVisible) return;
 
     const hideTooltipOverInterface = (event: globalThis.PointerEvent) => {
@@ -1833,14 +1966,16 @@ export default function MapPageClient() {
     const map = mapRef.current?.getMap();
     if (!map) return;
 
-    const updateHabitatZoom = () => {
-      setIsHabitatZoomedIn(map.getZoom() >= HABITAT_MIN_ZOOM);
+    const updateMapZoom = () => {
+      const zoom = map.getZoom();
+      setMapZoom(zoom);
+      setIsHabitatZoomedIn(zoom >= HABITAT_MIN_ZOOM);
     };
 
-    updateHabitatZoom();
-    map.on('zoomend', updateHabitatZoom);
+    updateMapZoom();
+    map.on('zoomend', updateMapZoom);
     return () => {
-      map.off('zoomend', updateHabitatZoom);
+      map.off('zoomend', updateMapZoom);
     };
   }, [mapReady]);
 
@@ -2653,6 +2788,68 @@ export default function MapPageClient() {
           setMapReady(true);
         }}
       >
+        {areLotsEnabled && isLotZoomedIn && (
+          <Source
+            id="lot-boundary-tiles"
+            type="raster"
+            tiles={['/api/map/land-layers?type=lot&z={z}&x={x}&y={y}']}
+            tileSize={256}
+            maxzoom={22}
+            attribution="© Lands Department (HKSAR)"
+          >
+            <Layer
+              id="lot-boundaries"
+              type="raster"
+              minzoom={LOT_LAYER_MIN_ZOOM}
+              paint={{ 'raster-opacity': 0.9 }}
+            />
+          </Source>
+        )}
+        {areGlaEnabled && (
+          <Source
+            id="gla-map-data"
+            type="geojson"
+            data={glaData}
+            attribution='<a href="https://www.map.gov.hk/gm/map/search/lot" target="_blank" rel="noopener">GeoInfo Map © Lands Department (HKSAR)</a>'
+          >
+            <Layer
+              id="gla-map-fills"
+              type="fill"
+              minzoom={GLA_LAYER_MIN_ZOOM}
+              paint={{
+                'fill-color': '#f59e0b',
+                'fill-opacity': 0.12,
+              }}
+            />
+            <Layer
+              id="gla-map-outlines"
+              type="line"
+              minzoom={GLA_LAYER_MIN_ZOOM}
+              paint={{
+                'line-color': '#b45309',
+                'line-opacity': 0.85,
+                'line-width': ['interpolate', ['linear'], ['zoom'], GLA_LAYER_MIN_ZOOM, 0.6, 16, 1.2],
+              }}
+            />
+            <Layer
+              id="gla-map-labels"
+              type="symbol"
+              minzoom={GLA_LAYER_MIN_ZOOM}
+              layout={{
+                'text-field': ['coalesce', ['get', 'label'], ['to-string', ['get', 'glaid']]],
+                'text-font': ['Open Sans Regular', 'Arial Unicode MS Regular'],
+                'text-size': ['interpolate', ['linear'], ['zoom'], GLA_LAYER_MIN_ZOOM, 9, 16, 11, 18, 12],
+                'text-max-width': 10,
+                'text-allow-overlap': false,
+              }}
+              paint={{
+                'text-color': '#78350f',
+                'text-halo-color': '#fff7ed',
+                'text-halo-width': 1.2,
+              }}
+            />
+          </Source>
+        )}
         {areHabitatsEnabled && HABITAT_TYPES.map((habitat) => {
           const collection = habitatData[habitat.id];
           if (
@@ -3424,9 +3621,9 @@ export default function MapPageClient() {
               setIsBasemapPickerOpen(false);
               setIsTerrainPickerOpen(false);
             }}
-            className={`${MAP_ICON_BUTTON_CLASS} ${areHabitatsEnabled ? '!border-emerald-600 !bg-emerald-600 !text-white hover:!bg-emerald-700' : ''}`}
+            className={`${MAP_ICON_BUTTON_CLASS} ${areHabitatsEnabled || areLotsEnabled || areGlaEnabled ? '!border-emerald-600 !bg-emerald-600 !text-white hover:!bg-emerald-700' : ''}`}
           >
-            <Layers className={`h-5 w-5 ${areHabitatsEnabled ? 'text-white' : 'text-slate-700'}`} />
+            <Layers className={`h-5 w-5 ${areHabitatsEnabled || areLotsEnabled || areGlaEnabled ? 'text-white' : 'text-slate-700'}`} />
           </button>
 
           <AnimatePresence initial={false}>
@@ -3445,6 +3642,58 @@ export default function MapPageClient() {
                   {language === 'zh' ? '地圖圖層' : 'Map Layer'}
                 </h2>
                 <div className="space-y-2">
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={areLotsEnabled}
+                    aria-label={language === 'zh' ? '地段（LOT）' : 'Lots'}
+                    disabled={!isLotZoomedIn && !areLotsEnabled}
+                    onClick={() => setAreLotsEnabled((enabled) => !enabled)}
+                    className="flex w-full items-center justify-between rounded-xl px-2 py-2 text-left text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    <span>{language === 'zh' ? '地段（LOT）' : 'Lots'}</span>
+                    <span className={`relative h-5 w-9 rounded-full transition ${areLotsEnabled ? 'bg-emerald-600' : 'bg-slate-300'}`}>
+                      <span className={`absolute top-0.5 h-4 w-4 rounded-full bg-white transition ${areLotsEnabled ? 'left-[18px]' : 'left-0.5'}`} />
+                    </span>
+                  </button>
+                  {!isLotZoomedIn && (
+                    <p role="status" className="px-2 pt-1 text-xs text-slate-500">
+                      {language === 'zh'
+                        ? `請放大至 ${LOT_LAYER_MIN_ZOOM} 級以顯示地段界線。`
+                        : `Zoom in to level ${LOT_LAYER_MIN_ZOOM} to show lot boundaries.`}
+                    </p>
+                  )}
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={areGlaEnabled}
+                    aria-label={language === 'zh' ? '政府撥地（GLA）' : 'Government land allocation'}
+                    disabled={!isGlaZoomedIn && !areGlaEnabled}
+                    onClick={() => setAreGlaEnabled((enabled) => !enabled)}
+                    className="flex w-full items-center justify-between rounded-xl px-2 py-2 text-left text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    <span>{language === 'zh' ? '政府撥地（GLA）' : 'Government land allocation (GLA)'}</span>
+                    <span className={`relative h-5 w-9 rounded-full transition ${areGlaEnabled ? 'bg-emerald-600' : 'bg-slate-300'}`}>
+                      <span className={`absolute top-0.5 h-4 w-4 rounded-full bg-white transition ${areGlaEnabled ? 'left-[18px]' : 'left-0.5'}`} />
+                    </span>
+                  </button>
+                  {!isGlaZoomedIn && (
+                    <p role="status" className="px-2 pt-1 text-xs text-slate-500">
+                      {language === 'zh'
+                        ? `請放大至 ${GLA_LAYER_MIN_ZOOM} 級以載入政府撥地。`
+                        : `Zoom in to level ${GLA_LAYER_MIN_ZOOM} to load GLA features.`}
+                    </p>
+                  )}
+                  {areGlaEnabled && isGlaLoading && (
+                    <p role="status" className="px-2 pt-1 text-xs text-slate-500">
+                      {language === 'zh' ? '正在載入政府撥地…' : 'Loading GLA features…'}
+                    </p>
+                  )}
+                  {glaLoadError && (
+                    <p role="alert" className="px-2 pt-1 text-xs text-red-600">
+                      {glaLoadError}
+                    </p>
+                  )}
                   <button
                     type="button"
                     role="switch"
