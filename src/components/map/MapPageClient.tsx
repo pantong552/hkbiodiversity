@@ -1436,9 +1436,9 @@ export default function MapPageClient() {
     Partial<Record<HabitatTypeId, FeatureCollection>>
   >({});
   const habitatLoadedTypesRef = useRef<{
-    boundsKey: string;
+    bounds: [number, number, number, number] | null;
     loaded: Set<HabitatTypeId>;
-  }>({ boundsKey: '', loaded: new Set() });
+  }>({ bounds: null, loaded: new Set() });
   const [habitatHover, setHabitatHover] = useState<{
     type: HabitatTypeId;
     coordinates: RoutePoint;
@@ -1620,7 +1620,7 @@ export default function MapPageClient() {
   useEffect(() => {
     if (!areHabitatsEnabled) {
       setHabitatData({});
-      habitatLoadedTypesRef.current = { boundsKey: '', loaded: new Set() };
+      habitatLoadedTypesRef.current = { bounds: null, loaded: new Set() };
       setHabitatHover(null);
       setIsHabitatLoading(false);
       setLoadingHabitatType(null);
@@ -1640,11 +1640,10 @@ export default function MapPageClient() {
       const zoom = map.getZoom();
       const canLoad = zoom >= HABITAT_MIN_ZOOM;
       setIsHabitatZoomedIn(canLoad);
-      requestController?.abort();
 
       if (!canLoad) {
-        setHabitatData({});
-        habitatLoadedTypesRef.current = { boundsKey: '', loaded: new Set() };
+        requestController?.abort();
+        requestController = null;
         setHabitatHover(null);
         setIsHabitatLoading(false);
         setLoadingHabitatType(null);
@@ -1654,6 +1653,8 @@ export default function MapPageClient() {
       }
 
       if (selectedHabitats.length === 0) {
+        requestController?.abort();
+        requestController = null;
         setIsHabitatLoading(false);
         setLoadingHabitatType(null);
         setHabitatProgressCount(0);
@@ -1662,35 +1663,47 @@ export default function MapPageClient() {
       }
 
       const bounds = map.getBounds();
-      const controller = new AbortController();
-      requestController = controller;
-      setHabitatHover(null);
-      setIsHabitatLoading(true);
-      setLoadingHabitatType(null);
-      setHabitatProgressCount(0);
-      setHasHabitatError(false);
-
-      const bbox = [
+      const bbox: [number, number, number, number] = [
         bounds.getWest(),
         bounds.getSouth(),
         bounds.getEast(),
         bounds.getNorth(),
       ];
-      const boundsKey = JSON.stringify([bbox, zoom]);
-      if (habitatLoadedTypesRef.current.boundsKey !== boundsKey) {
-        habitatLoadedTypesRef.current = { boundsKey, loaded: new Set() };
+      const cachedBounds = habitatLoadedTypesRef.current.bounds;
+      const isWithinCachedBounds = cachedBounds !== null
+        && bbox[0] >= cachedBounds[0]
+        && bbox[1] >= cachedBounds[1]
+        && bbox[2] <= cachedBounds[2]
+        && bbox[3] <= cachedBounds[3];
+      if (
+        isWithinCachedBounds
+        && requestController
+        && !requestController.signal.aborted
+      ) return;
+
+      requestController?.abort();
+      requestController = null;
+      if (!isWithinCachedBounds) {
+        habitatLoadedTypesRef.current = { bounds: bbox, loaded: new Set() };
       }
+      const requestBbox = habitatLoadedTypesRef.current.bounds ?? bbox;
       const habitatsToFetch = selectedHabitats.filter(
         ({ id }) => !habitatLoadedTypesRef.current.loaded.has(id),
       );
       const loadedSelectedCount = selectedHabitats.length - habitatsToFetch.length;
       setHabitatProgressCount(loadedSelectedCount);
+      setHasHabitatError(false);
       if (habitatsToFetch.length === 0) {
         setIsHabitatLoading(false);
         setLoadingHabitatType(null);
-        setHasHabitatError(false);
         return;
       }
+
+      const controller = new AbortController();
+      requestController = controller;
+      setHabitatHover(null);
+      setIsHabitatLoading(true);
+      setLoadingHabitatType(null);
 
       const loadHabitats = async () => {
         for (const [index, habitat] of habitatsToFetch.entries()) {
@@ -1702,7 +1715,7 @@ export default function MapPageClient() {
               const response = await fetch('/api/map/habitats', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ type: habitat.id, bbox, zoom }),
+                body: JSON.stringify({ type: habitat.id, bbox: requestBbox, zoom }),
                 signal: controller.signal,
               });
               if (
@@ -1774,6 +1787,7 @@ export default function MapPageClient() {
       try {
         await loadHabitats();
       } finally {
+        if (requestController === controller) requestController = null;
         if (active && !controller.signal.aborted) {
           setIsHabitatLoading(false);
           setLoadingHabitatType(null);
