@@ -64,6 +64,20 @@ function formatLiveCoordinates(
   return formattedCoordinates;
 }
 
+function getHabitatFeatureKey(feature: FeatureCollection['features'][number]) {
+  if (feature.id !== undefined) return `id:${feature.id}`;
+
+  const properties = feature.properties;
+  for (const propertyName of ['OBJECTID', 'FID', 'fid', 'id', 'ID']) {
+    const value = properties?.[propertyName];
+    if (typeof value === 'string' || typeof value === 'number') {
+      return `property:${propertyName}:${value}`;
+    }
+  }
+
+  return `feature:${JSON.stringify([feature.geometry, properties])}`;
+}
+
 function ensureRouteDirectionImage(map: MapLibreMap) {
   if (map.hasImage(ROUTE_DIRECTION_IMAGE_ID)) return;
 
@@ -1368,6 +1382,7 @@ export default function MapPageClient() {
   } | null>(null);
   const [isHabitatLoading, setIsHabitatLoading] = useState(false);
   const [loadingHabitatType, setLoadingHabitatType] = useState<HabitatTypeId | null>(null);
+  const [habitatProgressCount, setHabitatProgressCount] = useState(0);
   const [hasHabitatError, setHasHabitatError] = useState(false);
   const [isHabitatZoomedIn, setIsHabitatZoomedIn] = useState(
     INITIAL_VIEW_STATE.zoom >= HABITAT_MIN_ZOOM,
@@ -1544,6 +1559,7 @@ export default function MapPageClient() {
       setHabitatHover(null);
       setIsHabitatLoading(false);
       setLoadingHabitatType(null);
+      setHabitatProgressCount(0);
       setHasHabitatError(false);
       return;
     }
@@ -1565,6 +1581,7 @@ export default function MapPageClient() {
         setHabitatHover(null);
         setIsHabitatLoading(false);
         setLoadingHabitatType(null);
+        setHabitatProgressCount(0);
         setHasHabitatError(false);
         return;
       }
@@ -1572,10 +1589,10 @@ export default function MapPageClient() {
       const bounds = map.getBounds();
       const controller = new AbortController();
       requestController = controller;
-      setHabitatData({});
       setHabitatHover(null);
       setIsHabitatLoading(true);
       setLoadingHabitatType(null);
+      setHabitatProgressCount(0);
       setHasHabitatError(false);
 
       const bbox = [
@@ -1624,7 +1641,24 @@ export default function MapPageClient() {
               break;
             }
             if (collection && active && !controller.signal.aborted) {
-              setHabitatData((current) => ({ ...current, [habitat.id]: collection }));
+              const loadedCollection = collection;
+              setHabitatData((current) => {
+                const existingCollection = current[habitat.id];
+                const features = existingCollection ? [...existingCollection.features] : [];
+                const seenFeatures = new Set(features.map(getHabitatFeatureKey));
+
+                for (const feature of loadedCollection.features) {
+                  const key = getHabitatFeatureKey(feature);
+                  if (seenFeatures.has(key)) continue;
+                  seenFeatures.add(key);
+                  features.push(feature);
+                }
+
+                return {
+                  ...current,
+                  [habitat.id]: { ...loadedCollection, features },
+                };
+              });
             }
           } catch (error) {
             if (active && !controller.signal.aborted) {
@@ -1633,8 +1667,12 @@ export default function MapPageClient() {
             }
           }
 
+          if (active && !controller.signal.aborted) {
+            setHabitatProgressCount(index + 1);
+          }
+
           if (index < HABITAT_TYPES.length - 1 && active && !controller.signal.aborted) {
-            await new Promise((resolve) => window.setTimeout(resolve, 600));
+            await new Promise((resolve) => window.setTimeout(resolve, 100));
           }
         }
       };
@@ -3237,8 +3275,8 @@ export default function MapPageClient() {
                       {isHabitatLoading && (
                         <p role="status" className="mt-2 text-xs text-slate-500">
                           {language === 'zh'
-                            ? `正在載入目前範圍的棲地（${Object.keys(habitatData).length}/${HABITAT_TYPES.length}）：${HABITAT_TYPES.find(({ id }) => id === loadingHabitatType)?.name.zh ?? '…'}`
-                            : `Loading habitats in this view (${Object.keys(habitatData).length}/${HABITAT_TYPES.length}): ${HABITAT_TYPES.find(({ id }) => id === loadingHabitatType)?.name.en ?? '…'}`}
+                            ? `正在載入目前範圍的棲地（${habitatProgressCount}/${HABITAT_TYPES.length}）：${HABITAT_TYPES.find(({ id }) => id === loadingHabitatType)?.name.zh ?? '…'}`
+                            : `Loading habitats in this view (${habitatProgressCount}/${HABITAT_TYPES.length}): ${HABITAT_TYPES.find(({ id }) => id === loadingHabitatType)?.name.en ?? '…'}`}
                         </p>
                       )}
                       {!isHabitatZoomedIn && (
