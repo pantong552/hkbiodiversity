@@ -68,6 +68,10 @@
   box-shadow: none;
 }
 
+.map-page .habitat-tooltip-popup {
+  pointer-events: none;
+}
+
 .map-page .habitat-tooltip-popup .maplibregl-popup-tip {
   display: none;
 }

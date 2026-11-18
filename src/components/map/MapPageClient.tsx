@@ -27,7 +27,7 @@ import proj4 from 'proj4';
 import { AnimatePresence, motion, useSpring, useTransform } from 'framer-motion';
 import CustomDropdown from '@/components/ui/CustomDropdown';
 import useOfflineRouting from '@/hooks/useOfflineRouting';
-import { Check, ChevronDown, ChevronLeft, ChevronUp, Info, Layers, LoaderCircle, Mountain, Plus, RefreshCw, Route as RouteIcon, Search, Download, Trash2, X } from 'lucide-react';
+import { Check, ChevronDown, ChevronLeft, ChevronUp, Eye, EyeOff, Info, Layers, LoaderCircle, Mountain, Plus, RefreshCw, Route as RouteIcon, Search, Download, Trash2, X } from 'lucide-react';
 import { useLanguage } from '@/context/LanguageContext';
 import { BASEMAPS } from '@/constants/basemaps';
 import { HABITAT_MIN_ZOOM, HABITAT_TYPES, type HabitatTypeId } from '@/constants/habitats';
@@ -1373,9 +1373,19 @@ export default function MapPageClient() {
   const [is3DModeEnabled, setIs3DModeEnabled] = useState(false);
   const [areContoursEnabled, setAreContoursEnabled] = useState(true);
   const [areHabitatsEnabled, setAreHabitatsEnabled] = useState(false);
+  const [habitatFetchSelection, setHabitatFetchSelection] = useState<Set<HabitatTypeId>>(
+    () => new Set(HABITAT_TYPES.map(({ id }) => id)),
+  );
+  const [habitatDisplaySelection, setHabitatDisplaySelection] = useState<Set<HabitatTypeId>>(
+    () => new Set(HABITAT_TYPES.map(({ id }) => id)),
+  );
   const [habitatData, setHabitatData] = useState<
     Partial<Record<HabitatTypeId, FeatureCollection>>
   >({});
+  const habitatLoadedTypesRef = useRef<{
+    boundsKey: string;
+    loaded: Set<HabitatTypeId>;
+  }>({ boundsKey: '', loaded: new Set() });
   const [habitatHover, setHabitatHover] = useState<{
     type: HabitatTypeId;
     coordinates: RoutePoint;
@@ -1384,6 +1394,7 @@ export default function MapPageClient() {
   const [loadingHabitatType, setLoadingHabitatType] = useState<HabitatTypeId | null>(null);
   const [habitatProgressCount, setHabitatProgressCount] = useState(0);
   const [hasHabitatError, setHasHabitatError] = useState(false);
+  const isHabitatTooltipVisible = habitatHover !== null;
   const [isHabitatZoomedIn, setIsHabitatZoomedIn] = useState(
     INITIAL_VIEW_STATE.zoom >= HABITAT_MIN_ZOOM,
   );
@@ -1556,6 +1567,7 @@ export default function MapPageClient() {
   useEffect(() => {
     if (!areHabitatsEnabled) {
       setHabitatData({});
+      habitatLoadedTypesRef.current = { boundsKey: '', loaded: new Set() };
       setHabitatHover(null);
       setIsHabitatLoading(false);
       setLoadingHabitatType(null);
@@ -1567,6 +1579,7 @@ export default function MapPageClient() {
     const map = mapRef.current?.getMap();
     if (!mapReady || !map) return;
 
+    const selectedHabitats = HABITAT_TYPES.filter(({ id }) => habitatFetchSelection.has(id));
     let active = true;
     let requestController: AbortController | null = null;
     let moveEndTimeout: number | null = null;
@@ -1578,7 +1591,16 @@ export default function MapPageClient() {
 
       if (!canLoad) {
         setHabitatData({});
+        habitatLoadedTypesRef.current = { boundsKey: '', loaded: new Set() };
         setHabitatHover(null);
+        setIsHabitatLoading(false);
+        setLoadingHabitatType(null);
+        setHabitatProgressCount(0);
+        setHasHabitatError(false);
+        return;
+      }
+
+      if (selectedHabitats.length === 0) {
         setIsHabitatLoading(false);
         setLoadingHabitatType(null);
         setHabitatProgressCount(0);
@@ -1601,8 +1623,24 @@ export default function MapPageClient() {
         bounds.getEast(),
         bounds.getNorth(),
       ];
+      const boundsKey = JSON.stringify([bbox, zoom]);
+      if (habitatLoadedTypesRef.current.boundsKey !== boundsKey) {
+        habitatLoadedTypesRef.current = { boundsKey, loaded: new Set() };
+      }
+      const habitatsToFetch = selectedHabitats.filter(
+        ({ id }) => !habitatLoadedTypesRef.current.loaded.has(id),
+      );
+      const loadedSelectedCount = selectedHabitats.length - habitatsToFetch.length;
+      setHabitatProgressCount(loadedSelectedCount);
+      if (habitatsToFetch.length === 0) {
+        setIsHabitatLoading(false);
+        setLoadingHabitatType(null);
+        setHasHabitatError(false);
+        return;
+      }
+
       const loadHabitats = async () => {
-        for (const [index, habitat] of HABITAT_TYPES.entries()) {
+        for (const [index, habitat] of habitatsToFetch.entries()) {
           if (!active || controller.signal.aborted) return;
           setLoadingHabitatType(habitat.id);
           try {
@@ -1642,6 +1680,7 @@ export default function MapPageClient() {
             }
             if (collection && active && !controller.signal.aborted) {
               const loadedCollection = collection;
+              habitatLoadedTypesRef.current.loaded.add(habitat.id);
               setHabitatData((current) => {
                 const existingCollection = current[habitat.id];
                 const features = existingCollection ? [...existingCollection.features] : [];
@@ -1668,10 +1707,12 @@ export default function MapPageClient() {
           }
 
           if (active && !controller.signal.aborted) {
-            setHabitatProgressCount(index + 1);
+            setHabitatProgressCount(
+              selectedHabitats.filter(({ id }) => habitatLoadedTypesRef.current.loaded.has(id)).length,
+            );
           }
 
-          if (index < HABITAT_TYPES.length - 1 && active && !controller.signal.aborted) {
+          if (index < habitatsToFetch.length - 1 && active && !controller.signal.aborted) {
             await new Promise((resolve) => window.setTimeout(resolve, 100));
           }
         }
@@ -1702,7 +1743,22 @@ export default function MapPageClient() {
       if (moveEndTimeout !== null) window.clearTimeout(moveEndTimeout);
       requestController?.abort();
     };
-  }, [areHabitatsEnabled, mapReady]);
+  }, [areHabitatsEnabled, habitatFetchSelection, mapReady]);
+
+  useEffect(() => {
+    if (!isHabitatTooltipVisible) return;
+
+    const hideTooltipOverInterface = (event: globalThis.PointerEvent) => {
+      if (
+        !(event.target instanceof Element)
+        || !event.target.closest('.maplibregl-canvas-container')
+      ) {
+        setHabitatHover(null);
+      }
+    };
+    document.addEventListener('pointermove', hideTooltipOverInterface);
+    return () => document.removeEventListener('pointermove', hideTooltipOverInterface);
+  }, [isHabitatTooltipVisible]);
 
   useEffect(() => {
     const map = mapRef.current?.getMap();
@@ -2424,7 +2480,10 @@ export default function MapPageClient() {
           ...(routeCoordinates.length > 1 ? [`planned-route-line-${activeRouteId}`] : []),
           ...(areHabitatsEnabled
             ? HABITAT_TYPES
-              .filter(({ id }) => (habitatData[id]?.features.length ?? 0) > 0)
+              .filter(({ id }) => (
+                habitatDisplaySelection.has(id)
+                && (habitatData[id]?.features.length ?? 0) > 0
+              ))
               .map(({ id }) => `habitat-map-fills-${id}`)
             : []),
         ]}
@@ -2509,7 +2568,11 @@ export default function MapPageClient() {
       >
         {areHabitatsEnabled && HABITAT_TYPES.map((habitat) => {
           const collection = habitatData[habitat.id];
-          if (!collection || collection.features.length === 0) return null;
+          if (
+            !habitatDisplaySelection.has(habitat.id)
+            || !collection
+            || collection.features.length === 0
+          ) return null;
           return (
           <Source key={habitat.id} id={`habitat-map-${habitat.id}`} type="geojson" data={collection}>
             <Layer
@@ -2695,7 +2758,7 @@ export default function MapPageClient() {
           >
             <div
               role="tooltip"
-              className="whitespace-nowrap rounded-xl border border-white/20 bg-slate-950/90 px-3 py-2 text-sm font-semibold text-white shadow-xl shadow-slate-950/25 ring-1 ring-slate-950/10 backdrop-blur-md"
+              className="whitespace-nowrap rounded-xl border border-slate-200/90 bg-white/95 px-3 py-2 text-sm font-semibold text-slate-800 shadow-lg shadow-slate-900/10 ring-1 ring-white/70 backdrop-blur-md"
             >
               {hoveredHabitat.name[language]}
             </div>
@@ -3262,21 +3325,72 @@ export default function MapPageClient() {
                       </h3>
                       <ul className="max-h-36 space-y-1 overflow-y-auto">
                         {HABITAT_TYPES.map((habitat) => (
-                          <li key={habitat.id} className="flex items-center gap-2 text-xs text-slate-700">
-                            <span
-                              aria-hidden="true"
-                              className="h-3 w-3 shrink-0 rounded-sm"
-                              style={{ backgroundColor: habitat.color }}
-                            />
-                            <span>{habitat.name[language]}</span>
+                          <li key={habitat.id} className="flex items-center gap-1 text-xs text-slate-700">
+                            <label className="flex min-w-0 flex-1 cursor-pointer items-center gap-2">
+                              <input
+                                type="checkbox"
+                                checked={habitatFetchSelection.has(habitat.id)}
+                                aria-label={language === 'zh'
+                                  ? `載入${habitat.name.zh}`
+                                  : `Fetch ${habitat.name.en}`}
+                                title={language === 'zh'
+                                  ? `載入${habitat.name.zh}`
+                                  : `Fetch ${habitat.name.en}`}
+                                onChange={(event) => {
+                                  const shouldFetch = event.target.checked;
+                                  setHabitatFetchSelection((current) => {
+                                    const next = new Set(current);
+                                    if (shouldFetch) next.add(habitat.id);
+                                    else next.delete(habitat.id);
+                                    return next;
+                                  });
+                                }}
+                                className="h-3.5 w-3.5 shrink-0 accent-emerald-700"
+                              />
+                              <span
+                                aria-hidden="true"
+                                className="h-3 w-3 shrink-0 rounded-sm"
+                                style={{ backgroundColor: habitat.color }}
+                              />
+                              <span className="truncate">{habitat.name[language]}</span>
+                            </label>
+                            <button
+                              type="button"
+                              aria-label={language === 'zh'
+                                ? `${habitatDisplaySelection.has(habitat.id) ? '隱藏' : '顯示'}${habitat.name.zh}`
+                                : `${habitatDisplaySelection.has(habitat.id) ? 'Hide' : 'Show'} ${habitat.name.en}`}
+                              aria-pressed={habitatDisplaySelection.has(habitat.id)}
+                              title={language === 'zh'
+                                ? `${habitatDisplaySelection.has(habitat.id) ? '隱藏' : '顯示'}${habitat.name.zh}`
+                                : `${habitatDisplaySelection.has(habitat.id) ? 'Hide' : 'Show'} ${habitat.name.en}`}
+                              onClick={() => {
+                                const shouldDisplay = !habitatDisplaySelection.has(habitat.id);
+                                setHabitatDisplaySelection((current) => {
+                                  const next = new Set(current);
+                                  if (shouldDisplay) next.add(habitat.id);
+                                  else next.delete(habitat.id);
+                                  return next;
+                                });
+                                if (!shouldDisplay && habitatHover?.type === habitat.id) {
+                                  setHabitatHover(null);
+                                }
+                              }}
+                              className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-md hover:bg-slate-100 hover:text-emerald-700 focus-visible:outline-2 focus-visible:outline-emerald-600 ${
+                                habitatDisplaySelection.has(habitat.id) ? 'text-emerald-700' : 'text-slate-400'
+                              }`}
+                            >
+                              {habitatDisplaySelection.has(habitat.id)
+                                ? <Eye aria-hidden="true" className="h-4 w-4" />
+                                : <EyeOff aria-hidden="true" className="h-4 w-4" />}
+                            </button>
                           </li>
                         ))}
                       </ul>
                       {isHabitatLoading && (
                         <p role="status" className="mt-2 text-xs text-slate-500">
                           {language === 'zh'
-                            ? `正在載入目前範圍的棲地（${habitatProgressCount}/${HABITAT_TYPES.length}）：${HABITAT_TYPES.find(({ id }) => id === loadingHabitatType)?.name.zh ?? '…'}`
-                            : `Loading habitats in this view (${habitatProgressCount}/${HABITAT_TYPES.length}): ${HABITAT_TYPES.find(({ id }) => id === loadingHabitatType)?.name.en ?? '…'}`}
+                            ? `正在載入目前範圍的棲地（${habitatProgressCount}/${habitatFetchSelection.size}）：${HABITAT_TYPES.find(({ id }) => id === loadingHabitatType)?.name.zh ?? '…'}`
+                            : `Loading habitats in this view (${habitatProgressCount}/${habitatFetchSelection.size}): ${HABITAT_TYPES.find(({ id }) => id === loadingHabitatType)?.name.en ?? '…'}`}
                         </p>
                       )}
                       {!isHabitatZoomedIn && (
