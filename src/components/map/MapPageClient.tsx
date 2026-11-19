@@ -2833,6 +2833,9 @@ export default function MapPageClient() {
     };
     map.on('style.load', apply3DModeAfterStyleLoad);
     map.on('styledata', apply3DModeAfterStyleData);
+    if (map.isStyleLoaded()) {
+      isStyleReadyRef.current = true;
+    }
     apply3DMode();
 
     return () => {
