@@ -19,6 +19,7 @@ import {
   Marker as MapLibreMarkerConstructor,
   type Marker as MapLibreMarker,
   type CalculateTileZoomFunction,
+  type MapSourceDataEvent,
   type Source as MapLibreSource,
   type StyleSpecification,
 } from 'maplibre-gl';
@@ -43,6 +44,7 @@ const INITIAL_VIEW_STATE = {
 const WGS84_PROJECTION = '+proj=longlat +datum=WGS84 +no_defs +type=crs';
 const HK1980_PROJECTION = '+proj=tmerc +lat_0=22.3121333333333 +lon_0=114.178555555556 +k=1 +x_0=836694.05 +y_0=819069.8 +ellps=intl +towgs84=-162.619,-276.959,-161.764,-0.067753,2.243648,1.158828,-1.094246 +units=m +no_defs +type=crs';
 const ROUTE_DIRECTION_IMAGE_ID = 'route-direction-arrow';
+const habitatFeatureKeyCache = new WeakMap<object, string>();
 
 function projectToHk1980(longitude: number, latitude: number) {
   const [easting, northing] = proj4(WGS84_PROJECTION, HK1980_PROJECTION, [longitude, latitude]);
@@ -66,17 +68,26 @@ function formatLiveCoordinates(
 }
 
 function getHabitatFeatureKey(feature: FeatureCollection['features'][number]) {
-  if (feature.id !== undefined) return `id:${feature.id}`;
+  const cachedKey = habitatFeatureKeyCache.get(feature);
+  if (cachedKey) return cachedKey;
 
-  const properties = feature.properties;
-  for (const propertyName of ['OBJECTID', 'FID', 'fid', 'id', 'ID']) {
-    const value = properties?.[propertyName];
-    if (typeof value === 'string' || typeof value === 'number') {
-      return `property:${propertyName}:${value}`;
-    }
+  let key: string;
+  if (feature.id !== undefined) {
+    key = `id:${feature.id}`;
+  } else {
+    const properties = feature.properties;
+    const idProperty = ['OBJECTID', 'FID', 'fid', 'id', 'ID'].find((propertyName) => {
+      const value = properties?.[propertyName];
+      return typeof value === 'string' || typeof value === 'number';
+    });
+    const idValue = idProperty ? properties?.[idProperty] : undefined;
+    key = idProperty
+      ? `property:${idProperty}:${idValue}`
+      : `feature:${JSON.stringify([feature.geometry, properties])}`;
   }
 
-  return `feature:${JSON.stringify([feature.geometry, properties])}`;
+  habitatFeatureKeyCache.set(feature, key);
+  return key;
 }
 
 function ensureRouteDirectionImage(map: MapLibreMap) {
@@ -1572,6 +1583,8 @@ export default function MapPageClient() {
   const [habitatData, setHabitatData] = useState<
     Partial<Record<HabitatTypeId, FeatureCollection>>
   >({});
+  const habitatDataRef = useRef(habitatData);
+  const habitatSourceUpdateStartedAtRef = useRef<Partial<Record<HabitatTypeId, number>>>({});
   const habitatLoadedTypesRef = useRef<{
     bounds: [number, number, number, number] | null;
     loaded: Set<HabitatTypeId>;
@@ -1758,8 +1771,10 @@ export default function MapPageClient() {
 
   useEffect(() => {
     if (!areHabitatsEnabled) {
+      habitatDataRef.current = {};
       setHabitatData({});
       habitatLoadedTypesRef.current = { bounds: null, loaded: new Set() };
+      habitatSourceUpdateStartedAtRef.current = {};
       setHabitatHover(null);
       setIsHabitatLoading(false);
       setLoadingHabitatType(null);
@@ -1851,12 +1866,14 @@ export default function MapPageClient() {
           try {
             let collection: FeatureCollection | null = null;
             for (let attempt = 0; attempt < 3; attempt += 1) {
+              const requestStartedAt = performance.now();
               const response = await fetch('/api/map/habitats', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ type: habitat.id, bbox: requestBbox, zoom }),
                 signal: controller.signal,
               });
+              const responseHeadersMs = performance.now() - requestStartedAt;
               if (
                 (response.status === 429 || response.status === 503)
                 && attempt < 2
@@ -1872,7 +1889,12 @@ export default function MapPageClient() {
                 throw new Error(`Habitat data request failed for ${habitat.id} (${response.status})`);
               }
 
-              const result = await response.json() as FeatureCollection | null;
+              const bodyReadStartedAt = performance.now();
+              const responseBody = await response.text();
+              const bodyReadMs = performance.now() - bodyReadStartedAt;
+              const jsonParseStartedAt = performance.now();
+              const result = JSON.parse(responseBody) as FeatureCollection | null;
+              const jsonParseMs = performance.now() - jsonParseStartedAt;
               if (
                 !result
                 || result.type !== 'FeatureCollection'
@@ -1880,28 +1902,59 @@ export default function MapPageClient() {
               ) {
                 throw new Error(`Invalid GeoJSON returned for ${habitat.id}`);
               }
+              console.info('[habitat-performance]', {
+                stage: 'client-response',
+                type: habitat.id,
+                attempt: attempt + 1,
+                responseHeadersMs: Math.round(responseHeadersMs),
+                bodyReadMs: Math.round(bodyReadMs),
+                jsonParseMs: Math.round(jsonParseMs),
+                contentLength: response.headers.get('content-length'),
+                featureCount: result.features.length,
+              });
               collection = result;
               break;
             }
             if (collection && active && !controller.signal.aborted) {
               const loadedCollection = collection;
               habitatLoadedTypesRef.current.loaded.add(habitat.id);
-              setHabitatData((current) => {
-                const existingCollection = current[habitat.id];
-                const features = existingCollection ? [...existingCollection.features] : [];
-                const seenFeatures = new Set(features.map(getHabitatFeatureKey));
+              const mergeStartedAt = performance.now();
+              const currentData = habitatDataRef.current;
+              const existingCollection = currentData[habitat.id];
+              const features = existingCollection ? [...existingCollection.features] : [];
+              const seenFeatures = new Set(features.map(getHabitatFeatureKey));
+              let duplicateCount = 0;
+              let fallbackGeometryKeyCount = 0;
 
-                for (const feature of loadedCollection.features) {
-                  const key = getHabitatFeatureKey(feature);
-                  if (seenFeatures.has(key)) continue;
-                  seenFeatures.add(key);
-                  features.push(feature);
+              for (const feature of loadedCollection.features) {
+                const key = getHabitatFeatureKey(feature);
+                if (key.startsWith('feature:')) fallbackGeometryKeyCount += 1;
+                if (seenFeatures.has(key)) {
+                  duplicateCount += 1;
+                  continue;
                 }
+                seenFeatures.add(key);
+                features.push(feature);
+              }
 
-                return {
-                  ...current,
-                  [habitat.id]: { ...loadedCollection, features },
-                };
+              const nextData = {
+                ...currentData,
+                [habitat.id]: { ...loadedCollection, features },
+              };
+              habitatDataRef.current = nextData;
+              if (features.length > 0) {
+                habitatSourceUpdateStartedAtRef.current[habitat.id] = performance.now();
+              }
+              setHabitatData(nextData);
+              console.info('[habitat-performance]', {
+                stage: 'merge',
+                type: habitat.id,
+                incomingFeatureCount: loadedCollection.features.length,
+                existingFeatureCount: existingCollection?.features.length ?? 0,
+                duplicateCount,
+                fallbackGeometryKeyCount,
+                mergedFeatureCount: features.length,
+                durationMs: Math.round(performance.now() - mergeStartedAt),
               });
             }
           } catch (error) {
@@ -1940,12 +1993,27 @@ export default function MapPageClient() {
         void updateHabitatFeatures();
       }, 200);
     };
+    const onHabitatSourceData = (event: MapSourceDataEvent) => {
+      if (!event.isSourceLoaded || event.sourceDataType !== 'content') return;
+      const habitat = HABITAT_TYPES.find(({ id }) => event.sourceId === `habitat-map-${id}`);
+      if (!habitat) return;
+      const startedAt = habitatSourceUpdateStartedAtRef.current[habitat.id];
+      if (startedAt === undefined) return;
+      console.info('[habitat-performance]', {
+        stage: 'maplibre-source',
+        type: habitat.id,
+        sourceReadyMs: Math.round(performance.now() - startedAt),
+      });
+      delete habitatSourceUpdateStartedAtRef.current[habitat.id];
+    };
 
     map.on('moveend', scheduleHabitatUpdate);
+    map.on('sourcedata', onHabitatSourceData);
     void updateHabitatFeatures();
     return () => {
       active = false;
       map.off('moveend', scheduleHabitatUpdate);
+      map.off('sourcedata', onHabitatSourceData);
       if (moveEndTimeout !== null) window.clearTimeout(moveEndTimeout);
       requestController?.abort();
     };

@@ -113,6 +113,7 @@ export async function POST(request: Request) {
       filter,
     });
     const signal = AbortSignal.any([request.signal, AbortSignal.timeout(60000)]);
+    const wfsRequestStartedAt = performance.now();
     const response = await fetch(`${HABITAT_WFS_URL}?${params}`, {
       headers: {
         Accept: 'application/json',
@@ -120,6 +121,7 @@ export async function POST(request: Request) {
       },
       signal,
     });
+    const wfsResponseHeadersMs = performance.now() - wfsRequestStartedAt;
     if (response.status === 403 || response.status === 429 || response.status === 503) {
       console.warn(`CSDI WFS temporarily rejected ${habitat.id} (${response.status})`);
       return NextResponse.json(
@@ -134,10 +136,21 @@ export async function POST(request: Request) {
       throw new Error(`CSDI WFS request failed for ${habitat.id} (${response.status})`);
     }
 
+    const wfsBodyAndParseStartedAt = performance.now();
     const collection: unknown = await response.json();
+    const wfsBodyAndParseMs = performance.now() - wfsBodyAndParseStartedAt;
     if (!isFeatureCollection(collection)) {
       throw new Error(`CSDI WFS returned invalid GeoJSON for ${habitat.id}`);
     }
+
+    console.info('[habitat-performance]', {
+      stage: 'wfs-response',
+      type: habitat.id,
+      responseHeadersMs: Math.round(wfsResponseHeadersMs),
+      bodyReadAndJsonParseMs: Math.round(wfsBodyAndParseMs),
+      contentLength: response.headers.get('content-length'),
+      featureCount: collection.features.length,
+    });
 
     return NextResponse.json(collection);
   } catch (error) {
