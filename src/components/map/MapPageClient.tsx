@@ -2644,7 +2644,11 @@ export default function MapPageClient() {
       isStyleReadyRef.current = true;
       apply3DMode();
     };
-    const apply3DModeAfterStyleData = () => apply3DMode();
+    const apply3DModeAfterStyleData = () => {
+      if (!map.isStyleLoaded()) return;
+      isStyleReadyRef.current = true;
+      apply3DMode();
+    };
     map.on('style.load', apply3DModeAfterStyleLoad);
     map.on('styledata', apply3DModeAfterStyleData);
     apply3DMode();
