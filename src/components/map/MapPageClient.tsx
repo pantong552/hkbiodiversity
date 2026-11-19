@@ -2669,17 +2669,24 @@ export default function MapPageClient() {
     const map = mapRef.current?.getMap();
     if (!mapReady || !map) return;
 
+    const applyBasemapStyle = () => {
+      isStyleReadyRef.current = false;
+      map.once('style.load', () => {
+        isStyleReadyRef.current = true;
+      });
+      map.setStyle(getBasemapStyle(currentBasemap, language), {
+        diff: !is3DModeEnabled,
+        transformStyle: (previousStyle, nextStyle) => preserveTerrainLayers(previousStyle, nextStyle),
+      });
+    };
+
     if (appliedBasemapId.current !== currentStyleId) {
       appliedBasemapId.current = currentStyleId;
       appliedLocalizedBasemapLanguage.current = language;
       if (is3DModeEnabled && isStyleReadyRef.current && map.getTerrain()) {
         map.setTerrain(null);
       }
-      isStyleReadyRef.current = false;
-      map.setStyle(getBasemapStyle(currentBasemap, language), {
-        diff: !is3DModeEnabled,
-        transformStyle: (previousStyle, nextStyle) => preserveTerrainLayers(previousStyle, nextStyle),
-      });
+      applyBasemapStyle();
       return;
     }
 
@@ -2691,11 +2698,7 @@ export default function MapPageClient() {
       if (is3DModeEnabled && isStyleReadyRef.current && map.getTerrain()) {
         map.setTerrain(null);
       }
-      isStyleReadyRef.current = false;
-      map.setStyle(getBasemapStyle(currentBasemap, language), {
-        diff: !is3DModeEnabled,
-        transformStyle: (previousStyle, nextStyle) => preserveTerrainLayers(previousStyle, nextStyle),
-      });
+      applyBasemapStyle();
       return;
     }
 
