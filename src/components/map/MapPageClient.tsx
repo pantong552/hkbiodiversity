@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent } from 'react';
+import { createPortal } from 'react-dom';
 import Map, {
   type MapRef,
   FullscreenControl,
@@ -134,6 +135,106 @@ const CONTOUR_THRESHOLDS: Record<number, [number, number]> = {
 };
 const MAP_ICON_BUTTON_CLASS = 'pointer-events-auto flex h-11 w-11 items-center justify-center rounded-full border border-white/80 bg-white/95 text-slate-700 shadow-lg backdrop-blur transition hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500';
 
+function ZoomRequirementNotice({
+  id,
+  language,
+  message,
+}: {
+  id: string;
+  language: 'zh' | 'en';
+  message: string;
+}) {
+  const [isOpen, setIsOpen] = useState(false);
+  const [isHovered, setIsHovered] = useState(false);
+  const [isFocused, setIsFocused] = useState(false);
+  const [position, setPosition] = useState<{ left: number; top: number } | null>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const closeTimerRef = useRef<number | null>(null);
+  const isTooltipVisible = isOpen || isHovered || isFocused;
+
+  const scheduleClose = () => {
+    if (closeTimerRef.current !== null) window.clearTimeout(closeTimerRef.current);
+    closeTimerRef.current = window.setTimeout(() => {
+      closeTimerRef.current = null;
+      setIsHovered(false);
+    }, 120);
+  };
+  const cancelClose = () => {
+    if (closeTimerRef.current !== null) {
+      window.clearTimeout(closeTimerRef.current);
+      closeTimerRef.current = null;
+    }
+  };
+
+  useEffect(() => {
+    if (!isTooltipVisible) return;
+
+    const updatePosition = () => {
+      const bounds = triggerRef.current?.getBoundingClientRect();
+      if (!bounds) return;
+      setPosition({
+        left: Math.max(8, Math.min(bounds.left, window.innerWidth - 232)),
+        top: Math.min(bounds.bottom, window.innerHeight - 80),
+      });
+    };
+
+    updatePosition();
+    window.addEventListener('resize', updatePosition);
+    window.addEventListener('scroll', updatePosition, true);
+    return () => {
+      window.removeEventListener('resize', updatePosition);
+      window.removeEventListener('scroll', updatePosition, true);
+    };
+  }, [isTooltipVisible]);
+
+  useEffect(() => () => {
+    if (closeTimerRef.current !== null) window.clearTimeout(closeTimerRef.current);
+  }, []);
+
+  return (
+    <>
+      <button
+        ref={triggerRef}
+        type="button"
+        aria-label={language === 'zh' ? '縮放提示' : 'Zoom requirement'}
+        aria-expanded={isOpen || isFocused}
+        aria-controls={id}
+        aria-describedby={isOpen || isFocused ? id : undefined}
+        onClick={() => setIsOpen((open) => !open)}
+        onPointerEnter={() => {
+          cancelClose();
+          setIsHovered(true);
+        }}
+        onPointerLeave={scheduleClose}
+        onFocus={() => setIsFocused(true)}
+        onBlur={() => setIsFocused(false)}
+        onKeyDown={(event) => {
+          if (event.key === 'Escape') setIsOpen(false);
+        }}
+        className="inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-full border border-slate-400 text-[11px] font-bold leading-none text-slate-500 hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500"
+      >
+        !
+      </button>
+      {isTooltipVisible && position && createPortal(
+        <span
+          id={id}
+          role="tooltip"
+          onPointerEnter={() => {
+            cancelClose();
+            setIsHovered(true);
+          }}
+          onPointerLeave={scheduleClose}
+          style={{ position: 'fixed', left: position.left, top: position.top, zIndex: 10000 }}
+          className="w-56 max-w-[calc(100vw-1rem)] rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-600 shadow-lg"
+        >
+          {message}
+        </span>,
+        document.body,
+      )}
+    </>
+  );
+}
+
 const DEM_SOURCES = {
   mapterhorn: {
     name: { zh: 'Mapterhorn', en: 'Mapterhorn' },
@@ -175,8 +276,8 @@ type PlannedRoute = {
   useOfflineRouting: boolean;
 };
 const INACTIVE_ROUTE_COLORS = ['#059669', '#7c3aed', '#ea580c', '#0891b2'];
-const LOT_LAYER_MIN_ZOOM = 15;
-const GLA_LAYER_MIN_ZOOM = 11;
+const LOT_LAYER_MIN_ZOOM = 16;
+const GLA_LAYER_MIN_ZOOM = 16;
 const HONG_KONG_SEARCH_BOUNDS = {
   west: 113.75,
   south: 22.15,
@@ -1386,7 +1487,12 @@ function ThreeDModeControl({ language, isEnabled, onToggle }: ThreeDModeControlP
   const buttonRef = useRef<HTMLButtonElement | null>(null);
 
   const control = useControl(() => ({
-    onAdd() {
+    onAdd(map) {
+      map.getContainer().querySelectorAll('.maplibregl-ctrl-fullscreen').forEach((existingButton) => {
+        if (existingButton.textContent?.trim() === '3D') {
+          existingButton.closest('.maplibregl-ctrl-group')?.remove();
+        }
+      });
       const container = document.createElement('div');
       container.className = 'maplibregl-ctrl maplibregl-ctrl-group';
       const button = document.createElement('button');
@@ -1413,6 +1519,14 @@ function ThreeDModeControl({ language, isEnabled, onToggle }: ThreeDModeControlP
     propsRef.current = { language, isEnabled, onToggle };
     const button = buttonRef.current;
     if (!button) return;
+
+    button.closest('.maplibregl-map')
+      ?.querySelectorAll('.maplibregl-ctrl-fullscreen')
+      .forEach((existingButton) => {
+        if (existingButton !== button && existingButton.textContent?.trim() === '3D') {
+          existingButton.closest('.maplibregl-ctrl-group')?.remove();
+        }
+      });
 
     const label = language === 'zh'
       ? (isEnabled ? '退出 3D 模式' : '進入 3D 模式')
@@ -2873,7 +2987,7 @@ export default function MapPageClient() {
               paint={{
                 'line-color': '#b45309',
                 'line-opacity': 0.85,
-                'line-width': ['interpolate', ['linear'], ['zoom'], GLA_LAYER_MIN_ZOOM, 0.6, 16, 1.2],
+                'line-width': 1.2,
               }}
             />
             <Layer
@@ -2883,7 +2997,7 @@ export default function MapPageClient() {
               layout={{
                 'text-field': ['coalesce', ['get', 'label'], ['to-string', ['get', 'glaid']]],
                 'text-font': ['Open Sans Regular', 'Arial Unicode MS Regular'],
-                'text-size': ['interpolate', ['linear'], ['zoom'], GLA_LAYER_MIN_ZOOM, 9, 16, 11, 18, 12],
+                'text-size': ['interpolate', ['linear'], ['zoom'], GLA_LAYER_MIN_ZOOM, 11, 18, 12],
                 'text-max-width': 10,
                 'text-allow-overlap': false,
               }}
@@ -2915,8 +3029,6 @@ export default function MapPageClient() {
                   ['linear'],
                   ['zoom'],
                   HABITAT_MIN_ZOOM,
-                  0.2,
-                  16,
                   0.38,
                   18,
                   0.5,
@@ -2930,7 +3042,7 @@ export default function MapPageClient() {
               paint={{
                 'line-color': habitat.color,
                 'line-opacity': 0.85,
-                'line-width': ['interpolate', ['linear'], ['zoom'], HABITAT_MIN_ZOOM, 0.35, 16, 1],
+                'line-width': 1,
               }}
             />
           </Source>
@@ -3666,9 +3778,9 @@ export default function MapPageClient() {
               setIsBasemapPickerOpen(false);
               setIsTerrainPickerOpen(false);
             }}
-            className={`${MAP_ICON_BUTTON_CLASS} ${areHabitatsEnabled || areLotsEnabled || areGlaEnabled ? '!border-emerald-600 !bg-emerald-600 !text-white hover:!bg-emerald-700' : ''}`}
+            className={MAP_ICON_BUTTON_CLASS}
           >
-            <Layers className={`h-5 w-5 ${areHabitatsEnabled || areLotsEnabled || areGlaEnabled ? 'text-white' : 'text-slate-700'}`} />
+            <Layers className="h-5 w-5 text-slate-700" />
           </button>
 
           <AnimatePresence initial={false}>
@@ -3687,48 +3799,56 @@ export default function MapPageClient() {
                   {language === 'zh' ? '地圖圖層' : 'Map Layer'}
                 </h2>
                 <div className="space-y-2">
-                  <button
-                    type="button"
-                    role="switch"
-                    aria-checked={areLotsEnabled}
-                    aria-label={language === 'zh' ? '地段（LOT）' : 'Lots'}
-                    disabled={!isLotZoomedIn && !areLotsEnabled}
-                    onClick={() => setAreLotsEnabled((enabled) => !enabled)}
-                    className="flex w-full items-center justify-between rounded-xl px-2 py-2 text-left text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
-                  >
-                    <span>{language === 'zh' ? '地段（LOT）' : 'Lots'}</span>
-                    <span className={`relative h-5 w-9 rounded-full transition ${areLotsEnabled ? 'bg-emerald-600' : 'bg-slate-300'}`}>
+                  <div className={`flex w-full items-center justify-between rounded-xl px-2 py-2 text-sm font-semibold ${isLotZoomedIn ? 'text-slate-700' : 'text-slate-400'}`}>
+                    <span className="flex min-w-0 items-center gap-2">
+                      <span>{language === 'zh' ? '地段（LOT）' : 'Lots'}</span>
+                      {!isLotZoomedIn && (
+                        <ZoomRequirementNotice
+                          id="lot-zoom-requirement"
+                          language={language}
+                          message={language === 'zh'
+                            ? `請放大至 ${LOT_LAYER_MIN_ZOOM} 級以顯示地段界線。`
+                            : `Zoom in to level ${LOT_LAYER_MIN_ZOOM} to show lot boundaries.`}
+                        />
+                      )}
+                    </span>
+                    <button
+                      type="button"
+                      role="switch"
+                      aria-checked={areLotsEnabled}
+                      aria-label={language === 'zh' ? '地段（LOT）' : 'Lots'}
+                      disabled={!isLotZoomedIn && !areLotsEnabled}
+                      onClick={() => setAreLotsEnabled((enabled) => !enabled)}
+                      className={`relative h-5 w-9 shrink-0 rounded-full transition disabled:cursor-not-allowed disabled:opacity-50 ${areLotsEnabled ? 'bg-emerald-600' : 'bg-slate-300'}`}
+                    >
                       <span className={`absolute top-0.5 h-4 w-4 rounded-full bg-white transition ${areLotsEnabled ? 'left-[18px]' : 'left-0.5'}`} />
+                    </button>
+                  </div>
+                  <div className={`flex w-full items-center justify-between rounded-xl px-2 py-2 text-sm font-semibold ${isGlaZoomedIn ? 'text-slate-700' : 'text-slate-400'}`}>
+                    <span className="flex min-w-0 items-center gap-2">
+                      <span>{language === 'zh' ? '政府撥地（GLA）' : 'GLA'}</span>
+                      {!isGlaZoomedIn && (
+                        <ZoomRequirementNotice
+                          id="gla-zoom-requirement"
+                          language={language}
+                          message={language === 'zh'
+                            ? `請放大至 ${GLA_LAYER_MIN_ZOOM} 級以載入政府撥地。`
+                            : `Zoom in to level ${GLA_LAYER_MIN_ZOOM} to load GLA features.`}
+                        />
+                      )}
                     </span>
-                  </button>
-                  {!isLotZoomedIn && (
-                    <p role="status" className="px-2 pt-1 text-xs text-slate-500">
-                      {language === 'zh'
-                        ? `請放大至 ${LOT_LAYER_MIN_ZOOM} 級以顯示地段界線。`
-                        : `Zoom in to level ${LOT_LAYER_MIN_ZOOM} to show lot boundaries.`}
-                    </p>
-                  )}
-                  <button
-                    type="button"
-                    role="switch"
-                    aria-checked={areGlaEnabled}
-                    aria-label={language === 'zh' ? '政府撥地（GLA）' : 'Government land allocation'}
-                    disabled={!isGlaZoomedIn && !areGlaEnabled}
-                    onClick={() => setAreGlaEnabled((enabled) => !enabled)}
-                    className="flex w-full items-center justify-between rounded-xl px-2 py-2 text-left text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
-                  >
-                    <span>{language === 'zh' ? '政府撥地（GLA）' : 'Government land allocation (GLA)'}</span>
-                    <span className={`relative h-5 w-9 rounded-full transition ${areGlaEnabled ? 'bg-emerald-600' : 'bg-slate-300'}`}>
+                    <button
+                      type="button"
+                      role="switch"
+                      aria-checked={areGlaEnabled}
+                      aria-label={language === 'zh' ? '政府撥地（GLA）' : 'GLA'}
+                      disabled={!isGlaZoomedIn && !areGlaEnabled}
+                      onClick={() => setAreGlaEnabled((enabled) => !enabled)}
+                      className={`relative h-5 w-9 shrink-0 rounded-full transition disabled:cursor-not-allowed disabled:opacity-50 ${areGlaEnabled ? 'bg-emerald-600' : 'bg-slate-300'}`}
+                    >
                       <span className={`absolute top-0.5 h-4 w-4 rounded-full bg-white transition ${areGlaEnabled ? 'left-[18px]' : 'left-0.5'}`} />
-                    </span>
-                  </button>
-                  {!isGlaZoomedIn && (
-                    <p role="status" className="px-2 pt-1 text-xs text-slate-500">
-                      {language === 'zh'
-                        ? `請放大至 ${GLA_LAYER_MIN_ZOOM} 級以載入政府撥地。`
-                        : `Zoom in to level ${GLA_LAYER_MIN_ZOOM} to load GLA features.`}
-                    </p>
-                  )}
+                    </button>
+                  </div>
                   {areGlaEnabled && isGlaLoading && (
                     <p role="status" className="px-2 pt-1 text-xs text-slate-500">
                       {language === 'zh' ? '正在載入政府撥地…' : 'Loading GLA features…'}
@@ -3739,27 +3859,31 @@ export default function MapPageClient() {
                       {glaLoadError}
                     </p>
                   )}
-                  <button
-                    type="button"
-                    role="switch"
-                    aria-checked={areHabitatsEnabled}
-                    aria-label={language === 'zh' ? '陸地棲地圖' : 'Terrestrial habitat map'}
-                    disabled={!isHabitatZoomedIn && !areHabitatsEnabled}
-                    onClick={() => setAreHabitatsEnabled((enabled) => !enabled)}
-                    className="flex w-full items-center justify-between rounded-xl px-2 py-2 text-left text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
-                  >
-                    <span>{language === 'zh' ? '陸地棲地圖' : 'Terrestrial habitat map'}</span>
-                    <span className={`relative h-5 w-9 rounded-full transition ${areHabitatsEnabled ? 'bg-emerald-600' : 'bg-slate-300'}`}>
-                      <span className={`absolute top-0.5 h-4 w-4 rounded-full bg-white transition ${areHabitatsEnabled ? 'left-[18px]' : 'left-0.5'}`} />
+                  <div className={`flex w-full items-center justify-between rounded-xl px-2 py-2 text-sm font-semibold ${isHabitatZoomedIn ? 'text-slate-700' : 'text-slate-400'}`}>
+                    <span className="flex min-w-0 items-center gap-2">
+                      <span>{language === 'zh' ? '陸地棲地圖' : 'Terrestrial habitat map'}</span>
+                      {!isHabitatZoomedIn && (
+                        <ZoomRequirementNotice
+                          id="habitat-zoom-requirement"
+                          language={language}
+                          message={language === 'zh'
+                            ? `請放大至 ${HABITAT_MIN_ZOOM} 級以啟用棲地地圖。`
+                            : `Zoom in to level ${HABITAT_MIN_ZOOM} to enable the habitat map.`}
+                        />
+                      )}
                     </span>
-                  </button>
-                  {!isHabitatZoomedIn && (
-                    <p role="status" className="px-2 pt-1 text-xs text-slate-500">
-                      {language === 'zh'
-                        ? `請放大至 ${HABITAT_MIN_ZOOM} 級以啟用棲地地圖。`
-                        : `Zoom in to level ${HABITAT_MIN_ZOOM} to enable the habitat map.`}
-                    </p>
-                  )}
+                    <button
+                      type="button"
+                      role="switch"
+                      aria-checked={areHabitatsEnabled}
+                      aria-label={language === 'zh' ? '陸地棲地圖' : 'Terrestrial habitat map'}
+                      disabled={!isHabitatZoomedIn && !areHabitatsEnabled}
+                      onClick={() => setAreHabitatsEnabled((enabled) => !enabled)}
+                      className={`relative h-5 w-9 shrink-0 rounded-full transition disabled:cursor-not-allowed disabled:opacity-50 ${areHabitatsEnabled ? 'bg-emerald-600' : 'bg-slate-300'}`}
+                    >
+                      <span className={`absolute top-0.5 h-4 w-4 rounded-full bg-white transition ${areHabitatsEnabled ? 'left-[18px]' : 'left-0.5'}`} />
+                    </button>
+                  </div>
                   {areHabitatsEnabled && (
                     <div className="px-2 pt-1">
                       <h3 className="mb-1 text-[11px] font-bold uppercase tracking-wide text-slate-500">

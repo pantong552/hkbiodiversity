@@ -23,4 +23,4 @@ export const HABITAT_TYPES = [
 ] as const;
 
 export type HabitatTypeId = (typeof HABITAT_TYPES)[number]['id'];
-export const HABITAT_MIN_ZOOM = 15;
+export const HABITAT_MIN_ZOOM = 16;
