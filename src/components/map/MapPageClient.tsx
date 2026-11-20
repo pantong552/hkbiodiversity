@@ -18,6 +18,7 @@ import {
   type Map as MapLibreMap,
   Marker as MapLibreMarkerConstructor,
   type Marker as MapLibreMarker,
+  type MapMouseEvent,
   type CalculateTileZoomFunction,
   type MapSourceDataEvent,
   type Source as MapLibreSource,
@@ -51,20 +52,104 @@ function projectToHk1980(longitude: number, latitude: number) {
   return { easting, northing };
 }
 
+function formatMapCoordinates(
+  longitude: number,
+  latitude: number,
+  coordinateSystem: 'wgs84' | 'hk1980',
+) {
+  if (coordinateSystem === 'hk1980') {
+    const { easting, northing } = projectToHk1980(longitude, latitude);
+    return `E ${Math.round(easting).toLocaleString('en-US')}, N ${Math.round(northing).toLocaleString('en-US')}`;
+  }
+
+  return `${latitude.toFixed(6)}, ${longitude.toFixed(6)}`;
+}
+
 function formatLiveCoordinates(
   coordinates: { longitude: number; latitude: number; accuracy: number } | null,
   coordinateSystem: 'wgs84' | 'hk1980',
 ) {
   if (!coordinates) return '--';
 
-  let formattedCoordinates: string;
-  if (coordinateSystem === 'hk1980') {
-    const { easting, northing } = projectToHk1980(coordinates.longitude, coordinates.latitude);
-    formattedCoordinates = `E ${Math.round(easting).toLocaleString('en-US')}, N ${Math.round(northing).toLocaleString('en-US')}`;
-  } else {
-    formattedCoordinates = `${coordinates.latitude.toFixed(6)}, ${coordinates.longitude.toFixed(6)}`;
-  }
-  return formattedCoordinates;
+  return formatMapCoordinates(coordinates.longitude, coordinates.latitude, coordinateSystem);
+}
+
+function CursorCoordinatesControl({
+  language,
+  coordinateSystem,
+  onCoordinateSystemChange,
+  mapRef,
+  mapReady,
+}: {
+  language: 'zh' | 'en';
+  coordinateSystem: 'wgs84' | 'hk1980';
+  onCoordinateSystemChange: (coordinateSystem: 'wgs84' | 'hk1980') => void;
+  mapRef: { current: MapRef | null };
+  mapReady: boolean;
+}) {
+  const [cursorCoordinates, setCursorCoordinates] = useState<{ longitude: number; latitude: number } | null>(null);
+  const [controlContainer, setControlContainer] = useState<HTMLDivElement | null>(null);
+  useControl(() => {
+    let container: HTMLDivElement;
+    return {
+      onAdd() {
+        container = document.createElement('div');
+        container.className = 'maplibregl-ctrl';
+        setControlContainer(container);
+        return container;
+      },
+      onRemove() {
+        container.remove();
+        setControlContainer(null);
+      },
+    };
+  }, { position: 'bottom-left' });
+
+  useEffect(() => {
+    const map = mapReady ? mapRef.current?.getMap() : null;
+    if (!map) return;
+
+    const updateCoordinates = (event: MapMouseEvent) => {
+      setCursorCoordinates({ longitude: event.lngLat.lng, latitude: event.lngLat.lat });
+    };
+    const clearCoordinates = () => setCursorCoordinates(null);
+    map.on('mousemove', updateCoordinates);
+    map.on('mouseleave', clearCoordinates);
+    return () => {
+      map.off('mousemove', updateCoordinates);
+      map.off('mouseleave', clearCoordinates);
+    };
+  }, [mapReady, mapRef]);
+
+  return controlContainer ? createPortal(
+    <div className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white/95 px-2 py-1 text-slate-700 shadow-lg backdrop-blur">
+      <div
+        role="group"
+        aria-label={language === 'zh' ? '座標系統' : 'Coordinate system'}
+        className="flex shrink-0 items-center rounded-md bg-slate-100 p-0.5"
+      >
+        {(['wgs84', 'hk1980'] as const).map((system) => (
+          <button
+            key={system}
+            type="button"
+            aria-pressed={coordinateSystem === system}
+            onClick={() => onCoordinateSystemChange(system)}
+            className={`rounded px-1.5 py-0.5 text-[9px] font-bold leading-none transition ${
+              coordinateSystem === system ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500'
+            }`}
+          >
+            {system === 'wgs84' ? 'WGS84' : 'HK1980'}
+          </button>
+        ))}
+      </div>
+      <span className="whitespace-nowrap font-mono text-[10px] leading-4 text-slate-800">
+        {cursorCoordinates
+          ? formatMapCoordinates(cursorCoordinates.longitude, cursorCoordinates.latitude, coordinateSystem)
+          : '--'}
+      </span>
+    </div>,
+    controlContainer,
+  ) : null;
 }
 
 function getHabitatFeatureKey(feature: FeatureCollection['features'][number]) {
@@ -3323,6 +3408,15 @@ export default function MapPageClient() {
           }}
         />
         <FullscreenControl position="bottom-right" />
+        {!isMobileViewport && (
+          <CursorCoordinatesControl
+            language={language}
+            coordinateSystem={coordinateSystem}
+            onCoordinateSystemChange={setCoordinateSystem}
+            mapRef={mapRef}
+            mapReady={mapReady}
+          />
+        )}
         <ScaleControl position="bottom-left" />
       </Map>
       <div className={`pointer-events-auto absolute left-3 top-3 z-30 overflow-hidden rounded-lg transition-[width] duration-300 ease-in-out ${isLocationSearchExpanded ? 'w-[min(24rem,calc(100vw-5.5rem))]' : 'w-11'}`}>
