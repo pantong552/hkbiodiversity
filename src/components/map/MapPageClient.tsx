@@ -1201,9 +1201,25 @@ function LiveLocationControl({
     let locationAccuracy = 0;
     let button: HTMLButtonElement;
 
+    const updateButtonLabel = () => {
+      const currentLanguage = propsRef.current.language;
+      const isSupported = window.isSecureContext && 'geolocation' in navigator;
+      const label = !isSupported
+        ? (currentLanguage === 'zh' ? '定位服務不可用' : 'Location unavailable')
+        : !isTracking
+          ? (currentLanguage === 'zh' ? '實時定位' : 'Live location')
+          : shouldFollowLocation
+            ? (currentLanguage === 'zh' ? '停止即時定位' : 'Stop live location')
+            : (currentLanguage === 'zh' ? '重新跟隨即時定位' : 'Resume live location');
+      button.setAttribute('aria-label', label);
+      button.title = label;
+      button.dataset.following = String(isTracking && shouldFollowLocation);
+    };
+
     const stopFollowingLocationOnUserInteraction = (event: { originalEvent: Event | undefined }) => {
-      if (isTracking && event.originalEvent) {
+      if (isTracking && shouldFollowLocation && event.originalEvent) {
         shouldFollowLocation = false;
+        updateButtonLabel();
       }
     };
 
@@ -1354,7 +1370,7 @@ function LiveLocationControl({
         'maplibregl-ctrl-geolocate-waiting',
       );
       button?.setAttribute('aria-pressed', 'false');
-      if (button) updateButtonLabel(false);
+      updateButtonLabel();
       propsRef.current.onTrackingChange(false);
       propsRef.current.onHeadingUpdate(null);
     };
@@ -1366,18 +1382,6 @@ function LiveLocationControl({
         setLocationStale(true);
       }
       propsRef.current.onError(error.code);
-    };
-
-    const updateButtonLabel = (tracking: boolean) => {
-      const currentLanguage = propsRef.current.language;
-      const isSupported = window.isSecureContext && 'geolocation' in navigator;
-      const label = !isSupported
-        ? (currentLanguage === 'zh' ? '定位服務不可用' : 'Location unavailable')
-        : tracking
-          ? (currentLanguage === 'zh' ? '停止即時定位' : 'Stop live location')
-          : (currentLanguage === 'zh' ? '實時定位' : 'Live location');
-      button.setAttribute('aria-label', label);
-      button.title = label;
     };
 
     const updateLocation = (position: GeolocationPosition) => {
@@ -1474,7 +1478,10 @@ function LiveLocationControl({
       onAdd(nextMap) {
         map = nextMap;
         propsRef.current.onSearchActionReady(() => {
-          if (isTracking) shouldFollowLocation = false;
+          if (isTracking && shouldFollowLocation) {
+            shouldFollowLocation = false;
+            updateButtonLabel();
+          }
         });
         map.on('zoom', updateAccuracyCircle);
         map.on('move', updateAccuracyCircle);
@@ -1502,11 +1509,25 @@ function LiveLocationControl({
         container.append(button);
 
         const isSupported = window.isSecureContext && 'geolocation' in navigator;
-        updateButtonLabel(false);
+        updateButtonLabel();
         button.disabled = !isSupported;
         button.addEventListener('click', () => {
           if (isTracking) {
-            stopTracking();
+            if (shouldFollowLocation) {
+              stopTracking();
+              return;
+            }
+
+            shouldFollowLocation = true;
+            updateButtonLabel();
+            if (map && locationMarker) {
+              const { lng, lat } = locationMarker.getLngLat();
+              map.flyTo({
+                center: [lng, lat],
+                zoom: Math.max(map.getZoom(), Math.min(16, map.getMaxZoom())),
+                duration: 1000,
+              });
+            }
             return;
           }
           if (!map || !isSupported) return;
@@ -1518,7 +1539,7 @@ function LiveLocationControl({
             'maplibregl-ctrl-geolocate-waiting',
           );
           button.setAttribute('aria-pressed', 'true');
-          updateButtonLabel(true);
+          updateButtonLabel();
           propsRef.current.onTrackingChange(true);
           requestOrientationPermission();
 
@@ -1568,10 +1589,13 @@ function LiveLocationControl({
     if (!button) return;
     const isSupported = window.isSecureContext && 'geolocation' in navigator;
     const isTracking = button.getAttribute('aria-pressed') === 'true';
+    const isFollowing = button.dataset.following === 'true';
     const label = !isSupported
       ? (language === 'zh' ? '定位服務不可用' : 'Location unavailable')
       : isTracking
-        ? (language === 'zh' ? '停止即時定位' : 'Stop live location')
+        ? isFollowing
+          ? (language === 'zh' ? '停止即時定位' : 'Stop live location')
+          : (language === 'zh' ? '重新跟隨即時定位' : 'Resume live location')
         : (language === 'zh' ? '實時定位' : 'Live location');
     button.setAttribute('aria-label', label);
     button.title = label;
