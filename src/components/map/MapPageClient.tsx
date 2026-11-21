@@ -4248,6 +4248,32 @@ export default function MapPageClient() {
               >
                 <button
                   type="button"
+                  aria-label={offlineRouting.isAvailable
+                    ? (language === 'zh' ? '更新香港離線路網' : 'Update Hong Kong offline network')
+                    : (language === 'zh' ? '下載路網並啟用離線路線規劃' : 'Download network and enable offline routing')}
+                  title={offlineRouting.isAvailable
+                    ? (language === 'zh' ? '更新香港離線路網' : 'Update Hong Kong offline network')
+                    : (language === 'zh' ? '下載路網並啟用離線路線規劃' : 'Download network and enable offline routing')}
+                  disabled={offlineRouting.isChecking || offlineRouting.isDownloading}
+                  onClick={async () => {
+                    if (offlineRouting.isAvailable) {
+                      await offlineRouting.download(true);
+                      return;
+                    }
+                    if (await offlineRouting.download()) setRouteOfflineMode(true);
+                  }}
+                  className={`inline-flex w-9 shrink-0 items-center justify-center rounded-l-xl transition hover:bg-black/5 disabled:cursor-wait disabled:opacity-70 ${
+                    activeRoute.useOfflineRouting ? 'text-emerald-700' : 'text-slate-500'
+                  }`}
+                >
+                  {offlineRouting.isChecking || (offlineRouting.isDownloading && !offlineRouting.isAvailable)
+                    ? <LoaderCircle className="h-4 w-4 animate-spin" />
+                    : offlineRouting.isAvailable
+                      ? <RefreshCw className={`h-4 w-4 ${offlineRouting.isDownloading ? 'animate-spin' : ''}`} />
+                      : <Download className="h-4 w-4" />}
+                </button>
+                <button
+                  type="button"
                   role="switch"
                   aria-checked={activeRoute.useOfflineRouting}
                   disabled={offlineRouting.isChecking || offlineRouting.isDownloading}
@@ -4259,27 +4285,20 @@ export default function MapPageClient() {
                     if (!offlineRouting.isAvailable && !(await offlineRouting.download())) return;
                     setRouteOfflineMode(true);
                   }}
-                  className="flex min-w-0 flex-1 items-center justify-between gap-2 rounded-l-xl px-3 py-2 text-left text-sm font-bold disabled:cursor-wait disabled:opacity-70"
+                  className="flex min-w-0 flex-1 items-center justify-between gap-2 px-3 py-2 text-left text-sm font-bold disabled:cursor-wait disabled:opacity-70"
                 >
-                  <span className="flex min-w-0 items-center gap-2">
-                    {offlineRouting.isDownloading
-                      ? <LoaderCircle className="h-4 w-4 shrink-0 animate-spin" />
-                      : activeRoute.useOfflineRouting
-                        ? <Check className="h-4 w-4 shrink-0" />
-                        : <Download className="h-4 w-4 shrink-0" />}
-                    <span className="min-w-0">
-                      {offlineRouting.isChecking
-                        ? (language === 'zh' ? '檢查離線路網…' : 'Checking offline network…')
-                        : offlineRouting.isDownloading
-                          ? (language === 'zh'
-                            ? (offlineRouting.isAvailable ? '更新香港離線路網…' : '下載香港離線路網…')
-                            : (offlineRouting.isAvailable ? 'Updating Hong Kong network…' : 'Downloading Hong Kong network…'))
-                          : activeRoute.useOfflineRouting
-                            ? (language === 'zh' ? '離線路線規劃已啟用' : 'Offline routing enabled')
-                            : offlineRouting.isAvailable
-                              ? (language === 'zh' ? '啟用離線路線規劃' : 'Enable offline routing')
-                              : (language === 'zh' ? '下載路網並啟用離線路線規劃' : 'Download network & enable offline routing')}
-                    </span>
+                  <span className="min-w-0">
+                    {offlineRouting.isChecking
+                      ? (language === 'zh' ? '檢查離線路網…' : 'Checking offline network…')
+                      : offlineRouting.isDownloading
+                        ? (language === 'zh'
+                          ? (offlineRouting.isAvailable ? '更新香港離線路網…' : '下載香港離線路網…')
+                          : (offlineRouting.isAvailable ? 'Updating Hong Kong network…' : 'Downloading Hong Kong network…'))
+                        : activeRoute.useOfflineRouting
+                          ? (language === 'zh' ? '離線路線規劃已啟用' : 'Offline routing enabled')
+                          : offlineRouting.isAvailable
+                            ? (language === 'zh' ? '啟用離線路線規劃' : 'Enable offline routing')
+                            : (language === 'zh' ? '下載路網並啟用離線路線規劃' : 'Download network & enable offline routing')}
                   </span>
                   {!offlineRouting.isChecking && !offlineRouting.isDownloading && (
                     <span className={`relative h-5 w-9 shrink-0 rounded-full transition ${
@@ -4369,17 +4388,6 @@ export default function MapPageClient() {
                           : (language === 'zh' ? '下載中…' : 'Downloading…')}
                   </p>
                 </div>
-              )}
-              {offlineRouting.isAvailable && (
-                <button
-                  type="button"
-                  disabled={offlineRouting.isDownloading || offlineRouting.isChecking}
-                  onClick={() => { void offlineRouting.download(true); }}
-                  className="mt-2 flex w-full items-center justify-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-xs font-bold text-slate-700 transition hover:bg-slate-50 disabled:cursor-wait disabled:opacity-60"
-                >
-                  <RefreshCw className={`h-3.5 w-3.5 ${offlineRouting.isDownloading ? 'animate-spin' : ''}`} />
-                  {language === 'zh' ? '更新 OpenStreetMap 路網' : 'Update OpenStreetMap network'}
-                </button>
               )}
               {offlineRouting.error && (
                 <p role="alert" className="mt-1 rounded-lg bg-red-50 px-2 py-1.5 text-xs text-red-700">
