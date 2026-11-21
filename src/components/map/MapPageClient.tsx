@@ -4188,7 +4188,26 @@ export default function MapPageClient() {
               style={{ transformOrigin: 'right center' }}
               className="pointer-events-auto absolute right-full top-0 mr-3 w-[min(20rem,calc(100vw-6rem))] rounded-2xl border border-white/70 bg-white/95 p-3 shadow-2xl backdrop-blur-xl"
             >
-            <h2 className="mb-2 flex items-center gap-2 px-1 text-sm font-black text-slate-900"><RouteIcon className="h-4 w-4" />{language === 'zh' ? '路線規劃' : 'Routing'}</h2>
+            <h2 className="mb-2 flex items-center justify-between gap-2 px-1 text-sm font-black text-slate-900">
+              <span className="flex min-w-0 items-center gap-2">
+                <RouteIcon className="h-4 w-4" />
+                {language === 'zh' ? '路線規劃' : 'Routing'}
+              </span>
+              <button
+                type="button"
+                role="switch"
+                aria-label={language === 'zh' ? '啟用路線規劃' : 'Enable routing'}
+                aria-checked={isRouting}
+                onClick={() => setIsRouting((active) => !active)}
+                className={`relative h-5 w-9 shrink-0 rounded-full transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 ${
+                  isRouting ? 'bg-emerald-600' : 'bg-slate-300'
+                }`}
+              >
+                <span className={`absolute top-0.5 h-4 w-4 rounded-full bg-white transition ${
+                  isRouting ? 'left-[18px]' : 'left-0.5'
+                }`} />
+              </button>
+            </h2>
             <div className="mb-2"><RouteTabs
               tabs={routes.map((route) => ({
                 id: route.id,
@@ -4207,9 +4226,6 @@ export default function MapPageClient() {
               }}
               onAdd={addRoute}
             /></div>
-            <button type="button" role="switch" aria-checked={isRouting} onClick={() => setIsRouting((active) => !active)} className="flex w-full items-center justify-between rounded-xl bg-slate-100 px-3 py-2 text-sm font-bold text-slate-800">
-              <span>{language === 'zh' ? '啟用路線規劃' : 'Enable routing'}</span><span className={`relative h-5 w-9 rounded-full transition ${isRouting ? 'bg-emerald-600' : 'bg-slate-300'}`}><span className={`absolute top-0.5 h-4 w-4 rounded-full bg-white transition ${isRouting ? 'left-[18px]' : 'left-0.5'}`} /></span>
-            </button>
             {isRouting && <>
               <CustomDropdown
                 options={[
@@ -4224,26 +4240,11 @@ export default function MapPageClient() {
               />
               <button type="button" role="switch" aria-checked={allowPrivateRoads} onClick={() => setAllowPrivateRoads((allowed) => !allowed)} className="mt-2 flex w-full items-center justify-between rounded-xl px-2 py-2 text-left text-sm font-semibold text-slate-700"><span>{language === 'zh' ? '允許私人道路' : 'Allow private roads'}</span><span className={`relative h-5 w-9 rounded-full transition ${allowPrivateRoads ? 'bg-emerald-600' : 'bg-slate-300'}`}><span className={`absolute top-0.5 h-4 w-4 rounded-full bg-white transition ${allowPrivateRoads ? 'left-[18px]' : 'left-0.5'}`} /></span></button>
               <div
-                className={`relative mt-2 flex w-full items-stretch rounded-xl border transition ${
+                className={`mt-2 flex w-full items-stretch rounded-xl border transition ${
                   activeRoute.useOfflineRouting
                     ? 'border-emerald-200 bg-emerald-50 text-emerald-800'
                     : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
                 }`}
-                onPointerEnter={(event) => {
-                  if (event.pointerType !== 'touch') setIsOfflineRoutingInfoOpen(true);
-                }}
-                onPointerLeave={(event) => {
-                  if (event.pointerType !== 'touch') setIsOfflineRoutingInfoOpen(false);
-                }}
-                onFocusCapture={() => setIsOfflineRoutingInfoOpen(true)}
-                onBlurCapture={(event) => {
-                  if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
-                    setIsOfflineRoutingInfoOpen(false);
-                  }
-                }}
-                onKeyDown={(event) => {
-                  if (event.key === 'Escape') setIsOfflineRoutingInfoOpen(false);
-                }}
               >
                 <button
                   type="button"
@@ -4290,29 +4291,48 @@ export default function MapPageClient() {
                     </span>
                   )}
                 </button>
-                <button
-                  type="button"
-                  aria-label={language === 'zh' ? '離線路網資料說明' : 'Offline routing data information'}
-                  aria-expanded={isOfflineRoutingInfoOpen}
-                  aria-describedby={isOfflineRoutingInfoOpen ? 'offline-routing-info' : undefined}
-                  onClick={() => setIsOfflineRoutingInfoOpen(true)}
-                  className="inline-flex w-9 shrink-0 items-center justify-center rounded-r-xl text-slate-500 transition hover:bg-slate-100 hover:text-slate-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-emerald-600"
+                <div
+                  className="relative shrink-0"
+                  onPointerEnter={(event) => {
+                    if (event.pointerType !== 'touch') setIsOfflineRoutingInfoOpen(true);
+                  }}
+                  onPointerLeave={(event) => {
+                    if (event.pointerType !== 'touch') setIsOfflineRoutingInfoOpen(false);
+                  }}
+                  onFocusCapture={() => setIsOfflineRoutingInfoOpen(true)}
+                  onBlurCapture={(event) => {
+                    if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
+                      setIsOfflineRoutingInfoOpen(false);
+                    }
+                  }}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Escape') setIsOfflineRoutingInfoOpen(false);
+                  }}
                 >
-                  <Info className="h-4 w-4" />
-                </button>
-                {isOfflineRoutingInfoOpen && (
-                  <div
-                    id="offline-routing-info"
-                    role="tooltip"
-                    className="absolute right-0 top-full z-20 mt-1 w-[min(18rem,calc(100vw-5rem))] rounded-xl border border-slate-200 bg-white p-3 text-[11px] leading-4 text-slate-600 shadow-xl"
+                  <button
+                    type="button"
+                    aria-label={language === 'zh' ? '離線路網資料說明' : 'Offline routing data information'}
+                    aria-expanded={isOfflineRoutingInfoOpen}
+                    aria-describedby={isOfflineRoutingInfoOpen ? 'offline-routing-info' : undefined}
+                    onClick={() => setIsOfflineRoutingInfoOpen(true)}
+                    className="inline-flex h-full w-9 items-center justify-center rounded-r-xl text-slate-500 transition hover:bg-slate-100 hover:text-slate-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-emerald-600"
                   >
-                    {language === 'zh'
-                      ? '首次使用會下載香港 OpenStreetMap 路網及高程資料並儲存於此裝置；離線路線與線上結果可能不同。'
-                      : 'First use downloads Hong Kong OpenStreetMap roads and elevation data to this device. Offline routes may differ from online results.'}
-                    {' '}<a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer" className="underline">© OpenStreetMap</a>
-                    {' · '}<a href="https://registry.opendata.aws/terrain-tiles/" target="_blank" rel="noopener noreferrer" className="underline">AWS Terrain Tiles (Mapzen/SRTM)</a>
-                  </div>
-                )}
+                    <Info className="h-4 w-4" />
+                  </button>
+                  {isOfflineRoutingInfoOpen && (
+                    <div
+                      id="offline-routing-info"
+                      role="tooltip"
+                      className="absolute right-0 top-full z-20 mt-1 w-[min(18rem,calc(100vw-5rem))] rounded-xl border border-slate-200 bg-white p-3 text-[11px] leading-4 text-slate-600 shadow-xl"
+                    >
+                      {language === 'zh'
+                        ? '首次使用會下載香港 OpenStreetMap 路網及高程資料並儲存於此裝置；離線路線與線上結果可能不同。'
+                        : 'First use downloads Hong Kong OpenStreetMap roads and elevation data to this device. Offline routes may differ from online results.'}
+                      {' '}<a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer" className="underline">© OpenStreetMap</a>
+                      {' · '}<a href="https://registry.opendata.aws/terrain-tiles/" target="_blank" rel="noopener noreferrer" className="underline">AWS Terrain Tiles (Mapzen/SRTM)</a>
+                    </div>
+                  )}
+                </div>
               </div>
               {offlineRouting.isDownloading && (
                 <div className="mt-2 px-1" role="status" aria-live="polite">
