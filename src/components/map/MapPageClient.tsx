@@ -988,6 +988,7 @@ function downloadRouteGpx(points: RouteCoordinate[]) {
 const LIBERTY_BUILDING_LAYER_ID = 'liberty-buildings-3d';
 const THREE_D_TERRAIN_SOURCE_ID = 'terrain-dem-3d';
 const THREE_D_TERRAIN_EXAGGERATION = 1.25;
+const THREE_D_TRANSITION_DURATION_MS = 500;
 const originalTileZoomFunctions = new WeakMap<
   MapLibreSource,
   CalculateTileZoomFunction | undefined
@@ -1680,6 +1681,9 @@ export default function MapPageClient() {
   const [isHabitatPickerOpen, setIsHabitatPickerOpen] = useState(false);
   const [isHillshadeEnabled, setIsHillshadeEnabled] = useState(false);
   const [is3DModeEnabled, setIs3DModeEnabled] = useState(false);
+  const [are3DBuildingsEnabled, setAre3DBuildingsEnabled] = useState(true);
+  const hillshadeBefore3DRef = useRef<boolean | null>(null);
+  const buildingHeightScaleRef = useRef(0);
   const [areContoursEnabled, setAreContoursEnabled] = useState(true);
   const [areHabitatsEnabled, setAreHabitatsEnabled] = useState(false);
   const [areLotsEnabled, setAreLotsEnabled] = useState(false);
@@ -1744,6 +1748,15 @@ export default function MapPageClient() {
   const [deviceHeading, setDeviceHeading] = useState<number | null>(null);
   const [isRoutingPanelOpen, setIsRoutingPanelOpen] = useState(false);
   const [isOfflineRoutingInfoOpen, setIsOfflineRoutingInfoOpen] = useState(false);
+  const closeMapPanels = () => {
+    setIsBasemapPickerOpen(false);
+    setIsTerrainPickerOpen(false);
+    setIsHabitatPickerOpen(false);
+    setIsRoutingPanelOpen(false);
+    setIsOfflineRoutingInfoOpen(false);
+    setIsLocationSearchExpanded(false);
+    setAreLocationSuggestionsOpen(false);
+  };
   const [routes, setRoutes] = useState<PlannedRoute[]>([{
     id: 'route-1', name: 'Route 1', enabled: false, allowPrivateRoads: false,
     profile: 'foot', anchors: [], routedAnchors: [], coordinates: [], busy: false, error: null,
@@ -2851,8 +2864,26 @@ export default function MapPageClient() {
     if (!mapReady || !map || !terrainReady) return;
 
     const terrainDemSource = getContourDemSource(demSourceId);
+    let transitionFrame: number | null = null;
+    let transitionStarted = false;
+    let transitionCompleted = false;
+
+    const setBuildingHeightScale = (scale: number) => {
+      if (!map.getLayer(LIBERTY_BUILDING_LAYER_ID)) return;
+      map.setPaintProperty(LIBERTY_BUILDING_LAYER_ID, 'fill-extrusion-height', [
+        '*',
+        ['to-number', ['get', 'render_height'], ['to-number', ['get', 'height'], 0]],
+        scale,
+      ]);
+      map.setPaintProperty(LIBERTY_BUILDING_LAYER_ID, 'fill-extrusion-base', [
+        '*',
+        ['to-number', ['get', 'render_min_height'], ['to-number', ['get', 'min_height'], 0]],
+        scale,
+      ]);
+    };
+
     const apply3DMode = () => {
-      if (!isStyleReadyRef.current) return;
+      if (!isStyleReadyRef.current || (transitionStarted && !transitionCompleted)) return;
 
       updateTileZoomForAllSources(map, is3DModeEnabled);
 
@@ -2899,47 +2930,121 @@ export default function MapPageClient() {
             source: LIBERTY_BUILDING_SOURCE_ID,
             'source-layer': 'building',
             minzoom: 13,
+            layout: {
+              visibility: 'none',
+            },
             paint: {
               'fill-extrusion-color': '#a7a7a5',
-              'fill-extrusion-height': [
-                'to-number',
-                ['get', 'render_height'],
-                ['to-number', ['get', 'height'], 0],
-              ],
-              'fill-extrusion-base': [
-                'to-number',
-                ['get', 'render_min_height'],
-                ['to-number', ['get', 'min_height'], 0],
-              ],
+              'fill-extrusion-height': 0,
+              'fill-extrusion-base': 0,
               'fill-extrusion-opacity': 0.85,
               'fill-extrusion-vertical-gradient': true,
             },
           }, firstSymbolLayerId);
+          buildingHeightScaleRef.current = 0;
         }
       }
 
-      const desiredVisibility = is3DModeEnabled ? 'visible' : 'none';
+      const targetTerrainExaggeration = is3DModeEnabled ? THREE_D_TERRAIN_EXAGGERATION : 0;
+      const targetBuildingHeightScale = is3DModeEnabled && are3DBuildingsEnabled ? 1 : 0;
+      const syncToTarget = () => {
+        if (map.getLayer(LIBERTY_BUILDING_LAYER_ID)) {
+          if (Math.abs(buildingHeightScaleRef.current - targetBuildingHeightScale) >= 0.001) {
+            setBuildingHeightScale(targetBuildingHeightScale);
+            buildingHeightScaleRef.current = targetBuildingHeightScale;
+          }
+          const desiredVisibility = targetBuildingHeightScale > 0 ? 'visible' : 'none';
+          if (
+            map.getLayoutProperty(LIBERTY_BUILDING_LAYER_ID, 'visibility') !== desiredVisibility
+          ) {
+            map.setLayoutProperty(LIBERTY_BUILDING_LAYER_ID, 'visibility', desiredVisibility);
+          }
+        }
+
+        if (is3DModeEnabled && map.getSource(THREE_D_TERRAIN_SOURCE_ID)) {
+          const terrain = map.getTerrain();
+          if (
+            terrain?.source !== THREE_D_TERRAIN_SOURCE_ID
+            || terrain.exaggeration !== targetTerrainExaggeration
+          ) {
+            map.setTerrain({
+              source: THREE_D_TERRAIN_SOURCE_ID,
+              exaggeration: targetTerrainExaggeration,
+            });
+          }
+        } else if (map.getTerrain()?.source === THREE_D_TERRAIN_SOURCE_ID) {
+          map.setTerrain(null);
+        }
+      };
+
+      if (transitionCompleted) {
+        syncToTarget();
+        return;
+      }
+
+      transitionStarted = true;
+      let terrain = map.getTerrain();
+      if (
+        is3DModeEnabled
+        && map.getSource(THREE_D_TERRAIN_SOURCE_ID)
+        && terrain?.source !== THREE_D_TERRAIN_SOURCE_ID
+      ) {
+        map.setTerrain({
+          source: THREE_D_TERRAIN_SOURCE_ID,
+          exaggeration: 0,
+        });
+        terrain = map.getTerrain();
+      }
+
+      const startingTerrainExaggeration = terrain?.source === THREE_D_TERRAIN_SOURCE_ID
+        ? terrain.exaggeration ?? 0
+        : 0;
+      const startingBuildingHeightScale = buildingHeightScaleRef.current;
+      if (
+        Math.abs(startingTerrainExaggeration - targetTerrainExaggeration) < 0.001
+        && Math.abs(startingBuildingHeightScale - targetBuildingHeightScale) < 0.001
+      ) {
+        transitionCompleted = true;
+        syncToTarget();
+        return;
+      }
+
       if (
         map.getLayer(LIBERTY_BUILDING_LAYER_ID)
-        && map.getLayoutProperty(LIBERTY_BUILDING_LAYER_ID, 'visibility') !== desiredVisibility
+        && (targetBuildingHeightScale > 0 || startingBuildingHeightScale > 0)
       ) {
-        map.setLayoutProperty(LIBERTY_BUILDING_LAYER_ID, 'visibility', desiredVisibility);
+        map.setLayoutProperty(LIBERTY_BUILDING_LAYER_ID, 'visibility', 'visible');
       }
 
-      if (is3DModeEnabled && map.getSource(THREE_D_TERRAIN_SOURCE_ID)) {
-        const terrain = map.getTerrain();
-        if (
-          terrain?.source !== THREE_D_TERRAIN_SOURCE_ID
-          || terrain.exaggeration !== THREE_D_TERRAIN_EXAGGERATION
-        ) {
+      const startedAt = performance.now();
+      const animateTransition = (now: number) => {
+        const progress = Math.min((now - startedAt) / THREE_D_TRANSITION_DURATION_MS, 1);
+        const easedProgress = progress * progress * (3 - 2 * progress);
+        const terrainExaggeration = startingTerrainExaggeration
+          + (targetTerrainExaggeration - startingTerrainExaggeration) * easedProgress;
+        if (map.getTerrain()?.source === THREE_D_TERRAIN_SOURCE_ID) {
           map.setTerrain({
             source: THREE_D_TERRAIN_SOURCE_ID,
-            exaggeration: THREE_D_TERRAIN_EXAGGERATION,
+            exaggeration: terrainExaggeration,
           });
         }
-      } else if (!is3DModeEnabled && map.getTerrain()) {
-        map.setTerrain(null);
-      }
+
+        const buildingHeightScale = startingBuildingHeightScale
+          + (targetBuildingHeightScale - startingBuildingHeightScale) * easedProgress;
+        setBuildingHeightScale(buildingHeightScale);
+        buildingHeightScaleRef.current = buildingHeightScale;
+
+        if (progress < 1) {
+          transitionFrame = requestAnimationFrame(animateTransition);
+          return;
+        }
+
+        transitionFrame = null;
+        transitionCompleted = true;
+        syncToTarget();
+      };
+
+      transitionFrame = requestAnimationFrame(animateTransition);
     };
 
     const apply3DModeAfterStyleLoad = () => {
@@ -2961,8 +3066,9 @@ export default function MapPageClient() {
     return () => {
       map.off('style.load', apply3DModeAfterStyleLoad);
       map.off('styledata', apply3DModeAfterStyleData);
+      if (transitionFrame !== null) cancelAnimationFrame(transitionFrame);
     };
-  }, [currentStyleId, demSourceId, is3DModeEnabled, mapReady, terrainReady]);
+  }, [are3DBuildingsEnabled, currentStyleId, demSourceId, is3DModeEnabled, mapReady, terrainReady]);
 
   useEffect(() => {
     const map = mapRef.current?.getMap();
@@ -2970,7 +3076,8 @@ export default function MapPageClient() {
     map.easeTo({
       pitch: is3DModeEnabled ? 55 : 0,
       zoom: is3DModeEnabled ? Math.max(map.getZoom(), 13) : map.getZoom(),
-      duration: 650,
+      duration: THREE_D_TRANSITION_DURATION_MS,
+      easing: (progress) => progress * progress * (3 - 2 * progress),
     });
   }, [is3DModeEnabled, mapReady]);
 
@@ -3431,10 +3538,18 @@ export default function MapPageClient() {
           language={language}
           isEnabled={is3DModeEnabled}
           onToggle={() => {
-            setIs3DModeEnabled((enabled) => {
-              if (!enabled) setIsHillshadeEnabled(true);
-              return !enabled;
-            });
+            if (is3DModeEnabled) {
+              const previousHillshadeEnabled = hillshadeBefore3DRef.current;
+              if (previousHillshadeEnabled !== null) {
+                setIsHillshadeEnabled(previousHillshadeEnabled);
+              }
+              hillshadeBefore3DRef.current = null;
+              setIs3DModeEnabled(false);
+            } else {
+              hillshadeBefore3DRef.current = isHillshadeEnabled;
+              setIsHillshadeEnabled(true);
+              setIs3DModeEnabled(true);
+            }
             setIsTerrainPickerOpen(false);
             setIsHabitatPickerOpen(false);
           }}
@@ -3465,6 +3580,7 @@ export default function MapPageClient() {
               if (isLocationSearchExpanded) {
                 showLocationResults(locationSuggestions);
               } else {
+                closeMapPanels();
                 setIsLocationSearchExpanded(true);
               }
             }}
@@ -3764,10 +3880,10 @@ export default function MapPageClient() {
           aria-expanded={isBasemapPickerOpen}
           aria-controls="map-basemap-picker"
           onClick={() => {
+            const shouldOpen = !isBasemapPickerOpen;
             setHasOpenedBasemapPicker(true);
-            setIsBasemapPickerOpen((open) => !open);
-            setIsTerrainPickerOpen(false);
-            setIsHabitatPickerOpen(false);
+            closeMapPanels();
+            setIsBasemapPickerOpen(shouldOpen);
           }}
           className={MAP_ICON_BUTTON_CLASS}
         >
@@ -3888,9 +4004,9 @@ export default function MapPageClient() {
               aria-expanded={isTerrainPickerOpen}
               aria-controls="map-layer-picker"
               onClick={() => {
-                setIsTerrainPickerOpen((open) => !open);
-                setIsBasemapPickerOpen(false);
-                setIsHabitatPickerOpen(false);
+                const shouldOpen = !isTerrainPickerOpen;
+                closeMapPanels();
+                setIsTerrainPickerOpen(shouldOpen);
               }}
               className={MAP_ICON_BUTTON_CLASS}
             >
@@ -3913,28 +4029,21 @@ export default function MapPageClient() {
                   {language === 'zh' ? '地形設定' : 'Terrain settings'}
                 </h2>
                 <div className="space-y-2">
-                  <fieldset role="radiogroup" className="space-y-1 border-b border-slate-100 pb-3">
-                    <legend className="px-2 pb-1 text-xs font-bold uppercase tracking-wide text-slate-500">
+                  <div className="space-y-1">
+                    <span className="block px-2 pb-1 text-xs font-bold uppercase tracking-wide text-slate-500">
                       {language === 'zh' ? '高程資料來源' : 'Elevation data'}
-                    </legend>
-                    {(Object.keys(DEM_SOURCES) as DemSourceId[]).map((id) => (
-                      <button
-                        key={id}
-                        type="button"
-                        role="radio"
-                        aria-checked={demSourceId === id}
-                        onClick={() => setDemSourceId(id)}
-                        className="flex w-full items-center justify-between rounded-xl px-2 py-2 text-left text-sm font-semibold text-slate-700 hover:bg-slate-50"
-                      >
-                        <span>{DEM_SOURCES[id].name[language]}</span>
-                        <span className={`flex h-4 w-4 items-center justify-center rounded-full border ${
-                          demSourceId === id ? 'border-emerald-600' : 'border-slate-300'
-                        }`}>
-                          {demSourceId === id && <span className="h-2 w-2 rounded-full bg-emerald-600" />}
-                        </span>
-                      </button>
-                    ))}
-                  </fieldset>
+                    </span>
+                    <CustomDropdown
+                      options={(Object.keys(DEM_SOURCES) as DemSourceId[]).map((id) => ({
+                        value: id,
+                        label: DEM_SOURCES[id].name[language],
+                      }))}
+                      value={demSourceId}
+                      onChange={(value) => setDemSourceId(value as DemSourceId)}
+                      appearance="map"
+                      ariaLabel={language === 'zh' ? '高程資料來源' : 'Elevation data'}
+                    />
+                  </div>
                   <button
                     type="button"
                     role="switch"
@@ -3960,6 +4069,24 @@ export default function MapPageClient() {
                       <span className={`absolute top-0.5 h-4 w-4 rounded-full bg-white transition ${areContoursEnabled ? 'left-[18px]' : 'left-0.5'}`} />
                     </span>
                   </button>
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={are3DBuildingsEnabled}
+                    aria-label={language === 'zh' ? '3D 建築' : '3D buildings'}
+                    disabled={!is3DModeEnabled}
+                    onClick={() => setAre3DBuildingsEnabled((enabled) => !enabled)}
+                    className={`flex w-full items-center justify-between rounded-xl px-2 py-2 text-left text-sm font-semibold ${
+                      is3DModeEnabled
+                        ? 'text-slate-700 hover:bg-slate-50'
+                        : 'cursor-not-allowed text-slate-400 opacity-60'
+                    }`}
+                  >
+                    <span>{language === 'zh' ? '3D 建築' : '3D buildings'}</span>
+                    <span className={`relative h-5 w-9 rounded-full transition ${are3DBuildingsEnabled ? 'bg-emerald-600' : 'bg-slate-300'}`}>
+                      <span className={`absolute top-0.5 h-4 w-4 rounded-full bg-white transition ${are3DBuildingsEnabled ? 'left-[18px]' : 'left-0.5'}`} />
+                    </span>
+                  </button>
                 </div>
                 </motion.section>
               )}
@@ -3974,9 +4101,9 @@ export default function MapPageClient() {
             aria-expanded={isHabitatPickerOpen}
             aria-controls="map-habitat-picker"
             onClick={() => {
-              setIsHabitatPickerOpen((open) => !open);
-              setIsBasemapPickerOpen(false);
-              setIsTerrainPickerOpen(false);
+              const shouldOpen = !isHabitatPickerOpen;
+              closeMapPanels();
+              setIsHabitatPickerOpen(shouldOpen);
             }}
             className={MAP_ICON_BUTTON_CLASS}
           >
@@ -4175,7 +4302,7 @@ export default function MapPageClient() {
         </div>
 
         <div className="relative">
-          <button type="button" aria-label={language === 'zh' ? '路線規劃' : 'Routing'} aria-expanded={isRoutingPanelOpen} onClick={() => { setIsRoutingPanelOpen((open) => !open); setIsBasemapPickerOpen(false); setIsTerrainPickerOpen(false); setIsHabitatPickerOpen(false); }} className={`${MAP_ICON_BUTTON_CLASS} ${isRouting ? '!border-emerald-600 !bg-emerald-600 !text-white hover:!bg-emerald-700' : ''}`}>
+          <button type="button" aria-label={language === 'zh' ? '路線規劃' : 'Routing'} aria-expanded={isRoutingPanelOpen} onClick={() => { const shouldOpen = !isRoutingPanelOpen; closeMapPanels(); setIsRoutingPanelOpen(shouldOpen); }} className={`${MAP_ICON_BUTTON_CLASS} ${isRouting ? '!border-emerald-600 !bg-emerald-600 !text-white hover:!bg-emerald-700' : ''}`}>
             <RouteIcon className="h-5 w-5" />
           </button>
           <AnimatePresence initial={false}>
