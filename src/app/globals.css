@@ -62,6 +62,19 @@
   color: #64748b;
 }
 
+.map-page .maplibregl-ctrl-bottom-left:has(> .maplibregl-ctrl-cursor-coordinates) {
+  display: flex;
+  align-items: flex-end;
+}
+
+.map-page .maplibregl-ctrl-bottom-left > .maplibregl-ctrl-cursor-coordinates {
+  margin: 0 10px 10px 10px;
+}
+
+.map-page .maplibregl-ctrl-bottom-left:has(> .maplibregl-ctrl-cursor-coordinates) > .maplibregl-ctrl-scale {
+  margin: 0 0 10px;
+}
+
 .map-page .habitat-tooltip-popup .maplibregl-popup-content {
   padding: 0 !important;
   background: transparent !important;

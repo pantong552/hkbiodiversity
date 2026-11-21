@@ -94,7 +94,7 @@ function CursorCoordinatesControl({
     return {
       onAdd() {
         container = document.createElement('div');
-        container.className = 'maplibregl-ctrl';
+        container.className = 'maplibregl-ctrl maplibregl-ctrl-cursor-coordinates';
         setControlContainer(container);
         return container;
       },
@@ -120,6 +120,14 @@ function CursorCoordinatesControl({
       map.off('mouseleave', clearCoordinates);
     };
   }, [mapReady, mapRef]);
+
+  useEffect(() => {
+    const controlGroup = controlContainer?.parentElement;
+    const scaleControl = controlGroup?.querySelector<HTMLElement>('.maplibregl-ctrl-scale');
+    if (!controlContainer || !controlGroup || !scaleControl) return;
+
+    controlGroup.insertBefore(controlContainer, scaleControl);
+  }, [controlContainer]);
 
   return controlContainer ? createPortal(
     <div className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white/95 px-2 py-1 text-slate-700 shadow-lg backdrop-blur">
